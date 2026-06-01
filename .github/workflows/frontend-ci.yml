@@ -1,0 +1,14 @@
+name: Frontend CI
+
+on:
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-ci.yml'
+
+jobs:
+  frontend-ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Placeholder step
+        run: echo "Frontend CI placeholder - add install, lint, test, and build steps."

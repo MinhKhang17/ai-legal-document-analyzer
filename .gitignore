@@ -1,0 +1,72 @@
+# --- OS / Editor ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# --- Node / React / Vite ---
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/coverage/
+frontend/.env
+frontend/.env.*
+
+# --- Java / Spring Boot (Maven) ---
+backend/target/
+backend/.mvn/wrapper/maven-wrapper.jar
+backend/.env
+backend/.env.*
+*.class
+*.jar
+*.war
+
+# --- Python / AI service ---
+ai-service/__pycache__/
+ai-service/*.py[cod]
+ai-service/.pytest_cache/
+ai-service/.mypy_cache/
+ai-service/.ruff_cache/
+ai-service/.venv/
+ai-service/venv/
+ai-service/.env
+ai-service/.env.*
+
+# --- Docker ---
+*.pid
+docker-data/
+
+# --- Vector DB / embeddings / indexes ---
+vector_db/
+chroma/
+faiss/
+*.faiss
+*.index
+*.ann
+
+# --- Uploaded legal documents / generated artifacts ---
+uploads/
+uploaded-documents/
+analysis-history/
+
+# --- AI model checkpoints ---
+models/
+checkpoints/
+*.ckpt
+*.pt
+*.pth
+*.safetensors
+
+# --- Logs ---
+*.log
+logs/
+
+# --- Environment / Secrets ---
+.env
+.env.*
+!.env.example
+
+# --- Temporary ---
+.tmp/
+tmp/
