@@ -1,0 +1,31 @@
+services:
+  frontend:
+    image: legal-rag-platform/frontend:dev
+    build:
+      context: ./frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - NODE_ENV=development
+    depends_on:
+      - backend
+
+  backend:
+    image: legal-rag-platform/backend:dev
+    build:
+      context: ./backend
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+    depends_on:
+      - ai-service
+
+  ai-service:
+    image: legal-rag-platform/ai-service:dev
+    build:
+      context: ./ai-service
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1

@@ -1,0 +1,17 @@
+name: AI Service CI
+
+on:
+  pull_request:
+    paths:
+      - 'ai-service/**'
+      - '.github/workflows/ai-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  ai-ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Placeholder step
+        run: echo "AI CI placeholder - add Python linting and test steps."
