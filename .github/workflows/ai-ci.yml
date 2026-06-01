@@ -6,6 +6,9 @@ on:
       - 'ai-service/**'
       - '.github/workflows/ai-ci.yml'
 
+permissions:
+  contents: read
+
 jobs:
   ai-ci:
     runs-on: ubuntu-latest
