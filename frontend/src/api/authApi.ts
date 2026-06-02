@@ -1,3 +1,5 @@
+import { API_ENDPOINTS, buildApiUrl } from '../config/api';
+
 export type RegisterRequest = {
   firstName: string;
   lastName: string;
@@ -31,29 +33,27 @@ const getErrorMessage = (data: RegisterResponse | RegisterErrorResponse | null):
     return null;
   }
 
-  if (typeof data.message === 'string' && data.message.length > 0) {
+  if (typeof data.message === 'string' && data.message.trim().length > 0) {
     return data.message;
   }
 
-  if ('error' in data && typeof data.error === 'string' && data.error.length > 0) {
+  if ('error' in data && typeof data.error === 'string' && data.error.trim().length > 0) {
     return data.error;
   }
 
   return null;
 };
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.trim() ?? '';
-
-const buildEndpoint = (path: string) => {
-  if (!API_BASE_URL) {
-    return path;
+const safeParseJson = async <T>(response: Response): Promise<T | null> => {
+  try {
+    return (await response.json()) as T;
+  } catch {
+    return null;
   }
-
-  return `${API_BASE_URL.replace(/\/+$/, '')}${path}`;
 };
 
 export async function register(payload: RegisterRequest): Promise<RegisterResponse> {
-  const response = await fetch(buildEndpoint('/api/auth/v1/register'), {
+  const response = await fetch(buildApiUrl(API_ENDPOINTS.auth.register), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -61,7 +61,7 @@ export async function register(payload: RegisterRequest): Promise<RegisterRespon
     body: JSON.stringify(payload),
   });
 
-  const data = (await response.json().catch(() => null)) as RegisterResponse | RegisterErrorResponse | null;
+  const data = await safeParseJson<RegisterResponse | RegisterErrorResponse>(response);
 
   if (!response.ok) {
     throw new Error(getErrorMessage(data) ?? 'Registration failed. Please try again.');
