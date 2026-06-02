@@ -23,8 +23,10 @@ backend/.env.*
 *.war
 
 # --- Python / AI service ---
-ai-service/__pycache__/
-ai-service/*.py[cod]
+ai-service/**/__pycache__/
+__pycache__/
+ai-service/**/*.py[cod]
+*.py[cod]
 ai-service/.pytest_cache/
 ai-service/.mypy_cache/
 ai-service/.ruff_cache/
@@ -32,6 +34,7 @@ ai-service/.venv/
 ai-service/venv/
 ai-service/.env
 ai-service/.env.*
+!ai-service/.env.example
 
 # --- Docker ---
 *.pid
@@ -51,7 +54,8 @@ uploaded-documents/
 analysis-history/
 
 # --- AI model checkpoints ---
-models/
+# Root-anchored so it does NOT match the Python package ai-service/app/models/
+/models/
 checkpoints/
 *.ckpt
 *.pt
@@ -70,3 +74,4 @@ logs/
 # --- Temporary ---
 .tmp/
 tmp/
+ai-service/_tmp_*.py
