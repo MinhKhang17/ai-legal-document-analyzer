@@ -6,6 +6,7 @@ import com.analyzer.api.security.JwtUtils;
 import com.analyzer.api.security.UserDetailsImpl;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -24,25 +25,33 @@ public class AuthController {
     private final JwtUtils jwtUtils;
 
     @PostMapping("/login")
-    @Operation(summary = "Login user", description = "Authenticate a user and return a JWT token")
-    public ResponseEntity<JwtResponseDTO> authenticateUser(@RequestBody LoginRequestDTO loginRequest) {
+    @Operation(summary = "Login user", description = "Authenticate a user by email and return a JWT token")
+    public ResponseEntity<JwtResponseDTO> authenticateUser(
+            @Valid @RequestBody LoginRequestDTO loginRequest) {
 
         Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword()));
+                new UsernamePasswordAuthenticationToken(
+                        loginRequest.getEmail(),
+                        loginRequest.getPassword()
+                )
+        );
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
+
         String jwt = jwtUtils.generateJwtToken(authentication);
 
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+
         String role = userDetails.getAuthorities().stream()
                 .findFirst()
                 .map(item -> item.getAuthority())
-                .orElse("ROLE_USER");
+                .orElse("ROLE_CUSTOMER");
 
-        return ResponseEntity.ok(new JwtResponseDTO(jwt,
+        return ResponseEntity.ok(new JwtResponseDTO(
+                jwt,
                 userDetails.getId(),
-                userDetails.getUsername(),
                 userDetails.getEmail(),
-                role));
+                role
+        ));
     }
 }

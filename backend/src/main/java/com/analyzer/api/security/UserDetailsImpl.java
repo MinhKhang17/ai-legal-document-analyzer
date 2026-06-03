@@ -27,16 +27,17 @@ public class UserDetailsImpl implements UserDetails {
     private Collection<? extends GrantedAuthority> authorities;
 
     public static UserDetailsImpl build(User user) {
-        List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority(user.getRole()));
+        List<GrantedAuthority> authorities = List.of(
+                new SimpleGrantedAuthority("ROLE_" + user.getRole().getName().name())
+        );
 
         return new UserDetailsImpl(
                 user.getId(),
-                user.getUsername(),
+                user.getEmail(),
                 user.getEmail(),
                 user.getPassword(),
                 authorities);
     }
-
     @Override
     public boolean isAccountNonExpired() {
         return true;
