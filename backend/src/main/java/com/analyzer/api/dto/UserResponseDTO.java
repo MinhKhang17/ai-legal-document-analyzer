@@ -1,6 +1,6 @@
 package com.analyzer.api.dto;
 
-import com.analyzer.api.domain.entity.RoleName;
+import com.analyzer.api.enums.RoleName;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 

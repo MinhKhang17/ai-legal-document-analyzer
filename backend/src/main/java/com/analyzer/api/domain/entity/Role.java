@@ -1,5 +1,6 @@
 package com.analyzer.api.domain.entity;
 
+import com.analyzer.api.enums.RoleName;
 import jakarta.persistence.*;
 import lombok.*;
 

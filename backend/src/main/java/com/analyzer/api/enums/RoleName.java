@@ -1,4 +1,4 @@
-package com.analyzer.api.domain.entity;
+package com.analyzer.api.enums;
 
 public enum RoleName {
     CUSTOMER,

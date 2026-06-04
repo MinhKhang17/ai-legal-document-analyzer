@@ -1,7 +1,7 @@
 package com.analyzer.api.repository;
 
 import com.analyzer.api.domain.entity.Role;
-import com.analyzer.api.domain.entity.RoleName;
+import com.analyzer.api.enums.RoleName;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

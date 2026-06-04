@@ -1,7 +1,7 @@
 package com.analyzer.api.service.impl;
 
 import com.analyzer.api.domain.entity.Role;
-import com.analyzer.api.domain.entity.RoleName;
+import com.analyzer.api.enums.RoleName;
 import com.analyzer.api.domain.entity.User;
 import com.analyzer.api.dto.UserRequestDTO;
 import com.analyzer.api.dto.UserResponseDTO;
