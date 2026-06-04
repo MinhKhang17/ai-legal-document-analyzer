@@ -1,57 +1,65 @@
 package com.analyzer.api.controller;
 
+import com.analyzer.api.dto.ApiResponseDTO;
 import com.analyzer.api.dto.JwtResponseDTO;
 import com.analyzer.api.dto.LoginRequestDTO;
-import com.analyzer.api.security.JwtUtils;
-import com.analyzer.api.security.UserDetailsImpl;
+import com.analyzer.api.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
-@Tag(name = "Authentication", description = "APIs for user login and authentication")
+@Tag(name = "Authentication", description = "APIs for user login, token refresh, and logout")
 public class AuthController {
 
-    private final AuthenticationManager authenticationManager;
-    private final JwtUtils jwtUtils;
+    private final AuthService authService;
 
     @PostMapping("/login")
-    @Operation(summary = "Login user", description = "Authenticate a user by email and return a JWT token")
-    public ResponseEntity<JwtResponseDTO> authenticateUser(
-            @Valid @RequestBody LoginRequestDTO loginRequest) {
+    @Operation(
+            summary = "Login user",
+            description = "Authenticate with email/password. Returns Access Token in response body. " +
+                    "Sets Refresh Token in HttpOnly Secure Cookie."
+    )
+    public ResponseEntity<ApiResponseDTO<JwtResponseDTO>> login(
+            @Valid @RequestBody LoginRequestDTO loginRequest,
+            HttpServletResponse response) {
 
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        loginRequest.getEmail(),
-                        loginRequest.getPassword()
-                )
-        );
+        JwtResponseDTO jwtResponse = authService.login(loginRequest, response);
+        return ResponseEntity.ok(ApiResponseDTO.success("Đăng nhập thành công", jwtResponse));
+    }
 
-        SecurityContextHolder.getContext().setAuthentication(authentication);
+    @PostMapping("/refresh")
+    @Operation(
+            summary = "Refresh access token",
+            description = "Reads Refresh Token from HttpOnly Cookie, validates it against PostgreSQL, " +
+                    "generates a new Access Token (in body) and a new Refresh Token (in cookie). " +
+                    "Old Refresh Token is revoked (token rotation)."
+    )
+    public ResponseEntity<ApiResponseDTO<JwtResponseDTO>> refreshToken(
+            HttpServletRequest request,
+            HttpServletResponse response) {
 
-        String jwt = jwtUtils.generateJwtToken(authentication);
+        JwtResponseDTO jwtResponse = authService.refreshToken(request, response);
+        return ResponseEntity.ok(ApiResponseDTO.success("Token đã được refresh thành công", jwtResponse));
+    }
 
-        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+    @PostMapping("/logout")
+    @Operation(
+            summary = "Logout user",
+            description = "Revokes all Refresh Tokens in database and clears the Refresh Token cookie."
+    )
+    public ResponseEntity<ApiResponseDTO<Void>> logout(
+            HttpServletRequest request,
+            HttpServletResponse response) {
 
-        String role = userDetails.getAuthorities().stream()
-                .findFirst()
-                .map(item -> item.getAuthority())
-                .orElse("ROLE_CUSTOMER");
-
-        return ResponseEntity.ok(new JwtResponseDTO(
-                jwt,
-                userDetails.getId(),
-                userDetails.getEmail(),
-                role
-        ));
+        authService.logout(request, response);
+        return ResponseEntity.ok(ApiResponseDTO.success("Đăng xuất thành công"));
     }
 }

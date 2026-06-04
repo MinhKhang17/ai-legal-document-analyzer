@@ -28,4 +28,6 @@ springdoc:
 app:
   jwt:
     secret: a-very-secure-secret-key-that-should-be-at-least-256-bits-long-for-hmac-sha-256
-    expiration-ms: 86400000 # 24 hours
+    access-token-expiration-ms: 900000       # 15 minutes
+    refresh-token-expiration-ms: 604800000   # 7 days
+    refresh-cookie-name: refreshToken

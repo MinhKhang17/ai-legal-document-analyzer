@@ -1,5 +1,6 @@
 package com.analyzer.api.controller;
 
+import com.analyzer.api.dto.ApiResponseDTO;
 import com.analyzer.api.dto.UserRequestDTO;
 import com.analyzer.api.dto.UserResponseDTO;
 import com.analyzer.api.service.UserService;
@@ -23,20 +24,21 @@ public class UserController {
 
     @PostMapping
     @Operation(summary = "Create a new user", description = "Creates a new user account in the system")
-    public ResponseEntity<UserResponseDTO> createUser(@RequestBody UserRequestDTO request) {
-        return new ResponseEntity<>(userService.createUser(request), HttpStatus.CREATED);
+    public ResponseEntity<ApiResponseDTO<UserResponseDTO>> createUser(@RequestBody UserRequestDTO request) {
+        UserResponseDTO user = userService.createUser(request);
+        return new ResponseEntity<>(ApiResponseDTO.created("Tạo tài khoản thành công", user), HttpStatus.CREATED);
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "Get user by ID", description = "Retrieves a user's details based on their ID")
-    public ResponseEntity<UserResponseDTO> getUserById(
+    public ResponseEntity<ApiResponseDTO<UserResponseDTO>> getUserById(
             @Parameter(description = "ID of the user to be retrieved") @PathVariable Long id) {
-        return ResponseEntity.ok(userService.getUserById(id));
+        return ResponseEntity.ok(ApiResponseDTO.success(userService.getUserById(id)));
     }
 
     @GetMapping
     @Operation(summary = "Get all users", description = "Retrieves a list of all registered users")
-    public ResponseEntity<List<UserResponseDTO>> getAllUsers() {
-        return ResponseEntity.ok(userService.getAllUsers());
+    public ResponseEntity<ApiResponseDTO<List<UserResponseDTO>>> getAllUsers() {
+        return ResponseEntity.ok(ApiResponseDTO.success(userService.getAllUsers()));
     }
 }
