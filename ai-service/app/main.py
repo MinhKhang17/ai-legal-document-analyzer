@@ -11,6 +11,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.api import documents as documents_router
 from app.api import graph as graph_router
 from app.api import health as health_router
 from app.api import legal_analysis as legal_router
@@ -106,6 +107,7 @@ app.include_router(health_router.router, prefix=_prefix)
 app.include_router(graph_router.router, prefix=_prefix)
 app.include_router(rag_router.router, prefix=_prefix)
 app.include_router(legal_router.router, prefix=_prefix)
+app.include_router(documents_router.router, prefix=_prefix)
 
 
 @app.get("/", tags=["root"])
@@ -121,5 +123,6 @@ def root():
             f"{base}/graph",
             f"{base}/rag",
             f"{base}/legal",
+            f"{base}/documents",
         ],
     }

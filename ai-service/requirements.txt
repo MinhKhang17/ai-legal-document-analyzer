@@ -6,3 +6,6 @@ pydantic
 pydantic-settings
 httpx
 pytest
+PyPDF2  # For PDF text extraction
+python-docx  # For DOCX text extraction
+python-multipart  # For file upload support

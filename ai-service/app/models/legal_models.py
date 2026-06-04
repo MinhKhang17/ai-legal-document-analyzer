@@ -71,7 +71,22 @@ class AnalysisOptions(BaseModel):
 
 
 class ClassifyContractRequest(BaseModel):
-    text: str = Field(..., min_length=1)
+    """Request để phân loại hợp đồng.
+    
+    Attributes:
+        text: Văn bản hợp đồng cần phân loại (tối thiểu 10 ký tự, tối đa 100,000 ký tự)
+    """
+    
+    text: str = Field(
+        ...,
+        min_length=10,
+        max_length=100000,
+        description="Văn bản hợp đồng cần phân loại",
+        examples=[
+            "HỢP ĐỒNG THUÊ NHÀ. Bên cho thuê: Nguyễn Văn A. Bên thuê: Trần Thị B. "
+            "Đối tượng: căn hộ tại Hà Nội. Tiền thuê 10 triệu/tháng."
+        ],
+    )
 
 
 class ClassifyContractResponse(BaseModel):
@@ -86,10 +101,42 @@ class ClassifyContractResponse(BaseModel):
 
 
 class AnalyzeContractRequest(BaseModel):
-    contractText: str = Field(..., min_length=1)
-    contractType: ContractType = ContractType.UNKNOWN
-    protectedParty: Optional[str] = None
-    question: Optional[str] = None
+    """Request để phân tích rủi ro hợp đồng.
+    
+    Attributes:
+        contractText: Văn bản hợp đồng cần phân tích
+        contractType: Loại hợp đồng (để UNKNOWN để tự động phân loại)
+        protectedParty: Bên cần bảo vệ (ví dụ: "bên thuê", "bên mua")
+        question: Câu hỏi cụ thể về hợp đồng (tùy chọn)
+        options: Tùy chọn phân tích
+    """
+    
+    contractText: str = Field(
+        ...,
+        min_length=10,
+        max_length=100000,
+        description="Văn bản hợp đồng cần phân tích rủi ro",
+        examples=[
+            "HỢP ĐỒNG THUÊ NHÀ. Bên cho thuê: Nguyễn Văn A. Bên thuê: Trần Thị B. "
+            "Đối tượng: căn hộ tại Hà Nội. Tiền thuê 10 triệu/tháng. Đặt cọc 2 tháng."
+        ],
+    )
+    contractType: ContractType = Field(
+        default=ContractType.UNKNOWN,
+        description="Loại hợp đồng. Để UNKNOWN để API tự động phân loại.",
+    )
+    protectedParty: Optional[str] = Field(
+        default=None,
+        max_length=200,
+        description="Bên cần bảo vệ quyền lợi (ví dụ: 'bên thuê', 'bên mua', 'người lao động')",
+        examples=["bên thuê", "bên mua"],
+    )
+    question: Optional[str] = Field(
+        default=None,
+        max_length=500,
+        description="Câu hỏi cụ thể về hợp đồng (tùy chọn)",
+        examples=["Hợp đồng này có rủi ro gì?", "Điều khoản thanh toán có hợp lý không?"],
+    )
     options: AnalysisOptions = Field(default_factory=AnalysisOptions)
 
 
@@ -118,10 +165,40 @@ class AnalyzeContractResponse(BaseModel):
 
 
 class CompareContractsRequest(BaseModel):
-    documentAText: str = Field(..., min_length=1)
-    documentBText: str = Field(..., min_length=1)
-    contractType: ContractType = ContractType.UNKNOWN
-    protectedParty: Optional[str] = None
+    """Request để so sánh 2 hợp đồng.
+    
+    Attributes:
+        documentAText: Văn bản hợp đồng A (thường là bản gốc/cũ)
+        documentBText: Văn bản hợp đồng B (thường là bản mới/sửa đổi)
+        contractType: Loại hợp đồng
+        protectedParty: Bên cần bảo vệ để đánh giá phiên bản nào có lợi hơn
+        options: Tùy chọn so sánh
+    """
+    
+    documentAText: str = Field(
+        ...,
+        min_length=10,
+        max_length=100000,
+        description="Văn bản hợp đồng A (bản gốc/hiện tại)",
+        examples=["HỢP ĐỒNG THUÊ NHÀ - Version 1..."],
+    )
+    documentBText: str = Field(
+        ...,
+        min_length=10,
+        max_length=100000,
+        description="Văn bản hợp đồng B (bản sửa đổi/đề xuất)",
+        examples=["HỢP ĐỒNG THUÊ NHÀ - Version 2..."],
+    )
+    contractType: ContractType = Field(
+        default=ContractType.UNKNOWN,
+        description="Loại hợp đồng. Để UNKNOWN để tự động phân loại.",
+    )
+    protectedParty: Optional[str] = Field(
+        default=None,
+        max_length=200,
+        description="Bên cần bảo vệ để đánh giá phiên bản nào có lợi hơn",
+        examples=["bên thuê", "bên mua"],
+    )
     options: AnalysisOptions = Field(default_factory=AnalysisOptions)
 
 
