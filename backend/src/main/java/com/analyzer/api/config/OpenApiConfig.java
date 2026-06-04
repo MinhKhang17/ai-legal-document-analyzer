@@ -31,6 +31,6 @@ public class OpenApiConfig {
                         .title("AI Legal Document Analyzer API")
                         .version("1.0.0")
                         .description("RESTful API documentation for AI Legal Document Analyzer")
-                        .contact(new Contact().name("Development Team").email("team@analyzer.com")));
+                        .contact(new Contact().name("Dat Nguyen").email("huudatnguyen15@gmail.com")));
     }
 }
