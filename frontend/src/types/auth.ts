@@ -26,19 +26,17 @@ export interface LoginRequest {
   password: string;
 }
 
-export interface LoginResponse {
-  accessToken?: string;
-  refreshToken?: string;
-  user?: {
-    id: string;
-    firstName: string;
-    lastName: string;
+export type LoginResponse = {
+  code: number;
+  message: string;
+  data: {
+    accessToken: string;
+    tokenType: string;
+    id: number;
     email: string;
-    workspaceId?: string;
-    workspaceName?: string;
+    role: string;
   };
-  message?: string;
-}
+};
 
 export interface ApiErrorResponse {
   message?: string;
