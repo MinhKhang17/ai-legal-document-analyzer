@@ -1,26 +1,28 @@
-import {
-  API_ENDPOINTS,
-  buildApiUrl,
-} from '../config/api';
+import { API_ENDPOINTS, buildApiUrl } from "../config/api";
 import type {
   ApiErrorResponse,
   LoginRequest,
   LoginResponse,
   RegisterRequest,
   RegisterResponse,
-} from '../types/auth';
+} from "../types/auth";
 
 type ParsedResponse<T> = {
   data: T | null;
   rawText: string;
 };
 
-const readResponseBody = async <T>(response: Response): Promise<ParsedResponse<T>> => {
+const readResponseBody = async <T>(
+  response: Response,
+): Promise<ParsedResponse<T>> => {
   const rawText = await response.text();
 
-  const contentType = response.headers.get('content-type') ?? '';
+  const contentType = response.headers.get("content-type") ?? "";
 
-  if (!contentType.includes('application/json') || rawText.trim().length === 0) {
+  if (
+    !contentType.includes("application/json") ||
+    rawText.trim().length === 0
+  ) {
     return {
       data: null,
       rawText,
@@ -62,41 +64,51 @@ const getApiErrorMessage = (
   return fallback;
 };
 
-const postJson = async <TResponse, TError>(
+const postJson = async <TResponse>(
   endpointPath: string,
-  payload: Record<string, unknown>,
+  payload: object,
   errorMessage: string,
 ): Promise<TResponse> => {
   const response = await fetch(buildApiUrl(endpointPath), {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
+    credentials: "include",
     body: JSON.stringify(payload),
   });
 
-  const { data, rawText } = await readResponseBody<TResponse | TError>(response);
+  const { data, rawText } = await readResponseBody<
+    TResponse | ApiErrorResponse
+  >(response);
 
   if (!response.ok) {
-    throw new Error(getApiErrorMessage(data as TError | null, rawText, errorMessage));
+    throw new Error(
+      getApiErrorMessage(
+        data as ApiErrorResponse | null,
+        rawText,
+        errorMessage,
+      ),
+    );
   }
 
   return (data ?? {}) as TResponse;
 };
 
-export async function register(payload: RegisterRequest): Promise<RegisterResponse> {
-  return postJson<RegisterResponse, ApiErrorResponse>(
+export async function register(
+  payload: RegisterRequest,
+): Promise<RegisterResponse> {
+  return postJson<RegisterResponse>(
     API_ENDPOINTS.auth.register,
     payload,
-    'Registration failed. Please try again.',
+    "Registration failed. Please try again.",
   );
 }
 
 export async function login(payload: LoginRequest): Promise<LoginResponse> {
-  return postJson<LoginResponse, ApiErrorResponse>(
+  return postJson<LoginResponse>(
     API_ENDPOINTS.auth.login,
     payload,
-    'Login failed. Please check your email and password.',
+    "Login failed. Please check your email and password.",
   );
 }
-
