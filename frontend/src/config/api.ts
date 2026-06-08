@@ -26,8 +26,8 @@ export const API_BASE_URL = getEnvValue('VITE_API_BASE_URL');
 
 export const API_ENDPOINTS = {
   auth: {
-    register: getEnvValue('VITE_AUTH_REGISTER_API', '/api/auth/v1/register'),
-    login: getEnvValue('VITE_AUTH_LOGIN_API', '/api/auth/v1/login'),
+    register: getEnvValue('VITE_AUTH_REGISTER_API', '/api/v1/auth/register'),
+    login: getEnvValue('VITE_AUTH_LOGIN_API', '/api/v1/auth/login'),
   },
 } as const;
 
