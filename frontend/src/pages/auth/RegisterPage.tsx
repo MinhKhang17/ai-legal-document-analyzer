@@ -5,7 +5,6 @@ import { register } from '../../api/authApi';
 import { Button } from '../../components/common/Button';
 import { Card } from '../../components/common/Card';
 import { useI18n } from '../../hooks/useI18n';
-import { useAppStore } from '../../store/AppStore';
 
 type RegisterFormData = {
   firstName: string;
@@ -17,7 +16,6 @@ type RegisterFormData = {
 
 export function RegisterPage() {
   const { t } = useI18n();
-  const { signIn } = useAppStore();
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState<RegisterFormData>({
@@ -112,8 +110,12 @@ export function RegisterPage() {
               acceptedTerms,
             });
 
-            signIn();
-            navigate('/dashboard');
+            navigate('/login', {
+              replace: true,
+              state: {
+                message: 'Registration successful. Please sign in.',
+              },
+            });
           } catch (error) {
             setSubmitError(
               error instanceof Error && error.message.length > 0

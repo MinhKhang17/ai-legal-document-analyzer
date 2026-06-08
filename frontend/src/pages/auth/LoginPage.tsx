@@ -1,10 +1,11 @@
 import { Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "../../components/common/Button";
 import { useI18n } from "../../hooks/useI18n";
 import { useAppStore } from "../../store/AppStore";
-import { login } from "../../api/authApi";
+import { getCurrentUser, login } from "../../api/authApi";
+import type { CurrentUser } from "../../types/auth";
 
 function GoogleIcon() {
   return (
@@ -29,15 +30,47 @@ function GoogleIcon() {
   );
 }
 
+const getStringStateValue = (state: unknown, key: string): string => {
+  if (typeof state === "object" && state !== null) {
+    const value = (state as Record<string, unknown>)[key];
+    return typeof value === "string" ? value : "";
+  }
+
+  return "";
+};
+
+const isCurrentUser = (value: unknown): value is CurrentUser => {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const user = value as Partial<CurrentUser>;
+
+  return (
+    typeof user.id === "number" &&
+    typeof user.firstName === "string" &&
+    typeof user.lastName === "string" &&
+    typeof user.email === "string" &&
+    typeof user.role === "string" &&
+    typeof user.active === "boolean"
+  );
+};
+
 export function LoginPage() {
   const { t } = useI18n();
-  const { signIn } = useAppStore();
+  const location = useLocation();
+  const { signIn, signOut } = useAppStore();
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const initialError = getStringStateValue(location.state, "errorMessage");
+  const initialNotice =
+    getStringStateValue(location.state, "noticeMessage") ||
+    getStringStateValue(location.state, "message");
+  const [error, setError] = useState(initialError);
+  const [notice, setNotice] = useState(initialNotice);
 
   return (
     <div>
@@ -56,6 +89,7 @@ export function LoginPage() {
           event.preventDefault();
 
           setError("");
+          setNotice("");
           setLoading(true);
 
           try {
@@ -64,12 +98,38 @@ export function LoginPage() {
               password,
             });
 
-            localStorage.setItem("accessToken", response.data.accessToken);
-            localStorage.setItem("user", JSON.stringify(response.data));
+            const accessToken = response.data.accessToken?.trim();
 
-            signIn();
-            navigate("/dashboard");
+            if (!accessToken) {
+              throw new Error("Login response did not include an access token.");
+            }
+
+            localStorage.setItem("accessToken", accessToken);
+
+            const currentUserResponse = await getCurrentUser(accessToken);
+            const currentUser = currentUserResponse.data;
+
+            if (!isCurrentUser(currentUser)) {
+              throw new Error("Unable to load current user session.");
+            }
+
+            if (!currentUser.active) {
+              signOut();
+              localStorage.removeItem("accessToken");
+              setError("Your account is inactive.");
+              return;
+            }
+
+            signIn(accessToken, currentUser);
+
+            if (currentUser.role === "ADMIN") {
+              navigate("/admin", { replace: true });
+            } else {
+              navigate("/dashboard", { replace: true });
+            }
           } catch (error) {
+            localStorage.removeItem("accessToken");
+            signOut();
             setError(error instanceof Error ? error.message : "Login failed");
           } finally {
             setLoading(false);
@@ -157,6 +217,11 @@ export function LoginPage() {
         {error && (
           <p className="rounded-md bg-red-50 px-3 py-2 text-xs font-medium text-red-600">
             {error}
+          </p>
+        )}
+        {notice && !error && (
+          <p className="rounded-md bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700">
+            {notice}
           </p>
         )}
         <Button
