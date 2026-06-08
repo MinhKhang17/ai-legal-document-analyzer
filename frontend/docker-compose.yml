@@ -3,10 +3,6 @@ services:
     image: legal-rag-platform/frontend:dev
     build:
       context: .
-      args:
-        VITE_API_BASE_URL: http://localhost:8080
-        VITE_AUTH_REGISTER_API: /api/auth/v1/register
-        VITE_AUTH_LOGIN_API: /api/auth/v1/login
     ports:
       - "5173:80"
     environment:
