@@ -78,4 +78,14 @@ public class AuthController {
         authService.logout(request, response);
         return ResponseEntity.ok(ApiResponseDTO.success("Đăng xuất thành công"));
     }
+
+    @GetMapping("/me")
+    @Operation(
+            summary = "Get current authenticated user",
+            description = "Get details of the currently authenticated user based on the JWT Bearer Token."
+    )
+    public ResponseEntity<ApiResponseDTO<UserResponseDTO>> getCurrentUser() {
+        UserResponseDTO currentUser = authService.getCurrentUser();
+        return ResponseEntity.ok(ApiResponseDTO.success("Lấy thông tin người dùng thành công", currentUser));
+    }
 }

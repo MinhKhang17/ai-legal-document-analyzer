@@ -4,6 +4,8 @@ import com.analyzer.api.domain.entity.RefreshToken;
 import com.analyzer.api.domain.entity.User;
 import com.analyzer.api.dto.JwtResponseDTO;
 import com.analyzer.api.dto.LoginRequestDTO;
+import com.analyzer.api.dto.UserResponseDTO;
+import com.analyzer.api.mapper.UserMapper;
 import com.analyzer.api.repository.RefreshTokenRepository;
 import com.analyzer.api.repository.UserRepository;
 import com.analyzer.api.security.JwtTokenProvider;
@@ -29,6 +31,7 @@ public class AuthServiceImpl implements AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final UserMapper userMapper;
 
     @Override
     @Transactional
@@ -164,5 +167,30 @@ public class AuthServiceImpl implements AuthService {
 
         // 4. Clear security context
         SecurityContextHolder.clearContext();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public UserResponseDTO getCurrentUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated() || 
+                "anonymousUser".equals(authentication.getPrincipal())) {
+            throw new RuntimeException("User not authenticated");
+        }
+
+        Object principal = authentication.getPrincipal();
+        String email;
+        if (principal instanceof UserDetailsImpl userDetails) {
+            email = userDetails.getEmail();
+        } else if (principal instanceof String strPrincipal) {
+            email = strPrincipal;
+        } else {
+            throw new RuntimeException("Invalid authentication principal");
+        }
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        return userMapper.toResponseDTO(user);
     }
 }
