@@ -3,3 +3,6 @@ uvicorn
 neo4j
 python-dotenv
 pydantic
+pypdf
+python-docx
+python-multipart

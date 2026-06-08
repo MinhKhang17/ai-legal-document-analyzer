@@ -1,4 +1,4 @@
-from app.graph.connection import driver
+from app.graph.connection import get_driver
 
 
 def get_technologies():
@@ -7,6 +7,6 @@ def get_technologies():
     RETURN t.name AS name
     """
 
-    with driver.session() as session:
+    with get_driver().session() as session:
         result = session.run(query)
         return [record["name"] for record in result]
