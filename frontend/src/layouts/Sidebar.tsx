@@ -32,8 +32,10 @@ interface NavItem {
   labelKey: string;
   icon: LucideIcon;
   end?: boolean;
-  section?: 'main' | 'intelligence' | 'admin';
+  section?: NavSection;
 }
+
+type NavSection = 'main' | 'intelligence' | 'system' | 'admin';
 
 const navItems: NavItem[] = [
   { to: '/dashboard', labelKey: 'nav.overview', icon: LayoutDashboard, section: 'main' },
@@ -47,27 +49,35 @@ const navItems: NavItem[] = [
   { to: '/editor/comparison-history', labelKey: 'nav.comparisonHistory', icon: History, section: 'intelligence' },
   { to: '/reports', labelKey: 'nav.reports', icon: BarChart3, section: 'intelligence' },
   { to: '/knowledge-base', labelKey: 'nav.knowledgeBase', icon: BookOpen, section: 'intelligence' },
-  { to: '/billing', labelKey: 'nav.billing', icon: Receipt, section: 'admin' },
-  { to: '/jobs', labelKey: 'nav.jobs', icon: Activity, section: 'admin' },
-  { to: '/templates', labelKey: 'nav.templates', icon: Wrench, section: 'admin' },
+  { to: '/billing', labelKey: 'nav.billing', icon: Receipt, section: 'system' },
+  { to: '/jobs', labelKey: 'nav.jobs', icon: Activity, section: 'system' },
+  { to: '/templates', labelKey: 'nav.templates', icon: Wrench, section: 'system' },
+  { to: '/settings', labelKey: 'nav.settings', icon: Settings, section: 'system' },
   { to: '/admin', labelKey: 'nav.admin', icon: UsersRound, section: 'admin' },
   { to: '/admin/audit-logs', labelKey: 'nav.auditLogs', icon: FileClock, section: 'admin' },
   { to: '/admin/system-health', labelKey: 'nav.systemHealth', icon: Activity, section: 'admin' },
-  { to: '/settings', labelKey: 'nav.settings', icon: Settings, section: 'admin' },
 ];
 
-const sectionLabelKeys: Record<NonNullable<NavItem['section']>, string> = {
+const sectionLabelKeys: Record<NavSection, string> = {
   main: 'nav.section.main',
   intelligence: 'nav.section.intelligence',
+  system: 'nav.section.system',
   admin: 'nav.section.admin',
 };
 
+const sectionOrder: NavSection[] = ['main', 'intelligence', 'system', 'admin'];
+
 function SidebarContent() {
   const { t } = useI18n();
-  const { sidebarCollapsed, toggleSidebar, setMobileSidebarOpen } = useAppStore();
+  const { sidebarCollapsed, toggleSidebar, setMobileSidebarOpen, user } = useAppStore();
+  const isAdmin = user?.role === 'ADMIN';
 
-  const groupedItems = navItems.reduce<Record<string, NavItem[]>>((accumulator, item) => {
+  const groupedItems = navItems.reduce<Partial<Record<NavSection, NavItem[]>>>((accumulator, item) => {
     const section = item.section ?? 'main';
+    if (section === 'admin' && !isAdmin) {
+      return accumulator;
+    }
+
     accumulator[section] = [...(accumulator[section] ?? []), item];
     return accumulator;
   }, {});
@@ -100,36 +110,44 @@ function SidebarContent() {
       </div>
 
       <nav className="flex-1 overflow-y-auto px-xs pb-lg" aria-label={t('nav.primaryNavigation')}>
-        {(Object.keys(groupedItems) as Array<keyof typeof groupedItems>).map((section) => (
-          <div key={section} className="mb-md">
-            {!sidebarCollapsed && <p className="px-md py-sm text-[11px] font-bold uppercase tracking-wider text-outline">{t(sectionLabelKeys[section as keyof typeof sectionLabelKeys])}</p>}
-            <div className="space-y-xs">
-              {groupedItems[section].map((item) => {
-                const Icon = item.icon;
-                return (
-                  <NavLink
-                    key={`${item.to}-${item.labelKey}`}
-                    to={item.to}
-                    end={item.end}
-                    onClick={() => setMobileSidebarOpen(false)}
-                    className={({ isActive }) =>
-                      cn(
-                        'group flex items-center gap-md rounded-r-full px-md py-sm text-sm font-semibold transition',
-                        sidebarCollapsed && 'justify-center rounded-lg px-sm',
-                        isActive
-                          ? 'border-r-4 border-primary bg-surface-container-high text-primary dark:border-inverse-primary dark:bg-slate-800 dark:text-inverse-primary'
-                          : 'text-on-surface-variant hover:bg-surface-container-low hover:text-primary dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-inverse-primary',
-                      )
-                    }
-                  >
-                    <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
-                    {!sidebarCollapsed && <span>{t(item.labelKey)}</span>}
-                  </NavLink>
-                );
-              })}
+        {sectionOrder.map((section) => {
+          const sectionItems = groupedItems[section] ?? [];
+
+          if (sectionItems.length === 0) {
+            return null;
+          }
+
+          return (
+            <div key={section} className="mb-md">
+              {!sidebarCollapsed && <p className="px-md py-sm text-[11px] font-bold uppercase tracking-wider text-outline">{t(sectionLabelKeys[section])}</p>}
+              <div className="space-y-xs">
+                {sectionItems.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <NavLink
+                      key={`${item.to}-${item.labelKey}`}
+                      to={item.to}
+                      end={item.end}
+                      onClick={() => setMobileSidebarOpen(false)}
+                      className={({ isActive }) =>
+                        cn(
+                          'group flex items-center gap-md rounded-r-full px-md py-sm text-sm font-semibold transition',
+                          sidebarCollapsed && 'justify-center rounded-lg px-sm',
+                          isActive
+                            ? 'border-r-4 border-primary bg-surface-container-high text-primary dark:border-inverse-primary dark:bg-slate-800 dark:text-inverse-primary'
+                            : 'text-on-surface-variant hover:bg-surface-container-low hover:text-primary dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-inverse-primary',
+                        )
+                      }
+                    >
+                      <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
+                      {!sidebarCollapsed && <span>{t(item.labelKey)}</span>}
+                    </NavLink>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </nav>
 
       <div className="border-t border-outline-variant p-md dark:border-slate-800">
