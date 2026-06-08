@@ -1,3 +1,20 @@
+export type UserRole = "ADMIN" | "CUSTOMER" | "USER" | string;
+
+export interface CurrentUser {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: UserRole;
+  active: boolean;
+}
+
+export interface ApiResponse<T> {
+  success: boolean;
+  message: string;
+  data: T;
+}
+
 export interface RegisterRequest {
   firstName: string;
   lastName: string;
@@ -7,36 +24,26 @@ export interface RegisterRequest {
   acceptedTerms: boolean;
 }
 
-export interface RegisterResponse {
-  accessToken?: string;
-  refreshToken?: string;
-  user?: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-    workspaceId?: string;
-    workspaceName?: string;
-  };
-  message?: string;
-}
+export type RegisterResponse = ApiResponse<CurrentUser>;
 
 export interface LoginRequest {
   email: string;
   password: string;
 }
 
-export type LoginResponse = {
-  code: number;
-  message: string;
-  data: {
-    accessToken: string;
-    tokenType: string;
-    id: number;
-    email: string;
-    role: string;
-  };
-};
+export interface LoginJwtResponse {
+  accessToken: string;
+  tokenType?: string;
+  id: number;
+  email: string;
+  role: UserRole;
+}
+
+export type LoginResponse = ApiResponse<LoginJwtResponse>;
+
+export interface RefreshResponse extends ApiResponse<LoginJwtResponse> {}
+
+export type AuthMeResponse = ApiResponse<CurrentUser>;
 
 export interface ApiErrorResponse {
   message?: string;

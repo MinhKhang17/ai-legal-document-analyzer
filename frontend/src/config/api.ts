@@ -1,33 +1,23 @@
 type EnvMap = Record<string, string | undefined>;
 
-const getEnvValue = (key: string, fallback = ''): string => {
+const getRequiredEnvValue = (key: string): string => {
   const value = (import.meta.env as EnvMap)[key]?.trim();
 
   if (typeof value !== 'string' || value.length === 0) {
-    return fallback;
+    throw new Error(`Missing required environment variable: ${key}`);
   }
 
   return value;
 };
 
-const getRequiredEnvValue = (key: string, fallback = ''): string => {
-  const value = getEnvValue(key, fallback);
-
-  if (!value) {
-    throw new Error(
-      `Missing required environment variable "${key}". Add "${key}" in frontend/.env or frontend/.env.local.`
-    );
-  }
-
-  return value;
-};
-
-export const API_BASE_URL = getEnvValue('VITE_API_BASE_URL');
+export const API_BASE_URL = getRequiredEnvValue('VITE_API_BASE_URL');
 
 export const API_ENDPOINTS = {
   auth: {
-    register: getEnvValue('VITE_AUTH_REGISTER_API', '/api/v1/auth/register'),
-    login: getEnvValue('VITE_AUTH_LOGIN_API', '/api/v1/auth/login'),
+    login: getRequiredEnvValue('VITE_AUTH_LOGIN_API'),
+    register: getRequiredEnvValue('VITE_AUTH_REGISTER_API'),
+    refresh: getRequiredEnvValue('VITE_AUTH_REFRESH_API'),
+    me: getRequiredEnvValue('VITE_AUTH_ME_API'),
   },
 } as const;
 
@@ -46,16 +36,11 @@ export const buildApiUrl = (endpoint: string): string => {
 
   if (!normalizedEndpoint || normalizedEndpoint === '/') {
     throw new Error(
-      'Missing or invalid auth API endpoint path. Check VITE_AUTH_REGISTER_API and VITE_AUTH_LOGIN_API.'
+      'Missing or invalid auth API endpoint path. Check VITE_AUTH_REGISTER_API, VITE_AUTH_LOGIN_API, VITE_AUTH_ME_API, and VITE_AUTH_REFRESH_API.'
     );
   }
 
-  if (/^https?:\/\//i.test(normalizedEndpoint)) {
-    return normalizedEndpoint;
-  }
-
-  const baseUrl = getRequiredEnvValue('VITE_API_BASE_URL');
-  const normalizedBaseUrl = stripTrailingSlashes(baseUrl);
+  const normalizedBaseUrl = stripTrailingSlashes(API_BASE_URL);
 
   return `${normalizedBaseUrl}${normalizedEndpoint}`;
 };
