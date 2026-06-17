@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import re
+import unicodedata
 from collections import defaultdict
 from typing import Any
 
@@ -10,8 +12,9 @@ from app.models.knowledge_models import ChunkedDocument, HierarchyNode, Retrieve
 
 
 class GraphRepository:
-    def __init__(self) -> None:
+    def __init__(self, vector_index_name: str | None = None) -> None:
         self.driver = get_driver()
+        self.vector_index_name = vector_index_name or settings.vector_index_name
 
     def ensure_schema(self) -> None:
         queries = [
@@ -36,7 +39,7 @@ class GraphRepository:
             REQUIRE n.node_id IS UNIQUE
             """,
             f"""
-            CREATE VECTOR INDEX {settings.vector_index_name} IF NOT EXISTS
+            CREATE VECTOR INDEX {self.vector_index_name} IF NOT EXISTS
             FOR (n:Chunk) ON (n.embedding)
             OPTIONS {{
               indexConfig: {{
@@ -49,7 +52,7 @@ class GraphRepository:
 
         with self.driver.session() as session:
             for query in queries:
-                session.run(query)
+                session.run(query).consume()
 
     def upsert_document(self, document: ChunkedDocument) -> None:
         self.ensure_schema()
@@ -67,7 +70,13 @@ class GraphRepository:
             for node in node_groups.get("Chunk", []):
                 self._merge_node(session, node, document)
 
-    def search_chunks(self, query_embedding: list[float], top_k: int = 5) -> list[RetrievedChunk]:
+    def search_chunks(
+        self,
+        query_embedding: list[float],
+        top_k: int = 5,
+        query_text: str | None = None,
+        metadata_filter: dict[str, Any] | None = None,
+    ) -> list[RetrievedChunk]:
         self.ensure_schema()
         cypher = f"""
         CALL db.index.vector.queryNodes($index_name, $top_k, $embedding)
@@ -75,29 +84,170 @@ class GraphRepository:
         RETURN node.node_id AS chunk_id,
                node.title AS title,
                node.text AS text,
+               coalesce(node.metadata_json, '{{}}') AS metadata_json,
                score AS score
         ORDER BY score DESC
         """
 
         with self.driver.session() as session:
-            result = session.run(
-                cypher,
-                index_name=settings.vector_index_name,
-                top_k=top_k,
-                embedding=query_embedding,
-            )
-            return [
-                RetrievedChunk(
-                    chunk_id=record["chunk_id"],
-                    text=record["text"] or "",
-                    score=float(record["score"]),
-                    title=record["title"] or "",
-                    context=self.get_context(record["chunk_id"]),
+            try:
+                candidate_limit = top_k if not metadata_filter else max(top_k * 5, top_k + 10)
+                result = session.run(
+                    cypher,
+                    index_name=self.vector_index_name,
+                    top_k=candidate_limit,
+                    embedding=query_embedding,
                 )
+                filtered_records = [
+                    record
+                    for record in result
+                    if self._record_matches_metadata(record, metadata_filter)
+                ]
+                return [self._record_to_retrieved_chunk(record, metadata_filter=metadata_filter) for record in filtered_records[:top_k]]
+            except Exception:
+                if not query_text:
+                    return []
+                return self._search_chunks_by_text(query_text, top_k=top_k, metadata_filter=metadata_filter)
+
+    def _record_to_retrieved_chunk(self, record, metadata_filter: dict[str, Any] | None = None) -> RetrievedChunk:
+        metadata_json = record["metadata_json"] or "{}"
+        metadata: dict[str, Any] = {}
+        if isinstance(metadata_json, str):
+            try:
+                metadata = json.loads(metadata_json)
+            except Exception:
+                metadata = {}
+
+        text = record["text"] or ""
+        retrieval_text = str(metadata.get("retrieval_text") or "").strip()
+        if retrieval_text:
+            text = retrieval_text
+
+        return RetrievedChunk(
+            chunk_id=record["chunk_id"],
+            text=text,
+            score=float(record["score"]),
+            title=record["title"] or "",
+            context=self.get_context(record["chunk_id"], metadata_filter=metadata_filter),
+        )
+
+    def list_chunks(self) -> list[dict[str, Any]]:
+        self.ensure_schema()
+        cypher = """
+        MATCH (node:Chunk)
+        RETURN node.node_id AS chunk_id,
+               coalesce(node.title, '') AS title,
+               coalesce(node.text, '') AS text,
+               coalesce(node.source_path, '') AS source_path,
+               coalesce(node.file_type, '') AS file_type,
+               coalesce(node.metadata_json, '{}') AS metadata_json,
+               coalesce(node.order, 0) AS order
+        ORDER BY node.order ASC, node.node_id ASC
+        """
+
+        with self.driver.session() as session:
+            result = session.run(cypher)
+            return [
+                {
+                    "chunk_id": record["chunk_id"],
+                    "title": record["title"] or "",
+                    "text": record["text"] or "",
+                    "source_path": record["source_path"] or "",
+                    "file_type": record["file_type"] or "",
+                    "metadata_json": record["metadata_json"] or "{}",
+                    "order": int(record["order"] or 0),
+                }
                 for record in result
             ]
 
-    def get_context(self, chunk_id: str, sibling_limit: int = 2) -> list[dict[str, Any]]:
+    def _search_chunks_by_text(
+        self,
+        query_text: str,
+        top_k: int = 5,
+        metadata_filter: dict[str, Any] | None = None,
+    ) -> list[RetrievedChunk]:
+        query_tokens = set(self._tokenize(query_text))
+        if not query_tokens:
+            return []
+
+        chunks = self.list_chunks()
+        scored: list[tuple[float, dict[str, Any]]] = []
+        for chunk in chunks:
+            metadata = self._parse_metadata(chunk.get("metadata_json"))
+            if not self._matches_metadata(metadata, metadata_filter):
+                continue
+            search_text = " ".join(
+                part
+                for part in [
+                    chunk.get("title", ""),
+                    chunk.get("text", ""),
+                    str(metadata.get("retrieval_text") or ""),
+                    str(metadata.get("embedding_text") or ""),
+                ]
+                if part
+            )
+            chunk_tokens = set(self._tokenize(search_text))
+            if not chunk_tokens:
+                continue
+            overlap = len(query_tokens & chunk_tokens)
+            if overlap == 0:
+                continue
+            score = overlap / max(1, len(query_tokens))
+            scored.append((score, chunk))
+
+        scored.sort(key=lambda item: item[0], reverse=True)
+        selected = scored[:top_k]
+        return [
+            RetrievedChunk(
+                chunk_id=chunk["chunk_id"],
+                text=self._chunk_text_with_metadata(chunk),
+                score=score,
+                title=chunk["title"],
+                context=self.get_context(chunk["chunk_id"]),
+            )
+            for score, chunk in selected
+        ]
+
+    def _record_matches_metadata(self, record: Any, metadata_filter: dict[str, Any] | None) -> bool:
+        if not metadata_filter:
+            return True
+        metadata_json = record["metadata_json"] if hasattr(record, "__getitem__") else "{}"
+        return self._matches_metadata(self._parse_metadata(metadata_json), metadata_filter)
+
+    def _matches_metadata(self, metadata: dict[str, Any], metadata_filter: dict[str, Any] | None) -> bool:
+        if not metadata_filter:
+            return True
+        for key, expected in metadata_filter.items():
+            if metadata.get(key) != expected:
+                return False
+        return True
+
+    def _chunk_text_with_metadata(self, chunk: dict[str, Any]) -> str:
+        metadata = self._parse_metadata(chunk.get("metadata_json"))
+        retrieval_text = str(metadata.get("retrieval_text") or "").strip()
+        if retrieval_text:
+            return retrieval_text
+        return str(chunk.get("text") or "")
+
+    def _parse_metadata(self, metadata_json: Any) -> dict[str, Any]:
+        if not isinstance(metadata_json, str):
+            return {}
+        try:
+            return json.loads(metadata_json)
+        except Exception:
+            return {}
+
+    def _tokenize(self, text: str) -> list[str]:
+        normalized = unicodedata.normalize("NFKD", text)
+        stripped = "".join(char for char in normalized if not unicodedata.combining(char))
+        return re.findall(r"[a-z0-9]+", stripped.lower())
+
+    def get_context(
+        self,
+        chunk_id: str,
+        sibling_limit: int = 2,
+        metadata_filter: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
         with self.driver.session() as session:
             ancestor_query = """
             MATCH path = (doc:Document)-[:PARENT_OF*0..5]->(chunk:Chunk {node_id: $chunk_id})
@@ -118,6 +268,7 @@ class GraphRepository:
             RETURN sibling.node_id AS node_id,
                    sibling.title AS title,
                    sibling.text AS text,
+                   coalesce(sibling.metadata_json, '{}') AS metadata_json,
                    sibling.order AS order
             ORDER BY sibling.order
             LIMIT $limit
@@ -132,6 +283,7 @@ class GraphRepository:
                     "order": record["order"] or 0,
                 }
                 for record in sibling_records
+                if self._matches_metadata(self._parse_metadata(record["metadata_json"]), metadata_filter)
             ]
 
         return [
