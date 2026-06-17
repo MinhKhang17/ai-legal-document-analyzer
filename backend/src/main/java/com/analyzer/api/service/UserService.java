@@ -1,7 +1,7 @@
 package com.analyzer.api.service;
 
-import com.analyzer.api.dto.UserRequestDTO;
-import com.analyzer.api.dto.UserResponseDTO;
+import com.analyzer.api.dto.user.UserRequestDTO;
+import com.analyzer.api.dto.user.UserResponseDTO;
 import java.util.List;
 
 public interface UserService {

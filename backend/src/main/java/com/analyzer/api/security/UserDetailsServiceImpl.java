@@ -1,6 +1,6 @@
 package com.analyzer.api.security;
 
-import com.analyzer.api.domain.entity.User;
+import com.analyzer.api.entity.User;
 import com.analyzer.api.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -20,8 +20,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException(
-                        "User Not Found with email: " + email
-                ));
+                        "User Not Found with email: " + email));
 
         return UserDetailsImpl.build(user);
     }

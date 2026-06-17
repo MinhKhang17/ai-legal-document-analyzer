@@ -1,4 +1,4 @@
-package com.analyzer.api.domain.entity;
+package com.analyzer.api.entity;
 
 import com.analyzer.api.enums.RoleName;
 import jakarta.persistence.*;

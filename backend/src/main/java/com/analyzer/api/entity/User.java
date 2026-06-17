@@ -1,4 +1,4 @@
-package com.analyzer.api.domain.entity;
+package com.analyzer.api.entity;
 
 import jakarta.persistence.*;
 import lombok.*;

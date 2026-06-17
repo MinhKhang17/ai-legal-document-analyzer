@@ -1,24 +1,25 @@
-# Stage 1: Build stage
+# Stage 1: Build stage (Dùng Alpine cho nhẹ và tận dụng cache dependency)
 FROM maven:3.9.9-eclipse-temurin-21-alpine AS builder
 WORKDIR /app
 
-# Copy pom.xml to download dependencies (helps with Docker caching)
+# Cache dependencies
 COPY pom.xml .
 RUN mvn dependency:go-offline -B
 
-# Copy the source code and compile
+# Build source code
 COPY src ./src
 RUN mvn clean package -DskipTests
 
-# Stage 2: Run stage
+# Stage 2: Run stage (Bảo mật bằng Non-root user)
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
-# Copy the built jar from the builder stage
+# Tạo non-root user để bảo mật container
+RUN addgroup -S app && adduser -S app -G app
+
 COPY --from=builder /app/target/*.jar app.jar
 
-# Expose port 8080
 EXPOSE 8080
+USER app
 
-# Run the application
 ENTRYPOINT ["java", "-jar", "app.jar"]

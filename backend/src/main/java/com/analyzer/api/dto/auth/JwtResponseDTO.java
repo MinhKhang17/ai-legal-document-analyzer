@@ -1,4 +1,4 @@
-package com.analyzer.api.dto;
+package com.analyzer.api.dto.auth;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;

@@ -1,6 +1,6 @@
 package com.analyzer.api.config;
 
-import com.analyzer.api.domain.entity.Role;
+import com.analyzer.api.entity.Role;
 import com.analyzer.api.enums.RoleName;
 import com.analyzer.api.repository.RoleRepository;
 import lombok.RequiredArgsConstructor;
@@ -13,7 +13,8 @@ import org.springframework.stereotype.Component;
 import java.util.Arrays;
 
 /**
- * Automatically cleans legacy database columns and seeds default roles on startup.
+ * Automatically cleans legacy database columns and seeds default roles on
+ * startup.
  */
 @Component
 @RequiredArgsConstructor

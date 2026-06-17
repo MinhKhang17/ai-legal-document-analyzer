@@ -1,10 +1,10 @@
 package com.analyzer.api.controller;
 
 import com.analyzer.api.dto.ApiResponseDTO;
-import com.analyzer.api.dto.JwtResponseDTO;
-import com.analyzer.api.dto.LoginRequestDTO;
-import com.analyzer.api.dto.UserRequestDTO;
-import com.analyzer.api.dto.UserResponseDTO;
+import com.analyzer.api.dto.auth.JwtResponseDTO;
+import com.analyzer.api.dto.auth.LoginRequestDTO;
+import com.analyzer.api.dto.user.UserRequestDTO;
+import com.analyzer.api.dto.user.UserResponseDTO;
 import com.analyzer.api.service.AuthService;
 import com.analyzer.api.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;

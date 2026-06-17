@@ -1,8 +1,8 @@
 package com.analyzer.api.service;
 
-import com.analyzer.api.dto.JwtResponseDTO;
-import com.analyzer.api.dto.LoginRequestDTO;
-import com.analyzer.api.dto.UserResponseDTO;
+import com.analyzer.api.dto.auth.JwtResponseDTO;
+import com.analyzer.api.dto.auth.LoginRequestDTO;
+import com.analyzer.api.dto.user.UserResponseDTO;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 

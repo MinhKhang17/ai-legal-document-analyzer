@@ -1,10 +1,10 @@
 package com.analyzer.api.service.impl;
 
-import com.analyzer.api.domain.entity.Role;
 import com.analyzer.api.enums.RoleName;
-import com.analyzer.api.domain.entity.User;
-import com.analyzer.api.dto.UserRequestDTO;
-import com.analyzer.api.dto.UserResponseDTO;
+import com.analyzer.api.dto.user.UserRequestDTO;
+import com.analyzer.api.dto.user.UserResponseDTO;
+import com.analyzer.api.entity.Role;
+import com.analyzer.api.entity.User;
 import com.analyzer.api.mapper.UserMapper;
 import com.analyzer.api.repository.RoleRepository;
 import com.analyzer.api.repository.UserRepository;

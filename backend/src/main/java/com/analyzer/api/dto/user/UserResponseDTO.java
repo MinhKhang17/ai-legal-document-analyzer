@@ -1,4 +1,4 @@
-package com.analyzer.api.dto;
+package com.analyzer.api.dto.user;
 
 import com.analyzer.api.enums.RoleName;
 import io.swagger.v3.oas.annotations.media.Schema;
