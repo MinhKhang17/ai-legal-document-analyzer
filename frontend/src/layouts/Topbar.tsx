@@ -33,6 +33,21 @@ export function Topbar() {
   const location = useLocation();
   const navigate = useNavigate();
   const current = routeLabels.find((route) => location.pathname.startsWith(route.prefix));
+  const displayName = user
+    ? `${user.firstName} ${user.lastName}`.trim() || user.email
+    : "Guest";
+  const displayEmail = user?.email ?? "";
+  const initialsSource = user ? `${user.firstName} ${user.lastName}`.trim() : "";
+  const avatarInitials = initialsSource.length > 1
+    ? initialsSource
+      .split(" ")
+      .filter(Boolean)
+      .map((segment) => segment[0]?.toUpperCase())
+      .join("")
+      .slice(0, 2)
+    : user && user.email
+      ? user.email.slice(0, 2).toUpperCase()
+      : "--";
 
   return (
     <header className="sticky top-0 z-30 border-b border-outline-variant bg-white/90 px-md py-sm backdrop-blur dark:border-slate-800 dark:bg-slate-950/90 sm:px-lg">
@@ -75,14 +90,14 @@ export function Topbar() {
           <Dropdown
             label={
               <span className="flex items-center gap-sm">
-                <span className="hidden text-sm font-semibold md:inline">{user.name}</span>
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">{user.avatarInitials}</span>
+                <span className="hidden text-sm font-semibold md:inline">{displayName}</span>
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">{avatarInitials}</span>
               </span>
             }
           >
             <div className="p-sm">
-              <p className="font-semibold text-on-surface dark:text-slate-100">{user.name}</p>
-              <p className="text-xs text-on-surface-variant dark:text-slate-400">{user.email}</p>
+              <p className="font-semibold text-on-surface dark:text-slate-100">{displayName}</p>
+              <p className="text-xs text-on-surface-variant dark:text-slate-400">{displayEmail}</p>
             </div>
             <button className="flex w-full items-center gap-sm rounded-lg px-sm py-sm text-left text-sm hover:bg-surface-container-low dark:hover:bg-slate-800" type="button" onClick={() => navigate('/admin')}>
               <UserRound className="h-4 w-4" aria-hidden="true" />
