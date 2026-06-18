@@ -91,9 +91,26 @@ docker compose up --build
 ```
 
 4. Start services independently during development:
-   - Frontend: from `frontend/`
-   - Backend: from `backend/`
-   - AI service: from `ai-service/`
+   - Frontend only:
+
+   ```bash
+   cd frontend
+   docker compose up --build
+   ```
+
+   - Backend stack:
+
+   ```bash
+   cd backend
+   docker compose up --build
+   ```
+
+   - AI service stack:
+
+   ```bash
+   cd ai-service
+   docker compose up --build
+   ```
 
 ## Development Workflow
 
