@@ -759,3 +759,9 @@ class SemanticChunkerV2(SemanticChunker):
             return title
         return f"{title} (part {index}/{total})"
 
+
+from app.services.legal_rag.legal_hierarchy_chunker import (
+    LegalHierarchyChunker as SemanticChunker,
+    LegalHierarchyChunkerV2 as SemanticChunkerV2,
+)
+

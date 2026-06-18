@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import logging
 import tempfile
 from pathlib import Path
 from typing import Any
+
+
+logger = logging.getLogger(__name__)
 
 
 class OCRService:
@@ -92,6 +96,7 @@ class OCRService:
             try:
                 return self._collect_texts(json_value())
             except Exception:
+                logger.exception("Failed to extract texts from OCR payload JSON value")
                 return texts
 
         return texts
@@ -103,6 +108,7 @@ class OCRService:
             else:
                 result = self.ocr.ocr(image_input, cls=False)
         except Exception:
+            logger.exception("OCR execution failed")
             return ""
 
         texts = self._collect_texts(result)
@@ -134,4 +140,5 @@ class OCRService:
                 try:
                     temp_path.unlink()
                 except OSError:
+                    logger.warning("Failed to remove temporary OCR image file: %s", temp_path)
                     pass

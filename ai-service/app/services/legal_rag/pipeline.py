@@ -268,12 +268,16 @@ class GeminiLLMProvider:
         base_url: str = "https://generativelanguage.googleapis.com/v1beta",
         timeout_seconds: float = 30.0,
         max_output_tokens: int = 128,
+        max_retries: int = 4,
+        retry_backoff_seconds: float = 2.0,
     ) -> None:
         self.api_key = api_key
         self.model = model
         self.base_url = base_url.rstrip("/")
         self.timeout_seconds = timeout_seconds
         self.max_output_tokens = max_output_tokens
+        self.max_retries = max_retries
+        self.retry_backoff_seconds = retry_backoff_seconds
 
     def analyze(
         self,
@@ -312,6 +316,8 @@ class GeminiLLMProvider:
             base_url=self.base_url,
             timeout_seconds=self.timeout_seconds,
             max_output_tokens=self.max_output_tokens,
+            max_retries=self.max_retries,
+            retry_backoff_seconds=self.retry_backoff_seconds,
         )
         result = client.generate_text(
             system_prompt="Return compact JSON only: concept_id, taxonomy_id, confidence, explanation.",
@@ -567,6 +573,8 @@ class ContractAnalysisService:
                 base_url=settings.gemini_base_url,
                 timeout_seconds=settings.gemini_timeout_seconds,
                 max_output_tokens=settings.gemini_max_output_tokens,
+                max_retries=settings.gemini_max_retries,
+                retry_backoff_seconds=settings.gemini_retry_backoff_seconds,
             )
         return DisabledLLMProvider()
 

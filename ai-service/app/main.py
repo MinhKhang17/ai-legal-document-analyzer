@@ -1,7 +1,14 @@
 from dotenv import load_dotenv
 from fastapi import FastAPI
+import logging
+import os
 
 load_dotenv()
+
+logging.basicConfig(
+    level=os.getenv("LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
 
 from app.api.knowledge_api import router as knowledge_router
 from app.api.risk_knowledge_api import router as risk_knowledge_router

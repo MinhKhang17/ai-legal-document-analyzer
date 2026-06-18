@@ -11,6 +11,9 @@ from app.graph.connection import get_driver
 from app.models.knowledge_models import ChunkedDocument, HierarchyNode, RetrievedChunk
 
 
+SUPPORTED_LABELS = {"Document", "Part", "Chapter", "Section", "Article", "Clause", "Point", "Chunk", "Subsection"}
+
+
 class GraphRepository:
     def __init__(self, vector_index_name: str | None = None) -> None:
         self.driver = get_driver()
@@ -18,26 +21,14 @@ class GraphRepository:
 
     def ensure_schema(self) -> None:
         queries = [
-            """
-            CREATE CONSTRAINT document_node_id IF NOT EXISTS
-            FOR (n:Document)
-            REQUIRE n.node_id IS UNIQUE
-            """,
-            """
-            CREATE CONSTRAINT section_node_id IF NOT EXISTS
-            FOR (n:Section)
-            REQUIRE n.node_id IS UNIQUE
-            """,
-            """
-            CREATE CONSTRAINT subsection_node_id IF NOT EXISTS
-            FOR (n:Subsection)
-            REQUIRE n.node_id IS UNIQUE
-            """,
-            """
-            CREATE CONSTRAINT chunk_node_id IF NOT EXISTS
-            FOR (n:Chunk)
-            REQUIRE n.node_id IS UNIQUE
-            """,
+            *[
+                f"""
+                CREATE CONSTRAINT {label.lower()}_node_id IF NOT EXISTS
+                FOR (n:{label})
+                REQUIRE n.node_id IS UNIQUE
+                """
+                for label in sorted(SUPPORTED_LABELS)
+            ],
             f"""
             CREATE VECTOR INDEX {self.vector_index_name} IF NOT EXISTS
             FOR (n:Chunk) ON (n.embedding)
@@ -61,14 +52,10 @@ class GraphRepository:
             node_groups[node.label].append(node)
 
         with self.driver.session() as session:
-            for node in node_groups.get("Document", []):
-                self._merge_node(session, node, document)
-            for node in node_groups.get("Section", []):
-                self._merge_node(session, node, document)
-            for node in node_groups.get("Subsection", []):
-                self._merge_node(session, node, document)
-            for node in node_groups.get("Chunk", []):
-                self._merge_node(session, node, document)
+            for label in sorted(SUPPORTED_LABELS):
+                for node in node_groups.get(label, []):
+                    self._merge_node(session, node, document)
+            self._link_chunk_sequence(session, [node for node in document.nodes if node.label == "Chunk"])
 
     def search_chunks(
         self,
@@ -247,23 +234,27 @@ class GraphRepository:
         chunk_id: str,
         sibling_limit: int = 2,
         metadata_filter: dict[str, Any] | None = None,
+        include_extended_context: bool = False,
     ) -> list[dict[str, Any]]:
         with self.driver.session() as session:
             ancestor_query = """
-            MATCH path = (doc:Document)-[:PARENT_OF*0..5]->(chunk:Chunk {node_id: $chunk_id})
+            MATCH path = (doc:Document)-[:PARENT_OF|HAS_PART|HAS_CHAPTER|HAS_SECTION|HAS_ARTICLE|HAS_CLAUSE|HAS_POINT|HAS_CHUNK*0..8]->(chunk:Chunk {node_id: $chunk_id})
             RETURN [node IN nodes(path) | {
                 node_id: node.node_id,
                 label: head(labels(node)),
                 title: coalesce(node.title, ''),
-                text: coalesce(node.text, '')
+                order: coalesce(node.order, 0)
             }] AS lineage
             """
             ancestor_result = session.run(ancestor_query, chunk_id=chunk_id).single()
             lineage = ancestor_result["lineage"] if ancestor_result else []
 
+            if not include_extended_context:
+                return [{"type": "ancestors", "nodes": lineage}]
+
             sibling_query = """
-            MATCH (parent)-[:PARENT_OF]->(chunk:Chunk {node_id: $chunk_id})
-            MATCH (parent)-[:PARENT_OF]->(sibling:Chunk)
+            MATCH (parent)-[:PARENT_OF|HAS_CHUNK]->(chunk:Chunk {node_id: $chunk_id})
+            MATCH (parent)-[:PARENT_OF|HAS_CHUNK]->(sibling:Chunk)
             WHERE sibling.node_id <> $chunk_id
             RETURN sibling.node_id AS node_id,
                    sibling.title AS title,
@@ -287,13 +278,13 @@ class GraphRepository:
             ]
 
         return [
-            {"type": "lineage", "nodes": lineage},
+            {"type": "ancestors", "nodes": lineage},
             {"type": "siblings", "nodes": siblings},
         ]
 
     def _merge_node(self, session, node: HierarchyNode, document: ChunkedDocument) -> None:
         label = node.label
-        if label not in {"Document", "Section", "Subsection", "Chunk"}:
+        if label not in SUPPORTED_LABELS:
             raise ValueError(f"Unsupported label: {label}")
 
         query = f"""
@@ -321,12 +312,67 @@ class GraphRepository:
             params["embedding"] = node.embedding
             query += ", n.embedding = $embedding"
 
-        if node.parent_id:
-            query += """
-            WITH n
-            MATCH (parent {node_id: $parent_id})
-            MERGE (parent)-[:PARENT_OF]->(n)
-            """
-            params["parent_id"] = node.parent_id
-
         session.run(query, **params)
+        if node.parent_id:
+            relation = self._relationship_type(label)
+            relation_params: dict[str, Any] = {
+                "parent_id": node.parent_id,
+                "child_id": node.node_id,
+            }
+            session.run(
+                """
+                MATCH (parent {node_id: $parent_id})
+                MATCH (child {node_id: $child_id})
+                MERGE (parent)-[:PARENT_OF]->(child)
+                """,
+                **relation_params,
+            )
+            if relation:
+                session.run(
+                    f"""
+                    MATCH (parent {{node_id: $parent_id}})
+                    MATCH (child {{node_id: $child_id}})
+                    MERGE (parent)-[:{relation}]->(child)
+                    """,
+                    **relation_params,
+                )
+
+    def _relationship_type(self, child_label: str) -> str | None:
+        if child_label == "Chunk":
+            return "HAS_CHUNK"
+        if child_label == "Point":
+            return "HAS_POINT"
+        if child_label == "Clause":
+            return "HAS_CLAUSE"
+        if child_label == "Article":
+            return "HAS_ARTICLE"
+        if child_label == "Section":
+            return "HAS_SECTION"
+        if child_label == "Chapter":
+            return "HAS_CHAPTER"
+        if child_label == "Part":
+            return "HAS_PART"
+        return None
+
+    def _link_chunk_sequence(self, session, chunks: list[HierarchyNode]) -> None:
+        ordered = sorted(chunks, key=lambda node: (node.order, node.node_id))
+        if not ordered:
+            return
+        session.run(
+            """
+            MATCH (doc:Document {node_id: $document_id})-[:PARENT_OF|HAS_PART|HAS_CHAPTER|HAS_SECTION|HAS_ARTICLE|HAS_CLAUSE|HAS_POINT|HAS_CHUNK*0..8]->(chunk:Chunk)
+            OPTIONAL MATCH (chunk)-[r:NEXT]->()
+            DELETE r
+            """,
+            document_id=ordered[0].metadata.get("document_id"),
+        )
+        for left, right in zip(ordered, ordered[1:]):
+            session.run(
+                """
+                MATCH (a:Chunk {node_id: $left_id})
+                MATCH (b:Chunk {node_id: $right_id})
+                MERGE (a)-[:NEXT]->(b)
+                """,
+                left_id=left.node_id,
+                right_id=right.node_id,
+            )

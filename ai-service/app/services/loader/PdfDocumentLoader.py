@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +15,9 @@ from app.services.loader.document_loaders import (
     looks_like_question,
 )
 from app.services.ocr_service import OCRService
+
+
+logger = logging.getLogger(__name__)
 
 
 class PdfDocumentLoader(DocumentLoader):
@@ -83,6 +87,7 @@ class PdfDocumentLoader(DocumentLoader):
                 last_page=page_number,
             )
         except Exception:
+            logger.exception("Failed to render PDF page %s for OCR from %s", page_number, source_path)
             return None
 
         if not rendered:
@@ -104,6 +109,11 @@ class PdfDocumentLoader(DocumentLoader):
                 try:
                     ocr_text = self._ocr_image(page_image)
                 except Exception:
+                    logger.exception(
+                        "Failed to OCR embedded image on page %s from %s",
+                        page_number,
+                        source_path,
+                    )
                     continue
                 if ocr_text.strip():
                     return ocr_text, "ocr_image"
@@ -117,7 +127,7 @@ class PdfDocumentLoader(DocumentLoader):
             if ocr_text.strip():
                 return ocr_text, "ocr"
         except Exception:
-            pass
+            logger.exception("Failed to OCR rendered page %s from %s", page_number, source_path)
 
         return "", "empty"
 

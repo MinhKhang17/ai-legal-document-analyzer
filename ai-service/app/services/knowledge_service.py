@@ -103,18 +103,26 @@ class KnowledgeService:
         self.repository.upsert_document(chunked)
 
         chunk_ids = [node.node_id for node in enriched_nodes if node.label == "Chunk"]
+        metadata = chunked.metadata
         return IngestionResult(
             document_id=chunked.document_id,
             title=chunked.title,
             file_type=chunked.file_type,
             source_path=str(chunked.source_path),
             total_blocks=len(extracted.blocks),
-            total_units=int(chunked.metadata.get("total_units", 0)),
+            total_units=int(metadata.get("total_child_chunks", metadata.get("total_units", 0))),
             total_chunks=len(chunk_ids),
             chunk_ids=chunk_ids,
             filename=filename or path.name,
             ingestion_version=ingestion_version,
             chunking_strategy=chunked.metadata.get("chunking_strategy", self.chunker.__class__.__name__),
+            total_parent_nodes=int(metadata.get("total_parent_nodes", 0)),
+            total_child_chunks=int(metadata.get("total_child_chunks", len(chunk_ids))),
+            embedded_chunks=int(metadata.get("embedded_chunks", len(chunk_ids))),
+            skipped_chunks=int(metadata.get("skipped_chunks", 0)),
+            avg_chunk_tokens=float(metadata.get("avg_chunk_tokens", 0.0)),
+            max_chunk_tokens=int(metadata.get("max_chunk_tokens", 0)),
+            warnings=list(metadata.get("warnings", [])),
         )
 
     async def ingest_upload(
