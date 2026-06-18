@@ -1,0 +1,10 @@
+fastapi
+uvicorn==0.49.0
+neo4j
+python-dotenv
+pydantic
+pypdf
+python-docx
+python-multipart
+pdf2image
+paddleocr

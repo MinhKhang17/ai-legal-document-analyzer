@@ -35,6 +35,8 @@ services:
       context: ./ai-service
     ports:
       - "8000:8000"
+    env_file:
+      - ./ai-service/.env
     environment:
       - PYTHONUNBUFFERED=1
       - NEO4J_URI=bolt://neo4j:7687

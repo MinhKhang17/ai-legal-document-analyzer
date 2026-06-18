@@ -1,0 +1,488 @@
+LEGAL_STRUCTURE_CHUNKING_V1
+
+MUC_TIEU
+Dung de train chunker/parser cho Legal RAG tieng Viet.
+Nguyen tac: uu tien chunk theo cau truc phap ly, khong chunk theo token truoc.
+
+==================================================
+1. VAN_BAN_QUY_PHAM_PHAP_LUAT
+==================================================
+
+Ap dung cho:
+- Luat
+- Bo luat
+- Nghi quyet
+- Phap lenh
+- Nghi dinh
+- Quyet dinh
+- Thong tu
+- Thong tu lien tich
+- Van ban hop nhat
+
+CAU_TRUC_CHUNG
+van_ban -> phan -> chuong -> muc -> tieu_muc -> dieu -> khoan -> diem -> tiet
+
+DON_VI_CHUNK_UU_TIEN
+1. Dieu
+2. Khoan
+3. Diem
+4. Cum dieu lien quan neu dieu qua ngan
+
+SCHEMA_CHUNK
+{
+  "doc_id": "",
+  "doc_type": "luat|bo_luat|nghi_dinh|thong_tu|nghi_quyet|quyet_dinh|van_ban_hop_nhat",
+  "doc_title": "",
+  "doc_number": "",
+  "issued_date": "",
+  "effective_date": "",
+  "status": "con_hieu_luc|het_hieu_luc|bi_thay_the|khong_ro",
+  "issuer": "",
+  "part": "",
+  "chapter": "",
+  "section": "",
+  "subsection": "",
+  "article": "",
+  "clause": "",
+  "point": "",
+  "item": "",
+  "heading": "",
+  "content": "",
+  "parent_path": "",
+  "legal_domain": [],
+  "keywords": [],
+  "source_url": ""
+}
+
+QUY_TAC_CHUNK
+- Neu Dieu <= 1200 tokens: chunk theo Dieu.
+- Neu Dieu > 1200 tokens: tach theo Khoan.
+- Neu Khoan > 800 tokens: tach theo Diem.
+- Luon giu metadata parent_path.
+- Khong tach roi tieu de Dieu khoi noi dung.
+- Khong tron nhieu Dieu khac chu de.
+- Co the overlap metadata, khong overlap noi dung qua nhieu.
+
+==================================================
+2. LUAT / BO_LUAT
+==================================================
+
+CAU_TRUC
+Ten luat -> Can cu ban hanh -> Phan -> Chuong -> Muc -> Dieu -> Khoan -> Diem
+
+CHUNK_DE_XUAT
+- article_chunk: mot Dieu day du.
+- clause_chunk: mot Khoan trong Dieu neu Dieu qua dai.
+- point_chunk: mot Diem neu Khoan qua dai.
+
+VI_DU_METADATA
+{
+  "doc_type": "bo_luat",
+  "doc_title": "Bo luat Dan su",
+  "article": "328",
+  "heading": "Dat coc",
+  "chunk_level": "article",
+  "content": ""
+}
+
+==================================================
+3. NGHI_DINH
+==================================================
+
+CAU_TRUC
+Ten nghi dinh -> Can cu -> Chuong -> Muc -> Dieu -> Khoan -> Diem -> Dieu khoan thi hanh -> Phu luc
+
+CHUNK_DE_XUAT
+- Chunk theo Dieu.
+- Voi Dieu xu phat: tach theo tung hanh vi vi pham neu co nhieu hanh vi.
+- Phu luc: chunk theo bang/muc/hang neu co cau truc ro.
+
+FIELD_BO_SUNG
+{
+  "sanction_type": "phat_tien|bien_phap_khac|khac",
+  "min_penalty": "",
+  "max_penalty": "",
+  "violation_behavior": ""
+}
+
+==================================================
+4. THONG_TU
+==================================================
+
+CAU_TRUC
+Ten thong tu -> Can cu -> Chuong -> Dieu -> Khoan -> Diem -> Bieu mau / Phu luc
+
+CHUNK_DE_XUAT
+- Chunk theo Dieu.
+- Neu la bieu mau: chunk theo tung mau.
+- Neu la quy trinh: chunk theo tung buoc/quy dinh.
+
+FIELD_BO_SUNG
+{
+  "form_code": "",
+  "procedure_step": "",
+  "applicable_subject": ""
+}
+
+==================================================
+5. VAN_BAN_HOP_NHAT
+==================================================
+
+MUC_DICH
+Dung de giam loi do luat bi sua doi nhieu lan.
+
+CAU_TRUC
+Van ban hop nhat -> Dieu goc -> Noi dung da hop nhat -> Chu thich sua doi/bo sung
+
+CHUNK_DE_XUAT
+- Chunk theo Dieu cua van ban hop nhat.
+- Metadata phai luu nguon goc van ban sua doi neu co.
+
+FIELD_BO_SUNG
+{
+  "is_consolidated": true,
+  "base_document": "",
+  "amending_documents": []
+}
+
+==================================================
+6. AN_LE
+==================================================
+
+CAU_TRUC
+An le -> So an le -> Tinh huong an le -> Giai phap phap ly -> Quy dinh lien quan -> Tu khoa -> Noi dung vu an -> Nhan dinh cua Toa -> Ket luan
+
+DON_VI_CHUNK_UU_TIEN
+1. legal_issue_chunk
+2. holding_chunk
+3. reasoning_chunk
+4. fact_chunk
+
+SCHEMA_CHUNK
+{
+  "doc_type": "an_le",
+  "case_no": "",
+  "case_name": "",
+  "legal_issue": "",
+  "facts": "",
+  "reasoning": "",
+  "holding": "",
+  "legal_basis": [],
+  "keywords": [],
+  "content": ""
+}
+
+QUY_TAC
+- Khong tron facts voi holding neu co the tach.
+- Holding la chunk quan trong nhat.
+- Reasoning dung cho legal reasoning.
+- Facts dung cho similarity voi vu viec/hop dong.
+
+==================================================
+7. BAN_AN / QUYET_DINH_TOA_AN
+==================================================
+
+CAU_TRUC
+Ban an -> Thong tin vu an -> Nguyen don -> Bi don -> Nguoi lien quan -> Yeu cau khoi kien -> Tinh tiet vu an -> Nhan dinh cua Toa -> Quyet dinh -> An phi
+
+DON_VI_CHUNK_UU_TIEN
+1. claim_chunk
+2. facts_chunk
+3. court_reasoning_chunk
+4. decision_chunk
+
+SCHEMA_CHUNK
+{
+  "doc_type": "ban_an",
+  "case_type": "",
+  "court": "",
+  "case_number": "",
+  "judgment_date": "",
+  "claim": "",
+  "facts": "",
+  "court_reasoning": "",
+  "decision": "",
+  "legal_basis": [],
+  "content": ""
+}
+
+QUY_TAC
+- Nhan dinh cua Toa la chunk quan trong nhat.
+- Quyet dinh dung de xac dinh outcome.
+- Yeu cau khoi kien dung de map loai tranh chap.
+- Khong dua toan bo ban an vao mot chunk.
+
+==================================================
+8. HOP_DONG
+==================================================
+
+Ap dung cho:
+- Hop dong lao dong/lam them
+- Hop dong cong tac vien
+- Hop dong thuc tap
+- Hop dong thue tro
+- Hop dong dao tao
+- Hop dong vay tien/tra gop
+- Cam ket bao mat
+- Giay cam ket
+- Giay uy quyen
+
+CAU_TRUC_CHUNG
+hop_dong -> thong_tin_cac_ben -> dinh_nghia -> doi_tuong -> thoi_han -> gia_tri -> thanh_toan -> dat_coc -> quyen -> nghia_vu -> bao_mat -> du_lieu_ca_nhan -> phat_vi_pham -> boi_thuong -> tam_ngung -> cham_dut -> don_phuong_cham_dut -> giai_quyet_tranh_chap -> dieu_khoan_chung -> chu_ky
+
+DON_VI_CHUNK_UU_TIEN
+1. Dieu khoan
+2. Tieu khoan
+3. Cum dieu khoan cung chu de
+
+SCHEMA_CHUNK
+{
+  "doc_type": "hop_dong",
+  "contract_type": "lao_dong|cong_tac_vien|thuc_tap|thue_tro|dao_tao|vay_tien|khac",
+  "clause_id": "",
+  "clause_title": "",
+  "clause_type": "",
+  "content": "",
+  "parties": [],
+  "obligated_party": "",
+  "benefited_party": "",
+  "amount": "",
+  "duration": "",
+  "condition": "",
+  "risk_candidates": [],
+  "source_file": ""
+}
+
+QUY_TAC_CHUNK
+- Moi Dieu la mot chunk neu ngan.
+- Neu Dieu co nhieu tieu khoan rui ro, tach tung tieu khoan.
+- Khong gop dieu khoan thanh toan voi phat/boi thuong neu tach duoc.
+- Khong bo chu phu dinh: khong, khong duoc, tru khi, moi truong hop.
+- Giu nguyen so tien, thoi han, ty le phan tram, dieu kien.
+- Giu nguyen chu the: Ben A, Ben B, nguoi lao dong, nguoi thue.
+
+==================================================
+9. TAXONOMY_DIEU_KHOAN_HOP_DONG
+==================================================
+
+chu_the
+dinh_nghia
+doi_tuong
+pham_vi_cong_viec
+thoi_han
+gia_han
+gia_tri
+thanh_toan
+dat_coc
+ky_quy
+phi_dich_vu
+lai_suat
+luong
+thuong
+phu_cap
+lam_them
+khau_tru
+quyen
+nghia_vu
+bao_mat
+so_huu_tri_tue
+du_lieu_ca_nhan
+kiem_tra_giam_sat
+dao_tao
+cam_ket_lam_viec
+thuc_tap
+thu_viec
+phat_vi_pham
+boi_thuong
+mien_trach_nhiem
+gioi_han_trach_nhiem
+cham_dut
+don_phuong_cham_dut
+tam_ngung
+bat_kha_khang
+chuyen_nhuong
+uy_quyen
+giai_quyet_tranh_chap
+toa_an
+trong_tai
+khieu_nai
+dieu_khoan_chung
+
+==================================================
+10. LABEL_CHO_TRAIN_CHUNKER
+==================================================
+
+B-DOC_TITLE
+I-DOC_TITLE
+B-PART
+I-PART
+B-CHAPTER
+I-CHAPTER
+B-SECTION
+I-SECTION
+B-ARTICLE
+I-ARTICLE
+B-CLAUSE
+I-CLAUSE
+B-POINT
+I-POINT
+B-CONTRACT_CLAUSE
+I-CONTRACT_CLAUSE
+B-CASE_FACT
+I-CASE_FACT
+B-COURT_REASONING
+I-COURT_REASONING
+B-DECISION
+I-DECISION
+O
+
+LABEL_METADATA
+article_no
+clause_no
+point_no
+heading
+chunk_level
+doc_type
+parent_path
+
+==================================================
+11. REGEX_HINTS_TIENG_VIET
+==================================================
+
+ARTICLE_PATTERNS
+- ^Dieu\s+\d+[a-zA-Z]?\.
+- ^Dieu\s+\d+[a-zA-Z]?\s+
+- ^DIEU\s+\d+
+
+CLAUSE_PATTERNS
+- ^\d+\.
+- ^\(\d+\)
+- ^Khoan\s+\d+
+
+POINT_PATTERNS
+- ^[a-z]\)
+- ^[a-z]\.
+- ^Diem\s+[a-z]
+
+CHAPTER_PATTERNS
+- ^Chuong\s+[IVXLCDM\d]+
+- ^CHUONG\s+[IVXLCDM\d]+
+
+SECTION_PATTERNS
+- ^Muc\s+\d+
+- ^MUC\s+\d+
+
+CONTRACT_CLAUSE_PATTERNS
+- ^Dieu\s+\d+
+- ^\d+\.\d+
+- ^[A-ZĐ][^\n]{3,80}$
+
+==================================================
+12. CHUNK_QUALITY_CHECK
+==================================================
+
+Mot chunk tot phai co:
+- content khong rong
+- metadata doc_type
+- parent_path
+- heading neu co
+- so Dieu/Khoan/Diem neu co
+- khong mat phu dinh
+- khong mat so tien/thoi han
+- khong tron qua nhieu chu de
+- du ngu canh de hieu doc lap
+
+BAD_CHUNK
+"khong duoc hoan tra trong moi truong hop"
+
+GOOD_CHUNK
+"Dieu 2. Tien bao dam. Ben B phai nop 5.000.000 VND tien bao dam. Khoan tien nay khong duoc hoan tra trong moi truong hop."
+
+==================================================
+13. TRAINING_SAMPLE_FORMAT
+==================================================
+
+{
+  "text": "",
+  "spans": [
+    {
+      "start": 0,
+      "end": 100,
+      "label": "CONTRACT_CLAUSE",
+      "metadata": {
+        "clause_id": "2",
+        "clause_title": "Tien bao dam",
+        "clause_type": "dat_coc"
+      }
+    }
+  ]
+}
+
+==================================================
+14. OUTPUT_CHUNK_FORMAT
+==================================================
+
+{
+  "chunk_id": "",
+  "doc_id": "",
+  "doc_type": "",
+  "chunk_level": "",
+  "parent_path": "",
+  "title": "",
+  "content": "",
+  "metadata": {},
+  "embedding_text": "",
+  "retrieval_text": ""
+}
+
+EMBEDDING_TEXT_TEMPLATE
+[doc_type]
+[title]
+[parent_path]
+[content]
+
+RETRIEVAL_TEXT_TEMPLATE
+Loai tai lieu: ...
+Vi tri: ...
+Tieu de: ...
+Noi dung: ...
+
+==================================================
+15. CHIEN_LUOC_CHUNKING_CHO_LEGAL_RAG
+==================================================
+
+1. Parse structure truoc.
+2. Detect heading.
+3. Detect article/clause/point.
+4. Build parent_path.
+5. Chunk theo don vi phap ly.
+6. Enrich metadata.
+7. Generate embedding_text.
+8. Index vao vector store.
+9. Index song song BM25.
+10. Khi query, dung hybrid search.
+
+==================================================
+16. UU_TIEN_CHO_BAI_TOAN_SINH_VIEN
+==================================================
+
+Nhan dien chunk lien quan den:
+- dat coc
+- ky quy
+- giu giay to
+- luong
+- lam them
+- phat nghi viec
+- boi thuong
+- cham dut
+- thue tro
+- hoan coc
+- hoc phi
+- cam ket viec lam
+- lai suat
+- phi an
+- quyen rieng tu
+- khieu nai
+- khoi kien
+
+END
