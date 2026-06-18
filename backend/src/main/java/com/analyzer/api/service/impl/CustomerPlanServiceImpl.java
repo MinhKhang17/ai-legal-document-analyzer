@@ -83,7 +83,10 @@ public class CustomerPlanServiceImpl implements CustomerPlanService {
 
         paymentTransactionRepository.save(transaction);
 
-        return customerPlanMapper.toResponseDTO(customerPlan);
+        CustomerPlanResponseDTO response = customerPlanMapper.toResponseDTO(customerPlan);
+        response.setLatestTransactionId(transaction.getId());
+        response.setLatestTransactionCode(transaction.getTransactionCode());
+        return response;
     }
 
     @Override

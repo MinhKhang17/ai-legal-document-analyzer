@@ -38,6 +38,15 @@ public class PaymentTransactionResponseDTO {
     @Schema(description = "Transaction reference code", example = "TX123456789")
     private String transactionCode;
 
+    @Schema(description = "URL used by the customer to complete payment")
+    private String paymentUrl;
+
+    @Schema(description = "Gateway transaction number")
+    private String gatewayTransactionNo;
+
+    @Schema(description = "Gateway response code")
+    private String gatewayResponseCode;
+
     @Schema(description = "Transaction paid date time")
     private LocalDateTime paidAt;
 

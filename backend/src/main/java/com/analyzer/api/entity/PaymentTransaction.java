@@ -46,6 +46,15 @@ public class PaymentTransaction {
     @Column(name = "transaction_code", nullable = false, unique = true)
     private String transactionCode;
 
+    @Column(name = "payment_url", length = 2048)
+    private String paymentUrl;
+
+    @Column(name = "gateway_transaction_no")
+    private String gatewayTransactionNo;
+
+    @Column(name = "gateway_response_code")
+    private String gatewayResponseCode;
+
     @Column(name = "paid_at")
     private LocalDateTime paidAt;
 

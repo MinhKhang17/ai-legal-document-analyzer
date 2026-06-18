@@ -37,6 +37,12 @@ public class CustomerPlanResponseDTO {
     @Schema(description = "Remaining quota", example = "95")
     private Integer remainingQuota;
 
+    @Schema(description = "Latest pending/success payment transaction ID", example = "10")
+    private Long latestTransactionId;
+
+    @Schema(description = "Latest payment transaction reference code", example = "TX123456789")
+    private String latestTransactionCode;
+
     @Schema(description = "Creation date time")
     private LocalDateTime createdAt;
 

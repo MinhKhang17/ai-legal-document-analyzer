@@ -1,20 +1,24 @@
 package com.analyzer.api.service.impl;
 
 import com.analyzer.api.dto.paymenttransaction.PaymentTransactionResponseDTO;
+import com.analyzer.api.dto.paymenttransaction.PaymentUrlResponseDTO;
 import com.analyzer.api.entity.CustomerPlan;
 import com.analyzer.api.entity.PaymentTransaction;
-import com.analyzer.api.enums.PlanStatus;
+import com.analyzer.api.enums.PaymentMethod;
 import com.analyzer.api.enums.PaymentStatus;
+import com.analyzer.api.enums.PlanStatus;
 import com.analyzer.api.mapper.PaymentTransactionMapper;
 import com.analyzer.api.repository.CustomerPlanRepository;
 import com.analyzer.api.repository.PaymentTransactionRepository;
 import com.analyzer.api.service.PaymentTransactionService;
+import com.analyzer.api.service.VnPayService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -24,6 +28,7 @@ public class PaymentTransactionServiceImpl implements PaymentTransactionService 
     private final PaymentTransactionRepository paymentTransactionRepository;
     private final CustomerPlanRepository customerPlanRepository;
     private final PaymentTransactionMapper paymentTransactionMapper;
+    private final VnPayService vnPayService;
 
     @Override
     @Transactional(readOnly = true)
@@ -45,26 +50,91 @@ public class PaymentTransactionServiceImpl implements PaymentTransactionService 
 
     @Override
     @Transactional
-    public PaymentTransactionResponseDTO simulateSuccess(Long transactionId) {
+    public PaymentUrlResponseDTO createVnPayPaymentUrl(Long transactionId, Long customerId, String clientIp) {
         PaymentTransaction transaction = paymentTransactionRepository.findById(transactionId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy giao dịch thanh toán với id: " + transactionId));
+                .orElseThrow(() -> new RuntimeException("Khong tim thay giao dich thanh toan voi id: " + transactionId));
 
+        if (!transaction.getCustomer().getId().equals(customerId)) {
+            throw new RuntimeException("Ban khong co quyen thanh toan giao dich nay");
+        }
+        if (transaction.getPaymentMethod() != PaymentMethod.VNPAY) {
+            throw new RuntimeException("Giao dich nay khong su dung phuong thuc VNPAY");
+        }
         if (transaction.getPaymentStatus() != PaymentStatus.PENDING) {
-            throw new RuntimeException("Giao dịch này đã được xử lý trước đó");
+            throw new RuntimeException("Giao dich nay da duoc xu ly truoc do");
         }
 
-        // Cập nhật PaymentTransaction = SUCCESS
+        String paymentUrl = vnPayService.createPaymentUrl(transaction, clientIp);
+        transaction.setPaymentUrl(paymentUrl);
+        PaymentTransaction savedTransaction = paymentTransactionRepository.save(transaction);
+
+        return new PaymentUrlResponseDTO(
+                savedTransaction.getId(),
+                savedTransaction.getTransactionCode(),
+                PaymentMethod.VNPAY.name(),
+                paymentUrl
+        );
+    }
+
+    @Override
+    @Transactional
+    public PaymentTransactionResponseDTO handleVnPayCallback(Map<String, String> callbackParams) {
+        if (!vnPayService.isValidSignature(callbackParams)) {
+            throw new RuntimeException("Chu ky VNPAY khong hop le");
+        }
+
+        String transactionCode = callbackParams.get("vnp_TxnRef");
+        PaymentTransaction transaction = paymentTransactionRepository.findByTransactionCode(transactionCode)
+                .orElseThrow(() -> new RuntimeException("Khong tim thay giao dich VNPAY: " + transactionCode));
+
+        transaction.setGatewayTransactionNo(callbackParams.get("vnp_TransactionNo"));
+        transaction.setGatewayResponseCode(callbackParams.get("vnp_ResponseCode"));
+
+        String responseCode = callbackParams.get("vnp_ResponseCode");
+        String transactionStatus = callbackParams.get("vnp_TransactionStatus");
+        if ("00".equals(responseCode) && "00".equals(transactionStatus)) {
+            transaction = markSuccess(transaction);
+        } else {
+            transaction = markFailed(transaction);
+        }
+
+        return paymentTransactionMapper.toResponseDTO(transaction);
+    }
+
+    @Override
+    @Transactional
+    public PaymentTransactionResponseDTO simulateSuccess(Long transactionId) {
+        PaymentTransaction transaction = paymentTransactionRepository.findById(transactionId)
+                .orElseThrow(() -> new RuntimeException("Khong tim thay giao dich thanh toan voi id: " + transactionId));
+
+        return paymentTransactionMapper.toResponseDTO(markSuccess(transaction));
+    }
+
+    @Override
+    @Transactional
+    public PaymentTransactionResponseDTO simulateFailed(Long transactionId) {
+        PaymentTransaction transaction = paymentTransactionRepository.findById(transactionId)
+                .orElseThrow(() -> new RuntimeException("Khong tim thay giao dich thanh toan voi id: " + transactionId));
+
+        return paymentTransactionMapper.toResponseDTO(markFailed(transaction));
+    }
+
+    private PaymentTransaction markSuccess(PaymentTransaction transaction) {
+        if (transaction.getPaymentStatus() == PaymentStatus.SUCCESS) {
+            return transaction;
+        }
+        if (transaction.getPaymentStatus() != PaymentStatus.PENDING) {
+            throw new RuntimeException("Giao dich nay da duoc xu ly truoc do");
+        }
+
         transaction.setPaymentStatus(PaymentStatus.SUCCESS);
         transaction.setPaidAt(LocalDateTime.now());
         PaymentTransaction savedTransaction = paymentTransactionRepository.save(transaction);
 
-        // Cập nhật CustomerPlan = ACTIVE
         CustomerPlan customerPlan = transaction.getCustomerPlan();
         if (customerPlan != null) {
             Long customerId = transaction.getCustomer().getId();
-            
-            // Một Customer chỉ nên có một CustomerPlan ACTIVE tại một thời điểm.
-            // Chuyển gói cũ đang ACTIVE (nếu có) thành EXPIRED.
+
             customerPlanRepository.findByCustomerIdAndStatus(customerId, PlanStatus.ACTIVE)
                     .ifPresent(oldActivePlan -> {
                         if (!oldActivePlan.getId().equals(customerPlan.getId())) {
@@ -78,31 +148,23 @@ public class PaymentTransactionServiceImpl implements PaymentTransactionService 
             if (transaction.getSubscriptionPlan() != null) {
                 customerPlan.setEndDate(LocalDateTime.now().plusDays(transaction.getSubscriptionPlan().getDurationDays()));
             } else {
-                customerPlan.setEndDate(LocalDateTime.now().plusDays(30)); // fallback
+                customerPlan.setEndDate(LocalDateTime.now().plusDays(30));
             }
             customerPlanRepository.save(customerPlan);
         }
 
-        return paymentTransactionMapper.toResponseDTO(savedTransaction);
+        return savedTransaction;
     }
 
-    @Override
-    @Transactional
-    public PaymentTransactionResponseDTO simulateFailed(Long transactionId) {
-        PaymentTransaction transaction = paymentTransactionRepository.findById(transactionId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy giao dịch thanh toán với id: " + transactionId));
-
+    private PaymentTransaction markFailed(PaymentTransaction transaction) {
+        if (transaction.getPaymentStatus() == PaymentStatus.FAILED) {
+            return transaction;
+        }
         if (transaction.getPaymentStatus() != PaymentStatus.PENDING) {
-            throw new RuntimeException("Giao dịch này đã được xử lý trước đó");
+            throw new RuntimeException("Giao dich nay da duoc xu ly truoc do");
         }
 
-        // Cập nhật PaymentTransaction = FAILED
         transaction.setPaymentStatus(PaymentStatus.FAILED);
-        PaymentTransaction savedTransaction = paymentTransactionRepository.save(transaction);
-
-        // Giữ nguyên CustomerPlan ở trạng thái PENDING hoặc cập nhật thành CANCELLED/PENDING
-        // Ở đây chúng ta giữ nguyên trạng thái PENDING như yêu cầu.
-        
-        return paymentTransactionMapper.toResponseDTO(savedTransaction);
+        return paymentTransactionRepository.save(transaction);
     }
 }
