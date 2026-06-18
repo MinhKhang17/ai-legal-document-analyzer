@@ -22,7 +22,7 @@ services:
       - paddlex_cache:/root/.paddlex
 
   neo4j:
-    image: neo4j:5
+    image: neo4j:5.26-community
     container_name: neo4j
     restart: unless-stopped
     ports:
@@ -30,6 +30,9 @@ services:
       - "7687:7687"
     environment:
       NEO4J_AUTH: neo4j/password
+      NEO4J_server_memory_pagecache_size: 512M
+      NEO4J_server_memory_heap_initial__size: 512M
+      NEO4J_server_memory_heap_max__size: 512M
     volumes:
       - neo4j_data:/data
     healthcheck:

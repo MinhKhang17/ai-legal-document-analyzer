@@ -31,4 +31,7 @@ def shutdown() -> None:
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "neo4j_uri": os.getenv("NEO4J_URI", ""),
+    }
