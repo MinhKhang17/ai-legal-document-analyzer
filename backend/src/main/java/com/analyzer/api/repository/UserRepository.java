@@ -1,8 +1,9 @@
 package com.analyzer.api.repository;
 
-import com.analyzer.api.domain.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
+
+import com.analyzer.api.entity.User;
 
 import java.util.Optional;
 

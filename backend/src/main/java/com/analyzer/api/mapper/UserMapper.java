@@ -1,8 +1,9 @@
 package com.analyzer.api.mapper;
 
-import com.analyzer.api.domain.entity.User;
-import com.analyzer.api.dto.UserRequestDTO;
-import com.analyzer.api.dto.UserResponseDTO;
+import com.analyzer.api.dto.user.UserRequestDTO;
+import com.analyzer.api.dto.user.UserResponseDTO;
+import com.analyzer.api.entity.User;
+
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingConstants;

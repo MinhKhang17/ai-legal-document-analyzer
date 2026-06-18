@@ -1,6 +1,6 @@
 package com.analyzer.api.security;
 
-import com.analyzer.api.domain.entity.User;
+import com.analyzer.api.entity.User;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -28,8 +28,7 @@ public class UserDetailsImpl implements UserDetails {
 
     public static UserDetailsImpl build(User user) {
         List<GrantedAuthority> authorities = List.of(
-                new SimpleGrantedAuthority("ROLE_" + user.getRole().getName().name())
-        );
+                new SimpleGrantedAuthority("ROLE_" + user.getRole().getName().name()));
 
         return new UserDetailsImpl(
                 user.getId(),
@@ -38,6 +37,7 @@ public class UserDetailsImpl implements UserDetails {
                 user.getPassword(),
                 authorities);
     }
+
     @Override
     public boolean isAccountNonExpired() {
         return true;

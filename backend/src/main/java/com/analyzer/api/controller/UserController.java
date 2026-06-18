@@ -1,7 +1,7 @@
 package com.analyzer.api.controller;
 
 import com.analyzer.api.dto.ApiResponseDTO;
-import com.analyzer.api.dto.UserResponseDTO;
+import com.analyzer.api.dto.user.UserResponseDTO;
 import com.analyzer.api.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
