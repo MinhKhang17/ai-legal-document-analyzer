@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: ai-legal-document-analyzer
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/ai_legal_db}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:12345}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+server:
+  port: 8080
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
+
+app:
+  jwt:
+    secret: a-very-secure-secret-key-that-should-be-at-least-256-bits-long-for-hmac-sha-256
+    access-token-expiration-ms: 900000       # 15 minutes
+    refresh-token-expiration-ms: 604800000   # 7 days
+    refresh-cookie-name: refreshToken

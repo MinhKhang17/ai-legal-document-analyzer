@@ -1,0 +1,31 @@
+from dotenv import load_dotenv
+from fastapi import FastAPI
+
+load_dotenv()
+
+from app.api.knowledge_api import router as knowledge_router
+from app.api.risk_knowledge_api import router as risk_knowledge_router
+from app.api.technology_api import router as technology_router
+from app.api.v2.contracts_api import router as contracts_v2_router
+from app.api.v2.contract_errors_api import router as contract_errors_router
+from app.api.v2.chatbot_api import router as chatbot_router
+from app.graph.connection import close_driver
+
+app = FastAPI(title="Neo4j AI Service")
+
+app.include_router(technology_router)
+app.include_router(knowledge_router)
+app.include_router(risk_knowledge_router)
+app.include_router(contracts_v2_router)
+app.include_router(contract_errors_router)
+app.include_router(chatbot_router)
+
+
+@app.on_event("shutdown")
+def shutdown() -> None:
+    close_driver()
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}

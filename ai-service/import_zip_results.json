@@ -1,0 +1,48 @@
+{
+  "success": [],
+  "failed": [
+    {
+      "status": "failed",
+      "file": "C:\\Users\\DELL\\AppData\\Local\\Temp\\vbpl_extract_n1ikcjzy\\files_100617_1780570061703\\Template.pdf",
+      "title": "Template",
+      "error": "HTTP 500: Internal Server Error"
+    },
+    {
+      "status": "failed",
+      "file": "C:\\Users\\DELL\\AppData\\Local\\Temp\\vbpl_extract_n1ikcjzy\\files_100627_1780570311746\\VanBanGoc_20.2014.QD.UBND.pdf",
+      "title": "VanBanGoc 20.2014.QD.UBND",
+      "error": "HTTP 500: Internal Server Error"
+    },
+    {
+      "status": "failed",
+      "file": "C:\\Users\\DELL\\AppData\\Local\\Temp\\vbpl_extract_n1ikcjzy\\files_100634_1780569876425\\VanBanGoc_13.2009.QD.UBND.pdf",
+      "title": "VanBanGoc 13.2009.QD.UBND",
+      "error": "HTTP 500: Internal Server Error"
+    },
+    {
+      "status": "failed",
+      "file": "C:\\Users\\DELL\\AppData\\Local\\Temp\\vbpl_extract_n1ikcjzy\\files_100635_1780569914021\\Template.pdf",
+      "title": "Template",
+      "error": "HTTP 500: Internal Server Error"
+    },
+    {
+      "status": "failed",
+      "file": "C:\\Users\\DELL\\AppData\\Local\\Temp\\vbpl_extract_n1ikcjzy\\files_100645_1780569907372\\VanBanGoc_683.QD-UBND (PL).pdf",
+      "title": "VanBanGoc 683.QD UBND (PL)",
+      "error": "HTTP 500: Internal Server Error"
+    },
+    {
+      "status": "failed",
+      "file": "C:\\Users\\DELL\\AppData\\Local\\Temp\\vbpl_extract_n1ikcjzy\\files_100645_1780569907372\\VanBanGoc_683_QD-UBND_13022026.pdf",
+      "title": "VanBanGoc 683 QD UBND 13022026",
+      "error": "HTTP 500: Internal Server Error"
+    },
+    {
+      "status": "failed",
+      "file": "C:\\Users\\DELL\\AppData\\Local\\Temp\\vbpl_extract_n1ikcjzy\\files_100645_1780569907372\\Quyết định số 18 2009 của UBND tỉnh.doc",
+      "title": "Quyết định số 18 2009 của UBND tỉnh",
+      "error": "HTTP 500: Internal Server Error"
+    }
+  ],
+  "skipped": []
+}

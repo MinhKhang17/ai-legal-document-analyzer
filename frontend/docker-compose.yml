@@ -1,0 +1,9 @@
+services:
+  frontend:
+    image: legal-rag-platform/frontend:dev
+    build:
+      context: .
+    ports:
+      - "5173:80"
+    environment:
+      NODE_ENV: development
