@@ -26,6 +26,12 @@ springdoc:
     operationsSorter: method
 
 app:
+  api:
+    callback-base-url: ${APP_CALLBACK_BASE_URL:http://localhost:8080}
+  ai-service:
+    base-url: ${AI_SERVICE_BASE_URL:http://localhost:8000}
+  storage:
+    upload-root: ${UPLOAD_ROOT:uploads}
   jwt:
     secret: a-very-secure-secret-key-that-should-be-at-least-256-bits-long-for-hmac-sha-256
     access-token-expiration-ms: 900000       # 15 minutes
