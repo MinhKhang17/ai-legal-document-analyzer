@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import tempfile
+import importlib.util
 from pathlib import Path
 from typing import Any
 
@@ -15,8 +16,8 @@ class OCRService:
             from paddleocr import PaddleOCR
         except ImportError as exc:
             raise RuntimeError(
-                "paddleocr is required for OCR support. "
-                "Install the 'paddleocr' package in the runtime environment."
+                "OCR backend is not available. Install 'paddleocr' (and its runtime dependencies) "
+                "in the container to process scanned PDFs or image-based DOCX files."
             ) from exc
 
         self.ocr = PaddleOCR(
@@ -28,6 +29,13 @@ class OCRService:
             enable_cinn=False,
             use_doc_orientation_classify=False,
             use_doc_unwarping=False,
+        )
+
+    @staticmethod
+    def is_available() -> bool:
+        return (
+            importlib.util.find_spec("paddleocr") is not None
+            and importlib.util.find_spec("paddle") is not None
         )
 
     def _collect_texts(self, payload: Any) -> list[str]:

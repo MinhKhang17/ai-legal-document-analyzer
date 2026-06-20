@@ -1,7 +1,7 @@
 services:
   api:
     build:
-      context: .
+      context: .  
       dockerfile: Dockerfile
     container_name: ai-service-api
     restart: unless-stopped
@@ -17,9 +17,13 @@ services:
       NEO4J_USER: neo4j
       NEO4J_PASSWORD: password
       PYTHONUNBUFFERED: "1"
-      PADDLEOCR_HOME: /root/.paddlex
+      PADDLEOCR_HOME: /root/.paddleocr
+      XDG_CACHE_HOME: /root/.cache
+      DOCUMENT_IMPORT_DIR: /app/uploads
     volumes:
-      - paddlex_cache:/root/.paddlex
+      - ./uploads:/app/uploads
+      - paddleocr_cache:/root/.paddleocr
+      - python_cache:/root/.cache
 
   neo4j:
     image: neo4j:5.26-community
@@ -43,4 +47,5 @@ services:
 
 volumes:
   neo4j_data:
-  paddlex_cache:
+  paddleocr_cache:
+  python_cache:

@@ -99,6 +99,12 @@ class PdfDocumentLoader(DocumentLoader):
         if text.strip():
             return text, "pdf_text"
 
+        if not OCRService.is_available():
+            raise RuntimeError(
+                f"Scanned PDF page {page_number} requires OCR support, but the OCR backend is not installed "
+                f"(missing 'paddleocr'/'paddlepaddle')."
+            )
+
         page_images = self._extract_page_images(page)
         if page_images:
             page_images.sort(

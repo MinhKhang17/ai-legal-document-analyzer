@@ -27,6 +27,12 @@ class Settings:
     vector_store_provider: str = os.getenv("VECTOR_STORE_PROVIDER", "neo4j")
     vector_index_name: str = os.getenv("VECTOR_INDEX_NAME", "chunk_embedding_index")
     legal_vector_index_name: str = os.getenv("LEGAL_VECTOR_INDEX_NAME", "legal_chunk_embedding_index")
+    document_import_dir: Path = Path(
+        os.getenv(
+            "DOCUMENT_IMPORT_DIR",
+            str(Path(__file__).resolve().parents[3] / ".tmp" / "test-files"),
+        )
+    )
     docs_flow_dir: Path = Path(
         os.getenv(
             "LEGAL_DOCS_FLOW_DIR",

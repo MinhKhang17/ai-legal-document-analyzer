@@ -64,6 +64,58 @@ class GraphRepository:
         query_text: str | None = None,
         metadata_filter: dict[str, Any] | None = None,
     ) -> list[RetrievedChunk]:
+        return self._search_chunks_with_filter(
+            query_embedding=query_embedding,
+            top_k=top_k,
+            query_text=query_text,
+            metadata_filter=metadata_filter,
+        )
+
+    def search_user_chunks(
+        self,
+        embedding: list[float],
+        user_id: str,
+        workspace_id: str,
+        top_k: int = 5,
+        *,
+        query_text: str | None = None,
+    ) -> list[RetrievedChunk]:
+        return self._search_chunks_with_filter(
+            query_embedding=embedding,
+            top_k=top_k,
+            query_text=query_text,
+            metadata_filter={
+                "source_type": "USER_DOCUMENT",
+                "user_id": user_id,
+                "workspace_id": workspace_id,
+            },
+        )
+
+    def search_knowledge_chunks(
+        self,
+        embedding: list[float],
+        top_k: int = 5,
+        *,
+        query_text: str | None = None,
+    ) -> list[RetrievedChunk]:
+        return self._search_chunks_with_filter(
+            query_embedding=embedding,
+            top_k=top_k,
+            query_text=query_text,
+            metadata_filter={
+                "source_type": "SYSTEM_KB",
+                "ingest_source": "INGEST_V2",
+                "effective_status": {"ACTIVE", "UNKNOWN"},
+            },
+        )
+
+    def _search_chunks_with_filter(
+        self,
+        query_embedding: list[float],
+        top_k: int = 5,
+        query_text: str | None = None,
+        metadata_filter: dict[str, Any] | None = None,
+    ) -> list[RetrievedChunk]:
         self.ensure_schema()
         cypher = f"""
         CALL db.index.vector.queryNodes($index_name, $top_k, $embedding)
@@ -116,6 +168,8 @@ class GraphRepository:
             score=float(record["score"]),
             title=record["title"] or "",
             context=self.get_context(record["chunk_id"], metadata_filter=metadata_filter),
+            source_type=str(metadata.get("source_type") or ""),
+            metadata=metadata,
         )
 
     def list_chunks(self) -> list[dict[str, Any]]:
@@ -191,6 +245,8 @@ class GraphRepository:
                 score=score,
                 title=chunk["title"],
                 context=self.get_context(chunk["chunk_id"]),
+                source_type=str(self._parse_metadata(chunk.get("metadata_json")).get("source_type") or ""),
+                metadata=self._parse_metadata(chunk.get("metadata_json")),
             )
             for score, chunk in selected
         ]
@@ -205,7 +261,12 @@ class GraphRepository:
         if not metadata_filter:
             return True
         for key, expected in metadata_filter.items():
-            if metadata.get(key) != expected:
+            actual = metadata.get(key)
+            if isinstance(expected, (list, tuple, set, frozenset)):
+                if actual not in expected:
+                    return False
+                continue
+            if actual != expected:
                 return False
         return True
 

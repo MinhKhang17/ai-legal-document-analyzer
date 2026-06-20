@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import io
+import zipfile
 from pathlib import Path
 
 from app.models.knowledge_models import DocumentBlock, ExtractedDocument
@@ -13,6 +15,42 @@ from app.services.loader.document_loaders import (
 
 class WordDocumentLoader(DocumentLoader):
     supported_extensions = (".docx",)
+
+    def _extract_embedded_image_texts(self, source_path: Path) -> list[str]:
+        try:
+            with zipfile.ZipFile(source_path) as archive:
+                media_names = [name for name in archive.namelist() if name.startswith("word/media/")]
+                if not media_names:
+                    return []
+
+                try:
+                    from PIL import Image
+                except ImportError:
+                    return []
+
+                try:
+                    from app.services.ocr_service import OCRService
+                except Exception:
+                    return []
+
+                if not OCRService.is_available():
+                    return []
+
+                ocr_service = OCRService()
+                texts: list[str] = []
+                for name in media_names:
+                    try:
+                        with archive.open(name) as media_file:
+                            image_bytes = media_file.read()
+                        with Image.open(io.BytesIO(image_bytes)) as image:
+                            ocr_text = ocr_service.extract_text_from_pil_image(image)
+                            if ocr_text.strip():
+                                texts.append(ocr_text.strip())
+                    except Exception:
+                        continue
+                return texts
+        except Exception:
+            return []
 
     def load(self, source_path: Path) -> ExtractedDocument:
         try:
@@ -67,6 +105,9 @@ class WordDocumentLoader(DocumentLoader):
                         f"[Table {table_index} R{row_index}C{cell_index}] {cell_text}",
                         kind="table_cell",
                     )
+
+        for image_text in self._extract_embedded_image_texts(source_path):
+            append_block(image_text, kind="ocr")
 
         return ExtractedDocument(
             source_path=source_path,

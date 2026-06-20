@@ -8,3 +8,4 @@ python-docx
 python-multipart
 pdf2image
 paddleocr
+paddlepaddle
