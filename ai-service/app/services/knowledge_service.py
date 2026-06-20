@@ -62,6 +62,40 @@ class KnowledgeService:
                 metadata=extracted.metadata,
             )
         chunked = self.chunker.chunk_document(extracted)
+        is_system_kb = str(self.document_metadata.get("source_type") or chunked.metadata.get("source_type") or "").upper() == "SYSTEM_KB"
+        if is_system_kb:
+            enriched_nodes = []
+            for node in chunked.nodes:
+                metadata = dict(node.metadata)
+                if node.label == "Chunk":
+                    metadata.setdefault("knowledge_document_id", chunked.document_id)
+                    metadata.setdefault("law_name", chunked.title)
+                    metadata.setdefault("law_code", None)
+                    metadata.setdefault("legal_domain", self.document_metadata.get("legal_domain") or None)
+                    metadata.setdefault("effective_status", self.document_metadata.get("effective_status") or "UNKNOWN")
+                    metadata.setdefault("ingest_source", self.document_metadata.get("ingest_source") or "INGEST_V2")
+                    metadata.setdefault("source_type", "SYSTEM_KB")
+                enriched_nodes.append(
+                    node.__class__(
+                        node_id=node.node_id,
+                        label=node.label,
+                        title=node.title,
+                        text=node.text,
+                        parent_id=node.parent_id,
+                        order=node.order,
+                        token_count=node.token_count,
+                        metadata=metadata,
+                        embedding=node.embedding,
+                    )
+                )
+            chunked = chunked.__class__(
+                document_id=chunked.document_id,
+                title=chunked.title,
+                source_path=chunked.source_path,
+                file_type=chunked.file_type,
+                nodes=enriched_nodes,
+                metadata=chunked.metadata,
+            )
 
         chunk_nodes = [node for node in chunked.nodes if node.label == "Chunk"]
         embedding_texts = [
@@ -186,6 +220,9 @@ class KnowledgeServiceV2(KnowledgeService):
         merged_metadata = {
             "ingestion_version": 2,
             "chunking_strategy": "structural_semantic_subchunk_v2",
+            "source_type": "SYSTEM_KB",
+            "ingest_source": "INGEST_V2",
+            "effective_status": "UNKNOWN",
         }
         if document_metadata:
             merged_metadata.update(document_metadata)

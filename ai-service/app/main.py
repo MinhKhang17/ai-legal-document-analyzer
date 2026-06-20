@@ -11,6 +11,8 @@ logging.basicConfig(
 )
 
 from app.api.knowledge_api import router as knowledge_router
+from app.api.internal_documents_api import router as internal_documents_router
+from app.api.rag_api import router as rag_router
 from app.api.risk_knowledge_api import router as risk_knowledge_router
 from app.api.technology_api import router as technology_router
 from app.api.v2.contracts_api import router as contracts_v2_router
@@ -20,6 +22,8 @@ app = FastAPI(title="Neo4j AI Service")
 
 app.include_router(technology_router)
 app.include_router(knowledge_router)
+app.include_router(internal_documents_router)
+app.include_router(rag_router)
 app.include_router(risk_knowledge_router)
 app.include_router(contracts_v2_router)
 
