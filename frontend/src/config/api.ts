@@ -19,6 +19,12 @@ export const API_ENDPOINTS = {
     refresh: getRequiredEnvValue('VITE_AUTH_REFRESH_API'),
     me: getRequiredEnvValue('VITE_AUTH_ME_API'),
   },
+  workspaces: {
+    create: getRequiredEnvValue("VITE_WORKSPACE_CREATE_API"),
+
+    documents: (workspaceId: string) =>
+      `${getRequiredEnvValue("VITE_WORKSPACE_DOCUMENTS_API")}/${workspaceId}/documents`,
+  },
 } as const;
 
 const stripTrailingSlashes = (value: string): string => value.replace(/\/+$/, '');
