@@ -8,5 +8,5 @@ import java.util.Optional;
 
 @Repository
 public interface WorkspaceRepository extends JpaRepository<Workspace, String> {
-    Optional<Workspace> findByIdAndUserIdAndStatus(String id, String userId, String status);
+    Optional<Workspace> findByIdAndUserIdAndStatus(String id, Long userId, String status);
 }

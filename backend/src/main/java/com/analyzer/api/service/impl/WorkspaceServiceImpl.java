@@ -6,6 +6,7 @@ import com.analyzer.api.dto.document.ProcessingResultRequestDTO;
 import com.analyzer.api.dto.workspace.WorkspaceRequestDTO;
 import com.analyzer.api.dto.workspace.WorkspaceResponseDTO;
 import com.analyzer.api.entity.Document;
+import com.analyzer.api.entity.User;
 import com.analyzer.api.entity.Workspace;
 import com.analyzer.api.repository.DocumentRepository;
 import com.analyzer.api.repository.WorkspaceRepository;
@@ -62,7 +63,7 @@ public class WorkspaceServiceImpl implements WorkspaceService {
     public WorkspaceResponseDTO createWorkspace(Long userId, WorkspaceRequestDTO request) {
         Workspace workspace = Workspace.builder()
                 .id(generateWorkspaceId())
-                .userId(String.valueOf(userId))
+                .user(User.builder().id(userId).build())
                 .name(request.getName().trim())
                 .description(request.getDescription())
                 .status(STATUS_ACTIVE)
@@ -75,12 +76,11 @@ public class WorkspaceServiceImpl implements WorkspaceService {
     @Override
     @Transactional(readOnly = true)
     public List<DocumentResponseDTO> getDocuments(Long userId, String workspaceId) {
-        String currentUserId = String.valueOf(userId);
-        workspaceRepository.findByIdAndUserIdAndStatus(workspaceId, currentUserId, STATUS_ACTIVE)
+        workspaceRepository.findByIdAndUserIdAndStatus(workspaceId, userId, STATUS_ACTIVE)
                 .orElseThrow(() -> new RuntimeException("Workspace khong ton tai hoac khong thuoc user hien tai"));
 
         return documentRepository
-                .findByWorkspaceIdAndUserIdAndStatusNotOrderByUploadedAtDesc(workspaceId, currentUserId, STATUS_DELETED)
+                .findByWorkspaceIdAndUserIdAndStatusNotOrderByUploadedAtDesc(workspaceId, userId, STATUS_DELETED)
                 .stream()
                 .map(this::toDocumentResponse)
                 .toList();
@@ -94,7 +94,7 @@ public class WorkspaceServiceImpl implements WorkspaceService {
         }
 
         String currentUserId = String.valueOf(userId);
-        workspaceRepository.findByIdAndUserIdAndStatus(workspaceId, currentUserId, STATUS_ACTIVE)
+        workspaceRepository.findByIdAndUserIdAndStatus(workspaceId, userId, STATUS_ACTIVE)
                 .orElseThrow(() -> new RuntimeException("Workspace khong ton tai hoac khong thuoc user hien tai"));
 
         String documentId = generateDocumentId();
@@ -113,8 +113,8 @@ public class WorkspaceServiceImpl implements WorkspaceService {
 
         Document document = Document.builder()
                 .id(documentId)
-                .workspaceId(workspaceId)
-                .userId(currentUserId)
+                .workspace(Workspace.builder().id(workspaceId).build())
+                .user(User.builder().id(userId).build())
                 .originalFileName(originalFileName)
                 .storedFileName(storedFileName)
                 .filePath(storedPath.toString())
@@ -156,8 +156,8 @@ public class WorkspaceServiceImpl implements WorkspaceService {
         ProcessDocumentRequestDTO request = ProcessDocumentRequestDTO.builder()
                 .jobId(jobId)
                 .documentId(document.getId())
-                .workspaceId(document.getWorkspaceId())
-                .userId(document.getUserId())
+                .workspaceId(document.getWorkspace().getId())
+                .userId(String.valueOf(document.getUser().getId()))
                 .sourceType(document.getSourceType())
                 .fileName(document.getOriginalFileName())
                 .fileType(document.getFileType())
@@ -208,7 +208,7 @@ public class WorkspaceServiceImpl implements WorkspaceService {
     private DocumentResponseDTO toDocumentResponse(Document document) {
         return DocumentResponseDTO.builder()
                 .documentId(document.getId())
-                .workspaceId(document.getWorkspaceId())
+                .workspaceId(document.getWorkspace().getId())
                 .originalFileName(document.getOriginalFileName())
                 .fileType(document.getFileType())
                 .fileSize(document.getFileSize())

@@ -10,6 +10,6 @@ import java.util.List;
 public interface DocumentRepository extends JpaRepository<Document, String> {
     List<Document> findByWorkspaceIdAndUserIdAndStatusNotOrderByUploadedAtDesc(
             String workspaceId,
-            String userId,
+            Long userId,
             String status);
 }
