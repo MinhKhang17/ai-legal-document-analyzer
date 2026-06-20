@@ -20,7 +20,7 @@ import java.util.Arrays;
 
 /**
  * Automatically cleans legacy database columns and seeds default roles,
- * an admin user, and subscription plans on startup.
+ * default users, and subscription plans on startup.
  */
 @Component
 @RequiredArgsConstructor
@@ -62,28 +62,15 @@ public class DataInitializer implements CommandLineRunner {
             }
         });
 
-        // 3. Seed Admin User
-        logger.info("Checking for default ADMIN user...");
-        String adminEmail = "admin@analyzer.com";
-        if (!userRepository.existsByEmail(adminEmail)) {
-            Role adminRole = roleRepository.findByName(RoleName.ADMIN)
-                    .orElseThrow(() -> new RuntimeException("ADMIN role not found in database"));
+        // 3. Seed default users
+        logger.info("Seeding default users...");
+        Role adminRole = roleRepository.findByName(RoleName.ADMIN)
+                .orElseThrow(() -> new RuntimeException("ADMIN role not found in database"));
+        Role customerRole = roleRepository.findByName(RoleName.CUSTOMER)
+                .orElseThrow(() -> new RuntimeException("CUSTOMER role not found in database"));
 
-            User admin = User.builder()
-                    .firstName("System")
-                    .lastName("Admin")
-                    .email(adminEmail)
-                    .password(passwordEncoder.encode("12345678"))
-                    .acceptedTerms(true)
-                    .role(adminRole)
-                    .active(true)
-                    .build();
-
-            userRepository.save(admin);
-            logger.info("Seeded default ADMIN user: {} / adminpassword", adminEmail);
-        } else {
-            logger.info("ADMIN user already exists.");
-        }
+        seedUser("admin", "admin", "admin@123", "pass@123", adminRole);
+        seedUser("user", "user", "user@123", "pass@123", customerRole);
 
         // 4. Seed Subscription Plans
         logger.info("Checking for default Subscription Plans...");
@@ -123,5 +110,21 @@ public class DataInitializer implements CommandLineRunner {
         } else {
             logger.info("Subscription Plans already exist.");
         }
+    }
+
+    private void seedUser(String firstName, String lastName, String email, String rawPassword, Role role) {
+        User user = userRepository.findByEmail(email)
+                .orElseGet(User::new);
+
+        user.setFirstName(firstName);
+        user.setLastName(lastName);
+        user.setEmail(email);
+        user.setPassword(passwordEncoder.encode(rawPassword));
+        user.setAcceptedTerms(true);
+        user.setRole(role);
+        user.setActive(true);
+
+        userRepository.save(user);
+        logger.info("Seeded default user: {} / {}", email, rawPassword);
     }
 }

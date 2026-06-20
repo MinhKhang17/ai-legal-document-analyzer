@@ -102,7 +102,7 @@ class DocumentProcessor:
         if not file_path.exists():
             raise FileNotFoundError(f"File not found: {request.filePath}")
 
-        normalized_type = request.fileType.lower().lstrip(".")
+        normalized_type = self._normalize_file_type(request.fileType)
         normalized_suffix = file_path.suffix.lower().lstrip(".")
         if normalized_type not in {"pdf", "docx"}:
             raise ValueError(f"Unsupported fileType: {request.fileType}")
@@ -258,3 +258,13 @@ class DocumentProcessor:
     def _send_callback(self, callback_url: str, result: DocumentProcessResult) -> None:
         if not self.callback_client.post_json(callback_url, result.model_dump()):
             logger.warning("Callback delivery failed for %s", callback_url)
+
+    def _normalize_file_type(self, file_type: str) -> str:
+        normalized = (file_type or "").strip().lower().lstrip(".")
+        if normalized in {"pdf", "docx"}:
+            return normalized
+        if "pdf" in normalized:
+            return "pdf"
+        if "wordprocessingml.document" in normalized or "docx" in normalized:
+            return "docx"
+        return normalized

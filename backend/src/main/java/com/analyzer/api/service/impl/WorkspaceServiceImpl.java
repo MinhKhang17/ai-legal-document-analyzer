@@ -8,6 +8,7 @@ import com.analyzer.api.dto.workspace.WorkspaceResponseDTO;
 import com.analyzer.api.entity.Document;
 import com.analyzer.api.entity.User;
 import com.analyzer.api.entity.Workspace;
+import com.analyzer.api.exception.DocumentProcessingDispatchException;
 import com.analyzer.api.repository.DocumentRepository;
 import com.analyzer.api.repository.WorkspaceRepository;
 import com.analyzer.api.service.WorkspaceService;
@@ -87,13 +88,12 @@ public class WorkspaceServiceImpl implements WorkspaceService {
     }
 
     @Override
-    @Transactional
+    @Transactional(noRollbackFor = DocumentProcessingDispatchException.class)
     public DocumentResponseDTO uploadDocument(Long userId, String workspaceId, MultipartFile file) throws IOException {
         if (file == null || file.isEmpty()) {
             throw new RuntimeException("File khong duoc de trong");
         }
 
-        String currentUserId = String.valueOf(userId);
         workspaceRepository.findByIdAndUserIdAndStatus(workspaceId, userId, STATUS_ACTIVE)
                 .orElseThrow(() -> new RuntimeException("Workspace khong ton tai hoac khong thuoc user hien tai"));
 
@@ -101,7 +101,7 @@ public class WorkspaceServiceImpl implements WorkspaceService {
         String originalFileName = StringUtils.cleanPath(
                 file.getOriginalFilename() == null ? "document" : file.getOriginalFilename());
         String storedFileName = documentId + "_" + originalFileName.replaceAll("[^a-zA-Z0-9._-]", "_");
-        Path documentDir = Path.of(uploadRoot, "users", currentUserId, "workspaces", workspaceId, "documents", documentId)
+        Path documentDir = Path.of(uploadRoot)
                 .toAbsolutePath()
                 .normalize();
         Files.createDirectories(documentDir);
@@ -160,7 +160,7 @@ public class WorkspaceServiceImpl implements WorkspaceService {
                 .userId(String.valueOf(document.getUser().getId()))
                 .sourceType(document.getSourceType())
                 .fileName(document.getOriginalFileName())
-                .fileType(document.getFileType())
+                .fileType(resolveDocumentFileType(document.getOriginalFileName(), document.getFileType()))
                 .filePath(document.getFilePath())
                 .callbackUrl(callbackBaseUrl + "/api/internal/documents/" + document.getId() + "/processing-result")
                 .build();
@@ -175,16 +175,46 @@ public class WorkspaceServiceImpl implements WorkspaceService {
             HttpResponse<String> response = HttpClient.newHttpClient()
                     .send(httpRequest, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new RuntimeException("Python AI Service returned HTTP " + response.statusCode());
+                document.setStatus(STATUS_FAILED);
+                document.setChunkCount(0);
+                document.setErrorMessage("Python AI Service returned HTTP " + response.statusCode());
+                documentRepository.save(document);
+                throw new DocumentProcessingDispatchException("Python AI Service returned HTTP " + response.statusCode());
             }
             document.setStatus(STATUS_PROCESSING);
             document.setErrorMessage(null);
+            document.setProcessedAt(null);
         } catch (Exception ex) {
+            if (ex instanceof DocumentProcessingDispatchException dispatchException) {
+                throw dispatchException;
+            }
             document.setStatus(STATUS_FAILED);
             document.setChunkCount(0);
             document.setErrorMessage("Cannot call Python AI Service: " + ex.getMessage());
+            documentRepository.save(document);
+            throw new DocumentProcessingDispatchException("Cannot call Python AI Service: " + ex.getMessage(), ex);
         }
         return documentRepository.save(document);
+    }
+
+    private String resolveDocumentFileType(String fileName, String contentType) {
+        String normalizedFileName = fileName == null ? "" : fileName.toLowerCase();
+        if (normalizedFileName.endsWith(".pdf")) {
+            return "pdf";
+        }
+        if (normalizedFileName.endsWith(".docx")) {
+            return "docx";
+        }
+        if (contentType != null) {
+            String normalizedContentType = contentType.toLowerCase();
+            if (normalizedContentType.contains("pdf")) {
+                return "pdf";
+            }
+            if (normalizedContentType.contains("wordprocessingml.document") || normalizedContentType.contains("docx")) {
+                return "docx";
+            }
+        }
+        return "";
     }
 
     private String generateWorkspaceId() {

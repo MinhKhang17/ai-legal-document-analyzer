@@ -14,6 +14,14 @@ import java.util.Map;
 @ControllerAdvice
 public class GlobalExceptionHandler {
 
+        @ExceptionHandler(DocumentProcessingDispatchException.class)
+        public ResponseEntity<ApiResponseDTO<Void>> handleDocumentProcessingDispatchException(
+                        DocumentProcessingDispatchException ex) {
+                return new ResponseEntity<>(
+                                ApiResponseDTO.error(HttpStatus.BAD_GATEWAY.value(), ex.getMessage()),
+                                HttpStatus.BAD_GATEWAY);
+        }
+
         @ExceptionHandler(BadCredentialsException.class)
         public ResponseEntity<ApiResponseDTO<Void>> handleBadCredentials(BadCredentialsException ex) {
                 return new ResponseEntity<>(

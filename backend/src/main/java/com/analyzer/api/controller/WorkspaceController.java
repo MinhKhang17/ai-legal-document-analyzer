@@ -58,7 +58,7 @@ public class WorkspaceController {
             @PathVariable String workspaceId,
             @RequestPart("file") MultipartFile file) throws IOException {
         DocumentResponseDTO response = workspaceService.uploadDocument(getCurrentUserId(), workspaceId, file);
-        return new ResponseEntity<>(response, HttpStatus.CREATED);
+        return new ResponseEntity<>(response, HttpStatus.ACCEPTED);
     }
 
     private Long getCurrentUserId() {
