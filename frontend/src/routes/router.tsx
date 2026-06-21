@@ -5,17 +5,11 @@ import { AuthLayout } from '../layouts/AuthLayout';
 import { LoginPage } from '../pages/auth/LoginPage';
 import { RegisterPage } from '../pages/auth/RegisterPage';
 import { DashboardPage } from '../pages/dashboard/DashboardPage';
-import { ProjectsPage } from '../pages/projects/ProjectsPage';
-import { ProjectDetailPage } from '../pages/projects/ProjectDetailPage';
-import { DocumentsPage } from '../pages/documents/DocumentsPage';
-import { DocumentDetailPage } from '../pages/documents/DocumentDetailPage';
 import { UploadPage } from '../pages/upload/UploadPage';
 import { EditorPage } from '../pages/editor/EditorPage';
 import { RiskReviewPage } from '../pages/editor/RiskReviewPage';
 import { VersionComparisonPage } from '../pages/editor/VersionComparisonPage';
 import { ComparisonHistoryPage } from '../pages/editor/ComparisonHistoryPage';
-import { LegalChatPage } from '../pages/chat/LegalChatPage';
-import { ChatHistoryPage } from '../pages/chat/ChatHistoryPage';
 import { ReportsPage } from '../pages/reports/ReportsPage';
 import { ReportDetailPage } from '../pages/reports/ReportDetailPage';
 import { KnowledgeBasePage } from '../pages/knowledge-base/KnowledgeBasePage';
@@ -28,6 +22,11 @@ import { SystemHealthPage } from '../pages/admin/SystemHealthPage';
 import { JobsPage } from '../pages/jobs/JobsPage';
 import { TemplatesPage } from '../pages/templates/TemplatesPage';
 import { SettingsPage } from '../pages/settings/SettingsPage';
+import { WorkspaceListPage } from '../pages/workspaces/WorkspaceListPage';
+import { WorkspaceDetailPage } from '../pages/workspaces/WorkspaceDetailPage';
+import { ChatSessionListPage } from '../pages/chat/ChatSessionListPage';
+import { ChatSessionDetailPage } from '../pages/chat/ChatSessionDetailPage';
+
 
 export const router = createBrowserRouter([
   {
@@ -53,18 +52,16 @@ export const router = createBrowserRouter([
     ),
     children: [
       { path: '/dashboard', element: <DashboardPage /> },
-      { path: '/projects', element: <ProjectsPage /> },
-      { path: '/projects/:id', element: <ProjectDetailPage /> },
-      { path: '/documents', element: <DocumentsPage /> },
-      { path: '/documents/:id', element: <DocumentDetailPage /> },
+      { path: '/workspaces', element: <WorkspaceListPage /> },
+      { path: '/workspaces/:workspaceId', element: <WorkspaceDetailPage /> },
+      { path: '/workspaces/:workspaceId/chat-sessions', element: <ChatSessionListPage /> },
+      { path: '/chat-sessions/:chatSessionId', element: <ChatSessionDetailPage /> },
       { path: '/upload', element: <UploadPage /> },
       { path: '/editor', element: <EditorPage /> },
       { path: '/editor/risk-review', element: <RiskReviewPage /> },
       { path: '/editor/version-comparison', element: <VersionComparisonPage /> },
       { path: '/editor/comparison-history', element: <ComparisonHistoryPage /> },
       { path: '/comparison-history', element: <Navigate to="/editor/comparison-history" replace /> },
-      { path: '/chat', element: <LegalChatPage /> },
-      { path: '/chat/history', element: <ChatHistoryPage /> },
       { path: '/reports', element: <ReportsPage /> },
       { path: '/reports/:id', element: <ReportDetailPage /> },
       { path: '/knowledge-base', element: <KnowledgeBasePage /> },

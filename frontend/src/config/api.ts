@@ -20,17 +20,42 @@ export const API_ENDPOINTS = {
     me: getRequiredEnvValue("VITE_AUTH_ME_API"),
   },
 
-workspaces: {
-  list: getRequiredEnvValue("VITE_WORKSPACE_LIST_API"),
-  create: getRequiredEnvValue("VITE_WORKSPACE_CREATE_API"),
+  workspaces: {
+    list: getRequiredEnvValue("VITE_WORKSPACE_LIST_API"),
+    create: getRequiredEnvValue("VITE_WORKSPACE_CREATE_API"),
 
-  detail: (workspaceId: string) =>
-    `${getRequiredEnvValue("VITE_WORKSPACE_DETAIL_API")}/${workspaceId}`,
+    detail: (workspaceId: string) =>
+      `${getRequiredEnvValue("VITE_WORKSPACE_DETAIL_API")}/${workspaceId}`,
 
-  documents: (workspaceId: string) =>
-    `${getRequiredEnvValue("VITE_WORKSPACE_DOCUMENTS_API")}/${workspaceId}/documents`,
-},
+    documents: (workspaceId: string) =>
+      `${getRequiredEnvValue("VITE_WORKSPACE_DOCUMENTS_API")}/${workspaceId}/documents`,
+  },
+  chatSessions: {
+    create: (workspaceId: string) =>
+      `${getRequiredEnvValue("VITE_WORKSPACE_CHAT_SESSIONS_API")}/${workspaceId}/chat-sessions`,
 
+    listByWorkspace: (workspaceId: string) =>
+      `${getRequiredEnvValue("VITE_WORKSPACE_CHAT_SESSIONS_API")}/${workspaceId}/chat-sessions`,
+
+    detail: (chatSessionId: string) =>
+      `${getRequiredEnvValue("VITE_CHAT_SESSION_DETAIL_API")}/${chatSessionId}`,
+
+    update: (chatSessionId: string) =>
+      `${getRequiredEnvValue("VITE_CHAT_SESSION_DETAIL_API")}/${chatSessionId}`,
+
+    delete: (chatSessionId: string) =>
+      `${getRequiredEnvValue("VITE_CHAT_SESSION_DETAIL_API")}/${chatSessionId}`,
+  },
+  chatMessages: {
+    listByChatSession: (chatSessionId: string) =>
+      `${getRequiredEnvValue("VITE_CHAT_SESSION_MESSAGES_API")}/${chatSessionId}/messages`,
+
+    sendToChatSession: (chatSessionId: string) =>
+      `${getRequiredEnvValue("VITE_CHAT_SESSION_MESSAGES_API")}/${chatSessionId}/messages`,
+
+    detail: (messageId: string) =>
+      `${getRequiredEnvValue("VITE_CHAT_MESSAGE_DETAIL_API")}/${messageId}`,
+  },
   subscription: {
     plans: getRequiredEnvValue("VITE_SUBSCRIPTION_PLANS_API"),
     customerPlanSubscribe: getRequiredEnvValue(
@@ -71,6 +96,5 @@ export const buildApiUrl = (endpoint: string): string =>
   buildServiceUrl(
     API_BASE_URL,
     endpoint,
-    "Missing or invalid backend API endpoint path. Check VITE_AUTH_*, VITE_WORKSPACE_*, VITE_SUBSCRIPTION_*, and VITE_CUSTOMER_PLAN_* env values.",
+    "Missing or invalid backend API endpoint path. Check VITE_AUTH_*, VITE_WORKSPACE_*, VITE_CHAT_SESSION_*, VITE_SUBSCRIPTION_*, and VITE_CUSTOMER_PLAN_* env values.",
   );
-  
