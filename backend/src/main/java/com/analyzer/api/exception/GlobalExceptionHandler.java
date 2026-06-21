@@ -40,6 +40,66 @@ public class GlobalExceptionHandler {
                                 HttpStatus.BAD_REQUEST);
         }
 
+        @ExceptionHandler(ResourceNotFoundException.class)
+        public ResponseEntity<ApiResponseDTO<Void>> handleResourceNotFoundException(ResourceNotFoundException ex) {
+                return new ResponseEntity<>(
+                                ApiResponseDTO.error(HttpStatus.NOT_FOUND.value(), ex.getMessage()),
+                                HttpStatus.NOT_FOUND);
+        }
+
+        @ExceptionHandler(ForbiddenException.class)
+        public ResponseEntity<ApiResponseDTO<Void>> handleForbiddenException(ForbiddenException ex) {
+                return new ResponseEntity<>(
+                                ApiResponseDTO.error(HttpStatus.FORBIDDEN.value(), ex.getMessage()),
+                                HttpStatus.FORBIDDEN);
+        }
+
+        @ExceptionHandler(WorkspaceDeletedException.class)
+        public ResponseEntity<ApiResponseDTO<Map<String, String>>> handleWorkspaceDeletedException(WorkspaceDeletedException ex) {
+                Map<String, String> data = Map.of(
+                                "workspaceId", ex.getWorkspaceId(),
+                                "status", ex.getStatus()
+                );
+                return new ResponseEntity<>(
+                                ApiResponseDTO.error(HttpStatus.BAD_REQUEST.value(), ex.getMessage(), data),
+                                HttpStatus.BAD_REQUEST);
+        }
+
+        @ExceptionHandler(InvalidPageException.class)
+        public ResponseEntity<ApiResponseDTO<Map<String, Integer>>> handleInvalidPageException(InvalidPageException ex) {
+                Map<String, Integer> data = Map.of("page", ex.getPage());
+                return new ResponseEntity<>(
+                                ApiResponseDTO.error(HttpStatus.BAD_REQUEST.value(), ex.getMessage(), data),
+                                HttpStatus.BAD_REQUEST);
+        }
+
+        @ExceptionHandler(InvalidSizeException.class)
+        public ResponseEntity<ApiResponseDTO<Map<String, Integer>>> handleInvalidSizeException(InvalidSizeException ex) {
+                Map<String, Integer> data = Map.of("size", ex.getSize());
+                return new ResponseEntity<>(
+                                ApiResponseDTO.error(HttpStatus.BAD_REQUEST.value(), ex.getMessage(), data),
+                                HttpStatus.BAD_REQUEST);
+        }
+
+        @ExceptionHandler(InvalidStatusException.class)
+        public ResponseEntity<ApiResponseDTO<Map<String, Object>>> handleInvalidStatusException(InvalidStatusException ex) {
+                Map<String, Object> data = Map.of("allowedValues", ex.getAllowedValues());
+                return new ResponseEntity<>(
+                                ApiResponseDTO.error(HttpStatus.BAD_REQUEST.value(), ex.getMessage(), data),
+                                HttpStatus.BAD_REQUEST);
+        }
+
+        @ExceptionHandler(DeletedChatSessionException.class)
+        public ResponseEntity<ApiResponseDTO<Map<String, String>>> handleDeletedChatSessionException(DeletedChatSessionException ex) {
+                Map<String, String> data = Map.of(
+                                "chatSessionId", ex.getChatSessionId(),
+                                "status", ex.getStatus()
+                );
+                return new ResponseEntity<>(
+                                ApiResponseDTO.error(HttpStatus.BAD_REQUEST.value(), ex.getMessage(), data),
+                                HttpStatus.BAD_REQUEST);
+        }
+
         @ExceptionHandler(RuntimeException.class)
         public ResponseEntity<ApiResponseDTO<Void>> handleRuntimeException(RuntimeException ex) {
                 return new ResponseEntity<>(
