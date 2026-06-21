@@ -1,11 +1,12 @@
-import { AlertTriangle, CheckCircle2, FileText, Plus, Sparkles } from "lucide-react";
+import { AlertTriangle, FileText, Plus, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   createWorkspace,
   getWorkspaceDocuments,
+  getWorkspaces,
   uploadDocument,
 } from "../../api/workspaceApi";
-import type { Document } from "../../api/workspaceApi";
+import type { Document, Workspace } from "../../api/workspaceApi";
 import { Badge } from "../../components/common/Badge";
 import { Button } from "../../components/common/Button";
 import { Card } from "../../components/common/Card";
@@ -21,19 +22,71 @@ const getAccessToken = () => localStorage.getItem("accessToken") ?? "";
 export function UploadPage() {
   const { t } = useI18n();
 
-  const [workspaceId, setWorkspaceId] = useState("");
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState("");
+
   const [workspaceName, setWorkspaceName] = useState("");
   const [workspaceDescription, setWorkspaceDescription] = useState("");
 
   const [documents, setDocuments] = useState<Document[]>([]);
   const [uploading, setUploading] = useState(false);
   const [creatingWorkspace, setCreatingWorkspace] = useState(false);
+  const [loadingWorkspaces, setLoadingWorkspaces] = useState(false);
+  const [loadingDocuments, setLoadingDocuments] = useState(false);
   const [progress, setProgress] = useState(65);
   const [error, setError] = useState("");
 
   const hasProcessingDocument = documents.some(
     (document) => document.status === "processing",
   );
+
+  useEffect(() => {
+    const loadWorkspaces = async () => {
+      try {
+        setLoadingWorkspaces(true);
+        const data = await getWorkspaces(getAccessToken());
+        setWorkspaces(data);
+
+        if (data.length > 0) {
+          setSelectedWorkspaceId(data[0].workspaceId);
+        }
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : t("upload.loadWorkspacesFailed"),
+        );
+      } finally {
+        setLoadingWorkspaces(false);
+      }
+    };
+
+    loadWorkspaces();
+  }, [t]);
+
+  useEffect(() => {
+    if (!selectedWorkspaceId) {
+      setDocuments([]);
+      return undefined;
+    }
+
+    const loadDocuments = async () => {
+      try {
+        setLoadingDocuments(true);
+        const data = await getWorkspaceDocuments(
+          getAccessToken(),
+          selectedWorkspaceId,
+        );
+        setDocuments(data);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : t("upload.loadDocumentsFailed"),
+        );
+      } finally {
+        setLoadingDocuments(false);
+      }
+    };
+
+    loadDocuments();
+  }, [selectedWorkspaceId, t]);
 
   useEffect(() => {
     if (!hasProcessingDocument) return undefined;
@@ -46,11 +99,14 @@ export function UploadPage() {
   }, [hasProcessingDocument]);
 
   useEffect(() => {
-    if (!workspaceId || !hasProcessingDocument) return undefined;
+    if (!selectedWorkspaceId || !hasProcessingDocument) return undefined;
 
     const timer = window.setInterval(async () => {
       try {
-        const data = await getWorkspaceDocuments(getAccessToken(), workspaceId);
+        const data = await getWorkspaceDocuments(
+          getAccessToken(),
+          selectedWorkspaceId,
+        );
         setDocuments(data);
       } catch {
         // avoid UI spam while polling
@@ -58,14 +114,14 @@ export function UploadPage() {
     }, 3000);
 
     return () => window.clearInterval(timer);
-  }, [workspaceId, hasProcessingDocument]);
+  }, [selectedWorkspaceId, hasProcessingDocument]);
 
   const handleCreateWorkspace = async () => {
     setError("");
 
     if (!workspaceName.trim()) {
       setError(t("upload.workspaceNameRequired"));
-      return "";
+      return;
     }
 
     try {
@@ -76,34 +132,33 @@ export function UploadPage() {
         description: workspaceDescription.trim(),
       });
 
-      setWorkspaceId(workspace.workspaceId);
-      return workspace.workspaceId;
+      setWorkspaces((previous) => [workspace, ...previous]);
+      setSelectedWorkspaceId(workspace.workspaceId);
+      setWorkspaceName("");
+      setWorkspaceDescription("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("upload.createWorkspaceFailed"));
-      return "";
+      setError(
+        err instanceof Error ? err.message : t("upload.createWorkspaceFailed"),
+      );
     } finally {
       setCreatingWorkspace(false);
     }
   };
 
-  const ensureWorkspace = async () => {
-    if (workspaceId) return workspaceId;
-    return handleCreateWorkspace();
-  };
-
   const handleUploadFile = async (file: File) => {
     setError("");
+
+    if (!selectedWorkspaceId) {
+      setError(t("upload.selectWorkspaceRequired"));
+      return;
+    }
 
     try {
       setUploading(true);
 
-      const currentWorkspaceId = await ensureWorkspace();
-
-      if (!currentWorkspaceId) return;
-
       const uploadedDocument = await uploadDocument(
         getAccessToken(),
-        currentWorkspaceId,
+        selectedWorkspaceId,
         file,
       );
 
@@ -121,92 +176,113 @@ export function UploadPage() {
 
       <div className="grid gap-gutter xl:grid-cols-[1fr_340px]">
         <div className="space-y-gutter">
-          <Card
-            title={t("upload.step1")}
-            actions={
-              workspaceId ? (
-                <Badge tone="gold">{t("upload.workspaceCreated")}</Badge>
-              ) : (
-                <Badge tone="gold">{t("upload.required")}</Badge>
-              )
-            }
-          >
-            <div className="space-y-md">
-              <p className="text-sm text-on-surface-variant dark:text-slate-400">
-                {t("upload.workspaceHelp")}
-              </p>
+            <Card title={t("upload.createWorkspace")}>
+              <div className="space-y-md">
+                <p className="text-sm text-on-surface-variant dark:text-slate-400">
+                  {t("upload.createWorkspaceHelp")}
+                </p>
 
-              <div className="grid gap-md md:grid-cols-2">
-                <div>
-                  <label className="label-uppercase" htmlFor="workspaceName">
-                    {t("upload.workspaceName")}
-                  </label>
-                  <input
-                    id="workspaceName"
-                    className="form-field mt-xs"
-                    placeholder={t("upload.workspaceNamePlaceholder")}
-                    value={workspaceName}
-                    onChange={(event) => setWorkspaceName(event.target.value)}
-                    disabled={Boolean(workspaceId)}
-                  />
+                <div className="grid gap-md md:grid-cols-2">
+                  <div>
+                    <label className="label-uppercase" htmlFor="workspaceName">
+                      {t("upload.workspaceName")}
+                    </label>
+                    <input
+                      id="workspaceName"
+                      className="form-field mt-xs"
+                      placeholder={t("upload.workspaceNamePlaceholder")}
+                      value={workspaceName}
+                      onChange={(event) => setWorkspaceName(event.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      className="label-uppercase"
+                      htmlFor="workspaceDescription"
+                    >
+                      {t("upload.workspaceDescription")}
+                    </label>
+                    <input
+                      id="workspaceDescription"
+                      className="form-field mt-xs"
+                      placeholder={t("upload.workspaceDescriptionPlaceholder")}
+                      value={workspaceDescription}
+                      onChange={(event) =>
+                        setWorkspaceDescription(event.target.value)
+                      }
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <label className="label-uppercase" htmlFor="workspaceDescription">
-                    {t("upload.workspaceDescription")}
-                  </label>
-                  <input
-                    id="workspaceDescription"
-                    className="form-field mt-xs"
-                    placeholder={t("upload.workspaceDescriptionPlaceholder")}
-                    value={workspaceDescription}
-                    onChange={(event) => setWorkspaceDescription(event.target.value)}
-                    disabled={Boolean(workspaceId)}
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-sm">
                 <Button
                   variant="primary"
                   onClick={handleCreateWorkspace}
-                  disabled={Boolean(workspaceId) || creatingWorkspace}
+                  disabled={creatingWorkspace}
                 >
                   {creatingWorkspace
                     ? t("upload.creatingWorkspace")
                     : t("upload.createWorkspace")}
                 </Button>
-
-                {workspaceId && (
-                  <div className="flex items-center gap-xs rounded-lg bg-surface-container-low px-md py-sm text-sm dark:bg-slate-800">
-                    <CheckCircle2 className="h-4 w-4 text-success" />
-                    <span>
-                      {t("upload.workspaceId")}:{" "}
-                      <span className="font-semibold">{workspaceId}</span>
-                    </span>
-                  </div>
-                )}
               </div>
-            </div>
-          </Card>
+            </Card>
 
-          <Card
-            title={t("upload.step2")}
-            actions={
-              workspaceId ? (
-                <Badge tone="gold">{t("upload.ready")}</Badge>
-              ) : (
-                <Badge tone="gold">{t("upload.needWorkspace")}</Badge>
-              )
-            }
-          >
-            <FileUploadZone onUpload={handleUploadFile} disabled={uploading} />
-
-            {!workspaceId && (
-              <p className="mt-md text-sm text-on-surface-variant dark:text-slate-400">
-                {t("upload.autoCreateWorkspace")}
+          <Card title={t("upload.uploadDocument")}>
+            <div className="space-y-md">
+              <p className="text-sm text-on-surface-variant dark:text-slate-400">
+                {t("upload.workspaceHelp")}
               </p>
-            )}
+              <div>
+                <label className="label-uppercase" htmlFor="workspaceSelect">
+                  {t("upload.selectWorkspace")}
+                </label>
+                <select
+                  id="workspaceSelect"
+                  className="form-field mt-xs"
+                  value={selectedWorkspaceId}
+                  onChange={(event) =>
+                    setSelectedWorkspaceId(event.target.value)
+                  }
+                  disabled={loadingWorkspaces || workspaces.length === 0}
+                >
+                  <option value="">
+                    {loadingWorkspaces
+                      ? t("upload.loadingWorkspaces")
+                      : t("upload.selectWorkspacePlaceholder")}
+                  </option>
+
+                  {workspaces.map((workspace) => (
+                    <option
+                      key={workspace.workspaceId}
+                      value={workspace.workspaceId}
+                    >
+                      {workspace.name}
+                    </option>
+                  ))}
+                </select>
+                {selectedWorkspaceId && (
+                  <p className="mt-xs text-xs text-on-surface-variant dark:text-slate-400">
+                    {
+                      workspaces.find(
+                        (workspace) =>
+                          workspace.workspaceId === selectedWorkspaceId,
+                      )?.description
+                    }
+                  </p>
+                )}{" "}
+              </div>
+
+              <FileUploadZone
+                onUpload={handleUploadFile}
+                disabled={uploading || !selectedWorkspaceId}
+              />
+
+              {!selectedWorkspaceId && (
+                <p className="mt-md text-sm text-on-surface-variant dark:text-slate-400">
+                  {t("upload.selectWorkspaceRequired")}
+                </p>
+              )}
+            </div>
           </Card>
 
           {error && (
@@ -216,11 +292,21 @@ export function UploadPage() {
           )}
 
           <Card
-            title={t("upload.step3")}
-            actions={<Badge tone="gold">{t("upload.estimatedTime")}</Badge>}
+            title={t("upload.processingQueue")}
+            actions={
+              hasProcessingDocument ? (
+                <Badge tone="gold">{t("upload.estimatedTime")}</Badge>
+              ) : undefined
+            }
           >
             <div className="space-y-md">
-              {documents.length === 0 && (
+              {loadingDocuments && (
+                <p className="text-sm text-on-surface-variant dark:text-slate-400">
+                  {t("upload.loadingDocuments")}
+                </p>
+              )}
+
+              {documents.length === 0 && !loadingDocuments && (
                 <p className="text-sm text-on-surface-variant dark:text-slate-400">
                   {t("upload.noDocuments")}
                 </p>
@@ -238,7 +324,9 @@ export function UploadPage() {
                       </div>
 
                       <div>
-                        <p className="font-semibold">{document.originalFileName}</p>
+                        <p className="font-semibold">
+                          {document.originalFileName}
+                        </p>
                         <p className="text-sm text-on-surface-variant dark:text-slate-400">
                           {(document.fileSize / 1024 / 1024).toFixed(2)} MB ·{" "}
                           {document.fileType}

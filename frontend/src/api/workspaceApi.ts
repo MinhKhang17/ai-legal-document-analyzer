@@ -1,11 +1,13 @@
 export {
   createWorkspace,
-  uploadDocument,
+  getWorkspaceDetail,
   getWorkspaceDocuments,
+  getWorkspaces,
+  uploadDocument,
 } from "../services/workspace.service";
 
 export type {
-  Workspace,
-  Document,
   CreateWorkspaceRequest,
+  Document,
+  Workspace,
 } from "../types/workspace";
