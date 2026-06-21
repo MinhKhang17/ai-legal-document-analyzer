@@ -14,19 +14,23 @@ import com.analyzer.api.repository.WorkspaceRepository;
 import com.analyzer.api.service.WorkspaceService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestTemplate;
 
 import java.io.IOException;
 import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -37,6 +41,8 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class WorkspaceServiceImpl implements WorkspaceService {
+
+    private static final Logger logger = LoggerFactory.getLogger(WorkspaceServiceImpl.class);
 
     private static final String STATUS_ACTIVE = "ACTIVE";
     private static final String STATUS_DELETED = "DELETED";
@@ -185,23 +191,39 @@ public class WorkspaceServiceImpl implements WorkspaceService {
 
         try {
             String requestBody = objectMapper.writeValueAsString(request);
-            HttpRequest httpRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(aiServiceBaseUrl + "/internal/documents/process"))
-                    .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
-                    .build();
-            HttpResponse<String> response = HttpClient.newHttpClient()
-                    .send(httpRequest, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+            headers.set(HttpHeaders.ACCEPT_CHARSET, StandardCharsets.UTF_8.name());
+
+            ResponseEntity<String> response = new RestTemplate().exchange(
+                    URI.create(aiServiceBaseUrl + "/internal/documents/process"),
+                    org.springframework.http.HttpMethod.POST,
+                    new HttpEntity<>(requestBody, headers),
+                    String.class
+            );
+
+            if (!response.getStatusCode().is2xxSuccessful()) {
+                logger.warn("AI service rejected document processing request. status={} body={} request={}",
+                        response.getStatusCode().value(),
+                        response.getBody(),
+                        requestBody);
                 document.setStatus(STATUS_FAILED);
                 document.setChunkCount(0);
-                document.setErrorMessage("Python AI Service returned HTTP " + response.statusCode());
+                document.setErrorMessage("Python AI Service returned HTTP " + response.getStatusCode().value()
+                        + (response.getBody() == null || response.getBody().isBlank() ? "" : ": " + response.getBody()));
                 documentRepository.save(document);
-                throw new DocumentProcessingDispatchException("Python AI Service returned HTTP " + response.statusCode());
+                throw new DocumentProcessingDispatchException("Python AI Service returned HTTP " + response.getStatusCode().value());
             }
             document.setStatus(STATUS_PROCESSING);
             document.setErrorMessage(null);
             document.setProcessedAt(null);
+        } catch (RestClientException ex) {
+            document.setStatus(STATUS_FAILED);
+            document.setChunkCount(0);
+            document.setErrorMessage("Cannot call Python AI Service: " + ex.getMessage());
+            documentRepository.save(document);
+            throw new DocumentProcessingDispatchException("Cannot call Python AI Service: " + ex.getMessage(), ex);
         } catch (Exception ex) {
             if (ex instanceof DocumentProcessingDispatchException dispatchException) {
                 throw dispatchException;
@@ -220,6 +242,9 @@ public class WorkspaceServiceImpl implements WorkspaceService {
         if (normalizedFileName.endsWith(".pdf")) {
             return "pdf";
         }
+        if (normalizedFileName.endsWith(".doc")) {
+            return "doc";
+        }
         if (normalizedFileName.endsWith(".docx")) {
             return "docx";
         }
@@ -228,11 +253,14 @@ public class WorkspaceServiceImpl implements WorkspaceService {
             if (normalizedContentType.contains("pdf")) {
                 return "pdf";
             }
+            if (normalizedContentType.contains("msword")) {
+                return "doc";
+            }
             if (normalizedContentType.contains("wordprocessingml.document") || normalizedContentType.contains("docx")) {
                 return "docx";
             }
         }
-        return "";
+        return normalizedFileName.endsWith(".doc") ? "doc" : "";
     }
 
     private String generateWorkspaceId() {

@@ -169,12 +169,14 @@ class LoaderRegistry:
 
 def build_default_loader_registry() -> LoaderRegistry:
     from app.services.loader.PdfDocumentLoader import PdfDocumentLoader
+    from app.services.loader.doc_document_loader import DocDocumentLoader
     from app.services.loader.word_document_loader import WordDocumentLoader
     from app.services.loader.text_document_loader import TextDocumentLoader
 
     return LoaderRegistry(
         loaders=[
             PdfDocumentLoader(),
+            DocDocumentLoader(),
             TextDocumentLoader(),
             WordDocumentLoader(),
         ]

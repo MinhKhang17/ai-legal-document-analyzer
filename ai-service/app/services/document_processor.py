@@ -104,9 +104,9 @@ class DocumentProcessor:
 
         normalized_type = self._normalize_file_type(request.fileType)
         normalized_suffix = file_path.suffix.lower().lstrip(".")
-        if normalized_type not in {"pdf", "docx"}:
+        if normalized_type not in {"pdf", "docx", "doc"}:
             raise ValueError(f"Unsupported fileType: {request.fileType}")
-        if normalized_suffix not in {"pdf", "docx"}:
+        if normalized_suffix not in {"pdf", "docx", "doc"}:
             raise ValueError(f"Unsupported file extension: {file_path.suffix}")
         if normalized_type != normalized_suffix:
             raise ValueError("fileType does not match filePath extension")
@@ -261,10 +261,12 @@ class DocumentProcessor:
 
     def _normalize_file_type(self, file_type: str) -> str:
         normalized = (file_type or "").strip().lower().lstrip(".")
-        if normalized in {"pdf", "docx"}:
+        if normalized in {"pdf", "docx", "doc"}:
             return normalized
         if "pdf" in normalized:
             return "pdf"
+        if "msword" in normalized or normalized == "doc":
+            return "doc"
         if "wordprocessingml.document" in normalized or "docx" in normalized:
             return "docx"
         return normalized

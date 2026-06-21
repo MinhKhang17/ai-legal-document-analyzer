@@ -92,9 +92,13 @@ async def ingest_document(
     file: UploadFile = File(...),
     title: str | None = Form(default=None),
 ) -> IngestionResult:
-    response = await get_service().ingest_upload(file=file, title=title)
-    _log_response("ingest", response)
-    return response
+    try:
+        response = await get_service().ingest_upload(file=file, title=title)
+        _log_response("ingest", response)
+        return response
+    except Exception as exc:
+        logger.exception("Failed to ingest knowledge document")
+        raise
 
 
 @router.post("/ingest-v2")
@@ -102,9 +106,13 @@ async def ingest_document_v2(
     file: UploadFile = File(...),
     title: str | None = Form(default=None),
 ) -> IngestionResult:
-    response = await get_service_v2().ingest_upload(file=file, title=title, ingestion_version=2)
-    _log_response("ingest_v2", response)
-    return response
+    try:
+        response = await get_service_v2().ingest_upload(file=file, title=title, ingestion_version=2)
+        _log_response("ingest_v2", response)
+        return response
+    except Exception:
+        logger.exception("Failed to ingest knowledge document v2")
+        raise
 
 
 @router.post("/search")
