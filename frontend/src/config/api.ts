@@ -24,6 +24,11 @@ export const API_ENDPOINTS = {
 
     documents: (workspaceId: string) =>
       `${getRequiredEnvValue("VITE_WORKSPACE_DOCUMENTS_API")}/${workspaceId}/documents`,
+
+  subscription: {
+    plans: getRequiredEnvValue('VITE_SUBSCRIPTION_PLANS_API'),
+    customerPlanSubscribe: getRequiredEnvValue('VITE_CUSTOMER_PLAN_SUBSCRIBE_API'),
+    customerPlanMe: getRequiredEnvValue('VITE_CUSTOMER_PLAN_ME_API'),
   },
 } as const;
 
@@ -37,16 +42,26 @@ const normalizeEndpoint = (endpoint: string): string => {
   return singleLeadingSlash.replace(/^\/$/, '/');
 };
 
-export const buildApiUrl = (endpoint: string): string => {
+const buildServiceUrl = (
+  baseUrl: string,
+  endpoint: string,
+  invalidEndpointMessage: string,
+): string => {
   const normalizedEndpoint = normalizeEndpoint(endpoint);
 
   if (!normalizedEndpoint || normalizedEndpoint === '/') {
-    throw new Error(
-      'Missing or invalid auth API endpoint path. Check VITE_AUTH_REGISTER_API, VITE_AUTH_LOGIN_API, VITE_AUTH_ME_API, and VITE_AUTH_REFRESH_API.'
-    );
+    throw new Error(invalidEndpointMessage);
   }
 
-  const normalizedBaseUrl = stripTrailingSlashes(API_BASE_URL);
+  const normalizedBaseUrl = stripTrailingSlashes(baseUrl);
 
   return `${normalizedBaseUrl}${normalizedEndpoint}`;
 };
+
+export const buildApiUrl = (endpoint: string): string =>
+  buildServiceUrl(
+    API_BASE_URL,
+    endpoint,
+    'Missing or invalid backend API endpoint path. Check VITE_AUTH_*, VITE_SUBSCRIPTION_*, and VITE_CUSTOMER_PLAN_* env values.',
+  );
+
