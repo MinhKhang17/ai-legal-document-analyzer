@@ -1,0 +1,9 @@
+{
+  "request_id": "test_001",
+  "user_id": "user_demo",
+  "workspace_id": "ws_001",
+  "question": "Có vấn đề gì với văn bản này không?",
+  "top_k_checklist": 10,
+  "top_k_user_chunks_per_checklist": 3,
+  "top_k_knowledge_chunks": 5
+}
