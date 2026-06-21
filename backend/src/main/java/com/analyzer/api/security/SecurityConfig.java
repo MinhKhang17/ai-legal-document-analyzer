@@ -54,7 +54,12 @@ public class SecurityConfig {
             .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> 
-                auth.requestMatchers("/api/v1/auth/**").permitAll()
+                auth.requestMatchers("/api/v1/auth/me").authenticated()
+                    .requestMatchers("/api/v1/auth/**").permitAll()
+                    .requestMatchers(
+                            "/api/v1/payment-transactions/vnpay-return",
+                            "/api/v1/payment-transactions/vnpay-ipn"
+                    ).permitAll()
                     .requestMatchers(
                             "/v3/api-docs",
                             "/v3/api-docs/**",

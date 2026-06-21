@@ -1,7 +1,8 @@
 package com.analyzer.api.service;
 
-import com.analyzer.api.dto.JwtResponseDTO;
-import com.analyzer.api.dto.LoginRequestDTO;
+import com.analyzer.api.dto.auth.JwtResponseDTO;
+import com.analyzer.api.dto.auth.LoginRequestDTO;
+import com.analyzer.api.dto.user.UserResponseDTO;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -23,4 +24,9 @@ public interface AuthService {
      * Logout user: revoke all refresh tokens and clear refresh token cookie.
      */
     void logout(HttpServletRequest request, HttpServletResponse response);
+
+    /**
+     * Get the current authenticated user's details.
+     */
+    UserResponseDTO getCurrentUser();
 }

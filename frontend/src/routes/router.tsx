@@ -21,6 +21,7 @@ import { ReportDetailPage } from '../pages/reports/ReportDetailPage';
 import { KnowledgeBasePage } from '../pages/knowledge-base/KnowledgeBasePage';
 import { KnowledgeBaseDetailPage } from '../pages/knowledge-base/KnowledgeBaseDetailPage';
 import { BillingPage } from '../pages/billing/BillingPage';
+import { SubscribePlanPage } from '../pages/billing/SubscribePlanPage';
 import { AdminConsolePage } from '../pages/admin/AdminConsolePage';
 import { AuditLogsPage } from '../pages/admin/AuditLogsPage';
 import { SystemHealthPage } from '../pages/admin/SystemHealthPage';
@@ -69,6 +70,7 @@ export const router = createBrowserRouter([
       { path: '/knowledge-base', element: <KnowledgeBasePage /> },
       { path: '/knowledge-base/:id', element: <KnowledgeBaseDetailPage /> },
       { path: '/billing', element: <BillingPage /> },
+      { path: '/billing/subscribe', element: <SubscribePlanPage /> },
       { path: '/jobs', element: <JobsPage /> },
       { path: '/templates', element: <TemplatesPage /> },
       { path: '/settings', element: <SettingsPage /> },

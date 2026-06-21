@@ -1,0 +1,17 @@
+package com.analyzer.api.repository;
+
+import com.analyzer.api.entity.CustomerPlan;
+import com.analyzer.api.enums.PlanStatus;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface CustomerPlanRepository extends JpaRepository<CustomerPlan, Long> {
+    Optional<CustomerPlan> findByCustomerIdAndStatus(Long customerId, PlanStatus status);
+    List<CustomerPlan> findByCustomerId(Long customerId);
+    boolean existsByCustomerIdAndStatus(Long customerId, PlanStatus status);
+    boolean existsBySubscriptionPlanId(Long subscriptionPlanId);
+}

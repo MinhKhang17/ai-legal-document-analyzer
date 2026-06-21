@@ -31,3 +31,9 @@ app:
     access-token-expiration-ms: 900000       # 15 minutes
     refresh-token-expiration-ms: 604800000   # 7 days
     refresh-cookie-name: refreshToken
+  payment:
+    vnpay:
+      pay-url: ${VNPAY_PAY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
+      return-url: ${VNPAY_RETURN_URL:http://localhost:8080/api/v1/payment-transactions/vnpay-return}
+      tmn-code: ${VNPAY_TMN_CODE:CHANGE_ME}
+      hash-secret: ${VNPAY_HASH_SECRET:CHANGE_ME}
