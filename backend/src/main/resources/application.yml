@@ -1,6 +1,9 @@
 spring:
   application:
     name: ai-legal-document-analyzer
+  jackson:
+    parser:
+      allow-unquoted-control-chars: true
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/ai_legal_db}
     username: ${DB_USERNAME:postgres}

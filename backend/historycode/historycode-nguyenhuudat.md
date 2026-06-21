@@ -1,5 +1,24 @@
 # History Code - Nguyen Huu Dat
 
+**Date:** 2026-06-21 (Ngày 21 tháng 6 năm 2026)
+
+## Tasks Completed:
+- **Thiết kế và Cài đặt Thực thể Chat AI theo Workspace**:
+  - Tạo mới các `@Entity`: `ChatSession` (ID kiểu String định dạng `chat_...`, quan hệ `@ManyToOne` với `User` và `Workspace`) và `ChatMessage` (ID kiểu String, quan hệ `@ManyToOne` với `ChatSession` và `User`).
+  - Thiết lập các enum đi kèm: `ChatSessionStatus`, `ChatMessageRole`, `ChatMessageType`, `ChatMessageStatus`.
+  - Tạo các interface `ChatSessionRepository` và `ChatMessageRepository` hỗ trợ truy vấn.
+- **Triển khai các API quản lý Chat Session**:
+  - **`POST /api/v1/workspaces/{workspaceId}/chat-sessions`**: Tạo cuộc hội thoại mới cho Workspace thuộc người dùng hiện tại (lấy từ Security Context). Ràng buộc validation tiêu đề (`title` không trống, tối đa 255 ký tự).
+  - **`GET /api/v1/workspaces/{workspaceId}/chat-sessions`**: Lấy danh sách cuộc hội thoại phân trang, lọc theo trạng thái (`status`), sắp xếp theo `lastMessageAt DESC` và `createdAt DESC`. Sử dụng DTO phân trang generic mới tạo `PageResponse<T>`.
+  - **`GET /api/v1/chat-sessions/{chatSessionId}`**: Lấy chi tiết thông tin một cuộc hội thoại cụ thể, chặn truy cập nếu cuộc hội thoại đã bị xóa (`DELETED`).
+  - Đảm bảo kiểm tra phân quyền sở hữu Workspace/ChatSession chặt chẽ (`403 Forbidden`) và trạng thái tồn tại (`404 Not Found`).
+- **Chuẩn hóa Route & Tài liệu Swagger**:
+  - Chuyển cấu hình ánh xạ route của `ChatSessionController` sang mức độ method với các đường dẫn tuyệt đối dạng `/api/v1/...`, giúp loại bỏ hiển thị trùng lặp trên giao diện Swagger/OpenAPI.
+- **Khắc phục lỗi phân tích cú pháp JSON**:
+  - Cấu hình thuộc tính `spring.jackson.parser.allow-unquoted-control-chars: true` trong `application.yml` cho phép Jackson xử lý các chuỗi JSON chứa ký tự điều khiển thô chưa escape (như ký tự xuống dòng `\n` - code 10), khắc phục hoàn toàn lỗi `JSON parse error: Illegal unquoted character` khi gọi API (ví dụ `/api/v1/auth/register`).
+
+---
+
 **Date:** 2026-06-20 (Ngày 20 tháng 6 năm 2026)
 
 ## Tasks Completed:
