@@ -5,7 +5,12 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import router
+from app.api.routes import router as rag_router
+from app.api.technology_api import router as technology_router
+from app.api.knowledge_api import router as knowledge_router
+from app.api.internal_documents_api import router as internal_documents_router
+from app.api.risk_knowledge_api import router as risk_knowledge_router
+from app.api.v2.contracts_api import router as contracts_v2_router
 from app.config import settings
 from app.database.neo4j_client import neo4j_client
 from app.services.checklist_seed_service import seed_review_checklists
@@ -68,7 +73,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(router, tags=["AI Service"])
+app.include_router(rag_router, tags=["AI Service"])
+app.include_router(technology_router, tags=["technologies"])
+app.include_router(knowledge_router, tags=["knowledge"])
+app.include_router(internal_documents_router, tags=["internal-documents"])
+app.include_router(risk_knowledge_router, tags=["risk-knowledge"])
+app.include_router(contracts_v2_router, tags=["contracts-v2"])
 
 
 @app.get("/")

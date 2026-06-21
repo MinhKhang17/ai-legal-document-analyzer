@@ -76,6 +76,24 @@ public class WorkspaceServiceImpl implements WorkspaceService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<WorkspaceResponseDTO> getWorkspaces(Long userId) {
+        return workspaceRepository
+                .findAllByUserIdAndStatusOrderByCreatedAtDesc(userId, STATUS_ACTIVE)
+                .stream()
+                .map(this::toWorkspaceResponse)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public WorkspaceResponseDTO getWorkspaceById(Long userId, String workspaceId) {
+        Workspace workspace = workspaceRepository.findByIdAndUserIdAndStatus(workspaceId, userId, STATUS_ACTIVE)
+                .orElseThrow(() -> new RuntimeException("Workspace khong ton tai hoac khong thuoc user hien tai"));
+        return toWorkspaceResponse(workspace);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<DocumentResponseDTO> getDocuments(Long userId, String workspaceId) {
         workspaceRepository.findByIdAndUserIdAndStatus(workspaceId, userId, STATUS_ACTIVE)
                 .orElseThrow(() -> new RuntimeException("Workspace khong ton tai hoac khong thuoc user hien tai"));

@@ -67,7 +67,7 @@ export function DocumentsPage() {
       />
 
       <section className="grid gap-gutter xl:grid-cols-[0.85fr_1.15fr]">
-        <FileUploadZone onFakeUpload={() => setFakeUploadActive(true)} />
+        <FileUploadZone onUpload={() => setFakeUploadActive(true)} />
         <Card title={t('documents.aiProcessingFlow')} actions={<Badge tone={fakeUploadActive ? 'gold' : 'green'}>{fakeUploadActive ? t('status.processing') : t('status.ready')}</Badge>}>
           <ProcessingTimeline orientation="horizontal" />
         </Card>

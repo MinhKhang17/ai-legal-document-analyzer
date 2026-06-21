@@ -1,7 +1,6 @@
 """Gemini LLM service for answer generation."""
 import logging
 from typing import List, Dict, Any, Optional
-import google.generativeai as genai
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -21,8 +20,10 @@ class GeminiService:
         if not self.api_key or self.api_key == "your_gemini_api_key_here":
             logger.warning("Gemini API key not configured. LLM features will be disabled.")
             return False
-        
+
         try:
+            import google.generativeai as genai
+
             genai.configure(api_key=self.api_key)
             self.model = genai.GenerativeModel(self.model_name)
             logger.info(f"Gemini service initialized with model: {self.model_name}")

@@ -11,6 +11,8 @@ import java.util.List;
 
 public interface WorkspaceService {
     WorkspaceResponseDTO createWorkspace(Long userId, WorkspaceRequestDTO request);
+    List<WorkspaceResponseDTO> getWorkspaces(Long userId);
+    WorkspaceResponseDTO getWorkspaceById(Long userId, String workspaceId);
     List<DocumentResponseDTO> getDocuments(Long userId, String workspaceId);
     DocumentResponseDTO uploadDocument(Long userId, String workspaceId, MultipartFile file) throws IOException;
     DocumentResponseDTO updateProcessingResult(String documentId, ProcessingResultRequestDTO request);

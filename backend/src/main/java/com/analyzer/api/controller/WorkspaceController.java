@@ -29,7 +29,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/workspaces")
 @RequiredArgsConstructor
-@Tag(name = "Workspace Management", description = "APIs for creating workspaces and listing workspace documents")
+@Tag(name = "Workspace Management", description = "APIs for managing user workspaces and workspace documents")
 public class WorkspaceController {
 
     private final WorkspaceService workspaceService;
@@ -41,6 +41,22 @@ public class WorkspaceController {
             @Valid @RequestBody WorkspaceRequestDTO request) {
         WorkspaceResponseDTO response = workspaceService.createWorkspace(getCurrentUserId(), request);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
+    }
+
+    @GetMapping
+    @PreAuthorize("hasRole('CUSTOMER')")
+    @Operation(summary = "List my workspaces", description = "Get all active workspaces of the current authenticated user.")
+    public ResponseEntity<List<WorkspaceResponseDTO>> getMyWorkspaces() {
+        List<WorkspaceResponseDTO> response = workspaceService.getWorkspaces(getCurrentUserId());
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{workspaceId}")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    @Operation(summary = "Get workspace detail", description = "Get a single active workspace by id for the current authenticated user.")
+    public ResponseEntity<WorkspaceResponseDTO> getWorkspaceById(@PathVariable String workspaceId) {
+        WorkspaceResponseDTO response = workspaceService.getWorkspaceById(getCurrentUserId(), workspaceId);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{workspaceId}/documents")
