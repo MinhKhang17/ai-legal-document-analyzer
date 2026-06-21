@@ -19,6 +19,7 @@ const routeLabels: Array<{ prefix: string; key: string }> = [
   { prefix: '/chat', key: 'nav.legalChat' },
   { prefix: '/reports', key: 'nav.reports' },
   { prefix: '/knowledge-base', key: 'nav.knowledgeBase' },
+  { prefix: '/billing/subscribe', key: 'nav.billingSubscribe' },
   { prefix: '/billing', key: 'nav.billing' },
   { prefix: '/jobs', key: 'nav.jobs' },
   { prefix: '/templates', key: 'nav.templates' },
