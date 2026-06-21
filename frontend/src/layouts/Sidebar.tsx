@@ -5,12 +5,8 @@ import {
   ChevronLeft,
   ChevronRight,
   FileClock,
-  FileText,
-  FolderOpen,
   Gavel,
   History,
-  LayoutDashboard,
-  MessageSquareText,
   Receipt,
   Scale,
   Settings,
@@ -19,6 +15,7 @@ import {
   UsersRound,
   Wrench,
   X,
+  FolderOpen,
   type LucideIcon,
 } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
@@ -38,13 +35,9 @@ interface NavItem {
 type NavSection = 'main' | 'intelligence' | 'system' | 'admin';
 
 const navItems: NavItem[] = [
-  { to: '/dashboard', labelKey: 'nav.overview', icon: LayoutDashboard, section: 'main' },
-  { to: '/projects', labelKey: 'nav.projects', icon: FolderOpen, section: 'main' },
-  { to: '/documents', labelKey: 'nav.documents', icon: FileText, section: 'main' },
+  {to: '/workspaces', labelKey: 'nav.myWorkspaces', icon: FolderOpen, section: 'main',},
   { to: '/upload', labelKey: 'nav.upload', icon: UploadCloud, section: 'main' },
   { to: '/editor/risk-review', labelKey: 'nav.riskReview', icon: ShieldCheck, section: 'intelligence' },
-  { to: '/chat', labelKey: 'nav.legalChat', icon: MessageSquareText, section: 'intelligence' },
-  { to: '/chat/history', labelKey: 'nav.chatHistory', icon: FileClock, section: 'intelligence' },
   { to: '/editor/version-comparison', labelKey: 'nav.versionComparison', icon: Scale, section: 'intelligence' },
   { to: '/editor/comparison-history', labelKey: 'nav.comparisonHistory', icon: History, section: 'intelligence' },
   { to: '/reports', labelKey: 'nav.reports', icon: BarChart3, section: 'intelligence' },

@@ -1,4 +1,4 @@
-import { AlertTriangle, FileText, Plus, Sparkles } from "lucide-react";
+import { FileText } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   createWorkspace,
@@ -14,7 +14,6 @@ import { PageHeader } from "../../components/common/PageHeader";
 import { ProgressBar } from "../../components/common/ProgressBar";
 import { StatusBadge } from "../../components/common/StatusBadge";
 import { FileUploadZone } from "../../components/upload/FileUploadZone";
-import { ProcessingTimeline } from "../../components/upload/ProcessingTimeline";
 import { useI18n } from "../../hooks/useI18n";
 
 const getAccessToken = () => localStorage.getItem("accessToken") ?? "";
@@ -109,7 +108,6 @@ export function UploadPage() {
         );
         setDocuments(data);
       } catch {
-        // avoid UI spam while polling
       }
     }, 3000);
 
@@ -174,7 +172,7 @@ export function UploadPage() {
     <div>
       <PageHeader title={t("upload.title")} subtitle={t("upload.subtitle")} />
 
-      <div className="grid gap-gutter xl:grid-cols-[1fr_340px]">
+      <div className="gap-gutter xl:grid-cols-[1fr_340px]">
         <div className="space-y-gutter">
             <Card title={t("upload.createWorkspace")}>
               <div className="space-y-md">
@@ -260,16 +258,6 @@ export function UploadPage() {
                     </option>
                   ))}
                 </select>
-                {selectedWorkspaceId && (
-                  <p className="mt-xs text-xs text-on-surface-variant dark:text-slate-400">
-                    {
-                      workspaces.find(
-                        (workspace) =>
-                          workspace.workspaceId === selectedWorkspaceId,
-                      )?.description
-                    }
-                  </p>
-                )}{" "}
               </div>
 
               <FileUploadZone
@@ -351,44 +339,6 @@ export function UploadPage() {
             </div>
           </Card>
         </div>
-
-        <aside className="space-y-gutter">
-          <Card title={t("upload.pipeline")}>
-            <ProcessingTimeline />
-          </Card>
-
-          <Card tone="ai">
-            <div className="flex items-center gap-sm">
-              <Sparkles className="h-5 w-5 text-secondary dark:text-accent-gold" />
-              <h2 className="text-title-lg font-semibold">
-                {t("upload.recentIntelligence")}
-              </h2>
-            </div>
-
-            <div className="mt-md space-y-md text-sm">
-              <div className="rounded-lg bg-white p-md dark:bg-slate-950">
-                <p className="label-uppercase text-secondary dark:text-accent-gold">
-                  {t("upload.aiSuggestion")}
-                </p>
-                <p className="mt-xs font-semibold">
-                  {t("upload.aiSuggestionTitle")}
-                </p>
-                <p className="mt-xs text-on-surface-variant dark:text-slate-400">
-                  {t("upload.aiSuggestionDescription")}
-                </p>
-              </div>
-
-              <div className="flex items-start gap-sm text-on-surface-variant dark:text-slate-400">
-                <AlertTriangle className="mt-0.5 h-4 w-4 text-error" />
-                {t("upload.riskVariance")}
-              </div>
-
-              <Button variant="gold" rightIcon={<Plus className="h-4 w-4" />}>
-                {t("actions.viewDetails")}
-              </Button>
-            </div>
-          </Card>
-        </aside>
       </div>
     </div>
   );

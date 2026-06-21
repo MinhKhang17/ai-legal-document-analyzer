@@ -1,6 +1,5 @@
 import type { AuditLog } from '../types/audit';
 import type { BillingUsage, Invoice } from '../types/billing';
-import type { ChatThread } from '../types/chat';
 import type { LegalDocument } from '../types/document';
 import type { KnowledgeArticle } from '../types/knowledgeBase';
 import type { Project } from '../types/project';
@@ -315,75 +314,6 @@ export const reports: Report[] = [
     riskLevel: 'low',
     createdAt: 'Oct 21, 2024',
     summary: 'No critical compliance blockers detected. Privacy annex requires metadata correction.',
-  },
-];
-
-export const chatThreads: ChatThread[] = [
-  {
-    id: 'chat-001',
-    title: 'Indemnity Clause Ambiguity Review',
-    documentName: 'Service_Agreement_v4.pdf',
-    updatedAt: 'Today, 10:31 AM',
-    riskTags: ['Indemnity', 'Vietnam', 'Critical'],
-    messages: [
-      {
-        id: 'm1',
-        role: 'user',
-        content: 'Điều khoản bồi thường 200% có thực thi được tại Việt Nam không?',
-        timestamp: '10:27 AM',
-      },
-      {
-        id: 'm2',
-        role: 'assistant',
-        content:
-          'Khả năng thực thi thấp. Với hợp đồng thương mại, mức phạt vi phạm thường bị giới hạn ở 8% giá trị phần nghĩa vụ bị vi phạm. Nên tách phạt vi phạm khỏi bồi thường thiệt hại thực tế và đặt trần trách nhiệm rõ ràng.',
-        timestamp: '10:28 AM',
-        citations: ['Điều 301 Luật Thương mại 2005', 'Điều 418 Bộ luật Dân sự 2015'],
-      },
-    ],
-  },
-  {
-    id: 'chat-002',
-    title: 'Data residency question',
-    documentName: 'MSA_Global_Tech_2024.pdf',
-    updatedAt: 'Yesterday, 4:15 PM',
-    riskTags: ['Data Privacy', 'Transfer'],
-    messages: [
-      {
-        id: 'm3',
-        role: 'user',
-        content: 'Which clauses create cross-border transfer exposure?',
-        timestamp: '4:10 PM',
-      },
-      {
-        id: 'm4',
-        role: 'assistant',
-        content: 'Sections 8.4 and 22.2 are the primary exposure points because they allow region selection without notice or transfer impact safeguards.',
-        timestamp: '4:12 PM',
-        citations: ['Sec. 8.4', 'Sec. 22.2'],
-      },
-    ],
-  },
-  {
-    id: 'chat-003',
-    title: 'Termination cure period',
-    documentName: 'MSA_Client_Redline_v2.5.docx',
-    updatedAt: 'Oct 23, 2024',
-    riskTags: ['Termination', 'Negotiation'],
-    messages: [
-      {
-        id: 'm5',
-        role: 'user',
-        content: 'Should we accept a 15-day cure period?',
-        timestamp: '3:05 PM',
-      },
-      {
-        id: 'm6',
-        role: 'assistant',
-        content: 'For enterprise services, 30 days is more consistent with the baseline. 15 days may be acceptable only for payment default or security breach carve-outs.',
-        timestamp: '3:06 PM',
-      },
-    ],
   },
 ];
 

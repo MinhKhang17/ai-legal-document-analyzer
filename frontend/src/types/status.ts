@@ -5,9 +5,12 @@ export type Status =
   | 'success'
   | 'failed'
   | 'active'
+  | 'deleted'
   | 'offline'
   | 'online'
   | 'draft'
   | 'finalized'
   | 'archived'
-  | 'rateLimited';
+  | 'rateLimited'
+  | 'ACTIVE'
+  | 'DELETED';

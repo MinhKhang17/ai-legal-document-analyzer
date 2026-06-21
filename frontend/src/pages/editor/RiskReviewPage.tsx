@@ -3,7 +3,6 @@ import { Badge } from '../../components/common/Badge';
 import { PageHeader } from '../../components/common/PageHeader';
 import { DocumentPreview } from '../../components/editor/DocumentPreview';
 import { RiskReviewPanel } from '../../components/editor/RiskReviewPanel';
-import { ProcessingTimeline } from '../../components/upload/ProcessingTimeline';
 import { documents, riskFindings } from '../../api/mockData';
 import { useI18n } from '../../hooks/useI18n';
 
@@ -24,9 +23,7 @@ export function RiskReviewPage() {
             <FileText className="h-5 w-5" /> {document.name}
           </div>
           <DocumentPreview document={document} />
-          <div className="sticky bottom-0 mt-md rounded-xl border border-legal-border bg-white/95 p-md shadow-raised backdrop-blur dark:border-slate-700 dark:bg-slate-900/95">
-            <ProcessingTimeline orientation="horizontal" />
-          </div>
+          
         </div>
         <RiskReviewPanel findings={riskFindings} />
       </div>
