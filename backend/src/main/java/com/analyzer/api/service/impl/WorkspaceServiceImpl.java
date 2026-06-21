@@ -8,7 +8,7 @@ import com.analyzer.api.dto.workspace.WorkspaceResponseDTO;
 import com.analyzer.api.entity.Document;
 import com.analyzer.api.entity.User;
 import com.analyzer.api.entity.Workspace;
-import com.analyzer.api.exception.DocumentProcessingDispatchException;
+import com.analyzer.api.exception.workspace.DocumentProcessingDispatchException;
 import com.analyzer.api.repository.DocumentRepository;
 import com.analyzer.api.repository.WorkspaceRepository;
 import com.analyzer.api.service.WorkspaceService;

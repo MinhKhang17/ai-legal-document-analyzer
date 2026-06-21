@@ -12,4 +12,14 @@ public interface DocumentRepository extends JpaRepository<Document, String> {
             String workspaceId,
             Long userId,
             String status);
+
+    long countByWorkspaceIdAndUserIdAndStatus(
+            String workspaceId,
+            Long userId,
+            String status);
+
+    long countByWorkspaceIdAndUserIdAndStatusIn(
+            String workspaceId,
+            Long userId,
+            List<String> statuses);
 }

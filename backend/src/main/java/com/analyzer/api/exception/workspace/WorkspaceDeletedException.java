@@ -1,4 +1,4 @@
-package com.analyzer.api.exception;
+package com.analyzer.api.exception.workspace;
 
 import lombok.Getter;
 

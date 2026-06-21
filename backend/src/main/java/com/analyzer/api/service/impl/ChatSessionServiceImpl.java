@@ -3,15 +3,18 @@ package com.analyzer.api.service.impl;
 import com.analyzer.api.dto.PageResponse;
 import com.analyzer.api.dto.chatsession.ChatSessionResponse;
 import com.analyzer.api.dto.chatsession.CreateChatSessionRequest;
+import com.analyzer.api.dto.chatsession.UpdateChatSessionRequest;
+import com.analyzer.api.dto.chatsession.DeleteChatSessionResponse;
 import com.analyzer.api.entity.ChatSession;
 import com.analyzer.api.entity.Workspace;
 import com.analyzer.api.enums.ChatSessionStatus;
-import com.analyzer.api.exception.ForbiddenException;
-import com.analyzer.api.exception.ResourceNotFoundException;
-import com.analyzer.api.exception.WorkspaceDeletedException;
-import com.analyzer.api.exception.InvalidPageException;
-import com.analyzer.api.exception.InvalidSizeException;
-import com.analyzer.api.exception.DeletedChatSessionException;
+import com.analyzer.api.exception.common.ForbiddenException;
+import com.analyzer.api.exception.common.ResourceNotFoundException;
+import com.analyzer.api.exception.workspace.WorkspaceDeletedException;
+import com.analyzer.api.exception.validation.InvalidPageException;
+import com.analyzer.api.exception.validation.InvalidSizeException;
+import com.analyzer.api.exception.chat.DeletedChatSessionException;
+import com.analyzer.api.exception.chat.InvalidTitleException;
 import com.analyzer.api.repository.ChatSessionRepository;
 import com.analyzer.api.repository.WorkspaceRepository;
 import com.analyzer.api.service.ChatSessionService;
@@ -23,6 +26,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -127,6 +131,60 @@ public class ChatSessionServiceImpl implements ChatSessionService {
         }
 
         return toResponse(chatSession);
+    }
+
+    @Override
+    @Transactional
+    public ChatSessionResponse updateChatSession(Long userId, String chatSessionId, UpdateChatSessionRequest request) {
+        // Validate request title
+        if (request == null || request.getTitle() == null || request.getTitle().trim().isEmpty()) {
+            throw new InvalidTitleException("Chat session title is required", true, 255);
+        }
+        if (request.getTitle().length() > 255) {
+            throw new InvalidTitleException("Chat session title must not exceed 255 characters", false, 255);
+        }
+
+        ChatSession chatSession = chatSessionRepository.findById(chatSessionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Chat session not found"));
+
+        if (!chatSession.getUser().getId().equals(userId)) {
+            throw new ForbiddenException("You do not have permission to update this chat session");
+        }
+
+        if (chatSession.getStatus() == ChatSessionStatus.DELETED) {
+            throw new DeletedChatSessionException("Deleted chat session cannot be updated", chatSessionId, "DELETED");
+        }
+
+        chatSession.setTitle(request.getTitle().trim());
+        chatSession.setUpdatedAt(LocalDateTime.now());
+        ChatSession savedSession = chatSessionRepository.save(chatSession);
+
+        return toResponse(savedSession);
+    }
+
+    @Override
+    @Transactional
+    public DeleteChatSessionResponse deleteChatSession(Long userId, String chatSessionId) {
+        ChatSession chatSession = chatSessionRepository.findById(chatSessionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Chat session not found"));
+
+        if (!chatSession.getUser().getId().equals(userId)) {
+            throw new ForbiddenException("You do not have permission to delete this chat session");
+        }
+
+        if (chatSession.getStatus() == ChatSessionStatus.DELETED) {
+            throw new DeletedChatSessionException("Chat session is already deleted", chatSessionId, "DELETED");
+        }
+
+        chatSession.setStatus(ChatSessionStatus.DELETED);
+        chatSession.setUpdatedAt(LocalDateTime.now());
+        ChatSession savedSession = chatSessionRepository.save(chatSession);
+
+        return DeleteChatSessionResponse.builder()
+                .chatSessionId(savedSession.getId())
+                .status(savedSession.getStatus())
+                .deletedAt(savedSession.getUpdatedAt())
+                .build();
     }
 
     private String generateChatSessionId() {

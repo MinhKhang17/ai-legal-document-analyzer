@@ -10,6 +10,11 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 
 import java.util.HashMap;
 import java.util.Map;
+import com.analyzer.api.exception.common.*;
+import com.analyzer.api.exception.workspace.*;
+import com.analyzer.api.exception.chat.*;
+import com.analyzer.api.exception.ai.*;
+import com.analyzer.api.exception.validation.*;
 
 @ControllerAdvice
 public class GlobalExceptionHandler {
@@ -98,6 +103,58 @@ public class GlobalExceptionHandler {
                 return new ResponseEntity<>(
                                 ApiResponseDTO.error(HttpStatus.BAD_REQUEST.value(), ex.getMessage(), data),
                                 HttpStatus.BAD_REQUEST);
+        }
+
+        @ExceptionHandler(InvalidMessageException.class)
+        public ResponseEntity<ApiResponseDTO<Map<String, Object>>> handleInvalidMessageException(InvalidMessageException ex) {
+                Map<String, Object> data = ex.isBlank() ? Map.of() : Map.of("maxLength", ex.getMaxLength());
+                return new ResponseEntity<>(
+                                ApiResponseDTO.error(HttpStatus.BAD_REQUEST.value(), ex.getMessage(), data),
+                                HttpStatus.BAD_REQUEST);
+        }
+
+        @ExceptionHandler(InvalidTitleException.class)
+        public ResponseEntity<ApiResponseDTO<Map<String, Object>>> handleInvalidTitleException(InvalidTitleException ex) {
+                Map<String, Object> data = ex.isBlank() ? Map.of() : Map.of("maxLength", ex.getMaxLength());
+                return new ResponseEntity<>(
+                                ApiResponseDTO.error(HttpStatus.BAD_REQUEST.value(), ex.getMessage(), data),
+                                HttpStatus.BAD_REQUEST);
+        }
+
+        @ExceptionHandler(NoReadyDocumentsException.class)
+        public ResponseEntity<ApiResponseDTO<Map<String, Object>>> handleNoReadyDocumentsException(NoReadyDocumentsException ex) {
+                Map<String, Object> data;
+                if (ex.getProcessingDocumentCount() > 0) {
+                        data = Map.of(
+                                "workspaceId", ex.getWorkspaceId(),
+                                "readyDocumentCount", ex.getReadyDocumentCount(),
+                                "processingDocumentCount", ex.getProcessingDocumentCount()
+                        );
+                } else {
+                        data = Map.of(
+                                "workspaceId", ex.getWorkspaceId(),
+                                "readyDocumentCount", ex.getReadyDocumentCount()
+                        );
+                }
+                return new ResponseEntity<>(
+                                ApiResponseDTO.error(HttpStatus.BAD_REQUEST.value(), ex.getMessage(), data),
+                                HttpStatus.BAD_REQUEST);
+        }
+
+        @ExceptionHandler(AiServiceUnavailableException.class)
+        public ResponseEntity<ApiResponseDTO<Map<String, String>>> handleAiServiceUnavailableException(AiServiceUnavailableException ex) {
+                Map<String, String> data = Map.of("requestId", ex.getRequestId());
+                return new ResponseEntity<>(
+                                ApiResponseDTO.error(HttpStatus.SERVICE_UNAVAILABLE.value(), ex.getMessage(), data),
+                                HttpStatus.SERVICE_UNAVAILABLE);
+        }
+
+        @ExceptionHandler(AiServiceTimeoutException.class)
+        public ResponseEntity<ApiResponseDTO<Map<String, String>>> handleAiServiceTimeoutException(AiServiceTimeoutException ex) {
+                Map<String, String> data = Map.of("requestId", ex.getRequestId());
+                return new ResponseEntity<>(
+                                ApiResponseDTO.error(HttpStatus.GATEWAY_TIMEOUT.value(), ex.getMessage(), data),
+                                HttpStatus.GATEWAY_TIMEOUT);
         }
 
         @ExceptionHandler(RuntimeException.class)

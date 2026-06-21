@@ -1,4 +1,4 @@
-package com.analyzer.api.exception;
+package com.analyzer.api.exception.common;
 
 public class ResourceNotFoundException extends RuntimeException {
     public ResourceNotFoundException(String message) {
