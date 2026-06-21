@@ -53,7 +53,7 @@ public class ChatSessionController {
             try {
                 chatSessionStatus = ChatSessionStatus.valueOf(status.trim().toUpperCase());
             } catch (IllegalArgumentException e) {
-                throw new com.analyzer.api.exception.InvalidStatusException("Invalid chat session status");
+                throw new com.analyzer.api.exception.validation.InvalidStatusException("Invalid chat session status");
             }
         }
 
@@ -74,6 +74,25 @@ public class ChatSessionController {
             @PathVariable String chatSessionId) {
         ChatSessionResponse response = chatSessionService.getChatSessionDetail(getCurrentUserId(), chatSessionId);
         return ResponseEntity.ok(ApiResponseDTO.success("Chat session retrieved successfully", response));
+    }
+
+    @PutMapping("/api/v1/chat-sessions/{chatSessionId}")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    @Operation(summary = "Update chat session", description = "Updates the title of a specific chat session for the authenticated customer.")
+    public ResponseEntity<ApiResponseDTO<ChatSessionResponse>> updateChatSession(
+            @PathVariable String chatSessionId,
+            @Valid @RequestBody com.analyzer.api.dto.chatsession.UpdateChatSessionRequest request) {
+        ChatSessionResponse response = chatSessionService.updateChatSession(getCurrentUserId(), chatSessionId, request);
+        return ResponseEntity.ok(ApiResponseDTO.success("Chat session updated successfully", response));
+    }
+
+    @DeleteMapping("/api/v1/chat-sessions/{chatSessionId}")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    @Operation(summary = "Delete chat session", description = "Soft deletes a specific chat session by updating its status to DELETED.")
+    public ResponseEntity<ApiResponseDTO<com.analyzer.api.dto.chatsession.DeleteChatSessionResponse>> deleteChatSession(
+            @PathVariable String chatSessionId) {
+        com.analyzer.api.dto.chatsession.DeleteChatSessionResponse response = chatSessionService.deleteChatSession(getCurrentUserId(), chatSessionId);
+        return ResponseEntity.ok(ApiResponseDTO.success("Chat session deleted successfully", response));
     }
 
     private Long getCurrentUserId() {

@@ -16,6 +16,33 @@
   - Chuyển cấu hình ánh xạ route của `ChatSessionController` sang mức độ method với các đường dẫn tuyệt đối dạng `/api/v1/...`, giúp loại bỏ hiển thị trùng lặp trên giao diện Swagger/OpenAPI.
 - **Khắc phục lỗi phân tích cú pháp JSON**:
   - Cấu hình thuộc tính `spring.jackson.parser.allow-unquoted-control-chars: true` trong `application.yml` cho phép Jackson xử lý các chuỗi JSON chứa ký tự điều khiển thô chưa escape (như ký tự xuống dòng `\n` - code 10), khắc phục hoàn toàn lỗi `JSON parse error: Illegal unquoted character` khi gọi API (ví dụ `/api/v1/auth/register`).
+- **Triển khai các API gửi tin nhắn Chat/RAG**:
+  - **`POST /api/v1/workspaces/{workspaceId}/messages`**: Gửi câu hỏi đầu tiên trong Workspace. Tự động tạo một `ChatSession` mặc định (nếu chưa có), lưu tin nhắn của User, gọi Python AI Service để truy vấn RAG và lưu tin nhắn phản hồi của Assistant.
+  - **`POST /api/v1/chat-sessions/{chatSessionId}/messages`**: Gửi tin nhắn tiếp theo trong cuộc hội thoại hiện có. Lưu tin nhắn User, gọi Python AI và lưu tin nhắn phản hồi Assistant.
+  - **Tích hợp Python AI Client (`PythonAiClient.java`)**: Tạo client kết nối Python AI service qua `/internal/rag/query` bằng Java `HttpClient`, cấu hình connect/read timeout và ném exception tương ứng khi AI Service lỗi hoặc quá hạn.
+  - **Xử lý các tình huống lỗi Chat/RAG**: Triển khai các custom exception (`NoReadyDocumentsException`, `AiServiceUnavailableException`, `AiServiceTimeoutException`, `InvalidMessageException`) và đăng ký handler trong `GlobalExceptionHandler` để trả về đúng cấu trúc payload lỗi (400, 403, 404, 503, 504) như yêu cầu.
+  - Thiết kế các DTO phục vụ gửi nhận tin nhắn: `SendMessageRequest`, `ChatMessageResponse`, `SendMessageResponse`, `RagQueryRequest`, `RagQueryResponse`.
+- **Triển khai các API đọc tin nhắn**:
+  - **`GET /api/v1/chat-sessions/{chatSessionId}/messages`**: Lấy toàn bộ lịch sử tin nhắn trong một ChatSession cụ thể. Có hỗ trợ phân trang (`page`, `size`) và tự động sắp xếp theo thứ tự thời gian tăng dần (`createdAt ASC`).
+  - **`GET /api/v1/chat-messages/{messageId}`**: Lấy thông tin chi tiết của một tin nhắn cụ thể bao gồm các siêu dữ liệu (`requestId`, `aiModel`, `tokens`, `errorMessage`).
+  - Đảm bảo kiểm tra phân quyền sở hữu chặt chẽ (`403 Forbidden`) đối với người dùng hiện tại và kiểm tra trạng thái hoạt động của cuộc hội thoại để chặn truy xuất từ các cuộc hội thoại đã bị xóa (`400 Bad Request`).
+- **Triển khai các API quản lý ChatSession (Cập nhật & Xóa mềm)**:
+  - **`PUT /api/v1/chat-sessions/{chatSessionId}`**: Cập nhật tiêu đề (`title`) của `ChatSession`. Thực hiện kiểm tra quyền sở hữu, chặn cập nhật đối với cuộc hội thoại đã bị xóa, tự động trim tiêu đề, đồng thời validate không trống và độ dài tối đa 255 ký tự (ném custom exception `InvalidTitleException` để trả về định dạng lỗi chuẩn).
+  - **`DELETE /api/v1/chat-sessions/{chatSessionId}`**: Thực hiện xóa mềm cuộc hội thoại bằng cách cập nhật trường trạng thái `status` thành `DELETED` và ghi lại mốc thời gian xóa tại trường `updatedAt`. Kiểm tra các ràng buộc bảo mật và trạng thái cuộc hội thoại trước khi xóa (trả về `DeleteChatSessionResponse`).
+- **Khắc phục lỗi khởi động ApplicationContext do thiếu Bean `ObjectMapper`**:
+  - Khởi tạo trực tiếp instance `ObjectMapper` trong `PythonAiClient.java` (tương tự như cách làm ở `WorkspaceServiceImpl` và `AuthEntryPointJwt`), giúp loại bỏ lỗi dependency injection khi Spring Boot khởi động do không tìm thấy bean `ObjectMapper` được tự động cấu hình.
+- **Tách và phân loại cấu trúc Custom Exceptions**:
+  - Phân chia các custom exceptions trong package `com.analyzer.api.exception` thành 5 thư mục con chuyên biệt nhằm tăng tính tường minh và cấu trúc sạch cho dự án:
+    - `common`: `ResourceNotFoundException`, `ForbiddenException`
+    - `workspace`: `WorkspaceDeletedException`, `NoReadyDocumentsException`, `DocumentProcessingDispatchException`
+    - `chat`: `DeletedChatSessionException`, `InvalidMessageException`, `InvalidTitleException`
+    - `ai`: `AiServiceUnavailableException`, `AiServiceTimeoutException`
+    - `validation`: `InvalidPageException`, `InvalidSizeException`, `InvalidStatusException`
+  - Cập nhật toàn bộ các câu lệnh import, tham chiếu gói (package references) tương ứng tại các Service, Controller và Client của hệ thống, đồng thời đăng ký gói mới vào `GlobalExceptionHandler` để đảm bảo hệ thống vận hành ổn định.
+- **Cập nhật DTO `RagQueryRequest` gọi Python AI**:
+  - Thêm các annotation `@JsonProperty` cho tất cả thuộc tính của `RagQueryRequest` nhằm đảm bảo serialization tự động chuyển đổi định dạng camelCase sang snake_case (gồm `request_id`, `user_id`, `workspace_id`, `question`, `top_k_checklist`, `top_k_user_chunks_per_checklist`, `top_k_knowledge_chunks`).
+  - Loại bỏ hoàn toàn trường `chatSessionId` khỏi DTO để tránh gửi dư thừa thông tin sang AI Service.
+  - Cấu hình các tham số RAG mới trong `ChatMessageServiceImpl` gồm `topKChecklist(10)` và `topKUserChunksPerChecklist(3)` đồng thời giữ `topKKnowledgeChunks(5)`.
 
 ---
 
