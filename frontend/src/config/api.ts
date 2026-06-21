@@ -20,14 +20,16 @@ export const API_ENDPOINTS = {
     me: getRequiredEnvValue("VITE_AUTH_ME_API"),
   },
 
-  workspaces: {
-    create: getRequiredEnvValue("VITE_WORKSPACE_CREATE_API"),
+workspaces: {
+  list: getRequiredEnvValue("VITE_WORKSPACE_LIST_API"),
+  create: getRequiredEnvValue("VITE_WORKSPACE_CREATE_API"),
 
-    documents: (workspaceId: string) =>
-      `${getRequiredEnvValue(
-        "VITE_WORKSPACE_DOCUMENTS_API",
-      )}/${workspaceId}/documents`,
-  },
+  detail: (workspaceId: string) =>
+    `${getRequiredEnvValue("VITE_WORKSPACE_DETAIL_API")}/${workspaceId}`,
+
+  documents: (workspaceId: string) =>
+    `${getRequiredEnvValue("VITE_WORKSPACE_DOCUMENTS_API")}/${workspaceId}/documents`,
+},
 
   subscription: {
     plans: getRequiredEnvValue("VITE_SUBSCRIPTION_PLANS_API"),
