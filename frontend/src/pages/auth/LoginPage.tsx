@@ -234,22 +234,22 @@ export function LoginPage() {
         </Button>
       </form>
 
-      <div className="my-5 flex items-center gap-3">
+      {/* <div className="my-5 flex items-center gap-3">
         <div className="h-px flex-1 bg-outline-variant" />
         <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-on-surface-variant dark:text-slate-400">
           {t("auth.orContinueWith")}
         </span>
         <div className="h-px flex-1 bg-outline-variant" />
-      </div>
+      </div> */}
 
-      <Button
+      {/* <Button
         variant="secondary"
         className="h-10 w-full text-sm"
         size="md"
         leftIcon={<GoogleIcon />}
       >
         {t("auth.continueWithGoogle")}
-      </Button>
+      </Button> */}
 
       <footer className="mt-6 text-center text-[11px] text-on-surface-variant dark:text-slate-400">
         {t("auth.newToLexiGuard")}{" "}
