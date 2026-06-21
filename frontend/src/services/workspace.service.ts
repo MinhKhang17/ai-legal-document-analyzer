@@ -1,39 +1,69 @@
-import type { Document } from "../types/workspace";
 import { API_ENDPOINTS, buildApiUrl } from "../config/api";
+import type {
+  CreateWorkspaceRequest,
+  Document,
+  Workspace,
+} from "../types/workspace";
 
-export type WorkspaceResponse = {
-  workspaceId: string;
-  name: string;
-  description: string;
+type WorkspaceResponse = Omit<Workspace, "status"> & {
   status: string;
-  createdAt: string;
 };
 
-export type DocumentResponse = {
-  documentId: string;
-  workspaceId: string;
-  originalFileName: string;
-  fileType: string;
-  fileSize: number;
-  status: "PROCESSING" | "READY" | "FAILED";
-  uploadedAt: string;
+type DocumentResponse = Omit<Document, "status"> & {
+  status: string;
 };
 
 const getAuthHeaders = (accessToken: string): HeadersInit => ({
   Authorization: `Bearer ${accessToken}`,
 });
 
-const normalizeStatus = (status: string) => {
-  return status.toLowerCase() as Document['status'];
-};
+const normalizeStatus = <T extends { status: string }>(item: T) => ({
+  ...item,
+  status: item.status.toLowerCase(),
+});
+
+export async function getWorkspaces(accessToken: string): Promise<Workspace[]> {
+  const response = await fetch(buildApiUrl(API_ENDPOINTS.workspaces.list), {
+    method: "GET",
+    headers: getAuthHeaders(accessToken),
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    throw new Error("Không thể tải danh sách workspace");
+  }
+
+  const data: WorkspaceResponse[] = await response.json();
+
+  return data.map((workspace) => normalizeStatus(workspace) as Workspace);
+}
+
+export async function getWorkspaceDetail(
+  accessToken: string,
+  workspaceId: string,
+): Promise<Workspace> {
+  const response = await fetch(
+    buildApiUrl(API_ENDPOINTS.workspaces.detail(workspaceId)),
+    {
+      method: "GET",
+      headers: getAuthHeaders(accessToken),
+      credentials: "include",
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error("Không thể tải workspace");
+  }
+
+  const data: WorkspaceResponse = await response.json();
+
+  return normalizeStatus(data) as Workspace;
+}
 
 export async function createWorkspace(
   accessToken: string,
-  payload: {
-    name: string;
-    description: string;
-  },
-): Promise<WorkspaceResponse> {
+  payload: CreateWorkspaceRequest,
+): Promise<Workspace> {
   const response = await fetch(buildApiUrl(API_ENDPOINTS.workspaces.create), {
     method: "POST",
     headers: {
@@ -48,7 +78,9 @@ export async function createWorkspace(
     throw new Error("Tạo workspace thất bại");
   }
 
-  return response.json();
+  const data: WorkspaceResponse = await response.json();
+
+  return normalizeStatus(data) as Workspace;
 }
 
 export async function uploadDocument(
@@ -75,10 +107,7 @@ export async function uploadDocument(
 
   const data: DocumentResponse = await response.json();
 
-  return {
-    ...data,
-    status: normalizeStatus(data.status),
-  };
+  return normalizeStatus(data) as Document;
 }
 
 export async function getWorkspaceDocuments(
@@ -100,8 +129,5 @@ export async function getWorkspaceDocuments(
 
   const data: DocumentResponse[] = await response.json();
 
-  return data.map((document) => ({
-    ...document,
-    status: normalizeStatus(document.status),
-  }));
+  return data.map((document) => normalizeStatus(document) as Document);
 }
