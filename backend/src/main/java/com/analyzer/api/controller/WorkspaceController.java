@@ -27,7 +27,7 @@ import java.io.IOException;
 import java.util.List;
 
 @RestController
-@RequestMapping({"/api/workspaces", "/api/v1/workspaces"})
+@RequestMapping("/api/v1/workspaces")
 @RequiredArgsConstructor
 @Tag(name = "Workspace Management", description = "APIs for creating workspaces and listing workspace documents")
 public class WorkspaceController {
