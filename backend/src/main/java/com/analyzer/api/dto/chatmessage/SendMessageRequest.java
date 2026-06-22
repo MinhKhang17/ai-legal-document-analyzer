@@ -16,4 +16,7 @@ public class SendMessageRequest {
     @NotBlank(message = "Message content is required")
     @Size(max = 5000, message = "Message content must not exceed 5000 characters")
     private String message;
+
+    @Size(max = 100, message = "Document ID must not exceed 100 characters")
+    private String documentId;
 }

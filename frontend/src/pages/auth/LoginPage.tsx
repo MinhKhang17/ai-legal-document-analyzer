@@ -7,29 +7,6 @@ import { useAppStore } from "../../store/AppStore";
 import { getCurrentUser, login } from "../../api/authApi";
 import type { CurrentUser } from "../../types/auth";
 
-function GoogleIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
-      <path
-        fill="#EA4335"
-        d="M12 10.2v3.9h5.5c-.2 1.2-.9 2.2-1.9 2.9l3.1 2.4c1.8-1.7 2.9-4.1 2.9-7 0-.7-.1-1.4-.2-2.1H12z"
-      />
-      <path
-        fill="#34A853"
-        d="M12 22c2.6 0 4.9-.9 6.5-2.5l-3.1-2.4c-.9.6-2 1-3.4 1-2.6 0-4.7-1.7-5.4-4l-3.2 2.5C4.9 19.8 8.2 22 12 22z"
-      />
-      <path
-        fill="#FBBC05"
-        d="M6.6 14.1c-.2-.6-.4-1.3-.4-2.1s.1-1.4.4-2.1L3.4 7.4C2.8 8.6 2.5 10.2 2.5 12s.3 3.4.9 4.6l3.2-2.5z"
-      />
-      <path
-        fill="#4285F4"
-        d="M12 5.9c1.4 0 2.6.5 3.6 1.4l2.7-2.7C16.8 3.1 14.6 2 12 2 8.2 2 4.9 4.2 3.4 7.4l3.2 2.5c.7-2.3 2.8-4 5.4-4z"
-      />
-    </svg>
-  );
-}
-
 const getStringStateValue = (state: unknown, key: string): string => {
   if (typeof state === "object" && state !== null) {
     const value = (state as Record<string, unknown>)[key];

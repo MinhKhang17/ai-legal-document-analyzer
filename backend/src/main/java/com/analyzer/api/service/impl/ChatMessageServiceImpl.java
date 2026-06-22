@@ -10,6 +10,7 @@ import com.analyzer.api.dto.chatmessage.SendMessageResponse;
 import com.analyzer.api.dto.chatsession.ChatSessionResponse;
 import com.analyzer.api.entity.ChatMessage;
 import com.analyzer.api.entity.ChatSession;
+import com.analyzer.api.entity.Document;
 import com.analyzer.api.entity.Workspace;
 import com.analyzer.api.enums.ChatMessageRole;
 import com.analyzer.api.enums.ChatMessageStatus;
@@ -26,6 +27,8 @@ import com.analyzer.api.repository.DocumentRepository;
 import com.analyzer.api.repository.WorkspaceRepository;
 import com.analyzer.api.service.ChatMessageService;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -40,6 +43,8 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class ChatMessageServiceImpl implements ChatMessageService {
+
+    private static final Logger logger = LoggerFactory.getLogger(ChatMessageServiceImpl.class);
 
     private final WorkspaceRepository workspaceRepository;
     private final DocumentRepository documentRepository;
@@ -68,7 +73,8 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         }
 
         // Validate Documents
-        validateWorkspaceDocuments(userId, workspaceId);
+        Document selectedDocument = resolveSelectedDocument(userId, workspaceId, request.getDocumentId());
+        validateWorkspaceDocuments(userId, workspaceId, selectedDocument);
 
         // Find or create default ChatSession
         ChatSession chatSession = chatSessionRepository.findByWorkspaceIdAndUserIdAndIsDefaultTrueAndStatus(
@@ -79,7 +85,7 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         ChatMessage userMessage = createAndSaveUserMessage(chatSession, request.getMessage().trim());
 
         // Process AI Query
-        return executeAiQuery(workspace, chatSession, userMessage, request.getMessage().trim());
+        return executeAiQuery(workspace, chatSession, userMessage, request.getMessage().trim(), selectedDocument);
     }
 
     @Override
@@ -109,13 +115,14 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         }
 
         // Validate Documents
-        validateWorkspaceDocuments(userId, workspace.getId());
+        Document selectedDocument = resolveSelectedDocument(userId, workspace.getId(), request.getDocumentId());
+        validateWorkspaceDocuments(userId, workspace.getId(), selectedDocument);
 
         // Create User Message
         ChatMessage userMessage = createAndSaveUserMessage(chatSession, request.getMessage().trim());
 
         // Process AI Query
-        return executeAiQuery(workspace, chatSession, userMessage, request.getMessage().trim());
+        return executeAiQuery(workspace, chatSession, userMessage, request.getMessage().trim(), selectedDocument);
     }
 
     @Override
@@ -194,9 +201,16 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         if (request.getMessage().length() > 5000) {
             throw new InvalidMessageException("Message content must not exceed 5000 characters", false, 5000);
         }
+        if (request.getDocumentId() != null && request.getDocumentId().trim().length() > 100) {
+            throw new InvalidMessageException("Document ID must not exceed 100 characters", false, 100);
+        }
     }
 
-    private void validateWorkspaceDocuments(Long userId, String workspaceId) {
+    private void validateWorkspaceDocuments(Long userId, String workspaceId, Document selectedDocument) {
+        if (selectedDocument != null) {
+            return;
+        }
+
         long readyDocCount = documentRepository.countByWorkspaceIdAndUserIdAndStatus(workspaceId, userId, "READY");
         if (readyDocCount == 0) {
             long processingDocCount = documentRepository.countByWorkspaceIdAndUserIdAndStatusIn(
@@ -211,6 +225,31 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                         workspaceId, 0, 0);
             }
         }
+    }
+
+    private Document resolveSelectedDocument(Long userId, String workspaceId, String documentId) {
+        if (documentId == null || documentId.trim().isEmpty()) {
+            return null;
+        }
+
+        Document document = documentRepository.findById(documentId.trim())
+                .orElseThrow(() -> new ResourceNotFoundException("Document not found"));
+
+        if (!document.getWorkspace().getId().equals(workspaceId)) {
+            throw new ForbiddenException("Document does not belong to the selected workspace");
+        }
+        if (!document.getUser().getId().equals(userId)) {
+            throw new ForbiddenException("You do not have permission to access this document");
+        }
+        if (!"READY".equalsIgnoreCase(document.getStatus())) {
+            throw new NoReadyDocumentsException(
+                    "Selected document is not ready for chat",
+                    workspaceId,
+                    1,
+                    0);
+        }
+
+        return document;
     }
 
     private ChatSession createDefaultChatSession(Workspace workspace) {
@@ -241,7 +280,12 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         return chatMessageRepository.save(userMessage);
     }
 
-    private SendMessageResponse executeAiQuery(Workspace workspace, ChatSession chatSession, ChatMessage userMessage, String question) {
+    private SendMessageResponse executeAiQuery(
+            Workspace workspace,
+            ChatSession chatSession,
+            ChatMessage userMessage,
+            String question,
+            Document selectedDocument) {
         String requestId = "req_" + UUID.randomUUID().toString().replace("-", "");
         userMessage.setRequestId(requestId);
 
@@ -260,6 +304,7 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                     .requestId(requestId)
                     .userId(String.valueOf(workspace.getUser().getId()))
                     .workspaceId(workspace.getId())
+                    .documentId(selectedDocument != null ? selectedDocument.getId() : null)
                     .question(question)
                     .topKChecklist(10)
                     .topKUserChunksPerChecklist(3)
@@ -329,6 +374,17 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                 .userMessage(toChatMessageResponse(userMessage))
                 .assistantMessage(toChatMessageResponse(assistantMessage))
                 .build();
+    }
+
+    private void updateSessionTitleIfNeeded(ChatSession chatSession, String question) {
+        if (chatSession.getIsDefault() && "Default Conversation".equals(chatSession.getTitle())) {
+            String title = question;
+            if (title.length() > 100) {
+                title = title.substring(0, 100);
+            }
+            chatSession.setTitle(title);
+            chatSessionRepository.save(chatSession);
+        }
     }
 
     private ChatSessionResponse toChatSessionResponse(ChatSession chatSession) {

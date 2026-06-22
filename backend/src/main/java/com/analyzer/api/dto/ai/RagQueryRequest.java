@@ -21,6 +21,9 @@ public class RagQueryRequest {
     @JsonProperty("workspace_id")
     private String workspaceId;
 
+    @JsonProperty("document_id")
+    private String documentId;
+
     @JsonProperty("question")
     private String question;
 

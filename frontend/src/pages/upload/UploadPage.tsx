@@ -1,5 +1,6 @@
 import { AlertTriangle, FileText, Plus, Sparkles } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   createWorkspace,
   getWorkspaceDocuments,
@@ -21,9 +22,13 @@ const getAccessToken = () => localStorage.getItem("accessToken") ?? "";
 
 export function UploadPage() {
   const { t } = useI18n();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState("");
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(
+    searchParams.get("workspaceId") ?? "",
+  );
 
   const [workspaceName, setWorkspaceName] = useState("");
   const [workspaceDescription, setWorkspaceDescription] = useState("");
@@ -39,6 +44,10 @@ export function UploadPage() {
   const hasProcessingDocument = documents.some(
     (document) => document.status === "processing",
   );
+  const selectedWorkspace = useMemo(
+    () => workspaces.find((workspace) => workspace.workspaceId === selectedWorkspaceId),
+    [selectedWorkspaceId, workspaces],
+  );
 
   useEffect(() => {
     const loadWorkspaces = async () => {
@@ -47,8 +56,16 @@ export function UploadPage() {
         const data = await getWorkspaces(getAccessToken());
         setWorkspaces(data);
 
-        if (data.length > 0) {
-          setSelectedWorkspaceId(data[0].workspaceId);
+        const workspaceIdFromQuery = searchParams.get("workspaceId") ?? "";
+        const matchedWorkspace =
+          data.find((workspace) => workspace.workspaceId === workspaceIdFromQuery) ??
+          data[0];
+
+        if (matchedWorkspace) {
+          setSelectedWorkspaceId(matchedWorkspace.workspaceId);
+          if (workspaceIdFromQuery !== matchedWorkspace.workspaceId) {
+            setSearchParams({ workspaceId: matchedWorkspace.workspaceId });
+          }
         }
       } catch (err) {
         setError(
@@ -60,7 +77,7 @@ export function UploadPage() {
     };
 
     loadWorkspaces();
-  }, [t]);
+  }, [searchParams, setSearchParams, t]);
 
   useEffect(() => {
     if (!selectedWorkspaceId) {
@@ -134,6 +151,7 @@ export function UploadPage() {
 
       setWorkspaces((previous) => [workspace, ...previous]);
       setSelectedWorkspaceId(workspace.workspaceId);
+      setSearchParams({ workspaceId: workspace.workspaceId });
       setWorkspaceName("");
       setWorkspaceDescription("");
     } catch (err) {
@@ -163,6 +181,7 @@ export function UploadPage() {
       );
 
       setDocuments((previous) => [uploadedDocument, ...previous]);
+      void navigate(`/projects/${selectedWorkspaceId}`, { replace: false });
     } catch (err) {
       setError(err instanceof Error ? err.message : t("upload.uploadFailed"));
     } finally {
@@ -262,15 +281,21 @@ export function UploadPage() {
                 </select>
                 {selectedWorkspaceId && (
                   <p className="mt-xs text-xs text-on-surface-variant dark:text-slate-400">
-                    {
-                      workspaces.find(
-                        (workspace) =>
-                          workspace.workspaceId === selectedWorkspaceId,
-                      )?.description
-                    }
+                    {selectedWorkspace?.description}
                   </p>
                 )}{" "}
               </div>
+
+              {selectedWorkspaceId && (
+                <div className="flex flex-wrap gap-sm">
+                  <Link to={`/projects/${selectedWorkspaceId}`}>
+                    <Button variant="secondary">Open workspace</Button>
+                  </Link>
+                  <Link to={`/chat?workspaceId=${selectedWorkspaceId}`}>
+                    <Button variant="secondary">Open chat</Button>
+                  </Link>
+                </div>
+              )}
 
               <FileUploadZone
                 onUpload={handleUploadFile}

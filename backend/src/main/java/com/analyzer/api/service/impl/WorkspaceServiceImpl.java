@@ -12,7 +12,6 @@ import com.analyzer.api.exception.workspace.DocumentProcessingDispatchException;
 import com.analyzer.api.repository.DocumentRepository;
 import com.analyzer.api.repository.WorkspaceRepository;
 import com.analyzer.api.service.WorkspaceService;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
@@ -54,7 +54,6 @@ public class WorkspaceServiceImpl implements WorkspaceService {
 
     private final WorkspaceRepository workspaceRepository;
     private final DocumentRepository documentRepository;
-    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${app.storage.upload-root:uploads}")
     private String uploadRoot;
@@ -190,7 +189,6 @@ public class WorkspaceServiceImpl implements WorkspaceService {
                 .build();
 
         try {
-            String requestBody = objectMapper.writeValueAsString(request);
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.setAccept(List.of(MediaType.APPLICATION_JSON));
@@ -199,7 +197,7 @@ public class WorkspaceServiceImpl implements WorkspaceService {
             ResponseEntity<String> response = new RestTemplate().exchange(
                     URI.create(aiServiceBaseUrl + "/internal/documents/process"),
                     org.springframework.http.HttpMethod.POST,
-                    new HttpEntity<>(requestBody, headers),
+                    new HttpEntity<>(request, headers),
                     String.class
             );
 
@@ -207,7 +205,7 @@ public class WorkspaceServiceImpl implements WorkspaceService {
                 logger.warn("AI service rejected document processing request. status={} body={} request={}",
                         response.getStatusCode().value(),
                         response.getBody(),
-                        requestBody);
+                        request);
                 document.setStatus(STATUS_FAILED);
                 document.setChunkCount(0);
                 document.setErrorMessage("Python AI Service returned HTTP " + response.getStatusCode().value()
@@ -218,6 +216,19 @@ public class WorkspaceServiceImpl implements WorkspaceService {
             document.setStatus(STATUS_PROCESSING);
             document.setErrorMessage(null);
             document.setProcessedAt(null);
+        } catch (HttpStatusCodeException ex) {
+            String responseBody = ex.getResponseBodyAsString();
+            logger.warn("AI service rejected document processing request. status={} body={} request={}",
+                    ex.getStatusCode().value(),
+                    responseBody,
+                    request);
+            document.setStatus(STATUS_FAILED);
+            document.setChunkCount(0);
+            document.setErrorMessage("Python AI Service returned HTTP " + ex.getStatusCode().value()
+                    + (responseBody == null || responseBody.isBlank() ? "" : ": " + responseBody));
+            documentRepository.save(document);
+            throw new DocumentProcessingDispatchException("Python AI Service returned HTTP " + ex.getStatusCode().value()
+                    + (responseBody == null || responseBody.isBlank() ? "" : ": " + responseBody), ex);
         } catch (RestClientException ex) {
             document.setStatus(STATUS_FAILED);
             document.setChunkCount(0);

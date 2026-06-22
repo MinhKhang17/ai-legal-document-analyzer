@@ -79,16 +79,20 @@ class GraphRepository:
         top_k: int = 5,
         *,
         query_text: str | None = None,
+        document_id: str | None = None,
     ) -> list[RetrievedChunk]:
+        metadata_filter: dict[str, Any] = {
+            "source_type": "USER_DOCUMENT",
+            "user_id": user_id,
+            "workspace_id": workspace_id,
+        }
+        if document_id:
+            metadata_filter["document_id"] = document_id
         return self._search_chunks_with_filter(
             query_embedding=embedding,
             top_k=top_k,
             query_text=query_text,
-            metadata_filter={
-                "source_type": "USER_DOCUMENT",
-                "user_id": user_id,
-                "workspace_id": workspace_id,
-            },
+            metadata_filter=metadata_filter,
         )
 
     def search_knowledge_chunks(
@@ -142,7 +146,19 @@ class GraphRepository:
                     for record in result
                     if self._record_matches_metadata(record, metadata_filter)
                 ]
-                return [self._record_to_retrieved_chunk(record, metadata_filter=metadata_filter) for record in filtered_records[:top_k]]
+                vector_hits = [
+                    self._record_to_retrieved_chunk(record, metadata_filter=metadata_filter)
+                    for record in filtered_records[:top_k]
+                ]
+                if not query_text:
+                    return vector_hits
+
+                text_hits = self._search_chunks_by_text(
+                    query_text,
+                    top_k=top_k,
+                    metadata_filter=metadata_filter,
+                )
+                return self._merge_hits(vector_hits, text_hits, top_k=top_k)
             except Exception:
                 if not query_text:
                     return []
@@ -250,6 +266,22 @@ class GraphRepository:
             )
             for score, chunk in selected
         ]
+
+    def _merge_hits(
+        self,
+        vector_hits: list[RetrievedChunk],
+        text_hits: list[RetrievedChunk],
+        top_k: int,
+    ) -> list[RetrievedChunk]:
+        merged_by_id: dict[str, RetrievedChunk] = {}
+
+        for hit in [*vector_hits, *text_hits]:
+            existing = merged_by_id.get(hit.chunk_id)
+            if existing is None or hit.score > existing.score:
+                merged_by_id[hit.chunk_id] = hit
+
+        merged = sorted(merged_by_id.values(), key=lambda item: item.score, reverse=True)
+        return merged[:top_k]
 
     def _record_matches_metadata(self, record: Any, metadata_filter: dict[str, Any] | None) -> bool:
         if not metadata_filter:

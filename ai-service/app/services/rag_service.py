@@ -1,10 +1,11 @@
-"""RAG service for global review query processing."""
+"""RAG service for query processing."""
 import logging
 import time
 from typing import List, Dict, Any
 from app.database.neo4j_client import neo4j_client
 from app.services.embedding_service import embedding_service
 from app.services.gemini_service import gemini_service
+from app.services.retrieval_service import RetrievalService, RagChunkHit
 from app.models.query import RAGQueryRequest, RAGQueryResponse, ChecklistResult
 
 logger = logging.getLogger(__name__)
@@ -15,7 +16,139 @@ class RAGService:
     
     def __init__(self):
         """Initialize RAG service."""
-        pass
+        self.retrieval_service = RetrievalService()
+
+    def process_query(self, request: RAGQueryRequest) -> RAGQueryResponse:
+        """Process a direct query against user documents first, then knowledge base."""
+        start_time = time.time()
+        try:
+            user_hits, legal_search_query, knowledge_hits = self._retrieve_query_context(request)
+            if not user_hits and not knowledge_hits:
+                return RAGQueryResponse(
+                    request_id=request.request_id,
+                    success=True,
+                    answer="Không đủ thông tin để kết luận.",
+                    checklist_results=[],
+                    knowledge_chunks=[],
+                    total_checklist_items=0,
+                    total_user_chunks=0,
+                    total_knowledge_chunks=0,
+                    processing_time_ms=(time.time() - start_time) * 1000,
+                )
+
+            answer = gemini_service.generate_query_answer(
+                question=request.question,
+                user_chunks=[self._hit_to_context_dict(hit) for hit in user_hits],
+                knowledge_chunks=[self._hit_to_context_dict(hit) for hit in knowledge_hits],
+            )
+            processing_time = (time.time() - start_time) * 1000
+            return RAGQueryResponse(
+                request_id=request.request_id,
+                success=True,
+                answer=answer,
+                checklist_results=[],
+                knowledge_chunks=[self._hit_to_context_dict(hit) for hit in knowledge_hits],
+                total_checklist_items=0,
+                total_user_chunks=len(user_hits),
+                total_knowledge_chunks=len(knowledge_hits),
+                processing_time_ms=processing_time,
+            )
+        except Exception as e:
+            logger.error(f"Failed to process query: {e}", exc_info=True)
+            return RAGQueryResponse(
+                request_id=request.request_id,
+                success=False,
+                answer="Không đủ thông tin để kết luận.",
+                checklist_results=[],
+                knowledge_chunks=[],
+                total_checklist_items=0,
+                total_user_chunks=0,
+                total_knowledge_chunks=0,
+                processing_time_ms=(time.time() - start_time) * 1000,
+                error_message=f"Lỗi xử lý: {str(e)}",
+            )
+
+    def process_query_stream(self, request: RAGQueryRequest):
+        """Process a direct query and stream the response as SSE text."""
+        start_time = time.time()
+        try:
+            user_hits, legal_search_query, knowledge_hits = self._retrieve_query_context(request)
+            yield self._encode_sse(
+                "meta",
+                {
+                    "request_id": request.request_id,
+                    "total_user_chunks": len(user_hits),
+                    "total_knowledge_chunks": len(knowledge_hits),
+                    "legal_search_query": legal_search_query,
+                },
+            )
+
+            if not user_hits and not knowledge_hits:
+                final_answer = "Không đủ thông tin để kết luận."
+                yield self._encode_sse("chunk", {"delta": final_answer, "content": final_answer})
+                yield self._encode_sse(
+                    "done",
+                    {
+                        "answer": final_answer,
+                        "processing_time_ms": (time.time() - start_time) * 1000,
+                    },
+                )
+                return
+
+            user_context = [self._hit_to_context_dict(hit) for hit in user_hits]
+            knowledge_context = [self._hit_to_context_dict(hit) for hit in knowledge_hits]
+
+            for event_text in gemini_service.stream_query_answer(
+                question=request.question,
+                user_chunks=user_context,
+                knowledge_chunks=knowledge_context,
+            ):
+                yield event_text
+
+            processing_time = (time.time() - start_time) * 1000
+            logger.info("Streamed query successfully in %.2fms", processing_time)
+        except Exception as exc:
+            logger.error("Failed to stream query: %s", exc, exc_info=True)
+            yield self._encode_sse("error", {"message": f"Lỗi xử lý: {str(exc)}"})
+
+    def _retrieve_query_context(self, request: RAGQueryRequest) -> tuple[list[RagChunkHit], str, list[RagChunkHit]]:
+        user_hits = self.retrieval_service.search_user_chunks(
+            request.question,
+            user_id=request.user_id,
+            workspace_id=request.workspace_id,
+            top_k=request.top_k_user_chunks_per_checklist,
+            document_id=request.document_id,
+        )
+        legal_search_query = self.retrieval_service.build_legal_search_query(request.question, user_hits)
+        knowledge_hits = self.retrieval_service.search_knowledge_chunks(
+            legal_search_query,
+            top_k=request.top_k_knowledge_chunks,
+            query_text=request.question,
+        )
+        return user_hits, legal_search_query, knowledge_hits
+
+    def _hit_to_context_dict(self, hit: RagChunkHit) -> Dict[str, Any]:
+        return {
+            "citationId": hit.citationId,
+            "sourceType": hit.sourceType,
+            "score": hit.score,
+            "chunkText": hit.chunkText,
+            "text": hit.chunkText,
+            "documentId": hit.documentId,
+            "workspaceId": hit.workspaceId,
+            "userId": hit.userId,
+            "fileName": hit.fileName,
+            "knowledgeDocumentId": hit.knowledgeDocumentId,
+            "lawName": hit.lawName,
+            "lawCode": hit.lawCode,
+            "legalDomain": hit.legalDomain,
+            "pageNumber": hit.pageNumber,
+            "articleNumber": hit.articleNumber,
+            "clauseNumber": hit.clauseNumber,
+            "sectionTitle": hit.sectionTitle,
+            "title": hit.title,
+            "metadata": hit.metadata or {},
+        }
     
     def is_global_review_query(self, question: str) -> bool:
         """Determine if the question is a global review query."""
@@ -191,6 +324,7 @@ class RAGService:
                         embedding=embedding,
                         user_id=request.user_id,
                         workspace_id=request.workspace_id,
+                        document_id=request.document_id,
                         top_k=request.top_k_user_chunks_per_checklist
                     )
                     
@@ -263,7 +397,7 @@ class RAGService:
                 total_knowledge_chunks=len(knowledge_chunks),
                 processing_time_ms=processing_time
             )
-            
+
         except Exception as e:
             logger.error(f"Failed to process global review query: {e}", exc_info=True)
             return RAGQueryResponse(
@@ -271,6 +405,103 @@ class RAGService:
                 success=False,
                 error_message=f"Lỗi xử lý: {str(e)}"
             )
+
+    def process_global_review_query_stream(self, request: RAGQueryRequest):
+        """Process a global review query and stream the response as SSE text."""
+        start_time = time.time()
+
+        try:
+            logger.info("Retrieving checklists for streamed response")
+            checklists = neo4j_client.get_active_checklists(
+                document_type="ANY",
+                limit=request.top_k_checklist
+            )
+
+            if not checklists:
+                yield self._encode_sse(
+                    "done",
+                    {
+                        "answer": "Hệ thống chưa có bộ tiêu chí rà soát. Vui lòng chạy seed checklist trước.",
+                        "processing_time_ms": (time.time() - start_time) * 1000,
+                    },
+                )
+                return
+
+            checklist_results = []
+            total_user_chunks = 0
+            for checklist in checklists:
+                try:
+                    embedding = checklist.get("embedding")
+                    if not embedding:
+                        continue
+
+                    user_chunks = neo4j_client.search_user_chunks_by_embedding(
+                        embedding=embedding,
+                        user_id=request.user_id,
+                        workspace_id=request.workspace_id,
+                        document_id=request.document_id,
+                        top_k=request.top_k_user_chunks_per_checklist
+                    )
+
+                    checklist_results.append(ChecklistResult(
+                        checklist_id=checklist["checklist_id"],
+                        category=checklist["category"],
+                        title=checklist["title"],
+                        risk_question=checklist["risk_question"],
+                        priority=checklist["priority"],
+                        user_chunks_found=user_chunks
+                    ))
+
+                    total_user_chunks += len(user_chunks)
+                except Exception as exc:
+                    logger.error("Error processing checklist %s: %s", checklist.get("checklist_id"), exc)
+                    continue
+
+            question_embedding = embedding_service.embed_text(request.question)
+            knowledge_chunks = neo4j_client.search_knowledge_chunks_by_embedding(
+                embedding=question_embedding,
+                top_k=request.top_k_knowledge_chunks
+            )
+
+            yield self._encode_sse(
+                "meta",
+                {
+                    "request_id": request.request_id,
+                    "total_checklist_items": len(checklists),
+                    "total_user_chunks": total_user_chunks,
+                    "total_knowledge_chunks": len(knowledge_chunks),
+                },
+            )
+
+            checklist_dicts = [
+                {
+                    "checklist_id": r.checklist_id,
+                    "category": r.category,
+                    "title": r.title,
+                    "risk_question": r.risk_question,
+                    "priority": r.priority,
+                    "user_chunks_found": r.user_chunks_found
+                }
+                for r in checklist_results
+            ]
+
+            for event_text in gemini_service.stream_review_answer(
+                question=request.question,
+                checklist_results=checklist_dicts,
+                knowledge_chunks=knowledge_chunks,
+            ):
+                yield event_text
+
+            processing_time = (time.time() - start_time) * 1000
+            logger.info("Streamed global review query successfully in %.2fms", processing_time)
+        except Exception as exc:
+            logger.error("Failed to stream global review query: %s", exc, exc_info=True)
+            yield self._encode_sse("error", {"message": f"Lỗi xử lý: {str(exc)}"})
+
+    def _encode_sse(self, event_type: str, payload: Dict[str, Any]) -> str:
+        import json
+
+        return f"event: {event_type}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
     
     def _build_preliminary_answer(
         self,

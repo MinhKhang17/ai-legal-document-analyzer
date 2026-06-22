@@ -18,6 +18,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import jakarta.servlet.DispatcherType;
 import java.util.List;
 
 @Configuration
@@ -54,7 +55,9 @@ public class SecurityConfig {
             .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> 
-                auth.requestMatchers("/api/v1/auth/me").authenticated()
+                auth.dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
+                    .requestMatchers("/error").permitAll()
+                    .requestMatchers("/api/v1/auth/me").authenticated()
                     .requestMatchers("/api/v1/auth/**").permitAll()
                     .requestMatchers(
                             "/api/v1/payment-transactions/vnpay-return",

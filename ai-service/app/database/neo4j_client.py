@@ -141,6 +141,7 @@ class Neo4jClient:
         embedding: List[float],
         user_id: str,
         workspace_id: str,
+        document_id: Optional[str] = None,
         top_k: int = 3
     ) -> List[Dict[str, Any]]:
         """Search user document chunks by embedding vector."""
@@ -149,6 +150,7 @@ class Neo4jClient:
         query = """
         MATCH (doc:Document)-[:HAS_SECTION|HAS_SUBSECTION*0..2]->(chunk:Chunk)
         WHERE doc.userId = $user_id
+          AND ($document_id IS NULL OR doc.id = $document_id)
           AND chunk.embedding IS NOT NULL
         WITH chunk, doc,
              vector.similarity.cosine(chunk.embedding, $embedding) AS score
@@ -166,6 +168,7 @@ class Neo4jClient:
         return self.execute_query(query, {
             "embedding": embedding,
             "user_id": user_id,
+            "document_id": document_id,
             "top_k": top_k
         })
     

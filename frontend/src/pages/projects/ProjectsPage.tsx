@@ -1,83 +1,159 @@
-import { Grid2X2, List, Plus, Search, SlidersHorizontal } from 'lucide-react';
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Badge } from '../../components/common/Badge';
-import { Button } from '../../components/common/Button';
-import { Card } from '../../components/common/Card';
-import { DataTable, type DataTableColumn } from '../../components/common/DataTable';
-import { PageHeader } from '../../components/common/PageHeader';
-import { ProgressBar } from '../../components/common/ProgressBar';
-import { RiskBadge } from '../../components/common/RiskBadge';
-import { SearchInput } from '../../components/common/SearchInput';
-import { StatusBadge } from '../../components/common/StatusBadge';
-import { projects } from '../../api/mockData';
-import { useI18n } from '../../hooks/useI18n';
-import type { Project } from '../../types/project';
+import { Grid2X2, List, Plus, Search, SlidersHorizontal } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { Button } from "../../components/common/Button";
+import { Card } from "../../components/common/Card";
+import { DataTable, type DataTableColumn } from "../../components/common/DataTable";
+import { PageHeader } from "../../components/common/PageHeader";
+import { SearchInput } from "../../components/common/SearchInput";
+import { StatusBadge } from "../../components/common/StatusBadge";
+import { getWorkspaces } from "../../api/workspaceApi";
+import { useI18n } from "../../hooks/useI18n";
+import type { Workspace } from "../../types/workspace";
+
+const getAccessToken = () => localStorage.getItem("accessToken") ?? "";
 
 export function ProjectsPage() {
-  const { t } = useI18n();
-  const [query, setQuery] = useState('');
-  const [status, setStatus] = useState<'all' | 'active' | 'processing' | 'finalized'>('all');
-  const [view, setView] = useState<'grid' | 'list'>('grid');
+  const { language } = useI18n();
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState<"all" | "active">("all");
+  const [view, setView] = useState<"grid" | "list">("grid");
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const filteredProjects = useMemo(
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadWorkspaces = async () => {
+      try {
+        setLoading(true);
+        const data = await getWorkspaces(getAccessToken());
+        if (isMounted) {
+          setWorkspaces(data);
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : "Không thể tải danh sách workspace");
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void loadWorkspaces();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const filteredWorkspaces = useMemo(
     () =>
-      projects.filter((project) => {
-        const matchesQuery = `${project.name} ${project.client} ${project.description}`.toLowerCase().includes(query.toLowerCase());
-        const matchesStatus = status === 'all' || project.status === status;
+      workspaces.filter((workspace) => {
+        const matchesQuery = `${workspace.name} ${workspace.description}`.toLowerCase().includes(query.toLowerCase());
+        const matchesStatus = status === "all" || workspace.status === "active";
         return matchesQuery && matchesStatus;
       }),
-    [query, status],
+    [query, status, workspaces],
   );
 
-  const columns: DataTableColumn<Project>[] = [
+  const columns: DataTableColumn<Workspace>[] = [
     {
-      header: t('table.project'),
-      cell: (project) => (
-        <Link to={`/projects/${project.id}`} className="font-semibold text-primary hover:underline dark:text-inverse-primary">
-          {project.name}
+      header: "Workspace",
+      cell: (workspace) => (
+        <Link
+          to={`/projects/${workspace.workspaceId}`}
+          className="font-semibold text-primary hover:underline dark:text-inverse-primary"
+        >
+          {workspace.name}
         </Link>
       ),
     },
-    { header: t('projects.client'), cell: (project) => project.client },
-    { header: t('table.owner'), cell: (project) => project.owner },
-    { header: t('table.risk'), cell: (project) => <RiskBadge level={project.riskLevel} /> },
-    { header: t('table.status'), cell: (project) => <StatusBadge status={project.status} /> },
-    { header: t('table.updated'), cell: (project) => project.updatedAt },
+    {
+      header: "Description",
+      cell: (workspace) => workspace.description || "No description",
+    },
+    {
+      header: "Status",
+      cell: (workspace) => <StatusBadge status={workspace.status} />,
+    },
+    {
+      header: "Created",
+      cell: (workspace) =>
+        new Intl.DateTimeFormat(language === "vi" ? "vi-VN" : "en-US", {
+          dateStyle: "medium",
+          timeStyle: "short",
+        }).format(new Date(workspace.createdAt)),
+    },
   ];
 
   return (
     <div>
       <PageHeader
-        title={t('projects.title')}
-        subtitle={t('projects.subtitle')}
+        title="Workspaces"
+        subtitle="Create a workspace, upload documents, and chat on the same legal context."
         actions={
-          <Button leftIcon={<Plus className="h-4 w-4" />}>
-            {t('actions.createProject')}
-          </Button>
+          <Link to="/upload">
+            <Button leftIcon={<Plus className="h-4 w-4" />}>New workspace</Button>
+          </Link>
         }
       />
 
       <Card className="mb-xl">
         <div className="flex flex-col gap-md lg:flex-row lg:items-center lg:justify-between">
-          <SearchInput value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('projects.searchPlaceholder')} containerClassName="lg:w-96" />
+          <SearchInput
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search workspace"
+            containerClassName="lg:w-96"
+          />
           <div className="flex flex-wrap items-center gap-sm">
-            {(['all', 'active', 'processing', 'finalized'] as const).map((item) => (
+            {(["all", "active"] as const).map((item) => (
               <button
                 key={item}
-                className={`rounded-lg border px-md py-sm text-sm font-semibold transition ${status === item ? 'border-primary bg-primary text-white' : 'border-legal-border bg-white text-on-surface-variant hover:bg-surface-container-low dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'}`}
+                className={`rounded-lg border px-md py-sm text-sm font-semibold transition ${
+                  status === item
+                    ? "border-primary bg-primary text-white"
+                    : "border-legal-border bg-white text-on-surface-variant hover:bg-surface-container-low dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                }`}
                 type="button"
                 onClick={() => setStatus(item)}
               >
-                {item === 'all' ? t('projects.statusAll') : t(`status.${item}`)}
+                {item === "all" ? "All" : "Active"}
               </button>
             ))}
-            <Button variant="secondary" leftIcon={<SlidersHorizontal className="h-4 w-4" />}>{t('actions.filter')}</Button>
+            <Button
+              variant="secondary"
+              leftIcon={<SlidersHorizontal className="h-4 w-4" />}
+            >
+              Filters
+            </Button>
             <div className="flex rounded-lg border border-legal-border bg-white p-xs dark:border-slate-700 dark:bg-slate-900">
-              <button className={`rounded-md p-sm ${view === 'grid' ? 'bg-surface-container-high text-primary dark:bg-slate-800 dark:text-inverse-primary' : 'text-on-surface-variant'}`} type="button" aria-label={t('projects.gridView')} onClick={() => setView('grid')}>
+              <button
+                className={`rounded-md p-sm ${
+                  view === "grid"
+                    ? "bg-surface-container-high text-primary dark:bg-slate-800 dark:text-inverse-primary"
+                    : "text-on-surface-variant"
+                }`}
+                type="button"
+                aria-label="Grid view"
+                onClick={() => setView("grid")}
+              >
                 <Grid2X2 className="h-4 w-4" />
               </button>
-              <button className={`rounded-md p-sm ${view === 'list' ? 'bg-surface-container-high text-primary dark:bg-slate-800 dark:text-inverse-primary' : 'text-on-surface-variant'}`} type="button" aria-label={t('projects.listView')} onClick={() => setView('list')}>
+              <button
+                className={`rounded-md p-sm ${
+                  view === "list"
+                    ? "bg-surface-container-high text-primary dark:bg-slate-800 dark:text-inverse-primary"
+                    : "text-on-surface-variant"
+                }`}
+                type="button"
+                aria-label="List view"
+                onClick={() => setView("list")}
+              >
                 <List className="h-4 w-4" />
               </button>
             </div>
@@ -85,47 +161,66 @@ export function ProjectsPage() {
         </div>
       </Card>
 
-      {view === 'list' ? (
-        <DataTable columns={columns} data={filteredProjects} getRowKey={(project) => project.id} />
+      {error && (
+        <div className="mb-lg rounded-xl border border-error/40 bg-error/10 p-md text-sm text-error">
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <Card>
+          <p className="text-sm text-on-surface-variant dark:text-slate-400">
+            Loading workspaces...
+          </p>
+        </Card>
+      ) : view === "list" ? (
+        <DataTable
+          columns={columns}
+          data={filteredWorkspaces}
+          getRowKey={(workspace) => workspace.workspaceId}
+        />
+      ) : filteredWorkspaces.length === 0 ? (
+        <Card>
+          <p className="text-sm text-on-surface-variant dark:text-slate-400">
+            No workspace yet. Create one from the upload screen.
+          </p>
+        </Card>
       ) : (
         <div className="grid gap-gutter md:grid-cols-2 xl:grid-cols-3">
-          {filteredProjects.map((project) => (
-            <Link key={project.id} to={`/projects/${project.id}`} className="group block">
-              <Card className="h-full transition group-hover:-translate-y-1 group-hover:shadow-raised">
-                <div className="flex items-start justify-between gap-md">
-                  <div>
-                    <h2 className="text-title-lg font-semibold text-primary dark:text-inverse-primary">{project.name}</h2>
-                    <p className="mt-xs text-sm text-on-surface-variant dark:text-slate-400">{project.client}</p>
-                  </div>
-                  <RiskBadge level={project.riskLevel} />
+          {filteredWorkspaces.map((workspace) => (
+            <Card
+              key={workspace.workspaceId}
+              className="h-full transition hover:-translate-y-1 hover:shadow-raised"
+            >
+              <div className="flex items-start justify-between gap-md">
+                <div>
+                  <h2 className="text-title-lg font-semibold text-primary dark:text-inverse-primary">
+                    {workspace.name}
+                  </h2>
+                  <p className="mt-xs text-sm text-on-surface-variant dark:text-slate-400">
+                    {workspace.description || "No description"}
+                  </p>
                 </div>
-                <p className="mt-md line-clamp-3 text-sm leading-6 text-on-surface-variant dark:text-slate-400">{project.description}</p>
-                <div className="mt-md flex flex-wrap gap-xs">
-                  {project.tags.map((tag) => (
-                    <Badge key={tag} tone="blue">{tag}</Badge>
-                  ))}
-                </div>
-                <div className="mt-lg grid grid-cols-3 gap-sm text-center">
-                  <div className="rounded-lg bg-surface-container-low p-sm dark:bg-slate-800">
-                    <p className="font-bold">{project.documentCount}</p>
-                    <p className="text-[11px] text-on-surface-variant dark:text-slate-400">{t('projects.docs')}</p>
-                  </div>
-                  <div className="rounded-lg bg-surface-container-low p-sm dark:bg-slate-800">
-                    <p className="font-bold text-error">{project.highRiskCount}</p>
-                    <p className="text-[11px] text-on-surface-variant dark:text-slate-400">{t('risk.high')}</p>
-                  </div>
-                  <div className="rounded-lg bg-surface-container-low p-sm dark:bg-slate-800">
-                    <p className="font-bold">{project.progress}%</p>
-                    <p className="text-[11px] text-on-surface-variant dark:text-slate-400">{t('projects.done')}</p>
-                  </div>
-                </div>
-                <ProgressBar className="mt-md" value={project.progress} />
-                <div className="mt-md flex items-center justify-between text-sm text-on-surface-variant dark:text-slate-400">
-                  <span>{project.owner}</span>
-                  <StatusBadge status={project.status} />
-                </div>
-              </Card>
-            </Link>
+                <StatusBadge status={workspace.status} />
+              </div>
+              <div className="mt-lg rounded-lg bg-surface-container-low p-md dark:bg-slate-800">
+                <p className="label-uppercase">Created at</p>
+                <p className="mt-xs text-sm">
+                  {new Intl.DateTimeFormat(language === "vi" ? "vi-VN" : "en-US", {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  }).format(new Date(workspace.createdAt))}
+                </p>
+              </div>
+              <div className="mt-lg flex flex-wrap gap-sm">
+                <Link to={`/projects/${workspace.workspaceId}`}>
+                  <Button variant="secondary">Open workspace</Button>
+                </Link>
+                <Link to={`/upload?workspaceId=${workspace.workspaceId}`}>
+                  <Button>Upload file</Button>
+                </Link>
+              </div>
+            </Card>
           ))}
         </div>
       )}
@@ -133,12 +228,19 @@ export function ProjectsPage() {
       <Card tone="ai" className="mt-xl">
         <div className="flex flex-col gap-md md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="text-title-lg font-semibold">{t('projects.caseVelocity')}</h2>
+            <h2 className="text-title-lg font-semibold">
+              Jump into workspace analysis
+            </h2>
             <p className="mt-xs text-sm text-on-surface-variant dark:text-slate-300">
-              {t('projects.caseVelocityInsight')}
+              Use the workspace detail screen to inspect documents and open chat
+              on the same legal context.
             </p>
           </div>
-          <Button variant="gold" leftIcon={<Search className="h-4 w-4" />}>{t('projects.runPortfolioAudit')}</Button>
+          <Link to="/upload">
+            <Button variant="gold" leftIcon={<Search className="h-4 w-4" />}>
+              Start upload flow
+            </Button>
+          </Link>
         </div>
       </Card>
     </div>

@@ -1,207 +1,256 @@
-import { Edit3, FileText, History, MessageSquareText, Share2, ShieldAlert, UsersRound } from 'lucide-react';
-import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { Badge } from '../../components/common/Badge';
-import { Button } from '../../components/common/Button';
-import { Card } from '../../components/common/Card';
-import { DataTable, type DataTableColumn } from '../../components/common/DataTable';
-import { PageHeader } from '../../components/common/PageHeader';
-import { ProgressBar } from '../../components/common/ProgressBar';
-import { RiskBadge } from '../../components/common/RiskBadge';
-import { StatusBadge } from '../../components/common/StatusBadge';
-import { Tabs } from '../../components/common/Tabs';
-import { documents, projects, reports } from '../../api/mockData';
-import { useI18n } from '../../hooks/useI18n';
-import type { LegalDocument } from '../../types/document';
+import { Edit3, MessageSquareText, ShieldAlert, UsersRound } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { Badge } from "../../components/common/Badge";
+import { Button } from "../../components/common/Button";
+import { Card } from "../../components/common/Card";
+import { DataTable, type DataTableColumn } from "../../components/common/DataTable";
+import { PageHeader } from "../../components/common/PageHeader";
+import { ProgressBar } from "../../components/common/ProgressBar";
+import { StatusBadge } from "../../components/common/StatusBadge";
+import { getWorkspaceDetail, getWorkspaceDocuments } from "../../api/workspaceApi";
+import { useI18n } from "../../hooks/useI18n";
+import type { Document, Workspace } from "../../types/workspace";
 
-const tabs = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'documents', label: 'Documents' },
-  { id: 'reviews', label: 'Reviews' },
-  { id: 'reports', label: 'Reports' },
-  { id: 'activity', label: 'Activity' },
-];
+const getAccessToken = () => localStorage.getItem("accessToken") ?? "";
 
 export function ProjectDetailPage() {
-  const { id = 'phoenix' } = useParams();
-  const { t } = useI18n();
-  const [activeTab, setActiveTab] = useState('overview');
-  const project = projects.find((item) => item.id === id) ?? projects[0];
-  const projectDocuments = documents.filter((document) => document.projectId === project.id || project.id === 'phoenix');
+  const { id = "" } = useParams();
+  const { language } = useI18n();
+  const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const columns: DataTableColumn<LegalDocument>[] = [
+  useEffect(() => {
+    let active = true;
+
+    const loadWorkspace = async () => {
+      try {
+        setLoading(true);
+        const [workspaceData, documentData] = await Promise.all([
+          getWorkspaceDetail(getAccessToken(), id),
+          getWorkspaceDocuments(getAccessToken(), id),
+        ]);
+
+        if (!active) return;
+        setWorkspace(workspaceData);
+        setDocuments(documentData);
+      } catch (err) {
+        if (active) {
+          setError(err instanceof Error ? err.message : "Không thể tải workspace");
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    if (id) {
+      void loadWorkspace();
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [id]);
+
+  const summary = useMemo(() => {
+    const readyDocuments = documents.filter((document) => document.status === "ready").length;
+    const processingDocuments = documents.filter((document) => document.status === "processing").length;
+    const failedDocuments = documents.filter((document) => document.status === "failed").length;
+
+    return {
+      readyDocuments,
+      processingDocuments,
+      failedDocuments,
+    };
+  }, [documents]);
+
+  const columns: DataTableColumn<Document>[] = [
+    { header: "File", cell: (document) => document.originalFileName },
+    { header: "Type", cell: (document) => document.fileType },
+    { header: "Status", cell: (document) => <StatusBadge status={document.status} /> },
     {
-      header: t('table.document'),
-      cell: (document) => (
-        <Link to={`/documents/${document.id}`} className="font-semibold text-primary hover:underline dark:text-inverse-primary">
-          {document.name}
-        </Link>
-      ),
+      header: "Uploaded",
+      cell: (document) =>
+        new Intl.DateTimeFormat(language === "vi" ? "vi-VN" : "en-US", {
+          dateStyle: "medium",
+          timeStyle: "short",
+        }).format(new Date(document.uploadedAt)),
     },
-    { header: 'Type', cell: (document) => document.type },
-    { header: t('table.risk'), cell: (document) => <RiskBadge level={document.riskLevel} /> },
-    { header: t('table.status'), cell: (document) => <StatusBadge status={document.status} /> },
-    { header: t('table.updated'), cell: (document) => document.updatedAt },
   ];
+
+  const workspaceChatUrl = `/chat?workspaceId=${id}`;
+  const workspaceUploadUrl = `/upload?workspaceId=${id}`;
 
   return (
     <div>
       <PageHeader
-        title={project.name}
-        subtitle={project.description}
-        eyebrow={`${project.client} · ${project.jurisdiction}`}
+        title={workspace?.name ?? "Workspace details"}
+        subtitle={workspace?.description ?? "View documents and continue the analysis flow."}
+        eyebrow={workspace ? `${workspace.workspaceId} · ${workspace.status}` : "Workspace"}
         actions={
           <>
-            <Button variant="secondary" leftIcon={<Share2 className="h-4 w-4" />}>{t('actions.export')}</Button>
-            <Button leftIcon={<Edit3 className="h-4 w-4" />}>Edit Project</Button>
+            <Link to={workspaceUploadUrl}>
+              <Button variant="secondary" leftIcon={<Edit3 className="h-4 w-4" />}>
+                Upload file
+              </Button>
+            </Link>
+            <Link to={workspaceChatUrl}>
+              <Button leftIcon={<MessageSquareText className="h-4 w-4" />}>
+                Open chat
+              </Button>
+            </Link>
           </>
         }
       />
 
-      <Card className="mb-xl">
-        <div className="grid gap-lg lg:grid-cols-[1fr_320px]">
-          <div>
-            <div className="flex flex-wrap gap-xs">
-              {project.tags.map((tag) => (
-                <Badge key={tag} tone="blue">{tag}</Badge>
-              ))}
+      {error && (
+        <div className="mb-lg rounded-xl border border-error/40 bg-error/10 p-md text-sm text-error">
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <Card>
+          <p className="text-sm text-on-surface-variant dark:text-slate-400">
+            Loading workspace...
+          </p>
+        </Card>
+      ) : workspace ? (
+        <>
+          <Card className="mb-xl">
+            <div className="grid gap-lg lg:grid-cols-[1fr_320px]">
+              <div>
+                <div className="flex flex-wrap gap-xs">
+                  <Badge tone="blue">{workspace.workspaceId}</Badge>
+                  <StatusBadge status={workspace.status} />
+                </div>
+                <div className="mt-lg grid gap-md sm:grid-cols-3">
+                  <div className="rounded-lg bg-surface-container-low p-md dark:bg-slate-800">
+                    <p className="label-uppercase">Documents</p>
+                    <p className="mt-xs text-2xl font-bold">{documents.length}</p>
+                  </div>
+                  <div className="rounded-lg bg-surface-container-low p-md dark:bg-slate-800">
+                    <p className="label-uppercase">Ready</p>
+                    <p className="mt-xs text-2xl font-bold text-emerald-600">
+                      {summary.readyDocuments}
+                    </p>
+                  </div>
+                  <div className="rounded-lg bg-surface-container-low p-md dark:bg-slate-800">
+                    <p className="label-uppercase">Processing</p>
+                    <p className="mt-xs text-2xl font-bold text-secondary">
+                      {summary.processingDocuments}
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-lg">
+                  <div className="mb-sm flex items-center justify-between text-sm">
+                    <span className="font-semibold">Workspace health</span>
+                    <span>{documents.length === 0 ? 0 : Math.round((summary.readyDocuments / documents.length) * 100)}%</span>
+                  </div>
+                  <ProgressBar
+                    value={documents.length === 0 ? 0 : Math.round((summary.readyDocuments / documents.length) * 100)}
+                  />
+                </div>
+              </div>
+              <Card tone="ai" className="m-0">
+                <div className="flex items-center gap-sm">
+                  <ShieldAlert className="h-5 w-5 text-secondary dark:text-accent-gold" />
+                  <h2 className="text-title-lg font-semibold">
+                    AI workspace summary
+                  </h2>
+                </div>
+                <p className="mt-sm text-sm leading-6 text-on-surface-variant dark:text-slate-300">
+                  {documents.length > 0
+                    ? "Use the chat screen to ask questions over the uploaded documents in this workspace."
+                    : "Upload a document first so the AI can ingest and index it before chat."}
+                </p>
+                <Link to={workspaceChatUrl}>
+                  <Button className="mt-md" variant="gold">
+                    Open workspace chat
+                  </Button>
+                </Link>
+              </Card>
             </div>
-            <div className="mt-lg grid gap-md sm:grid-cols-3">
-              <div className="rounded-lg bg-surface-container-low p-md dark:bg-slate-800">
-                <p className="label-uppercase">Documents</p>
-                <p className="mt-xs text-2xl font-bold">{project.documentCount}</p>
+          </Card>
+
+          <Card title="Workspace documents">
+            {documents.length === 0 ? (
+              <p className="text-sm text-on-surface-variant dark:text-slate-400">
+                No documents uploaded yet.
+              </p>
+            ) : (
+              <DataTable
+                columns={columns}
+                data={documents}
+                getRowKey={(document) => document.documentId}
+              />
+            )}
+          </Card>
+
+          <div className="mt-xl grid gap-gutter xl:grid-cols-[1fr_360px]">
+            <Card title="Quick actions">
+              <div className="grid gap-sm sm:grid-cols-2">
+                <Link
+                  to={workspaceUploadUrl}
+                  className="rounded-xl border border-legal-border p-md hover:bg-surface-container-low dark:border-slate-700 dark:hover:bg-slate-800"
+                >
+                  <p className="font-semibold">Upload another file</p>
+                  <p className="mt-xs text-sm text-on-surface-variant dark:text-slate-400">
+                    Add more documents into the same workspace.
+                  </p>
+                </Link>
+                <Link
+                  to={workspaceChatUrl}
+                  className="rounded-xl border border-legal-border p-md hover:bg-surface-container-low dark:border-slate-700 dark:hover:bg-slate-800"
+                >
+                  <p className="font-semibold">Ask the AI</p>
+                  <p className="mt-xs text-sm text-on-surface-variant dark:text-slate-400">
+                    Ask questions based on the documents in this workspace.
+                  </p>
+                </Link>
               </div>
-              <div className="rounded-lg bg-surface-container-low p-md dark:bg-slate-800">
-                <p className="label-uppercase">High risks</p>
-                <p className="mt-xs text-2xl font-bold text-error">{project.highRiskCount}</p>
+            </Card>
+
+            <Card title="Workspace info" actions={<UsersRound className="h-5 w-5 text-primary dark:text-inverse-primary" />}>
+              <div className="space-y-md">
+                <div>
+                  <p className="label-uppercase">Workspace ID</p>
+                  <p className="mt-xs break-all text-sm">{workspace.workspaceId}</p>
+                </div>
+                <div>
+                  <p className="label-uppercase">Description</p>
+                  <p className="mt-xs text-sm text-on-surface-variant dark:text-slate-400">
+                    {workspace.description || "No description"}
+                  </p>
+                </div>
+                <div>
+                  <p className="label-uppercase">Created at</p>
+                  <p className="mt-xs text-sm">
+                    {new Intl.DateTimeFormat(language === "vi" ? "vi-VN" : "en-US", {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    }).format(new Date(workspace.createdAt))}
+                  </p>
+                </div>
+                <div>
+                  <p className="label-uppercase">Failed documents</p>
+                  <p className="mt-xs text-sm">{summary.failedDocuments}</p>
+                </div>
               </div>
-              <div className="rounded-lg bg-surface-container-low p-md dark:bg-slate-800">
-                <p className="label-uppercase">Owner</p>
-                <p className="mt-xs text-lg font-bold">{project.owner}</p>
-              </div>
-            </div>
-            <div className="mt-lg">
-              <div className="mb-sm flex items-center justify-between text-sm">
-                <span className="font-semibold">Review progress</span>
-                <span>{project.progress}%</span>
-              </div>
-              <ProgressBar value={project.progress} />
-            </div>
+            </Card>
           </div>
-          <Card tone="ai" className="m-0">
-            <div className="flex items-center gap-sm">
-              <ShieldAlert className="h-5 w-5 text-secondary dark:text-accent-gold" />
-              <h2 className="text-title-lg font-semibold">AI Risk Intelligence Summary</h2>
-            </div>
-            <p className="mt-sm text-sm leading-6 text-on-surface-variant dark:text-slate-300">
-              High-risk exposure concentrates in indemnity, limitation of liability, and change-of-control clauses. Review critical documents before external counsel handoff.
-            </p>
-            <Link to="/editor/risk-review">
-              <Button className="mt-md" variant="gold">Open AI Review</Button>
-            </Link>
-          </Card>
-        </div>
-      </Card>
-
-      <Tabs items={tabs} activeId={activeTab} onChange={setActiveTab} />
-
-      <div className="mt-lg grid gap-gutter xl:grid-cols-[1fr_360px]">
-        <div className="space-y-gutter">
-          {(activeTab === 'overview' || activeTab === 'documents') && (
-            <Card title="Critical Documents" actions={<Link className="text-sm font-semibold text-primary dark:text-inverse-primary" to="/documents">{t('actions.viewAll')}</Link>}>
-              <DataTable columns={columns} data={projectDocuments.slice(0, 5)} getRowKey={(document) => document.id} />
-            </Card>
-          )}
-
-          {activeTab === 'reviews' && (
-            <Card title="AI Reviews">
-              <div className="grid gap-md md:grid-cols-2">
-                {projectDocuments.slice(0, 4).map((document) => (
-                  <Link key={document.id} to="/editor/risk-review" className="rounded-xl border border-legal-border p-md hover:bg-surface-container-low dark:border-slate-700 dark:hover:bg-slate-800">
-                    <div className="flex items-start justify-between gap-md">
-                      <div>
-                        <p className="font-semibold">{document.name}</p>
-                        <p className="text-sm text-on-surface-variant dark:text-slate-400">{document.summary}</p>
-                      </div>
-                      <RiskBadge level={document.riskLevel} />
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </Card>
-          )}
-
-          {activeTab === 'reports' && (
-            <Card title="Reports">
-              <div className="space-y-md">
-                {reports.map((report) => (
-                  <Link key={report.id} to={`/reports/${report.id}`} className="flex items-center justify-between rounded-lg border border-legal-border p-md hover:bg-surface-container-low dark:border-slate-700 dark:hover:bg-slate-800">
-                    <div>
-                      <p className="font-semibold">{report.title}</p>
-                      <p className="text-sm text-on-surface-variant dark:text-slate-400">{report.createdAt}</p>
-                    </div>
-                    <StatusBadge status={report.status} />
-                  </Link>
-                ))}
-              </div>
-            </Card>
-          )}
-
-          {activeTab === 'activity' && (
-            <Card title="Activity Timeline">
-              <div className="space-y-md">
-                {['AI risk scan completed on Service_Agreement_v4.pdf', 'Jane Doe generated executive report', 'Marcus Aurelius flagged liability cap increase'].map((item, index) => (
-                  <div key={item} className="flex gap-md">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-container-high text-primary dark:bg-slate-800 dark:text-inverse-primary">{index + 1}</div>
-                    <div>
-                      <p className="font-semibold">{item}</p>
-                      <p className="text-sm text-on-surface-variant dark:text-slate-400">{index + 1} hours ago</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
-        </div>
-
-        <aside className="space-y-gutter">
-          <Card title="Team Members" actions={<UsersRound className="h-5 w-5 text-primary dark:text-inverse-primary" />}>
-            <div className="space-y-md">
-              {project.members.map((member) => (
-                <div key={member.id} className="flex items-center gap-md">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">{member.initials}</div>
-                  <div>
-                    <p className="font-semibold">{member.name}</p>
-                    <p className="text-sm text-on-surface-variant dark:text-slate-400">{member.role}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          <Card title="Activity Timeline" actions={<History className="h-5 w-5 text-secondary dark:text-accent-gold" />}>
-            <div className="space-y-md">
-              {['Document intake complete', 'Risk queue updated', 'External counsel memo attached'].map((activity) => (
-                <div key={activity} className="border-l-2 border-primary pl-md dark:border-inverse-primary">
-                  <p className="text-sm font-semibold">{activity}</p>
-                  <p className="text-xs text-on-surface-variant dark:text-slate-400">Today</p>
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          <Card title="Project Shortcuts">
-            <div className="grid gap-sm">
-              <Link to="/documents" className="flex items-center gap-sm rounded-lg p-sm hover:bg-surface-container-low dark:hover:bg-slate-800">
-                <FileText className="h-4 w-4 text-primary dark:text-inverse-primary" /> Documents
-              </Link>
-              <Link to="/chat" className="flex items-center gap-sm rounded-lg p-sm hover:bg-surface-container-low dark:hover:bg-slate-800">
-                <MessageSquareText className="h-4 w-4 text-primary dark:text-inverse-primary" /> Ask Legal AI
-              </Link>
-            </div>
-          </Card>
-        </aside>
-      </div>
+        </>
+      ) : (
+        <Card>
+          <p className="text-sm text-on-surface-variant dark:text-slate-400">
+            Workspace not found.
+          </p>
+        </Card>
+      )}
     </div>
   );
 }

@@ -20,16 +20,27 @@ export const API_ENDPOINTS = {
     me: getRequiredEnvValue("VITE_AUTH_ME_API"),
   },
 
-workspaces: {
-  list: getRequiredEnvValue("VITE_WORKSPACE_LIST_API"),
-  create: getRequiredEnvValue("VITE_WORKSPACE_CREATE_API"),
+  workspaces: {
+    list: getRequiredEnvValue("VITE_WORKSPACE_LIST_API"),
+    create: getRequiredEnvValue("VITE_WORKSPACE_CREATE_API"),
 
-  detail: (workspaceId: string) =>
-    `${getRequiredEnvValue("VITE_WORKSPACE_DETAIL_API")}/${workspaceId}`,
+    detail: (workspaceId: string) =>
+      `${getRequiredEnvValue("VITE_WORKSPACE_DETAIL_API")}/${workspaceId}`,
 
-  documents: (workspaceId: string) =>
-    `${getRequiredEnvValue("VITE_WORKSPACE_DOCUMENTS_API")}/${workspaceId}/documents`,
-},
+    documents: (workspaceId: string) =>
+      `${getRequiredEnvValue("VITE_WORKSPACE_DOCUMENTS_API")}/${workspaceId}/documents`,
+  },
+
+  chat: {
+    workspaceSessions: (workspaceId: string) =>
+      `/api/v1/workspaces/${workspaceId}/chat-sessions`,
+    sessionDetail: (chatSessionId: string) =>
+      `/api/v1/chat-sessions/${chatSessionId}`,
+    sessionMessages: (chatSessionId: string) =>
+      `/api/v1/chat-sessions/${chatSessionId}/messages`,
+    workspaceMessages: (workspaceId: string) =>
+      `/api/v1/workspaces/${workspaceId}/messages`,
+  },
 
   subscription: {
     plans: getRequiredEnvValue("VITE_SUBSCRIPTION_PLANS_API"),

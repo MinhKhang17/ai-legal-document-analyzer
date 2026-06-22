@@ -69,6 +69,7 @@ class RagQueryService:
         knowledge_hits = self.retrieval_service.search_knowledge_chunks(
             legal_search_query,
             top_k=request.topKKnowledgeChunks,
+            query_text=request.question,
         )
         return user_hits, legal_search_query, knowledge_hits
 

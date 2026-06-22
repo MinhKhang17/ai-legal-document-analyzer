@@ -5,7 +5,7 @@ from typing import Any, Literal
 
 from app.graph.repository import GraphRepository
 from app.models.knowledge_models import RetrievedChunk
-from app.services.embedding_service import RagEmbeddingService
+from app.services.embedding_service import EmbeddingService
 
 
 @dataclass(frozen=True)
@@ -37,15 +37,22 @@ class RetrievalService:
         self,
         *,
         repository: GraphRepository | None = None,
-        embedding_service: RagEmbeddingService | None = None,
+        embedding_service: EmbeddingService | None = None,
     ) -> None:
         self.repository = repository or GraphRepository()
-        self.embedding_service = embedding_service or RagEmbeddingService()
+        self.embedding_service = embedding_service or EmbeddingService()
 
     def embed_question(self, text: str) -> list[float]:
-        return self.embedding_service.embed([text])[0]
+        return self.embedding_service.embed_text(text)
 
-    def search_user_chunks(self, question: str, user_id: str, workspace_id: str, top_k: int) -> list[RagChunkHit]:
+    def search_user_chunks(
+        self,
+        question: str,
+        user_id: str,
+        workspace_id: str,
+        top_k: int,
+        document_id: str | None = None,
+    ) -> list[RagChunkHit]:
         embedding = self.embed_question(question)
         chunks = self.repository.search_user_chunks(
             embedding,
@@ -53,6 +60,7 @@ class RetrievalService:
             workspace_id=workspace_id,
             top_k=top_k,
             query_text=question,
+            document_id=document_id,
         )
         return [
             self._to_hit(
@@ -73,12 +81,18 @@ class RetrievalService:
         )
         return f"{question}\n\nRelevant user contract context:\n{user_context}".strip()
 
-    def search_knowledge_chunks(self, legal_search_query: str, top_k: int) -> list[RagChunkHit]:
+    def search_knowledge_chunks(
+        self,
+        legal_search_query: str,
+        top_k: int,
+        *,
+        query_text: str | None = None,
+    ) -> list[RagChunkHit]:
         embedding = self.embed_question(legal_search_query)
         chunks = self.repository.search_knowledge_chunks(
             embedding,
             top_k=top_k,
-            query_text=legal_search_query,
+            query_text=query_text or legal_search_query,
         )
         return [
             self._to_hit(
