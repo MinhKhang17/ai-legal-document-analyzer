@@ -58,6 +58,14 @@ public class ApiResponseDTO<T> {
                 .build();
     }
 
+    public static <T> ApiResponseDTO<T> accepted(String message, T data) {
+        return ApiResponseDTO.<T>builder()
+                .code(202)
+                .message(message)
+                .data(data)
+                .build();
+    }
+
     public static ApiResponseDTO<Void> success(String message) {
         return ApiResponseDTO.<Void>builder()
                 .code(200)
