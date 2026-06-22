@@ -1,5 +1,25 @@
 # History Code - Nguyen Huu Dat
 
+**Date:** 2026-06-20 (Ngày 20 tháng 6 năm 2026)
+
+## Tasks Completed:
+- **Thiết lập và Đồng bộ hóa Quan hệ Thực thể JPA**:
+  - **`Workspace`**: Chuyển đổi trường `userId` kiểu `String` thành mối quan hệ `@ManyToOne` kiểu `User` (`private User user`), đồng bộ kiểu dữ liệu trường ID của User (`Long`).
+  - **`Document`**: Thiết lập quan hệ `@ManyToOne` liên kết với `Workspace` (`private Workspace workspace`) và `User` (`private User user`) thay cho các trường `String` `workspaceId` và `userId` trước đó.
+  - Cập nhật các lớp Repository tương ứng (`WorkspaceRepository`, `DocumentRepository`) để nhận kiểu dữ liệu ID của `User` là `Long` khi truy vấn.
+  - Cập nhật lớp Service (`WorkspaceServiceImpl`) để lưu trữ dữ liệu, truy vấn và trả về kết quả khớp với cấu trúc thực thể mới.
+- **Chuẩn hóa Endpoint URL**:
+  - Chuẩn hóa base mapping của `WorkspaceController` từ việc hỗ trợ đa đường dẫn `{"/api/workspaces", "/api/v1/workspaces"}` về chỉ hỗ trợ duy nhất `"/api/v1/workspaces"` để đồng nhất với định dạng phiên bản `/api/v1` của toàn bộ hệ thống.
+  - Xác minh các API Controller khác (`UserController`, `SubscriptionPlanController`, `PaymentTransactionController`, `CustomerPlanController`, `AuthController`) đều đang tuân thủ đúng chuẩn `/api/v1`.
+- **Phân quyền và Bảo mật Endpoint Workspace & Document**:
+  - Thay đổi mức độ phân quyền từ `@PreAuthorize("isAuthenticated()")` sang `@PreAuthorize("hasRole('CUSTOMER')")` cho toàn bộ các endpoint trong `WorkspaceController` (bao gồm tạo workspace, lấy danh sách documents và upload document), đảm bảo chỉ những người dùng có vai trò **CUSTOMER** mới có quyền thao tác và sử dụng.
+- **Đánh giá luồng tích hợp với Python AI Service**:
+  - Rà soát toàn bộ luồng tích hợp gọi tệp tin từ Spring Boot sang Python AI Service (`POST /internal/documents/process`) và callback cập nhật kết quả (`POST /api/internal/documents/{documentId}/processing-result`).
+  - Xác nhận luồng tích hợp đồng bộ cơ bản đã được cài đặt hoạt động đầy đủ trong dự án.
+  - Lập báo cáo đánh giá kiến trúc, chỉ ra các điểm rủi ro tiềm ẩn (nghẽn connection pool, chặn luồng, cấu hình shared volume Docker) và đưa ra các đề xuất cải tiến tối ưu (xử lý bất đồng bộ, dùng Message Broker).
+
+---
+
 **Date:** 2026-06-18 (Ngày 18 tháng 6 năm 2026)
 
 ## Tasks Completed:

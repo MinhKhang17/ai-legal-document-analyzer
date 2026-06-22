@@ -35,7 +35,7 @@ public class WorkspaceController {
     private final WorkspaceService workspaceService;
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('CUSTOMER')")
     @Operation(summary = "Create workspace", description = "Create a new workspace for the current authenticated user.")
     public ResponseEntity<WorkspaceResponseDTO> createWorkspace(
             @Valid @RequestBody WorkspaceRequestDTO request) {
@@ -44,7 +44,7 @@ public class WorkspaceController {
     }
 
     @GetMapping("/{workspaceId}/documents")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('CUSTOMER')")
     @Operation(summary = "List workspace documents", description = "Get non-deleted documents in the workspace of the current authenticated user.")
     public ResponseEntity<List<DocumentResponseDTO>> getDocuments(@PathVariable String workspaceId) {
         List<DocumentResponseDTO> response = workspaceService.getDocuments(getCurrentUserId(), workspaceId);
@@ -52,7 +52,7 @@ public class WorkspaceController {
     }
 
     @PostMapping(value = "/{workspaceId}/documents", consumes = "multipart/form-data")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('CUSTOMER')")
     @Operation(summary = "Upload workspace document", description = "Upload a user document, save it, and request Python AI Service processing.")
     public ResponseEntity<DocumentResponseDTO> uploadDocument(
             @PathVariable String workspaceId,
