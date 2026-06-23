@@ -54,6 +54,8 @@ analysis-history/
 
 # --- AI model checkpoints ---
 models/
+!ai-service/app/models/
+!ai-service/app/models/**
 checkpoints/
 *.ckpt
 *.pt
