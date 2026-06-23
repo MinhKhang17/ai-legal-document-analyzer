@@ -32,6 +32,8 @@ ai-service/.venv/
 ai-service/venv/
 ai-service/.env
 ai-service/.env.*
+ai-service/*.key
+ai-service/*.pem
 
 # --- Docker ---
 *.pid

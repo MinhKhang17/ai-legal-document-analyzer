@@ -1,0 +1,12 @@
+{
+  "file_hash": "4edbc45d4ebb274434069ebad224a5cc27e4fcea54fd3e4fa1f0e91196f35db1",
+  "source_document_id": "doc_98611fc333ff4dceb6b54ef0eaf1fa31",
+  "file_name": "integration-test.pdf",
+  "created_at": "2026-06-21T19:59:28.023227+00:00",
+  "pages": [
+    {
+      "page_number": 1,
+      "text": "Integration test document for backend to AI import."
+    }
+  ]
+}

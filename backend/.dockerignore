@@ -1,0 +1,36 @@
+# Build artifacts
+target/
+*.jar
+*.war
+
+# Environment secrets
+.env
+
+# IDE and Editor configs
+.vscode/
+.idea/
+*.iml
+*.ipr
+*.iws
+.settings/
+.classpath
+.project
+.metadata/
+
+# Docker configurations (not needed inside build context)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Git
+.git/
+.gitignore
+
+# Maven wrapper and system files
+.mvn/
+mvnw
+mvnw.cmd
+HELP.md
+README.md
+**/.DS_Store
+**/*.log
