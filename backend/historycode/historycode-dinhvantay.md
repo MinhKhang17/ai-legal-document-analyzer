@@ -272,3 +272,170 @@ BUILD SUCCESS
 - Neu Python AI Service chua chay o `AI_SERVICE_BASE_URL`, upload document van tao record va luu file, nhung status se thanh `FAILED` voi `errorMessage` tuong ung.
 - Khi Python AI Service chay that, no se goi callback URL de cap nhat document thanh `READY` hoac `FAILED`.
 - Trong qua trinh test, server local tren port `8080` duoc restart de Swagger load code moi.
+
+---
+
+# Update History - 2026-06-22
+
+## Tasks Completed
+
+- **Gop route Workspace ve mot chuan**
+  - Bo alias `/api/workspaces`.
+  - Chi giu prefix chinh: `/api/v1/workspaces`.
+  - Swagger khong con hien duplicate endpoint workspace/document.
+
+- **Chuan hoa response controller**
+  - `WorkspaceController` tra ve `ApiResponseDTO` thay vi raw DTO/list.
+  - `InternalDocumentController` tra ve `ApiResponseDTO<DocumentResponseDTO>`.
+  - Them factory method:
+    - `ApiResponseDTO.accepted(String message, T data)`
+  - Upload document tra HTTP `202 Accepted` va body co `code = 202`.
+
+- **Refactor DTO sang record**
+  - Doi cac DTO sau sang Java `record`:
+    - `WorkspaceRequestDTO`
+    - `WorkspaceResponseDTO`
+    - `DocumentResponseDTO`
+    - `PaymentTransactionResponseDTO`
+    - `PaymentUrlResponseDTO`
+  - Cap nhat code tao DTO trong `WorkspaceServiceImpl` tu builder sang constructor record.
+  - Cap nhat truy cap request workspace tu `request.getName()` / `request.getDescription()` sang `request.name()` / `request.description()`.
+
+- **Refactor payment service**
+  - Xoa service trung gian:
+    - `PaymentService`
+    - `PaymentServiceImpl`
+    - `VnPayService`
+  - Chi giu service chinh:
+    - `PaymentTransactionService`
+    - `PaymentTransactionServiceImpl`
+  - Gop logic tao URL VNPAY, build hash data, verify signature, encode param vao `PaymentTransactionServiceImpl`.
+  - Inject truc tiep `VnPayProperties` vao `PaymentTransactionServiceImpl`.
+  - Thu muc `service/impl` chi con mot implementation payment: `PaymentTransactionServiceImpl`.
+
+- **Sua encoding tieng Viet**
+  - Them cau hinh Maven:
+    - `project.build.sourceEncoding=UTF-8`
+  - Sua cac message Swagger/API bi mojibake trong controller/DTO lien quan.
+
+- **Kiem tra return URL VNPAY**
+  - Xac nhan config van dung endpoint:
+    - `/api/v1/payment-transactions/vnpay-return`
+  - SecurityConfig da permit route return/ipn cua VNPAY.
+
+---
+
+## Files Added / Removed / Updated
+
+### Added
+- `src/main/java/com/analyzer/api/service/PaymentService.java` da tung duoc them trong qua trinh refactor, sau do da xoa de tranh trung service payment.
+- `src/main/java/com/analyzer/api/service/impl/PaymentServiceImpl.java` da tung duoc them trong qua trinh refactor, sau do da xoa de chi giu `PaymentTransactionServiceImpl`.
+
+### Removed
+- `src/main/java/com/analyzer/api/service/VnPayService.java`
+- `src/main/java/com/analyzer/api/service/PaymentService.java`
+- `src/main/java/com/analyzer/api/service/impl/PaymentServiceImpl.java`
+
+### Updated
+- `pom.xml`
+- `src/main/java/com/analyzer/api/dto/ApiResponseDTO.java`
+- `src/main/java/com/analyzer/api/controller/WorkspaceController.java`
+- `src/main/java/com/analyzer/api/controller/InternalDocumentController.java`
+- `src/main/java/com/analyzer/api/controller/PaymentTransactionController.java`
+- `src/main/java/com/analyzer/api/dto/workspace/WorkspaceRequestDTO.java`
+- `src/main/java/com/analyzer/api/dto/workspace/WorkspaceResponseDTO.java`
+- `src/main/java/com/analyzer/api/dto/document/DocumentResponseDTO.java`
+- `src/main/java/com/analyzer/api/dto/paymenttransaction/PaymentTransactionResponseDTO.java`
+- `src/main/java/com/analyzer/api/dto/paymenttransaction/PaymentUrlResponseDTO.java`
+- `src/main/java/com/analyzer/api/service/impl/WorkspaceServiceImpl.java`
+- `src/main/java/com/analyzer/api/service/impl/PaymentTransactionServiceImpl.java`
+
+---
+
+## API Changes
+
+### Workspace
+
+Workspace API chi dung prefix:
+
+```http
+/api/v1/workspaces
+```
+
+Khong con alias:
+
+```http
+/api/workspaces
+```
+
+### Upload Document
+
+**Endpoint**
+
+```http
+POST /api/v1/workspaces/{workspaceId}/documents
+```
+
+**Response**
+
+```json
+{
+  "code": 202,
+  "message": "Upload document thanh cong, dang gui yeu cau xu ly",
+  "data": {
+    "documentId": "doc_xxx",
+    "workspaceId": "ws_xxx",
+    "originalFileName": "contract.docx",
+    "fileType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "fileSize": 12345,
+    "status": "PROCESSING",
+    "uploadedAt": "2026-06-22T21:44:30"
+  }
+}
+```
+
+### Payment
+
+Payment controller giu cac endpoint:
+
+```http
+GET  /api/v1/payment-transactions/me
+GET  /api/v1/payment-transactions
+POST /api/v1/payment-transactions/{id}/vnpay-url
+GET  /api/v1/payment-transactions/vnpay-return
+GET  /api/v1/payment-transactions/vnpay-ipn
+PUT  /api/v1/payment-transactions/{id}/success
+PUT  /api/v1/payment-transactions/{id}/failed
+```
+
+Logic VNPAY hien nam trong:
+
+```text
+PaymentTransactionServiceImpl
+```
+
+---
+
+## Verification
+
+- Da chay Maven voi JDK local:
+
+```powershell
+$env:JAVA_HOME='C:\Users\admin\.jdks\openjdk-26.0.1'
+$env:Path="$env:JAVA_HOME\bin;$env:Path"
+.\mvnw.cmd '-Dmaven.compiler.useIncrementalCompilation=false' test
+```
+
+- Ket qua:
+
+```text
+BUILD SUCCESS
+```
+
+- Luu y:
+  - Project hien khong co test source nen Maven bao `No tests to run`.
+  - Compile backend pass.
+  - Con mot so thay doi ngoai backend khong thuoc phan nay:
+    - `frontend/.env.example`
+    - `frontend/vite.config.ts`
+    - `ai-service/package-lock.json`
