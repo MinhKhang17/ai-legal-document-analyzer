@@ -6,6 +6,15 @@ export interface ChatMessage {
   status?: 'thinking' | 'streaming' | 'done' | 'error';
   errorMessage?: string;
   citations?: string[];
+  requestId?: string | null;
+  confidenceScore?: number | null;
+  shouldSuggestTicket?: boolean | null;
+  suggestionType?: string | null;
+  suggestionReason?: string | null;
+  missingInformation?: string | null;
+  riskLevel?: string | null;
+  legalDomain?: string | null;
+  userActionHint?: string | null;
 }
 
 export interface ChatThread {
@@ -37,6 +46,14 @@ export interface WorkspaceChatMessage {
   status: string;
   requestId: string | null;
   aiModel: string | null;
+  confidenceScore: number | null;
+  shouldSuggestTicket: boolean | null;
+  suggestionType: string | null;
+  suggestionReason: string | null;
+  missingInformation: string | null;
+  riskLevel: string | null;
+  legalDomain: string | null;
+  userActionHint: string | null;
   promptTokens: number | null;
   completionTokens: number | null;
   totalTokens: number | null;
@@ -54,4 +71,10 @@ export interface WorkspaceChatConversation {
 export interface WorkspaceChatRequest {
   message: string;
   documentId?: string;
+}
+
+export interface DeleteChatSessionResponse {
+  chatSessionId: string;
+  status: string;
+  deletedAt: string;
 }

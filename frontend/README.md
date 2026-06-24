@@ -1,6 +1,6 @@
 # LexiGuard AI Legal Suite Frontend
 
-A production-oriented React + Vite + TypeScript + Tailwind CSS rebuild of the exported Stitch UI screens for **LexiGuard AI Legal Suite**, a legal AI SaaS product. The implementation converts the screen exports into reusable React components, mock data, routed pages, responsive layouts, theme handling, and language switching.
+A production-oriented React + Vite + TypeScript + Tailwind CSS frontend for **LexiGuard AI Legal Suite**, a legal AI SaaS product. The implementation converts the screen exports into reusable React components, API-backed routed pages, responsive layouts, theme handling, and language switching.
 
 ## Tech stack
 
@@ -133,18 +133,11 @@ Frontend/
 The app reconstructs the major exported LexiGuard screens as a cohesive SPA:
 
 - Login and workspace setup/auth pages
-- Overview dashboard with metrics, risk trend, AI insight, queue, and review table
-- Project portfolio and project detail workspace
-- Document management and document detail preview
-- Upload processing flow with drag-and-drop and fake processing state
-- AI legal risk review with document preview, findings, citations, and processing timeline
-- Legal chat and chat history with mock AI response behavior
-- Version comparison and comparison history
-- Reports generation and report detail/preview page
-- Knowledge base management and knowledge source detail page
-- Billing and usage page
-- Admin console, audit logs, and system health/model status page
-- Jobs and templates pages for scalable workspace coverage
+- API-backed customer dashboard, workspace portfolio, project detail, upload, chat, chat history, and billing flows
+- API-backed admin console for users, payments, subscription plans, and legal tickets
+- Direct AI-service pages for knowledge/risk/system health with unavailable states when AI-service is down
+- Document, report, audit log, job, template, comparison, and detail routes that show empty/unavailable states until real backend APIs exist
+- Role-aware navigation and route guards for ADMIN and CUSTOMER
 
 ## Design system
 
@@ -164,7 +157,7 @@ The implementation uses semantic components instead of pasted HTML. Shared compo
 - `Button`, `Card`, `Badge`, `Tabs`, `Modal`, `Dropdown`, `DataTable`, `EmptyState`
 - `StatCard`, `RiskBadge`, `StatusBadge`, `ThemeToggle`, `LanguageToggle`
 - `FileUploadZone`, `ProcessingTimeline`
-- `DocumentPreview`, `LegalChatPanel`, `RiskReviewPanel`, `VersionComparisonView`, `ReportPreview`
+- `DocumentPreview`, `LegalChatPanel`, `RiskReviewPanel`, `VersionComparisonView`
 - `AdminMetricCard`, `SystemHealthCard`, `BillingUsageCard`
 
 ## Theme switching
@@ -190,23 +183,14 @@ Supported languages:
 
 Translations live in `src/utils/i18n.ts`, and the `useI18n` hook exposes `t(key)` for labels, page titles, buttons, table headers, statuses, navigation items, and major UI text.
 
-## Mock data and mock API
+## Data policy
 
-Mock domain data is stored in `src/api/mockData.ts`:
+Production routes must not display fabricated domain data as if it came from the system.
 
-- projects
-- documents
-- risk findings
-- reports
-- chat threads/messages
-- audit logs
-- workspace users
-- billing usage and invoices
-- system services and processing jobs
-- knowledge base articles
-- comparison history rows
-
-`src/api/mockApi.ts` provides delayed mock API methods. Pages currently import mock data directly for clarity, but the mock API module is ready for replacing direct imports with asynchronous calls.
+- Backend endpoints are configured through `.env`, `.env.example`, and `src/config/api.ts`.
+- Customer workspace, document upload, chat, billing, and admin tables use real backend services where endpoints exist.
+- Direct AI-service pages use `VITE_AI_SERVICE_BASE_URL` and show unavailable states if the service is not reachable.
+- Routes without a real backend/API contract render empty or unavailable states instead of fabricated documents, reports, jobs, audit logs, templates, comparison rows, or findings.
 
 ## Accessibility and responsive behavior
 

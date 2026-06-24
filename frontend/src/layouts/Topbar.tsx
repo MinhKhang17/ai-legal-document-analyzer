@@ -34,6 +34,8 @@ export function Topbar() {
   const location = useLocation();
   const navigate = useNavigate();
   const current = routeLabels.find((route) => location.pathname.startsWith(route.prefix));
+  const isAdmin = user?.role === 'ADMIN';
+  const profileWorkspacePath = isAdmin ? '/admin' : '/dashboard';
   const displayName = user
     ? `${user.firstName} ${user.lastName}`.trim() || user.email
     : "Guest";
@@ -62,15 +64,17 @@ export function Topbar() {
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-outline" aria-hidden="true" />
               <input className="w-full rounded-xl border border-outline-variant bg-surface-container-low py-sm pl-10 pr-md text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10 dark:border-slate-700 dark:bg-slate-900" placeholder={t('topbar.search')} type="search" />
             </div>
-            <div className="hidden items-center gap-md xl:flex">
-              <Link className="border-b-2 border-primary pb-xs text-sm font-semibold text-primary dark:border-inverse-primary dark:text-inverse-primary" to="/admin">
-                {t('topbar.privateWorkspace')}
-              </Link>
-              <Link className="flex items-center gap-xs text-sm font-semibold text-on-surface-variant hover:text-primary dark:text-slate-400 dark:hover:text-inverse-primary" to="/admin/system-health">
-                <Shield className="h-4 w-4" aria-hidden="true" />
-                {location.pathname.includes('system-health') ? t('topbar.systemHealth') : t('topbar.localAiOnline')}
-              </Link>
-            </div>
+            {isAdmin && (
+              <div className="hidden items-center gap-md xl:flex">
+                <Link className="border-b-2 border-primary pb-xs text-sm font-semibold text-primary dark:border-inverse-primary dark:text-inverse-primary" to="/admin">
+                  {t('topbar.privateWorkspace')}
+                </Link>
+                <Link className="flex items-center gap-xs text-sm font-semibold text-on-surface-variant hover:text-primary dark:text-slate-400 dark:hover:text-inverse-primary" to="/admin/system-health">
+                  <Shield className="h-4 w-4" aria-hidden="true" />
+                  {location.pathname.includes('system-health') ? t('topbar.systemHealth') : t('topbar.localAiOnline')}
+                </Link>
+              </div>
+            )}
           </div>
           <div className="md:hidden">
             <p className="text-sm font-bold text-primary dark:text-inverse-primary">{current ? t(current.key) : t('app.name')}</p>
@@ -100,7 +104,7 @@ export function Topbar() {
               <p className="font-semibold text-on-surface dark:text-slate-100">{displayName}</p>
               <p className="text-xs text-on-surface-variant dark:text-slate-400">{displayEmail}</p>
             </div>
-            <button className="flex w-full items-center gap-sm rounded-lg px-sm py-sm text-left text-sm hover:bg-surface-container-low dark:hover:bg-slate-800" type="button" onClick={() => navigate('/admin')}>
+            <button className="flex w-full items-center gap-sm rounded-lg px-sm py-sm text-left text-sm hover:bg-surface-container-low dark:hover:bg-slate-800" type="button" onClick={() => navigate(profileWorkspacePath)}>
               <UserRound className="h-4 w-4" aria-hidden="true" />
               {t('topbar.profileWorkspace')}
             </button>
@@ -108,8 +112,7 @@ export function Topbar() {
               className="flex w-full items-center gap-sm rounded-lg px-sm py-sm text-left text-sm text-error hover:bg-error-container dark:hover:bg-red-950/40"
               type="button"
               onClick={() => {
-                signOut();
-                navigate('/login');
+                void signOut().finally(() => navigate('/login'));
               }}
             >
               <LogOut className="h-4 w-4" aria-hidden="true" />

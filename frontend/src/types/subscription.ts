@@ -36,6 +36,16 @@ export interface SubscribeCustomerPlanRequest {
   paymentMethod: PaymentMethod;
 }
 
+export interface SubscriptionPlanRequest {
+  planName: string;
+  planType: string;
+  description?: string | null;
+  price: number;
+  durationDays: number;
+  maxQuota: number;
+  active?: boolean;
+}
+
 export interface CustomerPlan {
   id: number;
   customerId: number;

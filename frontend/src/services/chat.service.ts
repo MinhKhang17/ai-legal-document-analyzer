@@ -1,5 +1,10 @@
 import { API_ENDPOINTS, buildApiUrl } from "../config/api";
+import {
+  ACCESS_DENIED_MESSAGE,
+  BACKEND_API_UNAVAILABLE_MESSAGE,
+} from "./http";
 import type {
+  DeleteChatSessionResponse,
   WorkspaceChatConversation,
   WorkspaceChatMessage,
   WorkspaceChatSession,
@@ -55,14 +60,19 @@ const getApiErrorMessage = (
   rawText: string,
   fallback: string,
 ): string => {
+  const normalizeMessage = (message: string) =>
+    message.trim().toLowerCase() === "access denied"
+      ? ACCESS_DENIED_MESSAGE
+      : message.trim();
+
   if (errorResponse?.message?.trim()) {
-    return errorResponse.message.trim();
+    return normalizeMessage(errorResponse.message);
   }
   if (errorResponse?.error?.trim()) {
-    return errorResponse.error.trim();
+    return normalizeMessage(errorResponse.error);
   }
   if (rawText.trim()) {
-    return rawText.trim();
+    return normalizeMessage(rawText);
   }
   return fallback;
 };
@@ -72,7 +82,14 @@ const requestJson = async <TResponse>(
   requestInit: RequestInit,
   errorMessage: string,
 ): Promise<TResponse> => {
-  const response = await fetch(buildApiUrl(endpointPath), requestInit);
+  let response: Response;
+
+  try {
+    response = await fetch(buildApiUrl(endpointPath), requestInit);
+  } catch {
+    throw new Error(BACKEND_API_UNAVAILABLE_MESSAGE);
+  }
+
   const { data, rawText } = await readResponseBody<TResponse | ApiResponse<TResponse> | ApiErrorResponse>(response);
 
   if (!response.ok) {
@@ -117,6 +134,41 @@ const postJson = async <TResponse>(
       },
       credentials: "include",
       body: JSON.stringify(payload),
+    },
+    errorMessage,
+  );
+
+const putJson = async <TResponse>(
+  endpointPath: string,
+  payload: object,
+  errorMessage: string,
+  accessToken: string,
+): Promise<TResponse> =>
+  requestJson<TResponse>(
+    endpointPath,
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        ...getAuthHeaders(accessToken),
+      },
+      credentials: "include",
+      body: JSON.stringify(payload),
+    },
+    errorMessage,
+  );
+
+const deleteJson = async <TResponse>(
+  endpointPath: string,
+  errorMessage: string,
+  accessToken: string,
+): Promise<TResponse> =>
+  requestJson<TResponse>(
+    endpointPath,
+    {
+      method: "DELETE",
+      headers: getAuthHeaders(accessToken),
+      credentials: "include",
     },
     errorMessage,
   );
@@ -182,6 +234,19 @@ export async function getChatSessionMessages(
   };
 }
 
+export async function getChatMessageDetail(
+  accessToken: string,
+  messageId: string,
+): Promise<WorkspaceChatMessage> {
+  const response = await getJson<ApiResponse<WorkspaceChatMessage>>(
+    API_ENDPOINTS.chat.messageDetail(messageId),
+    "Không thể tải chi tiết tin nhắn",
+    accessToken,
+  );
+
+  return mapMessage(response.data);
+}
+
 export async function createChatSession(
   accessToken: string,
   workspaceId: string,
@@ -195,6 +260,37 @@ export async function createChatSession(
   );
 
   return mapSession(response.data);
+}
+
+export async function updateChatSession(
+  accessToken: string,
+  chatSessionId: string,
+  title: string,
+): Promise<WorkspaceChatSession> {
+  const response = await putJson<ApiResponse<WorkspaceChatSession>>(
+    API_ENDPOINTS.chat.sessionDetail(chatSessionId),
+    { title },
+    "Không thể đổi tên chat session",
+    accessToken,
+  );
+
+  return mapSession(response.data);
+}
+
+export async function deleteChatSession(
+  accessToken: string,
+  chatSessionId: string,
+): Promise<DeleteChatSessionResponse> {
+  const response = await deleteJson<ApiResponse<DeleteChatSessionResponse>>(
+    API_ENDPOINTS.chat.sessionDetail(chatSessionId),
+    "Không thể xóa chat session",
+    accessToken,
+  );
+
+  return {
+    ...response.data,
+    status: response.data.status.toLowerCase(),
+  };
 }
 
 export async function sendWorkspaceMessage(
