@@ -83,7 +83,8 @@ public class PaymentTransactionServiceImpl implements PaymentTransactionService 
                 savedTransaction.getId(),
                 savedTransaction.getTransactionCode(),
                 PaymentMethod.VNPAY.name(),
-                paymentUrl
+                paymentUrl,
+                vnPayProperties.getReturnUrl()
         );
     }
 

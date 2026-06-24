@@ -1,14 +1,14 @@
 package com.analyzer.api.service;
 
+import com.analyzer.api.dto.legalticket.AssignLawyerRequest;
 import com.analyzer.api.dto.legalticket.LegalTicketResponse;
 
 /**
- * Contract for admin-side ticket assignment actions.
+ * Service interface for admin actions related to ticket assignment.
  */
 public interface AdminTicketAssignmentService {
 
-    /**
-     * Assign a lawyer to an existing ticket.
-     */
-    LegalTicketResponse assignLawyer(String ticketId, String lawyerId);
+    LegalTicketResponse assignLawyer(Long adminId, String ticketId, AssignLawyerRequest request);
+
+    LegalTicketResponse reassignLawyer(Long adminId, String ticketId, AssignLawyerRequest request);
 }

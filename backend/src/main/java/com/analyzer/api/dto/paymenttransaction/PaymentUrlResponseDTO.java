@@ -14,6 +14,9 @@ public record PaymentUrlResponseDTO(
         String provider,
 
         @Schema(description = "URL used by the customer to complete payment")
-        String paymentUrl
+        String paymentUrl,
+
+        @Schema(description = "Return URL configured for VNPAY callback")
+        String returnUrl
 ) {
 }
