@@ -1,55 +1,60 @@
 import { CheckCircle2, RefreshCw, XCircle } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Badge } from "../../components/common/Badge";
 import { Button } from "../../components/common/Button";
 import { Card } from "../../components/common/Card";
 import { PageHeader } from "../../components/common/PageHeader";
 import { useI18n } from "../../hooks/useI18n";
 import { useToast } from "../../hooks/useToast";
-import { handleVnPayReturn } from "../../services/paymentTransaction.service";
+import { getMyPaymentTransactions } from "../../services/paymentTransaction.service";
 import type { PaymentTransaction } from "../../types/paymentTransaction";
 import { formatDisplayDate, formatVndCurrency } from "../../utils/format";
 
 const isSuccessfulPayment = (transaction: PaymentTransaction | null) =>
   transaction?.paymentStatus?.toUpperCase() === "SUCCESS";
 
+const getLatestTransaction = (transactions: PaymentTransaction[]) =>
+  [...transactions].sort(
+    (a, b) =>
+      new Date(b.updatedAt ?? b.createdAt).getTime() -
+      new Date(a.updatedAt ?? a.createdAt).getTime(),
+  )[0] ?? null;
+
 export function PaymentResultPage() {
   const { t } = useI18n();
   const toast = useToast();
-  const [searchParams] = useSearchParams();
   const [transaction, setTransaction] = useState<PaymentTransaction | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const hasReturnParams = searchParams.toString().trim().length > 0;
   const notifiedResultRef = useRef("");
 
   const loadPaymentResult = useCallback(async () => {
-    if (!hasReturnParams) {
-      setTransaction(null);
-      setError(t("payment.result.missingParams"));
-      if (notifiedResultRef.current !== "missing-params") {
-        toast.warning(t("payment.result.missingParams"), t("toast.warningTitle"));
-        notifiedResultRef.current = "missing-params";
-      }
-      setLoading(false);
-      return;
-    }
-
     setLoading(true);
     setError("");
 
     try {
-      const result = await handleVnPayReturn(searchParams);
+      const transactions = await getMyPaymentTransactions();
+      const result = getLatestTransaction(transactions);
+
+      if (!result) {
+        setTransaction(null);
+        setError(t("payment.result.noTransaction"));
+        return;
+      }
+
       setTransaction(result);
+
       const status = result.paymentStatus?.toUpperCase() ?? "UNKNOWN";
       const resultKey = `${result.id}:${status}`;
+
       if (notifiedResultRef.current !== resultKey) {
         if (isSuccessfulPayment(result)) {
           toast.success(t("payment.result.success"), t("toast.successTitle"));
         } else {
           toast.warning(t("payment.result.pending"), t("toast.warningTitle"));
         }
+
         notifiedResultRef.current = resultKey;
       }
     } catch (err) {
@@ -60,7 +65,7 @@ export function PaymentResultPage() {
     } finally {
       setLoading(false);
     }
-  }, [hasReturnParams, searchParams, t, toast]);
+  }, [t, toast]);
 
   useEffect(() => {
     void loadPaymentResult();
@@ -78,7 +83,7 @@ export function PaymentResultPage() {
             variant="secondary"
             leftIcon={<RefreshCw className="h-4 w-4" />}
             onClick={() => void loadPaymentResult()}
-            disabled={loading || !hasReturnParams}
+            disabled={loading}
           >
             {t("billing.refresh")}
           </Button>

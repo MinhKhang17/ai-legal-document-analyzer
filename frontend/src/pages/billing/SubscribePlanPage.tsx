@@ -23,11 +23,7 @@ import { formatNumber, formatVndCurrency } from '../../utils/format';
 import { cn } from '../../utils/cn';
 
 const PAYMENT_METHODS: PaymentMethod[] = [
-  'VNPAY',
-  'MOMO',
-  'BANK_TRANSFER',
-  'CREDIT_CARD',
-  'CASH',
+  'VNPAY'
 ];
 
 const getSubscriptionErrorMessage = (
