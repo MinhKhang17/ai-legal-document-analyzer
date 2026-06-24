@@ -16,7 +16,7 @@ const getAccessToken = () => localStorage.getItem("accessToken") ?? "";
 
 export function ProjectDetailPage() {
   const { id = "" } = useParams();
-  const { language } = useI18n();
+  const { t, language } = useI18n();
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,7 +38,7 @@ export function ProjectDetailPage() {
         setDocuments(documentData);
       } catch (err) {
         if (active) {
-          setError(err instanceof Error ? err.message : "Không thể tải workspace");
+          setError(err instanceof Error ? err.message : t("workspace.loadError"));
         }
       } finally {
         if (active) {
@@ -70,10 +70,10 @@ export function ProjectDetailPage() {
 
   const columns: DataTableColumn<Document>[] = [
     { header: "File", cell: (document) => document.originalFileName },
-    { header: "Type", cell: (document) => document.fileType },
-    { header: "Status", cell: (document) => <StatusBadge status={document.status} /> },
+    { header: t("documents.type"), cell: (document) => document.fileType },
+    { header: t("table.status"), cell: (document) => <StatusBadge status={document.status} /> },
     {
-      header: "Uploaded",
+      header: t("table.date"),
       cell: (document) =>
         new Intl.DateTimeFormat(language === "vi" ? "vi-VN" : "en-US", {
           dateStyle: "medium",
@@ -88,19 +88,19 @@ export function ProjectDetailPage() {
   return (
     <div>
       <PageHeader
-        title={workspace?.name ?? "Workspace details"}
-        subtitle={workspace?.description ?? "View documents and continue the analysis flow."}
+        title={workspace?.name ?? t("workspace.detailsTitle")}
+        subtitle={workspace?.description ?? t("workspace.detailsSubtitle")}
         eyebrow={workspace ? `${workspace.workspaceId} · ${workspace.status}` : "Workspace"}
         actions={
           <>
             <Link to={workspaceUploadUrl}>
               <Button variant="secondary" leftIcon={<Edit3 className="h-4 w-4" />}>
-                Upload file
+                {t("actions.uploadFile")}
               </Button>
             </Link>
             <Link to={workspaceChatUrl}>
               <Button leftIcon={<MessageSquareText className="h-4 w-4" />}>
-                Open chat
+                {t("actions.openChat")}
               </Button>
             </Link>
           </>
@@ -116,7 +116,7 @@ export function ProjectDetailPage() {
       {loading ? (
         <Card>
           <p className="text-sm text-on-surface-variant dark:text-slate-400">
-            Loading workspace...
+            {t("workspace.loading")}
           </p>
         </Card>
       ) : workspace ? (
@@ -130,17 +130,17 @@ export function ProjectDetailPage() {
                 </div>
                 <div className="mt-lg grid gap-md sm:grid-cols-3">
                   <div className="rounded-lg bg-surface-container-low p-md dark:bg-slate-800">
-                    <p className="label-uppercase">Documents</p>
+                    <p className="label-uppercase">{t("nav.documents")}</p>
                     <p className="mt-xs text-2xl font-bold">{documents.length}</p>
                   </div>
                   <div className="rounded-lg bg-surface-container-low p-md dark:bg-slate-800">
-                    <p className="label-uppercase">Ready</p>
+                    <p className="label-uppercase">{t("status.ready")}</p>
                     <p className="mt-xs text-2xl font-bold text-emerald-600">
                       {summary.readyDocuments}
                     </p>
                   </div>
                   <div className="rounded-lg bg-surface-container-low p-md dark:bg-slate-800">
-                    <p className="label-uppercase">Processing</p>
+                    <p className="label-uppercase">{t("status.processing")}</p>
                     <p className="mt-xs text-2xl font-bold text-secondary">
                       {summary.processingDocuments}
                     </p>
@@ -148,7 +148,7 @@ export function ProjectDetailPage() {
                 </div>
                 <div className="mt-lg">
                   <div className="mb-sm flex items-center justify-between text-sm">
-                    <span className="font-semibold">Workspace health</span>
+                    <span className="font-semibold">{t("workspace.health")}</span>
                     <span>{documents.length === 0 ? 0 : Math.round((summary.readyDocuments / documents.length) * 100)}%</span>
                   </div>
                   <ProgressBar
@@ -160,27 +160,27 @@ export function ProjectDetailPage() {
                 <div className="flex items-center gap-sm">
                   <ShieldAlert className="h-5 w-5 text-secondary dark:text-accent-gold" />
                   <h2 className="text-title-lg font-semibold">
-                    AI workspace summary
+                    {t("workspace.aiSummary")}
                   </h2>
                 </div>
                 <p className="mt-sm text-sm leading-6 text-on-surface-variant dark:text-slate-300">
                   {documents.length > 0
-                    ? "Use the chat screen to ask questions over the uploaded documents in this workspace."
-                    : "Upload a document first so the AI can ingest and index it before chat."}
+                    ? t("workspace.summaryWithDocuments")
+                    : t("workspace.summaryNoDocuments")}
                 </p>
                 <Link to={workspaceChatUrl}>
                   <Button className="mt-md" variant="gold">
-                    Open workspace chat
+                    {t("actions.openChat")}
                   </Button>
                 </Link>
               </Card>
             </div>
           </Card>
 
-          <Card title="Workspace documents">
+          <Card title={t("workspace.documents")}>
             {documents.length === 0 ? (
               <p className="text-sm text-on-surface-variant dark:text-slate-400">
-                No documents uploaded yet.
+                {t("upload.noDocuments")}
               </p>
             ) : (
               <DataTable
@@ -192,30 +192,30 @@ export function ProjectDetailPage() {
           </Card>
 
           <div className="mt-xl grid gap-gutter xl:grid-cols-[1fr_360px]">
-            <Card title="Quick actions">
+            <Card title={t("workspace.quickActions")}>
               <div className="grid gap-sm sm:grid-cols-2">
                 <Link
                   to={workspaceUploadUrl}
                   className="rounded-xl border border-legal-border p-md hover:bg-surface-container-low dark:border-slate-700 dark:hover:bg-slate-800"
                 >
-                  <p className="font-semibold">Upload another file</p>
+                  <p className="font-semibold">{t("workspace.uploadAnotherFile")}</p>
                   <p className="mt-xs text-sm text-on-surface-variant dark:text-slate-400">
-                    Add more documents into the same workspace.
+                    {t("workspace.uploadAnotherFileDescription")}
                   </p>
                 </Link>
                 <Link
                   to={workspaceChatUrl}
                   className="rounded-xl border border-legal-border p-md hover:bg-surface-container-low dark:border-slate-700 dark:hover:bg-slate-800"
                 >
-                  <p className="font-semibold">Ask the AI</p>
+                  <p className="font-semibold">{t("workspace.askAi")}</p>
                   <p className="mt-xs text-sm text-on-surface-variant dark:text-slate-400">
-                    Ask questions based on the documents in this workspace.
+                    {t("workspace.askAiDescription")}
                   </p>
                 </Link>
               </div>
             </Card>
 
-            <Card title="Workspace info" actions={<UsersRound className="h-5 w-5 text-primary dark:text-inverse-primary" />}>
+            <Card title={t("workspace.info")} actions={<UsersRound className="h-5 w-5 text-primary dark:text-inverse-primary" />}>
               <div className="space-y-md">
                 <div>
                   <p className="label-uppercase">Workspace ID</p>
@@ -224,11 +224,11 @@ export function ProjectDetailPage() {
                 <div>
                   <p className="label-uppercase">Description</p>
                   <p className="mt-xs text-sm text-on-surface-variant dark:text-slate-400">
-                    {workspace.description || "No description"}
+                    {workspace.description || t("workspace.noDescription")}
                   </p>
                 </div>
                 <div>
-                  <p className="label-uppercase">Created at</p>
+                  <p className="label-uppercase">{t("workspace.createdAt")}</p>
                   <p className="mt-xs text-sm">
                     {new Intl.DateTimeFormat(language === "vi" ? "vi-VN" : "en-US", {
                       dateStyle: "medium",
@@ -237,7 +237,7 @@ export function ProjectDetailPage() {
                   </p>
                 </div>
                 <div>
-                  <p className="label-uppercase">Failed documents</p>
+                  <p className="label-uppercase">{t("status.failed")}</p>
                   <p className="mt-xs text-sm">{summary.failedDocuments}</p>
                 </div>
               </div>
@@ -247,7 +247,7 @@ export function ProjectDetailPage() {
       ) : (
         <Card>
           <p className="text-sm text-on-surface-variant dark:text-slate-400">
-            Workspace not found.
+            {t("workspace.notFound")}
           </p>
         </Card>
       )}

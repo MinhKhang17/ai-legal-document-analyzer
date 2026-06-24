@@ -33,29 +33,31 @@ interface NavItem {
   icon: LucideIcon;
   end?: boolean;
   section?: NavSection;
+  allowedRoles?: AppRole[];
 }
 
+type AppRole = 'ADMIN' | 'CUSTOMER';
 type NavSection = 'main' | 'intelligence' | 'system' | 'admin';
 
 const navItems: NavItem[] = [
-  { to: '/dashboard', labelKey: 'nav.overview', icon: LayoutDashboard, section: 'main' },
-  { to: '/projects', labelKey: 'nav.projects', icon: FolderOpen, section: 'main' },
-  { to: '/documents', labelKey: 'nav.documents', icon: FileText, section: 'main' },
-  { to: '/upload', labelKey: 'nav.upload', icon: UploadCloud, section: 'main' },
-  { to: '/editor/risk-review', labelKey: 'nav.riskReview', icon: ShieldCheck, section: 'intelligence' },
-  { to: '/chat', labelKey: 'nav.legalChat', icon: MessageSquareText, section: 'intelligence' },
-  { to: '/chat/history', labelKey: 'nav.chatHistory', icon: FileClock, section: 'intelligence' },
+  { to: '/dashboard', labelKey: 'nav.overview', icon: LayoutDashboard, section: 'main', allowedRoles: ['CUSTOMER'] },
+  { to: '/projects', labelKey: 'nav.projects', icon: FolderOpen, section: 'main', allowedRoles: ['CUSTOMER'] },
+  { to: '/documents', labelKey: 'nav.documents', icon: FileText, section: 'main', allowedRoles: ['CUSTOMER'] },
+  { to: '/upload', labelKey: 'nav.upload', icon: UploadCloud, section: 'main', allowedRoles: ['CUSTOMER'] },
+  { to: '/editor/risk-review', labelKey: 'nav.riskReview', icon: ShieldCheck, section: 'intelligence', allowedRoles: ['ADMIN'] },
+  { to: '/chat', labelKey: 'nav.legalChat', icon: MessageSquareText, section: 'intelligence', allowedRoles: ['CUSTOMER'] },
+  { to: '/chat/history', labelKey: 'nav.chatHistory', icon: FileClock, section: 'intelligence', allowedRoles: ['CUSTOMER'] },
   { to: '/editor/version-comparison', labelKey: 'nav.versionComparison', icon: Scale, section: 'intelligence' },
   { to: '/editor/comparison-history', labelKey: 'nav.comparisonHistory', icon: History, section: 'intelligence' },
   { to: '/reports', labelKey: 'nav.reports', icon: BarChart3, section: 'intelligence' },
-  { to: '/knowledge-base', labelKey: 'nav.knowledgeBase', icon: BookOpen, section: 'intelligence' },
-  { to: '/billing', labelKey: 'nav.billing', icon: Receipt, section: 'system' },
-  { to: '/jobs', labelKey: 'nav.jobs', icon: Activity, section: 'system' },
+  { to: '/knowledge-base', labelKey: 'nav.knowledgeBase', icon: BookOpen, section: 'intelligence', allowedRoles: ['ADMIN'] },
+  { to: '/billing', labelKey: 'nav.billing', icon: Receipt, section: 'system', allowedRoles: ['CUSTOMER'] },
+  { to: '/jobs', labelKey: 'nav.jobs', icon: Activity, section: 'system', allowedRoles: ['ADMIN'] },
   { to: '/templates', labelKey: 'nav.templates', icon: Wrench, section: 'system' },
   { to: '/settings', labelKey: 'nav.settings', icon: Settings, section: 'system' },
-  { to: '/admin', labelKey: 'nav.admin', icon: UsersRound, section: 'admin' },
-  { to: '/admin/audit-logs', labelKey: 'nav.auditLogs', icon: FileClock, section: 'admin' },
-  { to: '/admin/system-health', labelKey: 'nav.systemHealth', icon: Activity, section: 'admin' },
+  { to: '/admin', labelKey: 'nav.admin', icon: UsersRound, section: 'admin', allowedRoles: ['ADMIN'] },
+  { to: '/admin/audit-logs', labelKey: 'nav.auditLogs', icon: FileClock, section: 'admin', allowedRoles: ['ADMIN'] },
+  { to: '/admin/system-health', labelKey: 'nav.systemHealth', icon: Activity, section: 'admin', allowedRoles: ['ADMIN'] },
 ];
 
 const sectionLabelKeys: Record<NavSection, string> = {
@@ -70,11 +72,13 @@ const sectionOrder: NavSection[] = ['main', 'intelligence', 'system', 'admin'];
 function SidebarContent() {
   const { t } = useI18n();
   const { sidebarCollapsed, toggleSidebar, setMobileSidebarOpen, user } = useAppStore();
-  const isAdmin = user?.role === 'ADMIN';
+  const currentRole: AppRole | undefined = user?.role === 'ADMIN' || user?.role === 'CUSTOMER' ? user.role : undefined;
+  const isCustomer = currentRole === 'CUSTOMER';
+  const homePath = currentRole === 'ADMIN' ? '/admin' : '/dashboard';
 
   const groupedItems = navItems.reduce<Partial<Record<NavSection, NavItem[]>>>((accumulator, item) => {
     const section = item.section ?? 'main';
-    if (section === 'admin' && !isAdmin) {
+    if (item.allowedRoles && (!currentRole || !item.allowedRoles.includes(currentRole))) {
       return accumulator;
     }
 
@@ -85,7 +89,7 @@ function SidebarContent() {
   return (
     <div className="flex h-full flex-col bg-surface dark:bg-slate-950">
       <div className="flex items-center justify-between gap-sm border-b border-outline-variant px-md py-lg dark:border-slate-800">
-        <NavLink to="/dashboard" className="flex min-w-0 items-center gap-sm" onClick={() => setMobileSidebarOpen(false)}>
+        <NavLink to={homePath} className="flex min-w-0 items-center gap-sm" onClick={() => setMobileSidebarOpen(false)}>
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary text-white shadow-navy">
             <Gavel className="h-5 w-5" aria-hidden="true" />
           </div>
@@ -101,13 +105,15 @@ function SidebarContent() {
         </button>
       </div>
 
-      <div className="p-md">
-        <NavLink to="/upload" onClick={() => setMobileSidebarOpen(false)}>
-          <Button className={cn('w-full', sidebarCollapsed && 'px-0')} leftIcon={<UploadCloud className="h-4 w-4" />}>
-            {!sidebarCollapsed && t('actions.newAnalysis')}
-          </Button>
-        </NavLink>
-      </div>
+      {isCustomer && (
+        <div className="p-md">
+          <NavLink to="/upload" onClick={() => setMobileSidebarOpen(false)}>
+            <Button className={cn('w-full', sidebarCollapsed && 'px-0')} leftIcon={<UploadCloud className="h-4 w-4" />}>
+              {!sidebarCollapsed && t('actions.newAnalysis')}
+            </Button>
+          </NavLink>
+        </div>
+      )}
 
       <nav className="flex-1 overflow-y-auto px-xs pb-lg" aria-label={t('nav.primaryNavigation')}>
         {sectionOrder.map((section) => {

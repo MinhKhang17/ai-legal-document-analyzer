@@ -10,6 +10,7 @@ import {
 import {
   getCurrentUser,
   isAuthUnauthorizedError,
+  logout as requestLogout,
   refreshAccessToken,
 } from "../services/auth.service";
 import type { CurrentUser } from "../types/auth";
@@ -32,7 +33,11 @@ interface AppStoreValue {
   toggleSidebar: () => void;
   setMobileSidebarOpen: (open: boolean) => void;
   signIn: (accessToken?: string, user?: CurrentUser) => void;
-  signOut: () => void;
+  signOut: (options?: SignOutOptions) => Promise<void>;
+}
+
+interface SignOutOptions {
+  remote?: boolean;
 }
 
 const STORAGE_KEYS = {
@@ -283,7 +288,20 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     hydrateAuthState(accessToken, nextUser);
   };
 
-  const signOut = () => {
+  const signOut = async (options: SignOutOptions = {}) => {
+    const shouldCallRemote =
+      options.remote !== false &&
+      typeof window !== "undefined" &&
+      (window.localStorage.getItem(STORAGE_KEYS.accessToken)?.trim().length ?? 0) > 0;
+
+    if (shouldCallRemote) {
+      try {
+        await requestLogout();
+      } catch (error) {
+        console.warn("Logout API failed; clearing local session anyway.", error);
+      }
+    }
+
     clearAuthState();
   };
 

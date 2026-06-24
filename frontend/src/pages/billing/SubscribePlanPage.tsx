@@ -9,6 +9,8 @@ import { EmptyState } from '../../components/common/EmptyState';
 import { Modal } from '../../components/common/Modal';
 import { PageHeader } from '../../components/common/PageHeader';
 import { useI18n } from '../../hooks/useI18n';
+import { useToast } from '../../hooks/useToast';
+import { createVnPayPaymentUrl } from '../../services/paymentTransaction.service';
 import {
   getMyCustomerPlan,
   getSubscriptionPlans,
@@ -46,6 +48,7 @@ const getSubscriptionErrorMessage = (
 
 export function SubscribePlanPage() {
   const { t } = useI18n();
+  const toast = useToast();
   const navigate = useNavigate();
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
@@ -95,11 +98,13 @@ export function SubscribePlanPage() {
 
     if (!selectedPlan) {
       setErrorMessage(t('billing.subscribe.errors.noPlanSelected'));
+      toast.warning(t('billing.subscribe.errors.noPlanSelected'), t('toast.warningTitle'));
       return;
     }
 
     if (!selectedPlan.active) {
       setErrorMessage(t('billing.subscribe.errors.inactivePlan'));
+      toast.warning(t('billing.subscribe.errors.inactivePlan'), t('toast.warningTitle'));
       return;
     }
 
@@ -109,6 +114,7 @@ export function SubscribePlanPage() {
   const handleSubscribe = async () => {
     if (!selectedPlan) {
       setErrorMessage(t('billing.subscribe.errors.noPlanSelected'));
+      toast.warning(t('billing.subscribe.errors.noPlanSelected'), t('toast.warningTitle'));
       return;
     }
 
@@ -124,8 +130,38 @@ export function SubscribePlanPage() {
       const nextCustomerPlan = response.data ?? null;
 
       setSubscribedPlan(nextCustomerPlan);
-      setSuccessMessage(response.message || t('billing.subscribe.successMessage'));
+      const successMessage = t('billing.subscribe.successMessage');
+      setSuccessMessage(successMessage);
+      toast.success(successMessage, t('toast.successTitle'));
       setConfirmOpen(false);
+
+      if (paymentMethod === 'VNPAY') {
+        if (nextCustomerPlan?.latestTransactionId !== null && typeof nextCustomerPlan?.latestTransactionId !== 'undefined') {
+          try {
+            const paymentUrlResponse = await createVnPayPaymentUrl(nextCustomerPlan.latestTransactionId);
+
+            if (paymentUrlResponse.paymentUrl?.trim()) {
+              toast.info(t('billing.pay'), t('toast.infoTitle'));
+              window.location.assign(paymentUrlResponse.paymentUrl);
+              return;
+            }
+
+            setErrorMessage(t('billing.subscribe.vnPayMissingUrl'));
+            toast.warning(t('billing.subscribe.vnPayMissingUrl'), t('toast.warningTitle'));
+          } catch (paymentUrlError) {
+            console.error('Subscription succeeded but VNPAY URL creation failed:', paymentUrlError);
+            const message =
+              paymentUrlError instanceof Error
+                ? paymentUrlError.message
+                : t('billing.subscribe.vnPayUrlError');
+            setErrorMessage(message);
+            toast.error(message, t('toast.errorTitle'));
+          }
+        } else {
+          setErrorMessage(t('billing.subscribe.vnPayMissingTransaction'));
+          toast.warning(t('billing.subscribe.vnPayMissingTransaction'), t('toast.warningTitle'));
+        }
+      }
 
       try {
         const currentPlanResponse = await getMyCustomerPlan();
@@ -136,13 +172,14 @@ export function SubscribePlanPage() {
       }
     } catch (error) {
       console.error('Failed to subscribe customer plan:', error);
-      setErrorMessage(
+      const message =
         getSubscriptionErrorMessage(
           error,
           t('billing.subscribe.errors.subscribe'),
           t('billing.errors.unauthorized'),
-        ),
-      );
+        );
+      setErrorMessage(message);
+      toast.error(message, t('toast.errorTitle'));
     } finally {
       setIsSubmitting(false);
     }

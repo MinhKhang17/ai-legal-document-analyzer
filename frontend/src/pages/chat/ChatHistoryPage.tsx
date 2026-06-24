@@ -190,7 +190,7 @@ export function ChatHistoryPage() {
     <div>
       <PageHeader
         title={t("chatHistory.title")}
-        subtitle="Browse previous conversations by workspace and reopen them in chat."
+        subtitle={t("chatHistory.subtitleWorkspace")}
         actions={<Button variant="secondary">{t("chatHistory.allFilters")}</Button>}
       />
 
@@ -221,7 +221,7 @@ export function ChatHistoryPage() {
               disabled={loading}
             >
               <option value="">
-                {loading ? "Loading workspaces..." : "Select workspace"}
+                {loading ? t("chat.loadingWorkspaces") : t("chat.selectWorkspace")}
               </option>
               {workspaces.map((workspace) => (
                 <option key={workspace.workspaceId} value={workspace.workspaceId}>
@@ -234,7 +234,7 @@ export function ChatHistoryPage() {
               <div className="rounded-lg bg-surface-container-low p-md dark:bg-slate-800">
                 <p className="font-semibold">{selectedWorkspace.name}</p>
                 <p className="mt-xs text-sm text-on-surface-variant dark:text-slate-400">
-                  {selectedWorkspace.description || "No description"}
+                  {selectedWorkspace.description || t("workspace.noDescription")}
                 </p>
               </div>
             )}
@@ -243,13 +243,13 @@ export function ChatHistoryPage() {
           <div className="space-y-md">
             {loadingSessions && (
               <p className="text-sm text-on-surface-variant dark:text-slate-400">
-                Loading sessions...
+                {t("chatHistory.loadingSessions")}
               </p>
             )}
 
             {sessions.length === 0 && !loadingSessions ? (
               <p className="text-sm text-on-surface-variant dark:text-slate-400">
-                No conversations yet.
+                {t("chatHistory.noConversations")}
               </p>
             ) : (
               sessions.map((session) => (
@@ -263,7 +263,7 @@ export function ChatHistoryPage() {
                         {session.title}
                       </h2>
                       <p className="mt-xs text-sm text-on-surface-variant dark:text-slate-400">
-                        {session.chatSessionId} · {formatTimestamp(session.updatedAt, language)}
+                      {session.chatSessionId} · {formatTimestamp(session.updatedAt, language)}
                       </p>
                     </div>
                     <div className="flex gap-xs">
@@ -278,7 +278,7 @@ export function ChatHistoryPage() {
                   </div>
                   <div className="mt-md flex flex-wrap gap-xs">
                     <Badge tone={session.isDefault ? "gold" : "blue"}>
-                      {session.isDefault ? "Default" : "Session"}
+                      {session.isDefault ? t("chat.defaultSession") : t("chat.sessionLabel")}
                     </Badge>
                   </div>
                 </article>
@@ -289,14 +289,14 @@ export function ChatHistoryPage() {
 
         <aside>
           <Card
-            title={sessions.find((session) => session.chatSessionId === selectedSessionId)?.title ?? "Conversation"}
+            title={sessions.find((session) => session.chatSessionId === selectedSessionId)?.title ?? t("chatHistory.conversation")}
             subtitle={selectedWorkspace?.name}
             actions={<MessageSquareText className="h-5 w-5 text-primary dark:text-inverse-primary" />}
           >
             <div className="space-y-md">
               {messages.length === 0 ? (
                 <p className="text-sm text-on-surface-variant dark:text-slate-400">
-                  Open a session to preview the conversation.
+                  {t("chatHistory.previewEmpty")}
                 </p>
               ) : (
                 messages.map((message) => (

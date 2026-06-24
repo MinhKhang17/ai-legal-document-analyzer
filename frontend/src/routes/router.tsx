@@ -1,6 +1,6 @@
 import { Navigate, createBrowserRouter } from 'react-router-dom';
 import { AppShell } from '../components/common/AppShell';
-import { AdminRoute, AuthenticatedRoute, PublicRoute } from '../components/auth/AuthGuards';
+import { AdminRoute, AuthenticatedRoute, CustomerRoute, PublicRoute } from '../components/auth/AuthGuards';
 import { AuthLayout } from '../layouts/AuthLayout';
 import { LoginPage } from '../pages/auth/LoginPage';
 import { RegisterPage } from '../pages/auth/RegisterPage';
@@ -21,6 +21,7 @@ import { ReportDetailPage } from '../pages/reports/ReportDetailPage';
 import { KnowledgeBasePage } from '../pages/knowledge-base/KnowledgeBasePage';
 import { KnowledgeBaseDetailPage } from '../pages/knowledge-base/KnowledgeBaseDetailPage';
 import { BillingPage } from '../pages/billing/BillingPage';
+import { PaymentResultPage } from '../pages/billing/PaymentResultPage';
 import { SubscribePlanPage } from '../pages/billing/SubscribePlanPage';
 import { AdminConsolePage } from '../pages/admin/AdminConsolePage';
 import { AuditLogsPage } from '../pages/admin/AuditLogsPage';
@@ -52,26 +53,139 @@ export const router = createBrowserRouter([
       </AuthenticatedRoute>
     ),
     children: [
-      { path: '/dashboard', element: <DashboardPage /> },
-      { path: '/projects', element: <ProjectsPage /> },
-      { path: '/projects/:id', element: <ProjectDetailPage /> },
-      { path: '/documents', element: <DocumentsPage /> },
-      { path: '/documents/:id', element: <DocumentDetailPage /> },
-      { path: '/upload', element: <UploadPage /> },
-      { path: '/editor', element: <EditorPage /> },
-      { path: '/editor/risk-review', element: <RiskReviewPage /> },
+      {
+        path: '/dashboard',
+        element: (
+          <CustomerRoute>
+            <DashboardPage />
+          </CustomerRoute>
+        ),
+      },
+      {
+        path: '/projects',
+        element: (
+          <CustomerRoute>
+            <ProjectsPage />
+          </CustomerRoute>
+        ),
+      },
+      {
+        path: '/projects/:id',
+        element: (
+          <CustomerRoute>
+            <ProjectDetailPage />
+          </CustomerRoute>
+        ),
+      },
+      {
+        path: '/documents',
+        element: (
+          <CustomerRoute>
+            <DocumentsPage />
+          </CustomerRoute>
+        ),
+      },
+      {
+        path: '/documents/:id',
+        element: (
+          <CustomerRoute>
+            <DocumentDetailPage />
+          </CustomerRoute>
+        ),
+      },
+      {
+        path: '/upload',
+        element: (
+          <CustomerRoute>
+            <UploadPage />
+          </CustomerRoute>
+        ),
+      },
+      {
+        path: '/editor',
+        element: (
+          <CustomerRoute>
+            <EditorPage />
+          </CustomerRoute>
+        ),
+      },
+      {
+        path: '/editor/risk-review',
+        element: (
+          <AdminRoute>
+            <RiskReviewPage />
+          </AdminRoute>
+        ),
+      },
       { path: '/editor/version-comparison', element: <VersionComparisonPage /> },
       { path: '/editor/comparison-history', element: <ComparisonHistoryPage /> },
       { path: '/comparison-history', element: <Navigate to="/editor/comparison-history" replace /> },
-      { path: '/chat', element: <LegalChatPage /> },
-      { path: '/chat/history', element: <ChatHistoryPage /> },
+      {
+        path: '/chat',
+        element: (
+          <CustomerRoute>
+            <LegalChatPage />
+          </CustomerRoute>
+        ),
+      },
+      {
+        path: '/chat/history',
+        element: (
+          <CustomerRoute>
+            <ChatHistoryPage />
+          </CustomerRoute>
+        ),
+      },
       { path: '/reports', element: <ReportsPage /> },
       { path: '/reports/:id', element: <ReportDetailPage /> },
-      { path: '/knowledge-base', element: <KnowledgeBasePage /> },
-      { path: '/knowledge-base/:id', element: <KnowledgeBaseDetailPage /> },
-      { path: '/billing', element: <BillingPage /> },
-      { path: '/billing/subscribe', element: <SubscribePlanPage /> },
-      { path: '/jobs', element: <JobsPage /> },
+      {
+        path: '/knowledge-base',
+        element: (
+          <AdminRoute>
+            <KnowledgeBasePage />
+          </AdminRoute>
+        ),
+      },
+      {
+        path: '/knowledge-base/:id',
+        element: (
+          <AdminRoute>
+            <KnowledgeBaseDetailPage />
+          </AdminRoute>
+        ),
+      },
+      {
+        path: '/billing',
+        element: (
+          <CustomerRoute>
+            <BillingPage />
+          </CustomerRoute>
+        ),
+      },
+      {
+        path: '/billing/subscribe',
+        element: (
+          <CustomerRoute>
+            <SubscribePlanPage />
+          </CustomerRoute>
+        ),
+      },
+      {
+        path: '/billing/payment-result',
+        element: (
+          <CustomerRoute>
+            <PaymentResultPage />
+          </CustomerRoute>
+        ),
+      },
+      {
+        path: '/jobs',
+        element: (
+          <AdminRoute>
+            <JobsPage />
+          </AdminRoute>
+        ),
+      },
       { path: '/templates', element: <TemplatesPage /> },
       { path: '/settings', element: <SettingsPage /> },
       {

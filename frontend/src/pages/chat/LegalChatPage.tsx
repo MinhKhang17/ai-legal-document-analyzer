@@ -1,20 +1,27 @@
-import { Bot, FileText, Plus, RefreshCw, Send, UserRound } from "lucide-react";
+import { Bot, Check, ClipboardCheck, FileText, Pencil, Plus, RefreshCw, Send, Trash2, UserRound, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Badge } from "../../components/common/Badge";
 import { Button } from "../../components/common/Button";
 import { Card } from "../../components/common/Card";
+import { Modal } from "../../components/common/Modal";
 import { PageHeader } from "../../components/common/PageHeader";
 import { StatusBadge } from "../../components/common/StatusBadge";
 import {
   createChatSession,
+  deleteChatSession,
+  getChatMessageDetail,
+  getChatSessionDetail,
   getChatSessionMessages,
   getWorkspaceChatSessions,
   sendChatSessionMessage,
   sendWorkspaceMessage,
+  updateChatSession,
 } from "../../api/chatApi";
+import { createLegalTicket } from "../../api/legalTicketApi";
 import { getWorkspaceDocuments, getWorkspaces } from "../../api/workspaceApi";
 import { useI18n } from "../../hooks/useI18n";
+import { useToast } from "../../hooks/useToast";
 import { ChatMessageContent } from "../../components/chat/ChatMessageContent";
 import type { ChatMessage } from "../../types/chat";
 import type { Document, Workspace } from "../../types/workspace";
@@ -47,6 +54,16 @@ const toDisplayMessage = (
     : message.status.toLowerCase() === "processing"
       ? "done"
       : "done",
+  errorMessage: message.errorMessage ?? undefined,
+  requestId: message.requestId,
+  confidenceScore: message.confidenceScore,
+  shouldSuggestTicket: message.shouldSuggestTicket,
+  suggestionType: message.suggestionType,
+  suggestionReason: message.suggestionReason,
+  missingInformation: message.missingInformation,
+  riskLevel: message.riskLevel,
+  legalDomain: message.legalDomain,
+  userActionHint: message.userActionHint,
 });
 
 const createOptimisticUserMessage = (message: string, language: "en" | "vi"): ChatMessage => ({
@@ -61,6 +78,7 @@ type DisplayMessage = ChatMessage;
 
 export function LegalChatPage() {
   const { t, language } = useI18n();
+  const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [workspaceDocuments, setWorkspaceDocuments] = useState<Document[]>([]);
@@ -80,6 +98,16 @@ export function LegalChatPage() {
   const [loadingContext, setLoadingContext] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const [sessionActionError, setSessionActionError] = useState("");
+  const [sessionActionMessage, setSessionActionMessage] = useState("");
+  const [renamingSessionId, setRenamingSessionId] = useState("");
+  const [renameTitle, setRenameTitle] = useState("");
+  const [sessionActionBusyId, setSessionActionBusyId] = useState("");
+  const [creatingTicketMessageId, setCreatingTicketMessageId] = useState("");
+  const [ticketNotices, setTicketNotices] = useState<Record<string, string>>({});
+  const [messageDetailOpen, setMessageDetailOpen] = useState(false);
+  const [messageDetail, setMessageDetail] = useState<WorkspaceChatMessage | null>(null);
+  const [messageDetailLoading, setMessageDetailLoading] = useState(false);
   const lastSubmissionRef = useRef<{
     workspaceId: string;
     sessionId: string;
@@ -270,7 +298,173 @@ export function LegalChatPage() {
         sessionId: session.chatSessionId,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Không thể tạo chat session");
+      const message = err instanceof Error ? err.message : t("chat.sessionCreateError");
+      setError(message);
+      toast.error(message, t("toast.errorTitle"));
+      return;
+    }
+    toast.success(t("chat.sessionCreated"), t("toast.successTitle"));
+  };
+
+  const handleSelectSession = async (session: WorkspaceChatSession) => {
+    setSelectedSessionId(session.chatSessionId);
+    setSessionActionError("");
+
+    if (
+      searchParams.get("workspaceId") !== selectedWorkspaceId ||
+      searchParams.get("sessionId") !== session.chatSessionId
+    ) {
+      setSearchParams({
+        workspaceId: selectedWorkspaceId,
+        sessionId: session.chatSessionId,
+      });
+    }
+
+    try {
+      const detail = await getChatSessionDetail(getAccessToken(), session.chatSessionId);
+      setChatSessions((previous) =>
+        previous.map((item) => (item.chatSessionId === detail.chatSessionId ? detail : item)),
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t("chat.sessionCreateError");
+      setSessionActionError(message);
+      toast.error(message, t("toast.errorTitle"));
+    }
+  };
+
+  const handleRenameSession = async (chatSessionId: string) => {
+    const title = renameTitle.trim();
+
+    if (!title) {
+      setSessionActionError(t("chat.sessionNameRequired"));
+      toast.warning(t("chat.sessionNameRequired"), t("toast.warningTitle"));
+      return;
+    }
+
+    setSessionActionBusyId(chatSessionId);
+    setSessionActionError("");
+    setSessionActionMessage("");
+
+    try {
+      const updatedSession = await updateChatSession(getAccessToken(), chatSessionId, title);
+      setChatSessions((previous) =>
+        previous.map((session) =>
+          session.chatSessionId === chatSessionId ? updatedSession : session,
+        ),
+      );
+      setRenamingSessionId("");
+      setRenameTitle("");
+      setSessionActionMessage(t("chat.sessionRenamed"));
+      toast.success(t("chat.sessionRenamed"), t("toast.successTitle"));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t("chat.sessionRenameError");
+      setSessionActionError(message);
+      toast.error(message, t("toast.errorTitle"));
+    } finally {
+      setSessionActionBusyId("");
+    }
+  };
+
+  const handleDeleteSession = async (chatSessionId: string) => {
+    if (!window.confirm(t("chat.sessionDeleteConfirm"))) {
+      return;
+    }
+
+    setSessionActionBusyId(chatSessionId);
+    setSessionActionError("");
+    setSessionActionMessage("");
+
+    try {
+      await deleteChatSession(getAccessToken(), chatSessionId);
+      const remainingSessions = chatSessions.filter((session) => session.chatSessionId !== chatSessionId);
+      setChatSessions(remainingSessions);
+
+      if (selectedSessionId === chatSessionId) {
+        const nextSessionId =
+          remainingSessions.find((session) => session.isDefault)?.chatSessionId ??
+          remainingSessions[0]?.chatSessionId ??
+          "";
+
+        setSelectedSessionId(nextSessionId);
+        setMessages([]);
+        setSearchParams(
+          nextSessionId
+            ? { workspaceId: selectedWorkspaceId, sessionId: nextSessionId }
+            : { workspaceId: selectedWorkspaceId },
+        );
+      }
+
+      setSessionActionMessage(t("chat.sessionDeleted"));
+      toast.success(t("chat.sessionDeleted"), t("toast.successTitle"));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t("chat.sessionDeleteError");
+      setSessionActionError(message);
+      toast.error(message, t("toast.errorTitle"));
+    } finally {
+      setSessionActionBusyId("");
+    }
+  };
+
+  const handleCreateTicket = async (assistantMessage: DisplayMessage, question: string) => {
+    if (!selectedWorkspaceId) {
+      setError(t("chat.ticketSelectWorkspace"));
+      toast.warning(t("chat.ticketSelectWorkspace"), t("toast.warningTitle"));
+      return;
+    }
+
+    setCreatingTicketMessageId(assistantMessage.id);
+    setError("");
+
+    try {
+      const ticket = await createLegalTicket({
+        request_id: assistantMessage.requestId,
+        workspace_id: selectedWorkspaceId,
+        document_id: selectedDocumentId || null,
+        question,
+        answer: assistantMessage.content,
+        confidence_score: assistantMessage.confidenceScore,
+        should_suggest_ticket: assistantMessage.shouldSuggestTicket,
+        suggestion_type: assistantMessage.suggestionType,
+        suggestion_reason: assistantMessage.suggestionReason,
+        missing_information: assistantMessage.missingInformation,
+        risk_level: assistantMessage.riskLevel,
+        legal_domain: assistantMessage.legalDomain,
+        user_action_hint: assistantMessage.userActionHint,
+      });
+
+      setTicketNotices((previous) => ({
+        ...previous,
+        [assistantMessage.id]: `${t("chat.ticketCreated")} ${ticket.id}.`,
+      }));
+      toast.success(`${t("chat.ticketCreated")} ${ticket.id}.`, t("toast.successTitle"));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t("chat.ticketCreateError");
+      setError(message);
+      toast.error(message, t("toast.errorTitle"));
+    } finally {
+      setCreatingTicketMessageId("");
+    }
+  };
+
+  const handleOpenMessageDetail = async (messageId: string) => {
+    if (messageId.startsWith("local-")) {
+      return;
+    }
+
+    setMessageDetailOpen(true);
+    setMessageDetailLoading(true);
+    setMessageDetail(null);
+    setError("");
+
+    try {
+      const detail = await getChatMessageDetail(getAccessToken(), messageId);
+      setMessageDetail(detail);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t("chat.messageDetailError");
+      setError(message);
+      toast.error(message, t("toast.errorTitle"));
+    } finally {
+      setMessageDetailLoading(false);
     }
   };
 
@@ -333,17 +527,15 @@ export function LegalChatPage() {
         setMessages((previous) => [
           ...previous,
           {
+            ...toDisplayMessage(conversation.assistantMessage, language),
             id: conversation.assistantMessage.messageId ?? assistantMessageId,
-            role: "assistant",
-            content: conversation.assistantMessage.content,
-            timestamp: formatTimestamp(conversation.assistantMessage.createdAt, language),
-            status: conversation.assistantMessage.status?.toLowerCase() === "failed" ? "error" : "done",
           },
         ]);
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Không thể gửi câu hỏi";
+      const message = err instanceof Error ? err.message : t("chat.messageSendError");
       setError(message);
+      toast.error(message, t("toast.errorTitle"));
     } finally {
       setSending(false);
     }
@@ -353,7 +545,7 @@ export function LegalChatPage() {
     <div>
       <PageHeader
         title={t("chat.title")}
-        subtitle="Ask questions over the documents uploaded into the selected workspace."
+        subtitle={t("chat.subtitleWorkspace")}
         actions={
           <>
             <Button
@@ -367,14 +559,14 @@ export function LegalChatPage() {
                 });
               }}
             >
-              Refresh context
+              {t("chat.refreshContext")}
             </Button>
             <Button
               leftIcon={<Plus className="h-4 w-4" />}
               onClick={handleCreateSession}
               disabled={!selectedWorkspaceId}
             >
-              New session
+              {t("chat.newSession")}
             </Button>
           </>
         }
@@ -388,7 +580,7 @@ export function LegalChatPage() {
 
       <div className="grid gap-gutter xl:grid-cols-[360px_minmax(0,1fr)]">
         <aside className="space-y-gutter">
-          <Card title="Workspace">
+          <Card title={t("admin.workspace")}>
             <div className="space-y-md">
               <select
                 className="form-field"
@@ -410,7 +602,7 @@ export function LegalChatPage() {
                 disabled={loading}
               >
                 <option value="">
-                  {loading ? "Loading workspaces..." : "Select workspace"}
+                  {loading ? t("chat.loadingWorkspaces") : t("chat.selectWorkspace")}
                 </option>
                 {workspaces.map((workspace) => (
                   <option key={workspace.workspaceId} value={workspace.workspaceId}>
@@ -423,7 +615,7 @@ export function LegalChatPage() {
                 <div className="rounded-lg bg-surface-container-low p-md dark:bg-slate-800">
                   <p className="font-semibold">{selectedWorkspace.name}</p>
                   <p className="mt-xs text-sm text-on-surface-variant dark:text-slate-400">
-                    {selectedWorkspace.description || "No description"}
+                    {selectedWorkspace.description || t("workspace.noDescription")}
                   </p>
                   <div className="mt-sm flex items-center gap-sm">
                     <StatusBadge status={selectedWorkspace.status} />
@@ -481,13 +673,13 @@ export function LegalChatPage() {
 
               {loadingContext && (
                 <p className="text-sm text-on-surface-variant dark:text-slate-400">
-                  Loading documents...
+                  {t("upload.loadingDocuments")}
                 </p>
               )}
 
               {workspaceDocuments.length === 0 && !loadingContext ? (
                 <p className="text-sm text-on-surface-variant dark:text-slate-400">
-                  No documents available yet.
+                  {t("chat.noDocuments")}
                 </p>
               ) : (
                 workspaceDocuments.map((document) => (
@@ -531,27 +723,33 @@ export function LegalChatPage() {
             </div>
           </Card>
 
-          <Card title="Chat sessions">
+          <Card title={t("chatHistory.conversations")}>
             <div className="space-y-md">
+              {sessionActionError && (
+                <p className="rounded-lg bg-error-container px-md py-sm text-sm font-semibold text-risk-high-text dark:bg-red-950/40 dark:text-red-200">
+                  {sessionActionError}
+                </p>
+              )}
+              {sessionActionMessage && (
+                <p className="rounded-lg bg-emerald-50 px-md py-sm text-sm font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200">
+                  {sessionActionMessage}
+                </p>
+              )}
               {chatSessions.length === 0 ? (
                 <p className="text-sm text-on-surface-variant dark:text-slate-400">
-                  No sessions yet. Send your first question to create one.
+                  {t("chat.noSessions")}
                 </p>
               ) : (
                 chatSessions.map((session) => (
-                  <button
+                  <article
                     key={session.chatSessionId}
-                    type="button"
-                    onClick={() => {
-                      setSelectedSessionId(session.chatSessionId);
-                      if (
-                        searchParams.get("workspaceId") !== selectedWorkspaceId ||
-                        searchParams.get("sessionId") !== session.chatSessionId
-                      ) {
-                        setSearchParams({
-                          workspaceId: selectedWorkspaceId,
-                          sessionId: session.chatSessionId,
-                        });
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => void handleSelectSession(session)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        void handleSelectSession(session);
                       }
                     }}
                     className={`w-full rounded-xl border p-md text-left transition ${
@@ -561,20 +759,85 @@ export function LegalChatPage() {
                     }`}
                   >
                     <div className="flex items-start justify-between gap-md">
-                      <div>
-                        <p className="font-semibold">{session.title}</p>
-                        <p className="text-xs text-on-surface-variant dark:text-slate-400">
-                          {session.chatSessionId}
-                        </p>
+                      <div className="min-w-0 flex-1">
+                        {renamingSessionId === session.chatSessionId ? (
+                          <div
+                            className="space-y-sm"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <input
+                              className="form-field"
+                              value={renameTitle}
+                              onChange={(event) => setRenameTitle(event.target.value)}
+                              maxLength={255}
+                              autoFocus
+                            />
+                            <div className="flex gap-xs">
+                              <Button
+                                size="sm"
+                                leftIcon={<Check className="h-4 w-4" />}
+                                onClick={() => void handleRenameSession(session.chatSessionId)}
+                                disabled={sessionActionBusyId === session.chatSessionId}
+                              >
+                                {t("actions.save")}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                leftIcon={<X className="h-4 w-4" />}
+                                onClick={() => {
+                                  setRenamingSessionId("");
+                                  setRenameTitle("");
+                                }}
+                              >
+                                {t("actions.cancel")}
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <p className="font-semibold">{session.title}</p>
+                            <p className="break-all text-xs text-on-surface-variant dark:text-slate-400">
+                              {session.chatSessionId}
+                            </p>
+                          </>
+                        )}
                       </div>
-                      <Badge tone={session.isDefault ? "gold" : "blue"}>
-                        {session.isDefault ? "Default" : "Session"}
-                      </Badge>
+                      <div
+                        className="flex shrink-0 items-center gap-xs"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <Badge tone={session.isDefault ? "gold" : "blue"}>
+                          {session.isDefault ? t("chat.defaultSession") : t("chat.sessionLabel")}
+                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Rename chat session"
+                          onClick={() => {
+                            setRenamingSessionId(session.chatSessionId);
+                            setRenameTitle(session.title);
+                            setSessionActionError("");
+                            setSessionActionMessage("");
+                          }}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Delete chat session"
+                          disabled={sessionActionBusyId === session.chatSessionId}
+                          onClick={() => void handleDeleteSession(session.chatSessionId)}
+                        >
+                          <Trash2 className="h-4 w-4 text-error" />
+                        </Button>
+                      </div>
                     </div>
                     <p className="mt-xs text-xs text-on-surface-variant dark:text-slate-400">
-                      Updated {formatTimestamp(session.updatedAt, language)}
+                      {t("chat.updated")} {formatTimestamp(session.updatedAt, language)}
                     </p>
-                  </button>
+                  </article>
                 ))
               )}
             </div>
@@ -584,13 +847,13 @@ export function LegalChatPage() {
         <section className="space-y-gutter">
           <Card
             className="flex min-h-[680px] flex-col p-0"
-            title={selectedWorkspace?.name ?? "Legal chat"}
+            title={selectedWorkspace?.name ?? t("chat.legalChat")}
             subtitle={
               selectedDocument
-                ? `Document: ${selectedDocument.originalFileName}`
+                ? `${t("chat.documentLabel")}: ${selectedDocument.originalFileName}`
                 : selectedSessionId
-                  ? `Session: ${selectedSessionId}`
-                  : "No session selected yet"
+                  ? `${t("chat.sessionIdLabel")}: ${selectedSessionId}`
+                  : t("chat.noSessionSelected")
             }
             actions={<Badge tone="gold">RAG</Badge>}
           >
@@ -598,13 +861,29 @@ export function LegalChatPage() {
                 {messages.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-outline-variant p-lg text-sm text-on-surface-variant dark:border-slate-700 dark:text-slate-400">
                     {selectedWorkspaceId
-                      ? "Ask a question to start the chat and create a session automatically."
-                      : "Pick a workspace first."}
+                      ? t("chat.askToStart")
+                      : t("chat.pickWorkspaceFirst")}
                   </div>
                 ) : (
-                  messages.map((message) => {
+                  messages.map((message, messageIndex) => {
                     const assistant = message.role === "assistant";
                     const isError = message.status === "error";
+                    const previousUserMessage = assistant
+                      ? [...messages]
+                          .slice(0, messageIndex)
+                          .reverse()
+                          .find((item) => item.role === "user")
+                      : undefined;
+                    const shouldShowTicketAction =
+                      assistant &&
+                      !isError &&
+                      Boolean(
+                        message.shouldSuggestTicket ||
+                          message.userActionHint ||
+                          message.suggestionType ||
+                          message.riskLevel ||
+                          typeof message.confidenceScore === "number",
+                      );
                     return (
                     <article
                       key={message.id}
@@ -624,7 +903,7 @@ export function LegalChatPage() {
                       >
                         {assistant && isError ? (
                           <div className="space-y-sm">
-                            <p className="font-medium text-error">Không thể hoàn tất phản hồi</p>
+                            <p className="font-medium text-error">{t("chat.responseFailed")}</p>
                             <p className="text-sm text-on-surface-variant dark:text-slate-400">
                               {message.errorMessage ?? message.content}
                             </p>
@@ -641,18 +920,76 @@ export function LegalChatPage() {
                                   void handleSend(payload);
                                 }}
                               >
-                                Thử lại
+                                {t("actions.tryAgain")}
                               </Button>
                             )}
                           </div>
                         ) : (
-                          <ChatMessageContent
-                            content={message.content}
-                            className={assistant ? "text-on-surface dark:text-slate-100" : "text-white"}
-                          />
+                          <>
+                            <ChatMessageContent
+                              content={message.content}
+                              className={assistant ? "text-on-surface dark:text-slate-100" : "text-white"}
+                            />
+                            {shouldShowTicketAction && (
+                              <div className="mt-md rounded-lg border border-legal-border bg-surface-container-low p-sm dark:border-slate-700 dark:bg-slate-800">
+                                <div className="flex flex-wrap gap-xs">
+                                  {message.riskLevel && (
+                                    <Badge tone={message.riskLevel.toUpperCase() === "HIGH" ? "red" : "amber"}>
+                                      {message.riskLevel}
+                                    </Badge>
+                                  )}
+                                  {typeof message.confidenceScore === "number" && (
+                                    <Badge tone="blue">
+                                      Confidence {Math.round(message.confidenceScore * 100)}%
+                                    </Badge>
+                                  )}
+                                  {message.suggestionType && (
+                                    <Badge tone="purple">{message.suggestionType}</Badge>
+                                  )}
+                                </div>
+                                {message.suggestionReason && (
+                                  <p className="mt-sm text-xs text-on-surface-variant dark:text-slate-400">
+                                    {message.suggestionReason}
+                                  </p>
+                                )}
+                                <div className="mt-sm flex flex-wrap items-center gap-sm">
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    leftIcon={<ClipboardCheck className="h-4 w-4" />}
+                                    onClick={() =>
+                                      void handleCreateTicket(
+                                        message,
+                                        previousUserMessage?.content ?? "",
+                                      )
+                                    }
+                                    disabled={creatingTicketMessageId === message.id}
+                                  >
+                                    {creatingTicketMessageId === message.id
+                                      ? t("chat.creatingTicket")
+                                      : t("chat.createTicket")}
+                                  </Button>
+                                  {ticketNotices[message.id] && (
+                                    <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                                      {ticketNotices[message.id]}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </>
                         )}
                         <div className="mt-sm flex items-center justify-between gap-sm text-[11px] opacity-70">
                           <span>{message.timestamp}</span>
+                          {!message.id.startsWith("local-") && (
+                            <button
+                              type="button"
+                              className={assistant ? "font-semibold text-primary hover:underline dark:text-inverse-primary" : "font-semibold text-white underline-offset-2 hover:underline"}
+                              onClick={() => void handleOpenMessageDetail(message.id)}
+                            >
+                              {t("actions.details")}
+                            </button>
+                          )}
                         </div>
                       </div>
                       {!assistant && (
@@ -674,7 +1011,7 @@ export function LegalChatPage() {
               }}
             >
               <label className="sr-only" htmlFor="legal-chat-input">
-                Ask legal AI
+                {t("chat.inputLabel")}
               </label>
               <div className="flex gap-sm">
                 <input
@@ -682,7 +1019,7 @@ export function LegalChatPage() {
                   className="form-field"
                   value={input}
                   onChange={(event) => setInput(event.target.value)}
-                  placeholder="Ask a question about the uploaded documents..."
+                  placeholder={t("chat.inputPlaceholder")}
                   disabled={!selectedWorkspaceId || sending}
                 />
                 <Button
@@ -698,6 +1035,46 @@ export function LegalChatPage() {
           </Card>
         </section>
       </div>
+
+      <Modal
+        open={messageDetailOpen}
+        title={t("chat.messageDetailTitle")}
+        onClose={() => setMessageDetailOpen(false)}
+        footer={
+          <Button variant="secondary" onClick={() => setMessageDetailOpen(false)}>
+            {t("actions.close")}
+          </Button>
+        }
+      >
+        {messageDetailLoading ? (
+          <p className="text-sm text-on-surface-variant dark:text-slate-400">{t("chat.loadingMessageMetadata")}</p>
+        ) : messageDetail ? (
+          <div className="space-y-md text-sm">
+            <dl className="grid gap-md sm:grid-cols-2">
+              <div><dt className="label-uppercase">Message ID</dt><dd className="mt-xs break-all font-semibold">{messageDetail.messageId}</dd></div>
+              <div><dt className="label-uppercase">Session ID</dt><dd className="mt-xs break-all">{messageDetail.chatSessionId}</dd></div>
+              <div><dt className="label-uppercase">Role</dt><dd className="mt-xs">{messageDetail.role}</dd></div>
+              <div><dt className="label-uppercase">Status</dt><dd className="mt-xs"><Badge tone="slate">{messageDetail.status}</Badge></dd></div>
+              <div><dt className="label-uppercase">Model</dt><dd className="mt-xs">{messageDetail.aiModel ?? '-'}</dd></div>
+              <div><dt className="label-uppercase">Request ID</dt><dd className="mt-xs break-all">{messageDetail.requestId ?? '-'}</dd></div>
+              <div><dt className="label-uppercase">Prompt tokens</dt><dd className="mt-xs">{messageDetail.promptTokens ?? '-'}</dd></div>
+              <div><dt className="label-uppercase">Completion tokens</dt><dd className="mt-xs">{messageDetail.completionTokens ?? '-'}</dd></div>
+              <div><dt className="label-uppercase">Total tokens</dt><dd className="mt-xs">{messageDetail.totalTokens ?? '-'}</dd></div>
+              <div><dt className="label-uppercase">Confidence</dt><dd className="mt-xs">{typeof messageDetail.confidenceScore === 'number' ? `${Math.round(messageDetail.confidenceScore * 100)}%` : '-'}</dd></div>
+              <div><dt className="label-uppercase">Risk level</dt><dd className="mt-xs">{messageDetail.riskLevel ?? '-'}</dd></div>
+              <div><dt className="label-uppercase">Legal domain</dt><dd className="mt-xs">{messageDetail.legalDomain ?? '-'}</dd></div>
+            </dl>
+            {messageDetail.suggestionReason && (
+              <div className="rounded-lg bg-surface-container-low p-md dark:bg-slate-800">
+                <p className="label-uppercase mb-xs">Suggestion reason</p>
+                {messageDetail.suggestionReason}
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm text-on-surface-variant dark:text-slate-400">{t("chat.noMessageDetail")}</p>
+        )}
+      </Modal>
     </div>
   );
 }

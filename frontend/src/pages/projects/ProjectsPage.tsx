@@ -14,7 +14,7 @@ import type { Workspace } from "../../types/workspace";
 const getAccessToken = () => localStorage.getItem("accessToken") ?? "";
 
 export function ProjectsPage() {
-  const { language } = useI18n();
+  const { t, language } = useI18n();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<"all" | "active">("all");
   const [view, setView] = useState<"grid" | "list">("grid");
@@ -34,7 +34,7 @@ export function ProjectsPage() {
         }
       } catch (err) {
         if (isMounted) {
-          setError(err instanceof Error ? err.message : "Không thể tải danh sách workspace");
+          setError(err instanceof Error ? err.message : t("workspace.loadError"));
         }
       } finally {
         if (isMounted) {
@@ -74,14 +74,14 @@ export function ProjectsPage() {
     },
     {
       header: "Description",
-      cell: (workspace) => workspace.description || "No description",
+      cell: (workspace) => workspace.description || t("workspace.noDescription"),
     },
     {
-      header: "Status",
+      header: t("table.status"),
       cell: (workspace) => <StatusBadge status={workspace.status} />,
     },
     {
-      header: "Created",
+      header: t("workspace.createdAt"),
       cell: (workspace) =>
         new Intl.DateTimeFormat(language === "vi" ? "vi-VN" : "en-US", {
           dateStyle: "medium",
@@ -93,11 +93,11 @@ export function ProjectsPage() {
   return (
     <div>
       <PageHeader
-        title="Workspaces"
-        subtitle="Create a workspace, upload documents, and chat on the same legal context."
+        title={t("workspace.title")}
+        subtitle={t("workspace.subtitle")}
         actions={
           <Link to="/upload">
-            <Button leftIcon={<Plus className="h-4 w-4" />}>New workspace</Button>
+            <Button leftIcon={<Plus className="h-4 w-4" />}>{t("upload.createWorkspace")}</Button>
           </Link>
         }
       />
@@ -107,7 +107,7 @@ export function ProjectsPage() {
           <SearchInput
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search workspace"
+            placeholder={t("workspace.searchPlaceholder")}
             containerClassName="lg:w-96"
           />
           <div className="flex flex-wrap items-center gap-sm">
@@ -122,14 +122,14 @@ export function ProjectsPage() {
                 type="button"
                 onClick={() => setStatus(item)}
               >
-                {item === "all" ? "All" : "Active"}
+                {item === "all" ? t("workspace.all") : t("workspace.active")}
               </button>
             ))}
             <Button
               variant="secondary"
               leftIcon={<SlidersHorizontal className="h-4 w-4" />}
             >
-              Filters
+              {t("workspace.filters")}
             </Button>
             <div className="flex rounded-lg border border-legal-border bg-white p-xs dark:border-slate-700 dark:bg-slate-900">
               <button
@@ -170,7 +170,7 @@ export function ProjectsPage() {
       {loading ? (
         <Card>
           <p className="text-sm text-on-surface-variant dark:text-slate-400">
-            Loading workspaces...
+            {t("workspace.loading")}
           </p>
         </Card>
       ) : view === "list" ? (
@@ -182,7 +182,7 @@ export function ProjectsPage() {
       ) : filteredWorkspaces.length === 0 ? (
         <Card>
           <p className="text-sm text-on-surface-variant dark:text-slate-400">
-            No workspace yet. Create one from the upload screen.
+            {t("workspace.empty")}
           </p>
         </Card>
       ) : (
@@ -198,13 +198,13 @@ export function ProjectsPage() {
                     {workspace.name}
                   </h2>
                   <p className="mt-xs text-sm text-on-surface-variant dark:text-slate-400">
-                    {workspace.description || "No description"}
+                    {workspace.description || t("workspace.noDescription")}
                   </p>
                 </div>
                 <StatusBadge status={workspace.status} />
               </div>
               <div className="mt-lg rounded-lg bg-surface-container-low p-md dark:bg-slate-800">
-                <p className="label-uppercase">Created at</p>
+                <p className="label-uppercase">{t("workspace.createdAt")}</p>
                 <p className="mt-xs text-sm">
                   {new Intl.DateTimeFormat(language === "vi" ? "vi-VN" : "en-US", {
                     dateStyle: "medium",
@@ -214,10 +214,10 @@ export function ProjectsPage() {
               </div>
               <div className="mt-lg flex flex-wrap gap-sm">
                 <Link to={`/projects/${workspace.workspaceId}`}>
-                  <Button variant="secondary">Open workspace</Button>
+                  <Button variant="secondary">{t("actions.openWorkspace")}</Button>
                 </Link>
                 <Link to={`/upload?workspaceId=${workspace.workspaceId}`}>
-                  <Button>Upload file</Button>
+                  <Button>{t("actions.uploadFile")}</Button>
                 </Link>
               </div>
             </Card>
@@ -229,16 +229,15 @@ export function ProjectsPage() {
         <div className="flex flex-col gap-md md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="text-title-lg font-semibold">
-              Jump into workspace analysis
+              {t("workspace.aiSummary")}
             </h2>
             <p className="mt-xs text-sm text-on-surface-variant dark:text-slate-300">
-              Use the workspace detail screen to inspect documents and open chat
-              on the same legal context.
+              {t("workspace.summaryWithDocuments")}
             </p>
           </div>
           <Link to="/upload">
             <Button variant="gold" leftIcon={<Search className="h-4 w-4" />}>
-              Start upload flow
+              {t("actions.uploadFile")}
             </Button>
           </Link>
         </div>
