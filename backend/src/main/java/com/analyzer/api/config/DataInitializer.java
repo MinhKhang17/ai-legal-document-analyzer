@@ -68,9 +68,12 @@ public class DataInitializer implements CommandLineRunner {
                 .orElseThrow(() -> new RuntimeException("ADMIN role not found in database"));
         Role customerRole = roleRepository.findByName(RoleName.CUSTOMER)
                 .orElseThrow(() -> new RuntimeException("CUSTOMER role not found in database"));
+        Role expertRole = roleRepository.findByName(RoleName.EXPERT)
+                .orElseThrow(() -> new RuntimeException("EXPERT role not found in database"));
 
         seedUser("admin", "admin", "admin@123", "pass@123", adminRole);
         seedUser("user", "user", "user@123", "pass@123", customerRole);
+        seedUser("expert", "expert", "expert@123", "pass@123", expertRole);
 
         // 4. Seed Subscription Plans
         logger.info("Checking for default Subscription Plans...");
