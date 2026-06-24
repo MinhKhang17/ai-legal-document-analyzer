@@ -1,28 +1,34 @@
 package com.analyzer.api.service;
 
-import com.analyzer.api.dto.legalticket.CreateLegalTicketRequest;
-import com.analyzer.api.dto.legalticket.LegalTicketResponse;
+import com.analyzer.api.dto.PageResponse;
+import com.analyzer.api.dto.legalticket.*;
+import com.analyzer.api.enums.LegalTicketStatus;
+import com.analyzer.api.enums.RiskLevel;
 
 import java.util.List;
 
 /**
- * Contract for customer-facing legal tickets.
- * Persistence is intentionally deferred until the repository/model is ready.
+ * Service interface for managing Legal Tickets.
  */
 public interface LegalTicketService {
 
-    /**
-     * Create a new lawyer ticket from AI metadata.
-     */
-    LegalTicketResponse createTicket(CreateLegalTicketRequest request);
+    LegalTicketResponse createTicket(Long customerId, CreateLegalTicketRequest request);
 
-    /**
-     * Load a ticket for the current user or admin.
-     */
-    LegalTicketResponse getTicketById(String ticketId);
+    LegalTicketResponse getTicketById(Long userId, String userRole, String ticketId);
 
-    /**
-     * List tickets for the admin console.
-     */
-    List<LegalTicketResponse> listAdminTickets();
+    PageResponse<LegalTicketResponse> getMyTickets(Long customerId, LegalTicketStatus status, int page, int size);
+
+    LegalTicketResponse cancelTicket(Long customerId, String ticketId, CancelLegalTicketRequest request);
+
+    LegalTicketResponse closeTicket(Long customerId, String ticketId, CloseLegalTicketRequest request);
+
+    LegalTicketResponse reopenTicket(Long customerId, String ticketId, ReopenLegalTicketRequest request);
+
+    LegalTicketResponse customerReply(Long customerId, String ticketId, CustomerTicketReplyRequest request);
+
+    PageResponse<LegalTicketResponse> listAdminTickets(LegalTicketStatus status, RiskLevel riskLevel, int page, int size);
+
+    LegalTicketResponse rejectTicket(Long adminId, String ticketId, RejectLegalTicketRequest request);
+
+    List<LegalTicketMessageResponse> getMessages(Long userId, String userRole, String ticketId);
 }

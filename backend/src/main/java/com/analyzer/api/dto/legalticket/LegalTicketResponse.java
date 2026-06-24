@@ -14,16 +14,12 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
-/**
- * Read model for lawyer tickets exposed to customers and admins.
- * Keep this response stable so the FE can render ticket status without DB knowledge.
- */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_NULL)
-@Schema(description = "Legal ticket response")
+@Schema(description = "Legal ticket response details")
 public class LegalTicketResponse {
 
     @JsonProperty("id")
@@ -35,8 +31,20 @@ public class LegalTicketResponse {
     @JsonProperty("workspace_id")
     private String workspaceId;
 
+    @JsonProperty("workspace_name")
+    private String workspaceName;
+
     @JsonProperty("document_id")
     private String documentId;
+
+    @JsonProperty("document_name")
+    private String documentName;
+
+    @JsonProperty("created_by_id")
+    private Long createdById;
+
+    @JsonProperty("created_by_name")
+    private String createdByName;
 
     @JsonProperty("question")
     private String question;
@@ -72,10 +80,64 @@ public class LegalTicketResponse {
     private LegalTicketStatus status;
 
     @JsonProperty("assigned_lawyer_id")
-    private String assignedLawyerId;
+    private Long assignedLawyerId;
 
     @JsonProperty("assigned_lawyer_name")
     private String assignedLawyerName;
+
+    @JsonProperty("issue_fingerprint")
+    private String issueFingerprint;
+
+    @JsonProperty("customer_note")
+    private String customerNote;
+
+    @JsonProperty("issue_title")
+    private String issueTitle;
+
+    @JsonProperty("issue_summary")
+    private String issueSummary;
+
+    @JsonProperty("problematic_clause")
+    private String problematicClause;
+
+    @JsonProperty("clause_reference")
+    private String clauseReference;
+
+    @JsonProperty("page_number")
+    private Integer pageNumber;
+
+    @JsonProperty("ai_evidence")
+    private String aiEvidence;
+
+    @JsonProperty("recommended_action")
+    private String recommendedAction;
+
+    @JsonProperty("expert_answer")
+    private String expertAnswer;
+
+    @JsonProperty("expert_internal_note")
+    private String expertInternalNote;
+
+    @JsonProperty("admin_note")
+    private String adminNote;
+
+    @JsonProperty("rejection_reason")
+    private String rejectionReason;
+
+    @JsonProperty("assigned_at")
+    private LocalDateTime assignedAt;
+
+    @JsonProperty("resolved_at")
+    private LocalDateTime resolvedAt;
+
+    @JsonProperty("closed_at")
+    private LocalDateTime closedAt;
+
+    @JsonProperty("cancelled_at")
+    private LocalDateTime cancelledAt;
+
+    @JsonProperty("reopened_at")
+    private LocalDateTime reopenedAt;
 
     @JsonProperty("created_at")
     private LocalDateTime createdAt;

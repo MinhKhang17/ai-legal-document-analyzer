@@ -14,7 +14,8 @@ import org.springframework.web.bind.annotation.*;
 
 /**
  * Thin controller for legal AI queries.
- * The endpoint exists so the FE can request the answer and ticket-suggestion metadata in one call.
+ * The endpoint exists so the FE can request the answer and ticket-suggestion
+ * metadata in one call.
  */
 @RestController
 @RequiredArgsConstructor
@@ -23,10 +24,11 @@ public class AiLegalController {
 
     private final AiLegalService aiLegalService;
 
-    @PostMapping("/api/ai/legal-query")
+    @PostMapping("/api/v1/ai/legal-query")
     @PreAuthorize("hasAnyRole('CUSTOMER', 'ADMIN')")
     @Operation(summary = "Run a legal AI query", description = "Returns an AI answer plus ticket-suggestion metadata.")
-    public ResponseEntity<ApiResponseDTO<AiLegalQueryResponse>> legalQuery(@Valid @RequestBody AiLegalQueryRequest request) {
+    public ResponseEntity<ApiResponseDTO<AiLegalQueryResponse>> legalQuery(
+            @Valid @RequestBody AiLegalQueryRequest request) {
         AiLegalQueryResponse response = aiLegalService.queryLegal(request);
         return ResponseEntity.ok(ApiResponseDTO.success("Legal query processed successfully", response));
     }

@@ -4,9 +4,15 @@ package com.analyzer.api.enums;
  * Lifecycle state for a legal help ticket.
  */
 public enum LegalTicketStatus {
+    DRAFT,
     PENDING_ADMIN_REVIEW,
+    REJECTED_BY_ADMIN,
     ASSIGNED_TO_LAWYER,
-    LAWYER_ANSWERED,
+    IN_REVIEW,
+    NEED_MORE_INFO,
+    CUSTOMER_RESPONDED,
+    RESOLVED,
     CLOSED,
-    REJECTED
+    CANCELLED,
+    REOPENED
 }
