@@ -1,5 +1,8 @@
 package com.analyzer.api.dto.chatmessage;
 
+import com.analyzer.api.enums.RiskLevel;
+import com.analyzer.api.enums.SuggestionType;
+import com.analyzer.api.enums.UserActionHint;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -19,6 +22,14 @@ public class ChatMessageResponse {
     private String status;
     private String requestId;
     private String aiModel;
+    private Double confidenceScore;
+    private Boolean shouldSuggestTicket;
+    private SuggestionType suggestionType;
+    private String suggestionReason;
+    private String missingInformation;
+    private RiskLevel riskLevel;
+    private String legalDomain;
+    private UserActionHint userActionHint;
     private Integer promptTokens;
     private Integer completionTokens;
     private Integer totalTokens;

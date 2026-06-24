@@ -115,7 +115,20 @@ class RagQueryResponse(BaseModel):
     requestId: str
     chatSessionId: str | None = None
     answer: str
+    confidenceScore: float | None = Field(default=None, description="AI confidence used by the UI to decide ticket escalation.")
+    shouldSuggestTicket: bool = Field(default=False, description="Whether the frontend should surface a ticket action.")
+    suggestionType: Literal["NONE", "ASK_MORE_INFO", "SUGGEST_LAWYER", "REQUIRE_LAWYER"] = Field(
+        default="NONE",
+        description="Type of legal follow-up the AI recommends.",
+    )
+    suggestionReason: str | None = Field(default=None, description="Short explanation for the follow-up suggestion.")
+    missingInformation: str | None = Field(default=None, description="What information the AI still needs from the user.")
     riskLevel: Literal["LOW", "MEDIUM", "HIGH", "NEED_EXPERT", "UNKNOWN"]
+    legalDomain: str | None = Field(default=None, description="Detected legal domain for UI grouping.")
+    userActionHint: Literal["CONTINUE_CHAT", "PROVIDE_MORE_INFO", "CREATE_TICKET"] = Field(
+        default="CONTINUE_CHAT",
+        description="Small UX hint that tells the app how to guide the user next.",
+    )
     citations: list[RagCitation] = Field(default_factory=list)
     retrievedUserChunks: int
     retrievedKnowledgeChunks: int

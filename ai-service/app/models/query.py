@@ -29,7 +29,21 @@ class RAGQueryResponse(BaseModel):
     request_id: str
     success: bool
     answer: str | None = None
+    confidence_score: float | None = Field(default=None, description="AI confidence used to decide how much the UI should trust the answer.")
+    should_suggest_ticket: bool = Field(default=False, description="Signals that the frontend should show a lawyer-ticket action.")
+    suggestion_type: Literal["NONE", "ASK_MORE_INFO", "SUGGEST_LAWYER", "REQUIRE_LAWYER"] = Field(
+        default="NONE",
+        description="What kind of help the AI recommends when the answer is uncertain.",
+    )
+    suggestion_reason: str | None = Field(default=None, description="Short reason why the AI recommends additional review.")
+    missing_information: str | None = Field(default=None, description="Short summary of missing facts the user should provide.")
     checklist_results: list[ChecklistResult] = Field(default_factory=list)
+    risk_level: Literal["LOW", "MEDIUM", "HIGH"] = Field(default="LOW", description="High-level risk used by the UI to color the answer.")
+    legal_domain: str | None = Field(default=None, description="Detected legal domain for grouping and UI labeling.")
+    user_action_hint: Literal["CONTINUE_CHAT", "PROVIDE_MORE_INFO", "CREATE_TICKET"] = Field(
+        default="CONTINUE_CHAT",
+        description="Simple frontend hint for the next user action.",
+    )
     knowledge_chunks: list[dict] = Field(default_factory=list)
     total_checklist_items: int = 0
     total_user_chunks: int = 0
