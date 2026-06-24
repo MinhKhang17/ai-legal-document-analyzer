@@ -3,6 +3,7 @@ package com.analyzer.api.controller;
 import com.analyzer.api.dto.ApiResponseDTO;
 import com.analyzer.api.dto.paymenttransaction.PaymentTransactionResponseDTO;
 import com.analyzer.api.dto.paymenttransaction.PaymentUrlResponseDTO;
+import com.analyzer.api.dto.paymenttransaction.VnPayIpnResponseDTO;
 import com.analyzer.api.security.UserDetailsImpl;
 import com.analyzer.api.service.PaymentTransactionService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -21,7 +22,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -93,14 +93,9 @@ public class PaymentTransactionController {
             summary = "Xử lý IPN từ VNPAY",
             description = "Xác thực thông báo IPN từ VNPAY và cập nhật trạng thái giao dịch."
     )
-    public ResponseEntity<Map<String, String>> handleVnPayIpn(@RequestParam Map<String, String> params) {
+    public ResponseEntity<VnPayIpnResponseDTO> handleVnPayIpn(@RequestParam Map<String, String> params) {
         paymentTransactionService.handleVnPayCallback(params);
-
-        Map<String, String> response = new HashMap<>();
-        response.put("RspCode", "00");
-        response.put("Message", "Confirm Success");
-
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(new VnPayIpnResponseDTO("00", "Confirm Success"));
     }
 
     @PutMapping("/{id}/success")
