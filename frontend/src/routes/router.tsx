@@ -1,38 +1,44 @@
-import { Navigate, createBrowserRouter } from 'react-router-dom';
-import { AppShell } from '../components/common/AppShell';
-import { AdminRoute, AuthenticatedRoute, CustomerRoute, PublicRoute } from '../components/auth/AuthGuards';
-import { AuthLayout } from '../layouts/AuthLayout';
-import { LoginPage } from '../pages/auth/LoginPage';
-import { RegisterPage } from '../pages/auth/RegisterPage';
-import { DashboardPage } from '../pages/dashboard/DashboardPage';
-import { ProjectsPage } from '../pages/projects/ProjectsPage';
-import { ProjectDetailPage } from '../pages/projects/ProjectDetailPage';
-import { DocumentsPage } from '../pages/documents/DocumentsPage';
-import { DocumentDetailPage } from '../pages/documents/DocumentDetailPage';
-import { UploadPage } from '../pages/upload/UploadPage';
-import { EditorPage } from '../pages/editor/EditorPage';
-import { RiskReviewPage } from '../pages/editor/RiskReviewPage';
-import { VersionComparisonPage } from '../pages/editor/VersionComparisonPage';
-import { ComparisonHistoryPage } from '../pages/editor/ComparisonHistoryPage';
-import { LegalChatPage } from '../pages/chat/LegalChatPage';
-import { ChatHistoryPage } from '../pages/chat/ChatHistoryPage';
-import { ReportsPage } from '../pages/reports/ReportsPage';
-import { ReportDetailPage } from '../pages/reports/ReportDetailPage';
-import { KnowledgeBasePage } from '../pages/knowledge-base/KnowledgeBasePage';
-import { KnowledgeBaseDetailPage } from '../pages/knowledge-base/KnowledgeBaseDetailPage';
-import { BillingPage } from '../pages/billing/BillingPage';
-import { PaymentResultPage } from '../pages/billing/PaymentResultPage';
-import { SubscribePlanPage } from '../pages/billing/SubscribePlanPage';
-import { AdminConsolePage } from '../pages/admin/AdminConsolePage';
-import { AuditLogsPage } from '../pages/admin/AuditLogsPage';
-import { SystemHealthPage } from '../pages/admin/SystemHealthPage';
-import { JobsPage } from '../pages/jobs/JobsPage';
-import { TemplatesPage } from '../pages/templates/TemplatesPage';
-import { SettingsPage } from '../pages/settings/SettingsPage';
+import { Navigate, createBrowserRouter } from "react-router-dom";
+import { AppShell } from "../components/common/AppShell";
+import {
+  AdminRoute,
+  AuthenticatedRoute,
+  CustomerRoute,
+  PublicRoute,
+} from "../components/auth/AuthGuards";
+import { AuthLayout } from "../layouts/AuthLayout";
+import { LoginPage } from "../pages/auth/LoginPage";
+import { RegisterPage } from "../pages/auth/RegisterPage";
+import { DashboardPage } from "../pages/dashboard/DashboardPage";
+import { ProjectsPage } from "../pages/projects/ProjectsPage";
+import { ProjectDetailPage } from "../pages/projects/ProjectDetailPage";
+import { DocumentsPage } from "../pages/documents/DocumentsPage";
+import { DocumentDetailPage } from "../pages/documents/DocumentDetailPage";
+import { UploadPage } from "../pages/upload/UploadPage";
+import { EditorPage } from "../pages/editor/EditorPage";
+import { RiskReviewPage } from "../pages/editor/RiskReviewPage";
+import { VersionComparisonPage } from "../pages/editor/VersionComparisonPage";
+import { ComparisonHistoryPage } from "../pages/editor/ComparisonHistoryPage";
+import { LegalChatPage } from "../pages/chat/LegalChatPage";
+import { ChatHistoryPage } from "../pages/chat/ChatHistoryPage";
+import { ReportsPage } from "../pages/reports/ReportsPage";
+import { ReportDetailPage } from "../pages/reports/ReportDetailPage";
+import { KnowledgeBasePage } from "../pages/knowledge-base/KnowledgeBasePage";
+import { KnowledgeBaseDetailPage } from "../pages/knowledge-base/KnowledgeBaseDetailPage";
+import { BillingPage } from "../pages/billing/BillingPage";
+import { PaymentResultPage } from "../pages/billing/PaymentResultPage";
+import { SubscribePlanPage } from "../pages/billing/SubscribePlanPage";
+import { AdminConsolePage } from "../pages/admin/AdminConsolePage";
+import { AuditLogsPage } from "../pages/admin/AuditLogsPage";
+import { SystemHealthPage } from "../pages/admin/SystemHealthPage";
+import { JobsPage } from "../pages/jobs/JobsPage";
+import { TemplatesPage } from "../pages/templates/TemplatesPage";
+import { SettingsPage } from "../pages/settings/SettingsPage";
+import { PaymentResultRedirect } from "../pages/billing/PaymentResultRedirect";
 
 export const router = createBrowserRouter([
   {
-    path: '/',
+    path: "/",
     element: <Navigate to="/login" replace />,
   },
   {
@@ -42,8 +48,8 @@ export const router = createBrowserRouter([
       </PublicRoute>
     ),
     children: [
-      { path: '/login', element: <LoginPage /> },
-      { path: '/register', element: <RegisterPage /> },
+      { path: "/login", element: <LoginPage /> },
+      { path: "/register", element: <RegisterPage /> },
     ],
   },
   {
@@ -54,7 +60,7 @@ export const router = createBrowserRouter([
     ),
     children: [
       {
-        path: '/dashboard',
+        path: "/dashboard",
         element: (
           <CustomerRoute>
             <DashboardPage />
@@ -62,7 +68,7 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: '/projects',
+        path: "/projects",
         element: (
           <CustomerRoute>
             <ProjectsPage />
@@ -70,7 +76,7 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: '/projects/:id',
+        path: "/projects/:id",
         element: (
           <CustomerRoute>
             <ProjectDetailPage />
@@ -78,7 +84,7 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: '/documents',
+        path: "/documents",
         element: (
           <CustomerRoute>
             <DocumentsPage />
@@ -86,7 +92,7 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: '/documents/:id',
+        path: "/documents/:id",
         element: (
           <CustomerRoute>
             <DocumentDetailPage />
@@ -94,7 +100,7 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: '/upload',
+        path: "/upload",
         element: (
           <CustomerRoute>
             <UploadPage />
@@ -102,7 +108,7 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: '/editor',
+        path: "/editor",
         element: (
           <CustomerRoute>
             <EditorPage />
@@ -110,18 +116,27 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: '/editor/risk-review',
+        path: "/editor/risk-review",
         element: (
           <AdminRoute>
             <RiskReviewPage />
           </AdminRoute>
         ),
       },
-      { path: '/editor/version-comparison', element: <VersionComparisonPage /> },
-      { path: '/editor/comparison-history', element: <ComparisonHistoryPage /> },
-      { path: '/comparison-history', element: <Navigate to="/editor/comparison-history" replace /> },
       {
-        path: '/chat',
+        path: "/editor/version-comparison",
+        element: <VersionComparisonPage />,
+      },
+      {
+        path: "/editor/comparison-history",
+        element: <ComparisonHistoryPage />,
+      },
+      {
+        path: "/comparison-history",
+        element: <Navigate to="/editor/comparison-history" replace />,
+      },
+      {
+        path: "/chat",
         element: (
           <CustomerRoute>
             <LegalChatPage />
@@ -129,17 +144,17 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: '/chat/history',
+        path: "/chat/history",
         element: (
           <CustomerRoute>
             <ChatHistoryPage />
           </CustomerRoute>
         ),
       },
-      { path: '/reports', element: <ReportsPage /> },
-      { path: '/reports/:id', element: <ReportDetailPage /> },
+      { path: "/reports", element: <ReportsPage /> },
+      { path: "/reports/:id", element: <ReportDetailPage /> },
       {
-        path: '/knowledge-base',
+        path: "/knowledge-base",
         element: (
           <AdminRoute>
             <KnowledgeBasePage />
@@ -147,7 +162,7 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: '/knowledge-base/:id',
+        path: "/knowledge-base/:id",
         element: (
           <AdminRoute>
             <KnowledgeBaseDetailPage />
@@ -155,7 +170,7 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: '/billing',
+        path: "/billing",
         element: (
           <CustomerRoute>
             <BillingPage />
@@ -163,7 +178,7 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: '/billing/subscribe',
+        path: "/billing/subscribe",
         element: (
           <CustomerRoute>
             <SubscribePlanPage />
@@ -171,7 +186,7 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: '/billing/payment-result',
+        path: "/billing/payment-result",
         element: (
           <CustomerRoute>
             <PaymentResultPage />
@@ -179,17 +194,25 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: '/jobs',
+        path: "/payment-result",
+        element: <PaymentResultRedirect />,
+      },
+      {
+        path: "*",
+        element: <Navigate to="/dashboard" replace />,
+      },
+      {
+        path: "/jobs",
         element: (
           <AdminRoute>
             <JobsPage />
           </AdminRoute>
         ),
       },
-      { path: '/templates', element: <TemplatesPage /> },
-      { path: '/settings', element: <SettingsPage /> },
+      { path: "/templates", element: <TemplatesPage /> },
+      { path: "/settings", element: <SettingsPage /> },
       {
-        path: '/admin',
+        path: "/admin",
         element: (
           <AdminRoute>
             <AdminConsolePage />
@@ -197,7 +220,7 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: '/admin/audit-logs',
+        path: "/admin/audit-logs",
         element: (
           <AdminRoute>
             <AuditLogsPage />
@@ -205,7 +228,7 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: '/admin/system-health',
+        path: "/admin/system-health",
         element: (
           <AdminRoute>
             <SystemHealthPage />
@@ -215,7 +238,7 @@ export const router = createBrowserRouter([
     ],
   },
   {
-    path: '*',
+    path: "*",
     element: <Navigate to="/dashboard" replace />,
   },
 ]);

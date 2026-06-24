@@ -483,11 +483,7 @@ const en: TranslationDictionary = {
   "billing.latestTransactionId": "Transaction ID",
   "billing.latestTransactionCode": "Transaction code",
   "billing.paymentMethod": "Payment method",
-  "billing.paymentMethod.CASH": "Cash",
-  "billing.paymentMethod.BANK_TRANSFER": "Bank transfer",
-  "billing.paymentMethod.MOMO": "MoMo",
   "billing.paymentMethod.VNPAY": "VNPAY",
-  "billing.paymentMethod.CREDIT_CARD": "Credit card",
   "billing.errors.unauthorized":
     "Your session has expired. Please sign in again.",
   "billing.errors.loadCurrentPlan": "Unable to load the current service plan.",
@@ -1467,11 +1463,7 @@ const vi: TranslationDictionary = {
   "billing.latestTransactionId": "ID giao dịch",
   "billing.latestTransactionCode": "Mã giao dịch",
   "billing.paymentMethod": "Phương thức thanh toán",
-  "billing.paymentMethod.CASH": "Tiền mặt",
-  "billing.paymentMethod.BANK_TRANSFER": "Chuyển khoản ngân hàng",
-  "billing.paymentMethod.MOMO": "MoMo",
   "billing.paymentMethod.VNPAY": "VNPAY",
-  "billing.paymentMethod.CREDIT_CARD": "Thẻ tín dụng",
   "billing.errors.unauthorized":
     "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
   "billing.errors.loadCurrentPlan": "Không thể tải gói dịch vụ hiện tại.",
