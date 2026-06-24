@@ -6,6 +6,7 @@ import { Card } from '../common/Card';
 import type { ChatMessage } from '../../types/chat';
 import { cn } from '../../utils/cn';
 import { useI18n } from '../../hooks/useI18n';
+import { ChatMessageContent } from '../chat/ChatMessageContent';
 
 interface LegalChatPanelProps {
   initialMessages: ChatMessage[];
@@ -83,7 +84,11 @@ export function LegalChatPanel({ initialMessages, compact = false }: LegalChatPa
                     : 'border-primary bg-primary text-white',
                 )}
               >
-                <p>{message.content}</p>
+                {assistant ? (
+                  <ChatMessageContent content={message.content} className="text-on-surface dark:text-slate-100" />
+                ) : (
+                  <p className="whitespace-pre-wrap">{message.content}</p>
+                )}
                 {assistant && message.citations && (
                   <div className="mt-md flex flex-wrap gap-xs">
                     {message.citations.map((citation) => (

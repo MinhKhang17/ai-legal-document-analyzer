@@ -84,13 +84,21 @@ class DocumentProcessResult(BaseModel):
 
 
 class RagQueryRequest(BaseModel):
-    requestId: str
-    userId: str
-    workspaceId: str
-    chatSessionId: str | None = None
+    requestId: str = Field(alias="request_id")
+    userId: str = Field(alias="user_id")
+    workspaceId: str = Field(alias="workspace_id")
+    documentId: str | None = Field(default=None, alias="document_id")
+    chatSessionId: str | None = Field(default=None, alias="chat_session_id")
+    chatHistory: str | None = Field(default=None, alias="chat_history")
     question: str = Field(..., min_length=1)
-    topKUserChunks: int = Field(default=5, ge=1, le=20)
-    topKKnowledgeChunks: int = Field(default=5, ge=1, le=20)
+    topKUserChunks: int = Field(default=5, ge=1, le=20, alias="top_k_user_chunks")
+    topKKnowledgeChunks: int = Field(default=5, ge=1, le=20, alias="top_k_knowledge_chunks")
+    topKChecklist: int = Field(default=10, ge=1, le=50, alias="top_k_checklist")
+    topKUserChunksPerChecklist: int = Field(default=3, ge=1, le=10, alias="top_k_user_chunks_per_checklist")
+    
+    model_config = {
+        "populate_by_name": True
+    }
 
 
 class RagCitation(BaseModel):

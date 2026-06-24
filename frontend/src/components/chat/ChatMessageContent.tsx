@@ -41,8 +41,93 @@ interface ChatMessageContentProps {
   className?: string;
 }
 
+export function sanitizeAndExtractContent(text: string): string {
+  if (!text) return "";
+
+  let cleaned = text.trim();
+
+  // 1. Clean markdown fences:
+  // ```json or ``` at the start
+  if (cleaned.startsWith("```")) {
+    cleaned = cleaned.replace(/^```[a-zA-Z0-9]*\s*/, "");
+    // ``` at the end
+    if (cleaned.endsWith("```")) {
+      cleaned = cleaned.slice(0, -3).trim();
+    }
+  }
+
+  // 2. Try to parse as JSON if it looks like JSON
+  if (
+    (cleaned.startsWith("{") && cleaned.endsWith("}")) ||
+    (cleaned.startsWith("[") && cleaned.endsWith("]"))
+  ) {
+    try {
+      const parsed = JSON.parse(cleaned);
+      if (parsed && typeof parsed === "object") {
+        const candidate = parsed.answer || parsed.response || parsed.content || parsed.message;
+        if (candidate && typeof candidate === "string") {
+          return sanitizeAndExtractContent(candidate);
+        }
+        // If it's a valid JSON dict but has no specific string field, find the first string value
+        for (const value of Object.values(parsed)) {
+          if (typeof value === "string" && value.trim()) {
+            return sanitizeAndExtractContent(value);
+          }
+        }
+      }
+    } catch {
+      // If parsing fails, fall back to regex extraction for unclosed/malformed JSON
+    }
+  }
+
+  // If it's not valid JSON, but has something like "answer": "...", try extracting with regex
+  if (cleaned.includes('"answer"') || cleaned.includes('"response"') || cleaned.includes('"content"')) {
+    const regex = /"(?:answer|response|content)"\s*:\s*"((?:[^"\\]|\\.)*)"/;
+    const match = regex.exec(cleaned);
+    if (match) {
+      try {
+        const parsedStr = JSON.parse(`"${match[1]}"`);
+        return sanitizeAndExtractContent(parsedStr);
+      } catch {
+        return sanitizeAndExtractContent(match[1]);
+      }
+    }
+
+    // Try unclosed key regex: `"answer": "..."` but unclosed at the end
+    const unclosedRegex = /"(?:answer|response|content)"\s*:\s*"\s*([\s\S]*)/;
+    const unclosedMatch = unclosedRegex.exec(cleaned);
+    if (unclosedMatch) {
+      let val = unclosedMatch[1].trim();
+      val = val.replace(/"\s*,\s*"[^"]*"\s*:\s*[\s\S]*$/, ""); // remove subsequent fields
+      val = val.replace(/"\s*\}\s*$/, "");
+      val = val.replace(/"\s*$/, "");
+      try {
+        const parsedStr = JSON.parse(`"${val}"`);
+        return sanitizeAndExtractContent(parsedStr);
+      } catch {
+        return sanitizeAndExtractContent(val);
+      }
+    }
+  }
+
+  // Double quotes strip if surrounding
+  if (
+    cleaned.length >= 2 &&
+    ((cleaned.startsWith('"') && cleaned.endsWith('"')) ||
+      (cleaned.startsWith("'") && cleaned.endsWith("'")))
+  ) {
+    cleaned = cleaned.slice(1, -1).trim();
+  }
+
+  // Remove final trailing/leading code blocks or ticks if they surround the content
+  cleaned = cleaned.replace(/^```[a-zA-Z0-9]*\s*/, "").replace(/```$/, "");
+
+  return cleaned.trim();
+}
+
 export function ChatMessageContent({ content, className }: ChatMessageContentProps) {
-  const lines = content.replace(/\r\n/g, "\n").split("\n");
+  const sanitizedContent = sanitizeAndExtractContent(content);
+  const lines = sanitizedContent.replace(/\r\n/g, "\n").split("\n");
   const blocks: ReactNode[] = [];
 
   let bulletItems: string[] = [];

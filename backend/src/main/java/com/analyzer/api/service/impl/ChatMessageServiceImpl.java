@@ -298,6 +298,17 @@ public class ChatMessageServiceImpl implements ChatMessageService {
             chatSession.setTitle(title);
         }
 
+        // Build chat history string
+        List<ChatMessage> historyMessages = chatMessageRepository.findByChatSessionIdAndStatusOrderByCreatedAtAsc(
+                chatSession.getId(),
+                ChatMessageStatus.COMPLETED
+        );
+        StringBuilder historyBuilder = new StringBuilder();
+        for (ChatMessage msg : historyMessages) {
+            historyBuilder.append(msg.getRole().name()).append(": ").append(msg.getContent()).append("\n\n");
+        }
+        String chatHistoryStr = historyBuilder.toString().trim();
+
         RagQueryResponse aiResponse;
         try {
             RagQueryRequest aiRequest = RagQueryRequest.builder()
@@ -306,6 +317,7 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                     .workspaceId(workspace.getId())
                     .documentId(selectedDocument != null ? selectedDocument.getId() : null)
                     .question(question)
+                    .chatHistory(chatHistoryStr.isEmpty() ? null : chatHistoryStr)
                     .topKChecklist(10)
                     .topKUserChunksPerChecklist(3)
                     .topKKnowledgeChunks(5)

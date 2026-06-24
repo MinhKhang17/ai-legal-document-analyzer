@@ -1,0 +1,7 @@
+Đây là văn bản pháp luật test.
+
+Điều 1: Quy định chung
+Văn bản này dùng để test hệ thống upload knowledge base.
+
+Điều 2: Phạm vi áp dụng
+Áp dụng cho mục đích kiểm tra kỹ thuật.

@@ -5,6 +5,12 @@ import type {
   Workspace,
 } from "../types/workspace";
 
+interface ApiResponse<T> {
+  code: number;
+  message: string;
+  data: T;
+}
+
 type WorkspaceResponse = Omit<Workspace, "status"> & {
   status: string;
 };
@@ -33,7 +39,8 @@ export async function getWorkspaces(accessToken: string): Promise<Workspace[]> {
     throw new Error("Không thể tải danh sách workspace");
   }
 
-  const data: WorkspaceResponse[] = await response.json();
+  const json: ApiResponse<WorkspaceResponse[]> = await response.json();
+  const data = json.data;
 
   return data.map((workspace) => normalizeStatus(workspace) as Workspace);
 }
@@ -55,7 +62,8 @@ export async function getWorkspaceDetail(
     throw new Error("Không thể tải workspace");
   }
 
-  const data: WorkspaceResponse = await response.json();
+  const json: ApiResponse<WorkspaceResponse> = await response.json();
+  const data = json.data;
 
   return normalizeStatus(data) as Workspace;
 }
@@ -78,7 +86,8 @@ export async function createWorkspace(
     throw new Error("Tạo workspace thất bại");
   }
 
-  const data: WorkspaceResponse = await response.json();
+  const json: ApiResponse<WorkspaceResponse> = await response.json();
+  const data = json.data;
 
   return normalizeStatus(data) as Workspace;
 }
@@ -105,7 +114,8 @@ export async function uploadDocument(
     throw new Error("Upload tài liệu thất bại");
   }
 
-  const data: DocumentResponse = await response.json();
+  const json: ApiResponse<DocumentResponse> = await response.json();
+  const data = json.data;
 
   return normalizeStatus(data) as Document;
 }
@@ -127,7 +137,8 @@ export async function getWorkspaceDocuments(
     throw new Error("Không thể tải danh sách tài liệu");
   }
 
-  const data: DocumentResponse[] = await response.json();
+  const json: ApiResponse<DocumentResponse[]> = await response.json();
+  const data = json.data;
 
   return data.map((document) => normalizeStatus(document) as Document);
 }

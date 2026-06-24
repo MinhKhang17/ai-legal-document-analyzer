@@ -26,10 +26,28 @@ class RagQueryService:
         user_hits, legal_search_query, knowledge_hits = self._retrieve(request)
 
         system_prompt = build_system_prompt()
-        user_prompt = build_user_prompt(request.question, user_hits, knowledge_hits)
+        user_prompt = build_user_prompt(request.question, user_hits, knowledge_hits, chat_history=request.chatHistory)
         llm_result = self.llm_client.generate(system_prompt=system_prompt, user_prompt=user_prompt)
 
-        answer = llm_result.answer or self._build_fallback_answer(user_hits, knowledge_hits)
+        raw_answer = llm_result.answer or self._build_fallback_answer(user_hits, knowledge_hits)
+        from app.services.llm_client import sanitize_response
+        answer = sanitize_response(raw_answer)
+
+        # Logging all details requested
+        logger.info("=== RAG QUERY SERVICE LOGGING ===")
+        logger.info(f"User Question: {request.question}")
+        logger.info(f"Retrieved User Chunks (Total: {len(user_hits)}):")
+        for idx, hit in enumerate(user_hits):
+            logger.info(f"  User Chunk {idx + 1}: Doc={hit.fileName}, TextSnippet='{hit.chunkText[:150]}...'")
+        logger.info(f"Retrieved Knowledge Chunks (Total: {len(knowledge_hits)}):")
+        for idx, hit in enumerate(knowledge_hits):
+            logger.info(f"  Knowledge Chunk {idx + 1}: LawCode={hit.lawCode}, TextSnippet='{hit.chunkText[:150]}...'")
+        logger.info(f"Final Prompt (System):\n{system_prompt}")
+        logger.info(f"Final Prompt (User):\n{user_prompt}")
+        logger.info(f"Raw Gemini Response:\n{llm_result.raw_response}")
+        logger.info(f"Sanitized Response:\n{answer}")
+        logger.info("=================================")
+
         risk_level = llm_result.risk_level if llm_result.risk_level else "UNKNOWN"
         if risk_level not in {"LOW", "MEDIUM", "HIGH", "NEED_EXPERT", "UNKNOWN"}:
             risk_level = "UNKNOWN"
@@ -75,15 +93,8 @@ class RagQueryService:
 
     def _build_fallback_answer(self, user_hits: list[RagChunkHit], knowledge_hits: list[RagChunkHit]) -> str:
         if not user_hits and not knowledge_hits:
-            return "Không đủ dữ liệu trong tài liệu và Knowledge Base được cung cấp."
-
-        parts: list[str] = []
-        if user_hits:
-            parts.append(f"Dựa trên tài liệu người dùng, có {len(user_hits)} đoạn liên quan.")
-        if knowledge_hits:
-            parts.append(f"Knowledge Base cung cấp {len(knowledge_hits)} đoạn pháp lý liên quan.")
-        parts.append("Cần đối chiếu thêm để xác định mức độ rủi ro chính xác.")
-        return " ".join(parts)
+            return "Không tìm thấy thông tin liên quan trong tài liệu và cơ sở tri thức."
+        return "Hệ thống không thể kết nối tới mô hình AI để tự động phân tích điều khoản này. Vui lòng cấu hình API Key hợp lệ."
 
     def _to_citation(self, hit: RagChunkHit) -> RagCitation:
         return RagCitation(

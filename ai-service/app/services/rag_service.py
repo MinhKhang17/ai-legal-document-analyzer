@@ -6,28 +6,41 @@ from app.database.neo4j_client import neo4j_client
 from app.services.embedding_service import embedding_service
 from app.services.gemini_service import gemini_service
 from app.services.retrieval_service import RetrievalService, RagChunkHit
-from app.models.query import RAGQueryRequest, RAGQueryResponse, ChecklistResult
+from app.schemas import RagQueryRequest, RagQueryResponse, RagCitation
 
 logger = logging.getLogger(__name__)
 
 
-class RAGService:
+class RagService:
     """Service for RAG query processing."""
     
     def __init__(self):
         """Initialize RAG service."""
         self.retrieval_service = RetrievalService()
 
-    def process_query(self, request: RAGQueryRequest) -> RAGQueryResponse:
+    def process_query(self, request: RagQueryRequest) -> RagQueryResponse:
         """Process a direct query against user documents first, then knowledge base."""
         start_time = time.time()
         try:
             user_hits, legal_search_query, knowledge_hits = self._retrieve_query_context(request)
             if not user_hits and not knowledge_hits:
-                return RAGQueryResponse(
-                    request_id=request.request_id,
+                query_result = gemini_service.generate_legal_query_result(
+                    question=request.question,
+                    user_chunks=[],
+                    knowledge_chunks=[],
+                )
+                return RagQueryResponse(
+                    request_id=request.requestId,
                     success=True,
-                    answer="Không đủ thông tin để kết luận.",
+                    answer=query_result.answer,
+                    confidence_score=query_result.confidence_score,
+                    should_suggest_ticket=query_result.should_suggest_ticket,
+                    suggestion_type=query_result.suggestion_type,
+                    suggestion_reason=query_result.suggestion_reason,
+                    missing_information=query_result.missing_information,
+                    risk_level=query_result.risk_level,
+                    legal_domain=query_result.legal_domain,
+                    user_action_hint=query_result.user_action_hint,
                     checklist_results=[],
                     knowledge_chunks=[],
                     total_checklist_items=0,
@@ -42,8 +55,8 @@ class RAGService:
                 knowledge_chunks=[self._hit_to_context_dict(hit) for hit in knowledge_hits],
             )
             processing_time = (time.time() - start_time) * 1000
-            return RAGQueryResponse(
-                request_id=request.request_id,
+            return RagQueryResponse(
+                request_id=request.requestId,
                 success=True,
                 answer=answer,
                 checklist_results=[],
@@ -55,8 +68,8 @@ class RAGService:
             )
         except Exception as e:
             logger.error(f"Failed to process query: {e}", exc_info=True)
-            return RAGQueryResponse(
-                request_id=request.request_id,
+            return RagQueryResponse(
+                request_id=request.requestId,
                 success=False,
                 answer="Không đủ thông tin để kết luận.",
                 checklist_results=[],
@@ -68,7 +81,7 @@ class RAGService:
                 error_message=f"Lỗi xử lý: {str(e)}",
             )
 
-    def process_query_stream(self, request: RAGQueryRequest):
+    def process_query_stream(self, request: RagQueryRequest):
         """Process a direct query and stream the response as SSE text."""
         start_time = time.time()
         try:
@@ -76,7 +89,7 @@ class RAGService:
             yield self._encode_sse(
                 "meta",
                 {
-                    "request_id": request.request_id,
+                    "request_id": request.requestId,
                     "total_user_chunks": len(user_hits),
                     "total_knowledge_chunks": len(knowledge_hits),
                     "legal_search_query": legal_search_query,
@@ -111,18 +124,18 @@ class RAGService:
             logger.error("Failed to stream query: %s", exc, exc_info=True)
             yield self._encode_sse("error", {"message": f"Lỗi xử lý: {str(exc)}"})
 
-    def _retrieve_query_context(self, request: RAGQueryRequest) -> tuple[list[RagChunkHit], str, list[RagChunkHit]]:
+    def _retrieve_query_context(self, request: RagQueryRequest) -> tuple[list[RagChunkHit], str, list[RagChunkHit]]:
         user_hits = self.retrieval_service.search_user_chunks(
             request.question,
-            user_id=request.user_id,
-            workspace_id=request.workspace_id,
-            top_k=request.top_k_user_chunks_per_checklist,
-            document_id=request.document_id,
+            user_id=request.userId,
+            workspace_id=request.workspaceId,
+            top_k=request.topKUserChunksPerChecklist,
+            document_id=request.documentId,
         )
         legal_search_query = self.retrieval_service.build_legal_search_query(request.question, user_hits)
         knowledge_hits = self.retrieval_service.search_knowledge_chunks(
             legal_search_query,
-            top_k=request.top_k_knowledge_chunks,
+            top_k=request.topKKnowledgeChunks,
             query_text=request.question,
         )
         return user_hits, legal_search_query, knowledge_hits
@@ -278,7 +291,7 @@ class RAGService:
         
         return has_global_keyword or is_short_general
     
-    def process_global_review_query(self, request: RAGQueryRequest) -> RAGQueryResponse:
+    def process_global_review_query(self, request: RagQueryRequest) -> RagQueryResponse:
         """Process a global review query using checklist-based retrieval."""
         start_time = time.time()
         
@@ -287,13 +300,13 @@ class RAGService:
             logger.info(f"Retrieving checklists for document_type=ANY")
             checklists = neo4j_client.get_active_checklists(
                 document_type="ANY",
-                limit=request.top_k_checklist
+                limit=request.topKChecklist
             )
             
             if not checklists:
                 logger.warning("No active checklists found")
-                return RAGQueryResponse(
-                    request_id=request.request_id,
+                return RagQueryResponse(
+                    request_id=request.requestId,
                     success=True,
                     answer="Hệ thống chưa có bộ tiêu chí rà soát. Vui lòng chạy seed checklist trước.",
                     checklist_results=[],
@@ -322,10 +335,10 @@ class RAGService:
                     
                     user_chunks = neo4j_client.search_user_chunks_by_embedding(
                         embedding=embedding,
-                        user_id=request.user_id,
-                        workspace_id=request.workspace_id,
-                        document_id=request.document_id,
-                        top_k=request.top_k_user_chunks_per_checklist
+                        user_id=request.userId,
+                        workspace_id=request.workspaceId,
+                        document_id=request.documentId,
+                        top_k=request.topKUserChunksPerChecklist
                     )
                     
                     # Always add checklist result, even if no chunks found
@@ -356,7 +369,7 @@ class RAGService:
             question_embedding = embedding_service.embed_text(request.question)
             knowledge_chunks = neo4j_client.search_knowledge_chunks_by_embedding(
                 embedding=question_embedding,
-                top_k=request.top_k_knowledge_chunks
+                top_k=request.topKKnowledgeChunks
             )
             logger.info(f"Retrieved {len(knowledge_chunks)} knowledge chunks")
             
@@ -386,8 +399,8 @@ class RAGService:
             processing_time = (time.time() - start_time) * 1000  # Convert to ms
             logger.info(f"Query processed successfully in {processing_time:.2f}ms")
             
-            return RAGQueryResponse(
-                request_id=request.request_id,
+            return RagQueryResponse(
+                request_id=request.requestId,
                 success=True,
                 answer=answer,
                 checklist_results=checklist_results,
@@ -400,13 +413,13 @@ class RAGService:
 
         except Exception as e:
             logger.error(f"Failed to process global review query: {e}", exc_info=True)
-            return RAGQueryResponse(
-                request_id=request.request_id,
+            return RagQueryResponse(
+                request_id=request.requestId,
                 success=False,
                 error_message=f"Lỗi xử lý: {str(e)}"
             )
 
-    def process_global_review_query_stream(self, request: RAGQueryRequest):
+    def process_global_review_query_stream(self, request: RagQueryRequest):
         """Process a global review query and stream the response as SSE text."""
         start_time = time.time()
 
@@ -414,7 +427,7 @@ class RAGService:
             logger.info("Retrieving checklists for streamed response")
             checklists = neo4j_client.get_active_checklists(
                 document_type="ANY",
-                limit=request.top_k_checklist
+                limit=request.topKChecklist
             )
 
             if not checklists:
@@ -437,10 +450,10 @@ class RAGService:
 
                     user_chunks = neo4j_client.search_user_chunks_by_embedding(
                         embedding=embedding,
-                        user_id=request.user_id,
-                        workspace_id=request.workspace_id,
-                        document_id=request.document_id,
-                        top_k=request.top_k_user_chunks_per_checklist
+                        user_id=request.userId,
+                        workspace_id=request.workspaceId,
+                        document_id=request.documentId,
+                        top_k=request.topKUserChunksPerChecklist
                     )
 
                     checklist_results.append(ChecklistResult(
@@ -460,13 +473,13 @@ class RAGService:
             question_embedding = embedding_service.embed_text(request.question)
             knowledge_chunks = neo4j_client.search_knowledge_chunks_by_embedding(
                 embedding=question_embedding,
-                top_k=request.top_k_knowledge_chunks
+                top_k=request.topKKnowledgeChunks
             )
 
             yield self._encode_sse(
                 "meta",
                 {
-                    "request_id": request.request_id,
+                    "request_id": request.requestId,
                     "total_checklist_items": len(checklists),
                     "total_user_chunks": total_user_chunks,
                     "total_knowledge_chunks": len(knowledge_chunks),
@@ -572,4 +585,4 @@ class RAGService:
 
 
 # Singleton instance
-rag_service = RAGService()
+rag_service = RagService()

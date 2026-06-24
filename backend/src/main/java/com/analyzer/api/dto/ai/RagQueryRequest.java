@@ -35,4 +35,7 @@ public class RagQueryRequest {
 
     @JsonProperty("top_k_knowledge_chunks")
     private Integer topKKnowledgeChunks;
+
+    @JsonProperty("chat_history")
+    private String chatHistory;
 }
