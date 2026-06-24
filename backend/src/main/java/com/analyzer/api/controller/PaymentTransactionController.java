@@ -17,7 +17,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -96,28 +95,6 @@ public class PaymentTransactionController {
     public ResponseEntity<VnPayIpnResponseDTO> handleVnPayIpn(@RequestParam Map<String, String> params) {
         paymentTransactionService.handleVnPayCallback(params);
         return ResponseEntity.ok(new VnPayIpnResponseDTO("00", "Confirm Success"));
-    }
-
-    @PutMapping("/{id}/success")
-    @PreAuthorize("isAuthenticated()")
-    @Operation(
-            summary = "Giả lập thanh toán thành công",
-            description = "Giả lập giao dịch thanh toán thành công và kích hoạt gói dịch vụ của khách hàng."
-    )
-    public ResponseEntity<ApiResponseDTO<PaymentTransactionResponseDTO>> simulateSuccess(@PathVariable Long id) {
-        PaymentTransactionResponseDTO response = paymentTransactionService.simulateSuccess(id);
-        return ResponseEntity.ok(ApiResponseDTO.success("Giả lập thanh toán thành công", response));
-    }
-
-    @PutMapping("/{id}/failed")
-    @PreAuthorize("isAuthenticated()")
-    @Operation(
-            summary = "Giả lập thanh toán thất bại",
-            description = "Giả lập giao dịch thanh toán thất bại. Gói dịch vụ vẫn ở trạng thái chờ thanh toán."
-    )
-    public ResponseEntity<ApiResponseDTO<PaymentTransactionResponseDTO>> simulateFailed(@PathVariable Long id) {
-        PaymentTransactionResponseDTO response = paymentTransactionService.simulateFailed(id);
-        return ResponseEntity.ok(ApiResponseDTO.success("Giả lập thanh toán thất bại", response));
     }
 
     private Long getCurrentUserId() {

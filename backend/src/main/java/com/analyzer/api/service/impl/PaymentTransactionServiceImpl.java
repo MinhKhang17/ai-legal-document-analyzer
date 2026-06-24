@@ -15,7 +15,6 @@ import com.analyzer.api.service.PaymentTransactionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.util.UriComponentsBuilder;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -35,6 +34,8 @@ import java.util.stream.Collectors;
 public class PaymentTransactionServiceImpl implements PaymentTransactionService {
 
     private static final DateTimeFormatter VNPAY_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+    private static final BigDecimal VNPAY_MIN_AMOUNT = BigDecimal.valueOf(5000);
+    private static final BigDecimal VNPAY_MAX_AMOUNT = BigDecimal.valueOf(1_000_000_000);
 
     private final PaymentTransactionRepository paymentTransactionRepository;
     private final CustomerPlanRepository customerPlanRepository;
@@ -65,6 +66,8 @@ public class PaymentTransactionServiceImpl implements PaymentTransactionService 
         PaymentTransaction transaction = paymentTransactionRepository.findById(transactionId)
                 .orElseThrow(() -> new RuntimeException("Khong tim thay giao dich thanh toan voi id: " + transactionId));
 
+        validateVnPayConfig();
+
         if (!transaction.getCustomer().getId().equals(customerId)) {
             throw new RuntimeException("Ban khong co quyen thanh toan giao dich nay");
         }
@@ -73,6 +76,9 @@ public class PaymentTransactionServiceImpl implements PaymentTransactionService 
         }
         if (transaction.getPaymentStatus() != PaymentStatus.PENDING) {
             throw new RuntimeException("Giao dich nay da duoc xu ly truoc do");
+        }
+        if (!isValidVnPayAmount(transaction.getAmount())) {
+            throw new RuntimeException("So tien thanh toan VNPAY phai tu 5,000 VND den duoi 1 ty VND");
         }
 
         String paymentUrl = createPaymentUrl(transaction, clientIp);
@@ -111,24 +117,6 @@ public class PaymentTransactionServiceImpl implements PaymentTransactionService 
         }
 
         return paymentTransactionMapper.toResponseDTO(transaction);
-    }
-
-    @Override
-    @Transactional
-    public PaymentTransactionResponseDTO simulateSuccess(Long transactionId) {
-        PaymentTransaction transaction = paymentTransactionRepository.findById(transactionId)
-                .orElseThrow(() -> new RuntimeException("Khong tim thay giao dich thanh toan voi id: " + transactionId));
-
-        return paymentTransactionMapper.toResponseDTO(markSuccess(transaction));
-    }
-
-    @Override
-    @Transactional
-    public PaymentTransactionResponseDTO simulateFailed(Long transactionId) {
-        PaymentTransaction transaction = paymentTransactionRepository.findById(transactionId)
-                .orElseThrow(() -> new RuntimeException("Khong tim thay giao dich thanh toan voi id: " + transactionId));
-
-        return paymentTransactionMapper.toResponseDTO(markFailed(transaction));
     }
 
     private PaymentTransaction markSuccess(PaymentTransaction transaction) {
@@ -196,12 +184,19 @@ public class PaymentTransactionServiceImpl implements PaymentTransactionService 
         params.put("vnp_CreateDate", LocalDateTime.now().format(VNPAY_DATE_FORMAT));
         params.put("vnp_ExpireDate", LocalDateTime.now().plusMinutes(15).format(VNPAY_DATE_FORMAT));
 
-        String secureHash = hmacSha512(vnPayProperties.getHashSecret(), buildHashData(params));
-        return UriComponentsBuilder.fromUriString(vnPayProperties.getPayUrl())
-                .query(buildQuery(params))
-                .queryParam("vnp_SecureHash", secureHash)
-                .build(true)
-                .toUriString();
+        String query = buildHashData(params);
+        String secureHash = hmacSha512(vnPayProperties.getHashSecret(), query);
+        return vnPayProperties.getPayUrl() + "?" + query + "&vnp_SecureHash=" + secureHash;
+    }
+
+    private void validateVnPayConfig() {
+        if (isMissingConfig(vnPayProperties.getTmnCode()) || isMissingConfig(vnPayProperties.getHashSecret())) {
+            throw new RuntimeException("Chua cau hinh VNPAY_TMN_CODE hoac VNPAY_HASH_SECRET sandbox");
+        }
+    }
+
+    private boolean isMissingConfig(String value) {
+        return value == null || value.isBlank() || "CHANGE_ME".equals(value);
     }
 
     private boolean isValidSignature(Map<String, String> callbackParams) {
@@ -226,14 +221,13 @@ public class PaymentTransactionServiceImpl implements PaymentTransactionService 
                 .toPlainString();
     }
 
-    private String buildHashData(Map<String, String> params) {
-        return params.entrySet().stream()
-                .filter(entry -> entry.getValue() != null && !entry.getValue().isBlank())
-                .map(entry -> encode(entry.getKey()) + "=" + encode(entry.getValue()))
-                .collect(Collectors.joining("&"));
+    private boolean isValidVnPayAmount(BigDecimal amount) {
+        return amount != null
+                && amount.compareTo(VNPAY_MIN_AMOUNT) >= 0
+                && amount.compareTo(VNPAY_MAX_AMOUNT) < 0;
     }
 
-    private String buildQuery(Map<String, String> params) {
+    private String buildHashData(Map<String, String> params) {
         return params.entrySet().stream()
                 .filter(entry -> entry.getValue() != null && !entry.getValue().isBlank())
                 .map(entry -> encode(entry.getKey()) + "=" + encode(entry.getValue()))
@@ -257,6 +251,6 @@ public class PaymentTransactionServiceImpl implements PaymentTransactionService 
     }
 
     private String encode(String value) {
-        return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
+        return URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 }

@@ -6,6 +6,7 @@ import com.analyzer.api.entity.CustomerPlan;
 import com.analyzer.api.entity.PaymentTransaction;
 import com.analyzer.api.entity.SubscriptionPlan;
 import com.analyzer.api.entity.User;
+import com.analyzer.api.enums.PaymentMethod;
 import com.analyzer.api.enums.PlanStatus;
 import com.analyzer.api.enums.PaymentStatus;
 import com.analyzer.api.mapper.CustomerPlanMapper;
@@ -18,12 +19,16 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class CustomerPlanServiceImpl implements CustomerPlanService {
+
+    private static final BigDecimal VNPAY_MIN_AMOUNT = BigDecimal.valueOf(5000);
+    private static final BigDecimal VNPAY_MAX_AMOUNT = BigDecimal.valueOf(1_000_000_000);
 
     private final CustomerPlanRepository customerPlanRepository;
     private final SubscriptionPlanRepository subscriptionPlanRepository;
@@ -46,6 +51,10 @@ public class CustomerPlanServiceImpl implements CustomerPlanService {
         }
 
         // Tạo hoặc cập nhật CustomerPlan trạng thái PENDING
+        if (request.getPaymentMethod() == PaymentMethod.VNPAY && !isValidVnPayAmount(plan.getPrice())) {
+            throw new RuntimeException("So tien thanh toan VNPAY phai tu 5,000 VND den duoi 1 ty VND");
+        }
+
         CustomerPlan customerPlan = customerPlanRepository.findByCustomerIdAndStatus(customerId, PlanStatus.PENDING)
                 .orElse(null);
 
@@ -92,20 +101,10 @@ public class CustomerPlanServiceImpl implements CustomerPlanService {
     @Override
     @Transactional
     public CustomerPlanResponseDTO getMyPlan(Long customerId) {
-        // Lấy gói ACTIVE hoặc tự động chuyển sang EXPIRED nếu hết hạn
+        // Chỉ gói ACTIVE mới được xem là gói người dùng đang sở hữu.
         CustomerPlan activePlan = getActivePlanOrUpdateIfExpired(customerId);
         if (activePlan == null) {
-            // Nếu không có ACTIVE, trả về thông tin gói PENDING gần nhất
-            activePlan = customerPlanRepository.findByCustomerIdAndStatus(customerId, PlanStatus.PENDING)
-                    .orElse(null);
-        }
-
-        if (activePlan == null) {
-            // Nếu không có cả ACTIVE lẫn PENDING, lấy bất kỳ gói nào gần nhất
-            activePlan = customerPlanRepository.findByCustomerId(customerId).stream()
-                    .sorted((p1, p2) -> p2.getUpdatedAt().compareTo(p1.getUpdatedAt()))
-                    .findFirst()
-                    .orElseThrow(() -> new RuntimeException("Bạn chưa đăng ký gói dịch vụ nào"));
+            throw new RuntimeException("Bạn chưa sở hữu gói dịch vụ nào đang kích hoạt");
         }
 
         return customerPlanMapper.toResponseDTO(activePlan);
@@ -173,5 +172,11 @@ public class CustomerPlanServiceImpl implements CustomerPlanService {
             }
         }
         return activePlan;
+    }
+
+    private boolean isValidVnPayAmount(BigDecimal amount) {
+        return amount != null
+                && amount.compareTo(VNPAY_MIN_AMOUNT) >= 0
+                && amount.compareTo(VNPAY_MAX_AMOUNT) < 0;
     }
 }
