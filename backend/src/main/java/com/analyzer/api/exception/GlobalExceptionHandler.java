@@ -157,6 +157,20 @@ public class GlobalExceptionHandler {
                                 HttpStatus.GATEWAY_TIMEOUT);
         }
 
+        @ExceptionHandler(ConflictException.class)
+        public ResponseEntity<ApiResponseDTO<Void>> handleConflictException(ConflictException ex) {
+                return new ResponseEntity<>(
+                                ApiResponseDTO.error(HttpStatus.CONFLICT.value(), ex.getMessage()),
+                                HttpStatus.CONFLICT);
+        }
+
+        @ExceptionHandler(TooManyRequestsException.class)
+        public ResponseEntity<ApiResponseDTO<Void>> handleTooManyRequestsException(TooManyRequestsException ex) {
+                return new ResponseEntity<>(
+                                ApiResponseDTO.error(HttpStatus.TOO_MANY_REQUESTS.value(), ex.getMessage()),
+                                HttpStatus.TOO_MANY_REQUESTS);
+        }
+
         @ExceptionHandler(RuntimeException.class)
         public ResponseEntity<ApiResponseDTO<Void>> handleRuntimeException(RuntimeException ex) {
                 return new ResponseEntity<>(
