@@ -10,6 +10,9 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -20,7 +23,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.util.UriComponentsBuilder;
 
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 
@@ -34,6 +40,9 @@ import java.util.Map;
 public class PaymentTransactionController {
 
     private final PaymentTransactionService paymentTransactionService;
+
+    @Value("${app.frontend.payment-result-url:http://localhost:5173/billing/payment-result}")
+    private String paymentResultUrl;
 
     @GetMapping("/me")
     @PreAuthorize("isAuthenticated()")
@@ -81,10 +90,13 @@ public class PaymentTransactionController {
             summary = "Xử lý kết quả trả về từ VNPAY",
             description = "Xác thực các tham số VNPAY trả về và cập nhật trạng thái giao dịch."
     )
-    public ResponseEntity<ApiResponseDTO<PaymentTransactionResponseDTO>> handleVnPayReturn(
+    public ResponseEntity<Void> handleVnPayReturn(
             @RequestParam Map<String, String> params) {
-        PaymentTransactionResponseDTO response = paymentTransactionService.handleVnPayCallback(params);
-        return ResponseEntity.ok(ApiResponseDTO.success("Xử lý kết quả thanh toán VNPAY thành công", response));
+        paymentTransactionService.handleVnPayCallback(params);
+        URI redirectUri = buildPaymentResultRedirectUri(params);
+        return ResponseEntity.status(HttpStatus.FOUND)
+                .header(HttpHeaders.LOCATION, redirectUri.toString())
+                .build();
     }
 
     @GetMapping("/vnpay-ipn")
@@ -122,5 +134,13 @@ public class PaymentTransactionController {
         }
 
         return request.getRemoteAddr();
+    }
+
+    private URI buildPaymentResultRedirectUri(Map<String, String> params) {
+        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(paymentResultUrl);
+        params.forEach(builder::queryParam);
+        return builder.build()
+                .encode(StandardCharsets.UTF_8)
+                .toUri();
     }
 }
