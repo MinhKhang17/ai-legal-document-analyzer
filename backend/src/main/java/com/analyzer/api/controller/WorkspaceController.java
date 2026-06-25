@@ -1,5 +1,6 @@
 package com.analyzer.api.controller;
 
+import com.analyzer.api.dto.ApiResponseDTO;
 import com.analyzer.api.dto.document.DocumentResponseDTO;
 import com.analyzer.api.dto.workspace.WorkspaceRequestDTO;
 import com.analyzer.api.dto.workspace.WorkspaceResponseDTO;
@@ -37,44 +38,44 @@ public class WorkspaceController {
     @PostMapping
     @PreAuthorize("hasRole('CUSTOMER')")
     @Operation(summary = "Create workspace", description = "Create a new workspace for the current authenticated user.")
-    public ResponseEntity<WorkspaceResponseDTO> createWorkspace(
+    public ResponseEntity<ApiResponseDTO<WorkspaceResponseDTO>> createWorkspace(
             @Valid @RequestBody WorkspaceRequestDTO request) {
         WorkspaceResponseDTO response = workspaceService.createWorkspace(getCurrentUserId(), request);
-        return new ResponseEntity<>(response, HttpStatus.CREATED);
+        return new ResponseEntity<>(ApiResponseDTO.created("Tạo workspace thành công", response), HttpStatus.CREATED);
     }
 
     @GetMapping
     @PreAuthorize("hasRole('CUSTOMER')")
     @Operation(summary = "List my workspaces", description = "Get all active workspaces of the current authenticated user.")
-    public ResponseEntity<List<WorkspaceResponseDTO>> getMyWorkspaces() {
+    public ResponseEntity<ApiResponseDTO<List<WorkspaceResponseDTO>>> getMyWorkspaces() {
         List<WorkspaceResponseDTO> response = workspaceService.getWorkspaces(getCurrentUserId());
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponseDTO.success("Lấy danh sách workspace thành công", response));
     }
 
     @GetMapping("/{workspaceId}")
     @PreAuthorize("hasRole('CUSTOMER')")
     @Operation(summary = "Get workspace detail", description = "Get a single active workspace by id for the current authenticated user.")
-    public ResponseEntity<WorkspaceResponseDTO> getWorkspaceById(@PathVariable String workspaceId) {
+    public ResponseEntity<ApiResponseDTO<WorkspaceResponseDTO>> getWorkspaceById(@PathVariable String workspaceId) {
         WorkspaceResponseDTO response = workspaceService.getWorkspaceById(getCurrentUserId(), workspaceId);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponseDTO.success("Lấy chi tiết workspace thành công", response));
     }
 
     @GetMapping("/{workspaceId}/documents")
     @PreAuthorize("hasRole('CUSTOMER')")
     @Operation(summary = "List workspace documents", description = "Get non-deleted documents in the workspace of the current authenticated user.")
-    public ResponseEntity<List<DocumentResponseDTO>> getDocuments(@PathVariable String workspaceId) {
+    public ResponseEntity<ApiResponseDTO<List<DocumentResponseDTO>>> getDocuments(@PathVariable String workspaceId) {
         List<DocumentResponseDTO> response = workspaceService.getDocuments(getCurrentUserId(), workspaceId);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponseDTO.success("Lấy danh sách tài liệu thành công", response));
     }
 
     @PostMapping(value = "/{workspaceId}/documents", consumes = "multipart/form-data")
     @PreAuthorize("hasRole('CUSTOMER')")
     @Operation(summary = "Upload workspace document", description = "Upload a user document, save it, and request Python AI Service processing.")
-    public ResponseEntity<DocumentResponseDTO> uploadDocument(
+    public ResponseEntity<ApiResponseDTO<DocumentResponseDTO>> uploadDocument(
             @PathVariable String workspaceId,
             @RequestPart("file") MultipartFile file) throws IOException {
         DocumentResponseDTO response = workspaceService.uploadDocument(getCurrentUserId(), workspaceId, file);
-        return new ResponseEntity<>(response, HttpStatus.ACCEPTED);
+        return new ResponseEntity<>(ApiResponseDTO.success("Tải tài liệu lên thành công", response), HttpStatus.ACCEPTED);
     }
 
     private Long getCurrentUserId() {
