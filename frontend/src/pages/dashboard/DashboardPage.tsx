@@ -127,25 +127,25 @@ export function DashboardPage() {
       <section className="grid gap-gutter md:grid-cols-2 xl:grid-cols-4">
         <StatCard label={t('dashboard.totalDocuments')} value={loading ? '...' : String(stats.totalDocuments)} change={loading ? undefined : `${stats.readyDocuments} ready`} trend="up" icon={<FileText className="h-5 w-5" />} />
         <StatCard label={t('dashboard.reviewedContracts')} value={loading ? '...' : String(stats.readyDocuments)} change={loading ? undefined : `${processingPercent}% processing`} trend="up" icon={<SearchCheck className="h-5 w-5" />} accent="green" />
-        <StatCard label={t('dashboard.highRiskClauses')} value={loading ? '...' : String(stats.processingDocuments)} change={loading ? undefined : 'From active uploads'} trend="neutral" icon={<ShieldAlert className="h-5 w-5" />} accent="red" />
+        <StatCard label={t('dashboard.processingDocuments')} value={loading ? '...' : String(stats.processingDocuments)} change={loading ? undefined : t('dashboard.fromActiveUploads')} trend="neutral" icon={<ShieldAlert className="h-5 w-5" />} accent="red" />
         <StatCard label={t('dashboard.activeProjects')} value={loading ? '...' : String(stats.totalWorkspaces)} change={loading ? undefined : 'User workspaces'} trend="neutral" icon={<FolderOpen className="h-5 w-5" />} accent="gold" />
       </section>
 
       <section className="mt-xl grid gap-gutter xl:grid-cols-[1.2fr_0.8fr]">
-        <Card title={t('dashboard.riskTrend')} actions={<Badge tone="blue">Live data</Badge>}>
+        <Card title={t('dashboard.documentReadiness')} actions={<Badge tone="blue">{t('dashboard.liveData')}</Badge>}>
           <div className="space-y-md">
             <div className="flex items-center justify-between text-sm">
-              <span className="font-semibold">Documents ready</span>
+              <span className="font-semibold">{t('dashboard.documentsReady')}</span>
               <span>{readyPercent}%</span>
             </div>
             <ProgressBar value={readyPercent} />
             <div className="flex items-center justify-between text-sm">
-              <span className="font-semibold">Documents processing</span>
+              <span className="font-semibold">{t('dashboard.documentsProcessing')}</span>
               <span>{processingPercent}%</span>
             </div>
             <ProgressBar value={processingPercent} />
             <p className="text-sm text-on-surface-variant dark:text-slate-300">
-              Dashboard now reflects real workspaces and uploaded documents from PostgreSQL.
+              {t('dashboard.realDataDescription')}
             </p>
           </div>
         </Card>
@@ -153,7 +153,7 @@ export function DashboardPage() {
         <Card tone="ai">
           <h2 className="text-title-lg font-semibold">{t('dashboard.aiInsight')}</h2>
           <p className="mt-sm text-sm leading-6 text-on-surface-variant dark:text-slate-300">
-            Use the workspace cards below to open the detail page, upload more files, or jump directly into chat on the same document context.
+            {t('dashboard.workspaceInsight')}
           </p>
           <Link to="/upload">
             <Button className="mt-md" variant="gold" leftIcon={<UploadCloud className="h-4 w-4" />}>
@@ -166,9 +166,9 @@ export function DashboardPage() {
       <section className="mt-xl grid gap-gutter xl:grid-cols-[1.1fr_0.9fr]">
         <Card title={t('dashboard.activeProjects')}>
           {loading ? (
-            <p className="text-sm text-on-surface-variant dark:text-slate-400">Loading workspaces...</p>
+            <p className="text-sm text-on-surface-variant dark:text-slate-400">{t('workspace.loading')}</p>
           ) : recentWorkspaces.length === 0 ? (
-            <p className="text-sm text-on-surface-variant dark:text-slate-400">No workspace found.</p>
+            <p className="text-sm text-on-surface-variant dark:text-slate-400">{t('workspace.empty')}</p>
           ) : (
             <div className="space-y-md">
               {recentWorkspaces.map((workspace) => {
@@ -183,14 +183,14 @@ export function DashboardPage() {
                       <div>
                         <p className="font-semibold">{workspace.name}</p>
                         <p className="text-sm text-on-surface-variant dark:text-slate-400">
-                          {workspace.description || 'No description'}
+                          {workspace.description || t('workspace.noDescription')}
                         </p>
                       </div>
                       <StatusBadge status={workspace.status} />
                     </div>
                     <div className="mt-md flex items-center justify-between text-sm text-on-surface-variant dark:text-slate-400">
-                      <span>{workspace.documents.length} documents</span>
-                      <span>{readyCount} ready</span>
+                      <span>{workspace.documents.length} {t('nav.documents').toLowerCase()}</span>
+                      <span>{readyCount} {t('status.ready').toLowerCase()}</span>
                     </div>
                   </Link>
                 );
@@ -202,7 +202,7 @@ export function DashboardPage() {
         <Card title={t('dashboard.processingQueue')} actions={<Badge tone="gold">{stats.processingDocuments} active</Badge>}>
           <div className="space-y-md">
             {recentDocuments.length === 0 ? (
-              <p className="text-sm text-on-surface-variant dark:text-slate-400">No document uploaded yet.</p>
+              <p className="text-sm text-on-surface-variant dark:text-slate-400">{t('documents.emptyTitle')}</p>
             ) : (
               recentDocuments.map((document) => (
                 <div key={document.documentId} className="rounded-lg border border-legal-border p-md dark:border-slate-700">
@@ -245,16 +245,16 @@ export function DashboardPage() {
               <thead className="bg-surface-container-low dark:bg-slate-800">
                 <tr>
                   <th className="px-md py-sm text-left text-label-md font-bold uppercase tracking-wider leading-4 text-on-surface-variant dark:text-slate-400">
-                    File
+                    {t('table.document')}
                   </th>
                   <th className="px-md py-sm text-left text-label-md font-bold uppercase tracking-wider leading-4 text-on-surface-variant dark:text-slate-400">
-                    Workspace
+                    {t('workspace.title')}
                   </th>
                   <th className="px-md py-sm text-left text-label-md font-bold uppercase tracking-wider leading-4 text-on-surface-variant dark:text-slate-400">
-                    Status
+                    {t('table.status')}
                   </th>
                   <th className="px-md py-sm text-left text-label-md font-bold uppercase tracking-wider leading-4 text-on-surface-variant dark:text-slate-400">
-                    Uploaded
+                    {t('documents.uploadedAt')}
                   </th>
                 </tr>
               </thead>
@@ -305,7 +305,7 @@ export function DashboardPage() {
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   <div className="col-span-2">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-on-surface-variant dark:text-slate-400">
-                      Workspace
+                      {t('workspace.title')}
                     </p>
                     <p className="mt-0.5 break-words text-sm text-on-surface dark:text-slate-100">
                       {document.workspaceName}
@@ -314,7 +314,7 @@ export function DashboardPage() {
 
                   <div>
                     <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-on-surface-variant dark:text-slate-400">
-                      Status
+                      {t('table.status')}
                     </p>
                     <div className="mt-1">
                       <StatusBadge
@@ -326,7 +326,7 @@ export function DashboardPage() {
 
                   <div className="col-span-2">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-on-surface-variant dark:text-slate-400">
-                      Uploaded
+                      {t('documents.uploadedAt')}
                     </p>
                     <p className="mt-0.5 whitespace-nowrap text-sm text-on-surface dark:text-slate-100">
                       {new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(document.uploadedAt))}
@@ -345,7 +345,7 @@ export function DashboardPage() {
                 <UploadCloud className="h-5 w-5 text-primary dark:text-inverse-primary" />
                 <div>
                   <p className="font-semibold">{t('actions.upload')}</p>
-                  <p className="text-sm text-on-surface-variant dark:text-slate-400">Upload into the current workspace flow.</p>
+                  <p className="text-sm text-on-surface-variant dark:text-slate-400">{t('dashboard.uploadActionDescription')}</p>
                 </div>
               </div>
             </Link>
@@ -353,8 +353,8 @@ export function DashboardPage() {
               <div className="flex items-center gap-md">
                 <BarChart3 className="h-5 w-5 text-secondary dark:text-accent-gold" />
                 <div>
-                  <p className="font-semibold">Open workspaces</p>
-                  <p className="text-sm text-on-surface-variant dark:text-slate-400">Inspect documents and continue chat.</p>
+                  <p className="font-semibold">{t('actions.openWorkspace')}</p>
+                  <p className="text-sm text-on-surface-variant dark:text-slate-400">{t('dashboard.openWorkspaceDescription')}</p>
                 </div>
               </div>
             </Link>

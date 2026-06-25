@@ -1,5 +1,34 @@
 # History Code - Nguyen Huu Dat
 
+**Date:** 2026-06-24 (Ngày 24 tháng 6 năm 2026)
+
+## Tasks Completed:
+- **Thiết kế và Cài đặt tính năng Legal Ticket (Hỗ trợ Tư vấn Pháp lý từ Chuyên gia)**:
+  - **Cập nhật & Tạo mới Enums**:
+    - Cập nhật `LegalTicketStatus` gồm 11 trạng thái vòng đời đầy đủ: `DRAFT`, `PENDING_ADMIN_REVIEW`, `REJECTED_BY_ADMIN`, `ASSIGNED_TO_LAWYER`, `IN_REVIEW`, `NEED_MORE_INFO`, `CUSTOMER_RESPONDED`, `RESOLVED`, `CLOSED`, `CANCELLED`, `REOPENED`.
+    - Tạo mới `LegalTicketMessageType` để hỗ trợ phân loại luồng tin nhắn trao đổi: `CUSTOMER_REPLY`, `EXPERT_REQUEST_MORE_INFO`, `EXPERT_RESPONSE`, `ADMIN_NOTE`, `SYSTEM`.
+  - **Triển khai Thực thể JPA (Entities) & Repositories**:
+    - Tạo mới `@Entity` `LegalTicket` kế thừa đầy đủ cơ chế Soft Delete, Optimistic Locking (`@Version`), Audit Timestamps và ràng buộc Unique key trên cặp `(request_id, created_by_id)`.
+    - Tạo mới `@Entity` `LegalTicketMessage` lưu trữ lịch sử trao đổi giữa khách hàng, admin và chuyên gia.
+    - Cấu hình `LegalTicketRepository` sử dụng `@EntityGraph` để nạp trước (Eager Fetch) các quan hệ `workspace`, `document`, `createdBy`, và `assignedLawyer`, giải quyết triệt để lỗi N+1 Query.
+    - Bổ sung `findByRequestId` trong `ChatMessageRepository` và `findByTicket_IdOrderByCreatedAtAsc` trong `LegalTicketMessageRepository`.
+  - **Xây dựng DTOs và MapStruct Mapper**:
+    - Chuẩn hóa DTO tạo mới và phản hồi: `CreateLegalTicketRequest` và `LegalTicketResponse` chứa đầy đủ thông tin snapshot phân tích từ AI.
+    - Xây dựng các DTO hành động: `AssignLawyerRequest`, `RejectLegalTicketRequest`, `ResolveLegalTicketRequest`, `RequestMoreInfoRequest`, `CustomerTicketReplyRequest`, `CloseLegalTicketRequest`, `CancelLegalTicketRequest`, `ReopenLegalTicketRequest`.
+    - Triển khai `LegalTicketMapper` sử dụng MapStruct để chuyển đổi tự động và an toàn giữa Entity và DTO.
+  - **Triển khai Business Logic & Phân quyền Endpoint**:
+    - **`LegalTicketService`**: Xử lý logic tạo ticket từ phía Customer (kiểm tra quyền sở hữu Workspace, xác thực gói dịch vụ Active và từ chối các tài khoản Free, kiểm tra trùng lặp ticket), hủy ticket, đóng ticket, phản hồi của Customer, và mở lại ticket trong vòng 7 ngày.
+    - **`AdminTicketAssignmentService`**: Xử lý nghiệp vụ phân công/tái phân công chuyên gia (`assignLawyer` / `reassignLawyer`) dựa trên `AssignLawyerRequest`, tích hợp ghi nhận lịch sử và ghi chú bảo mật.
+    - **`ExpertLegalTicketService`**: Phục vụ các thao tác xử lý của chuyên gia gồm tiếp nhận rà soát (`startReview`), yêu cầu bổ sung tài liệu (`requestMoreInfo`), và hoàn tất trả lời câu hỏi (`resolveTicket`).
+    - **`LegalTicketController`**: Định nghĩa đầy đủ các REST API endpoints với tiền tố `/api/v1/...`, tích hợp kiểm tra phân quyền bảo mật `@PreAuthorize` tương ứng cho từng vai trò `CUSTOMER`, `ADMIN`, `EXPERT`.
+  - **Tối ưu hóa Xử lý Lỗi & Exception**:
+    - Tạo mới các custom exceptions: `ConflictException` (phục vụ lỗi Conflict 409 khi tạo trùng ticket hoặc chuyển trạng thái không hợp lệ) và `TooManyRequestsException` (mã 429).
+    - Cấu hình các exception handlers tương ứng trong `GlobalExceptionHandler.java`.
+  - **Kiểm tra và Xác minh Hệ thống**:
+    - Biên dịch và chạy thử hệ thống qua Maven wrapper (`./mvnw clean compile`) thành công 100% không phát sinh lỗi biên dịch.
+
+---
+
 **Date:** 2026-06-21 (Ngày 21 tháng 6 năm 2026)
 
 ## Tasks Completed:

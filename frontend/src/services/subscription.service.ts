@@ -1,8 +1,10 @@
 import { API_ENDPOINTS, buildApiUrl } from '../config/api';
+import { ACCESS_DENIED_MESSAGE, BACKEND_API_UNAVAILABLE_MESSAGE } from './http';
 import type {
   ApiResponse,
   CustomerPlan,
   SubscribeCustomerPlanRequest,
+  SubscriptionPlanRequest,
   SubscriptionPlan,
 } from '../types/subscription';
 
@@ -92,18 +94,23 @@ const getApiErrorMessage = (
   rawText: string,
   fallback: string,
 ): string => {
+  const normalizeMessage = (message: string) =>
+    message.trim().toLowerCase() === 'access denied'
+      ? ACCESS_DENIED_MESSAGE
+      : message.trim();
+
   if (errorResponse?.message && errorResponse.message.trim().length > 0) {
-    return errorResponse.message.trim();
+    return normalizeMessage(errorResponse.message);
   }
 
   if (errorResponse?.error && errorResponse.error.trim().length > 0) {
-    return errorResponse.error.trim();
+    return normalizeMessage(errorResponse.error);
   }
 
   const normalizedText = rawText.trim();
 
   if (normalizedText.length > 0) {
-    return normalizedText;
+    return normalizeMessage(normalizedText);
   }
 
   return fallback;
@@ -125,7 +132,20 @@ const requestJson = async <TResponse>(
   requestInit: RequestInit,
   errorMessage: string,
 ): Promise<TResponse> => {
-  const response = await fetch(buildApiUrl(endpointPath), requestInit);
+  let response: Response;
+
+  try {
+    response = await fetch(buildApiUrl(endpointPath), requestInit);
+  } catch (error) {
+    const rawText = error instanceof Error ? error.message : '';
+    throw new SubscriptionRequestError(
+      0,
+      BACKEND_API_UNAVAILABLE_MESSAGE,
+      { error: rawText },
+      rawText,
+    );
+  }
+
   const { data, rawText } = await readResponseBody<TResponse | ApiErrorResponse>(response);
 
   if (!response.ok) {
@@ -174,10 +194,80 @@ const postJson = async <TResponse>(
     errorMessage,
   );
 
+const putJson = async <TResponse>(
+  endpointPath: string,
+  errorMessage: string,
+  payload?: object,
+): Promise<TResponse> =>
+  requestJson<TResponse>(
+    endpointPath,
+    {
+      method: 'PUT',
+      headers: buildAuthHeaders({
+        Accept: 'application/json',
+        ...(payload ? { 'Content-Type': 'application/json' } : {}),
+      }),
+      credentials: 'include',
+      body: payload ? JSON.stringify(payload) : undefined,
+    },
+    errorMessage,
+  );
+
+const deleteJson = async <TResponse>(
+  endpointPath: string,
+  errorMessage: string,
+): Promise<TResponse> =>
+  requestJson<TResponse>(
+    endpointPath,
+    {
+      method: 'DELETE',
+      headers: buildAuthHeaders({
+        Accept: 'application/json',
+      }),
+      credentials: 'include',
+    },
+    errorMessage,
+  );
+
 export const getSubscriptionPlans = async (): Promise<ApiResponse<SubscriptionPlan[]>> =>
   getJson<ApiResponse<SubscriptionPlan[]>>(
     API_ENDPOINTS.subscription.plans,
     'Unable to load subscription plans.',
+  );
+
+export const getSubscriptionPlanById = async (
+  planId: number | string,
+): Promise<ApiResponse<SubscriptionPlan>> =>
+  getJson<ApiResponse<SubscriptionPlan>>(
+    API_ENDPOINTS.subscription.planDetail(planId),
+    'Unable to load subscription plan detail.',
+  );
+
+export const createSubscriptionPlan = async (
+  payload: SubscriptionPlanRequest,
+): Promise<ApiResponse<SubscriptionPlan>> =>
+  postJson<ApiResponse<SubscriptionPlan>>(
+    API_ENDPOINTS.subscription.plans,
+    payload,
+    'Unable to create subscription plan.',
+  );
+
+export const updateSubscriptionPlan = async (
+  planId: number | string,
+  payload: SubscriptionPlanRequest,
+): Promise<ApiResponse<SubscriptionPlan>> =>
+  putJson<ApiResponse<SubscriptionPlan>>(
+    API_ENDPOINTS.subscription.planDetail(planId),
+    'Unable to update subscription plan.',
+    payload,
+  );
+
+export const deleteSubscriptionPlan = async (
+  planId: number | string,
+): Promise<ApiResponse<void>> =>
+  deleteJson<ApiResponse<void>>(
+    API_ENDPOINTS.subscription.planDetail(planId),
+    'Unable to delete subscription plan.',
   );
 
 export const getMyCustomerPlan = async (): Promise<ApiResponse<CustomerPlan>> =>
@@ -193,4 +283,12 @@ export const subscribeCustomerPlan = async (
     API_ENDPOINTS.subscription.customerPlanSubscribe,
     payload,
     'Unable to subscribe to the selected plan.',
+  );
+
+export const cancelCustomerPlan = async (
+  customerPlanId: number | string,
+): Promise<ApiResponse<CustomerPlan>> =>
+  putJson<ApiResponse<CustomerPlan>>(
+    API_ENDPOINTS.subscription.customerPlanCancel(customerPlanId),
+    'Unable to cancel the current customer plan.',
   );

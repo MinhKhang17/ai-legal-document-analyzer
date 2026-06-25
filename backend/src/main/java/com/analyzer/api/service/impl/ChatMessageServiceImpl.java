@@ -374,6 +374,16 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                     .totalTokens(aiResponse.getUsage().getTotalTokens());
         }
 
+        assistantBuilder
+                .confidenceScore(aiResponse.getConfidenceScore())
+                .shouldSuggestTicket(aiResponse.getShouldSuggestTicket())
+                .suggestionType(aiResponse.getSuggestionType())
+                .suggestionReason(aiResponse.getSuggestionReason())
+                .missingInformation(aiResponse.getMissingInformation())
+                .riskLevel(aiResponse.getRiskLevel())
+                .legalDomain(aiResponse.getLegalDomain())
+                .userActionHint(aiResponse.getUserActionHint());
+
         ChatMessage assistantMessage = assistantBuilder.build();
         chatMessageRepository.save(assistantMessage);
 
@@ -425,6 +435,14 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                 .status(message.getStatus().name())
                 .requestId(message.getRequestId())
                 .aiModel(message.getAiModel())
+                .confidenceScore(message.getConfidenceScore())
+                .shouldSuggestTicket(message.getShouldSuggestTicket())
+                .suggestionType(message.getSuggestionType())
+                .suggestionReason(message.getSuggestionReason())
+                .missingInformation(message.getMissingInformation())
+                .riskLevel(message.getRiskLevel())
+                .legalDomain(message.getLegalDomain())
+                .userActionHint(message.getUserActionHint())
                 .promptTokens(message.getPromptTokens())
                 .completionTokens(message.getCompletionTokens())
                 .totalTokens(message.getTotalTokens())

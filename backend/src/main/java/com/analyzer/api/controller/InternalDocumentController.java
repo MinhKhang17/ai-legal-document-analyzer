@@ -1,5 +1,6 @@
 package com.analyzer.api.controller;
 
+import com.analyzer.api.dto.ApiResponseDTO;
 import com.analyzer.api.dto.document.DocumentResponseDTO;
 import com.analyzer.api.dto.document.ProcessingResultRequestDTO;
 import com.analyzer.api.service.WorkspaceService;
@@ -23,10 +24,9 @@ public class InternalDocumentController {
 
     @PostMapping("/{documentId}/processing-result")
     @Operation(summary = "Receive document processing result", description = "Callback endpoint used by Python AI Service.")
-    public ResponseEntity<DocumentResponseDTO> updateProcessingResult(
-            @PathVariable String documentId,
-            @RequestBody ProcessingResultRequestDTO request) {
+    public ResponseEntity<ApiResponseDTO<DocumentResponseDTO>> updateProcessingResult(
+            @PathVariable String documentId, @RequestBody ProcessingResultRequestDTO request) {
         DocumentResponseDTO response = workspaceService.updateProcessingResult(documentId, request);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponseDTO.success("Cập nhật kết quả xử lý document thành công", response));
     }
 }

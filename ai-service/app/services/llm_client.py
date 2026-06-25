@@ -17,6 +17,13 @@ logger = logging.getLogger(__name__)
 class LlmResponse:
     answer: str | None
     risk_level: str
+    confidence_score: float | None = None
+    should_suggest_ticket: bool = False
+    suggestion_type: str = "NONE"
+    suggestion_reason: str | None = None
+    missing_information: str | None = None
+    legal_domain: str | None = None
+    user_action_hint: str = "CONTINUE_CHAT"
     error: str | None = None
     raw_response: str | None = None
 
@@ -187,6 +194,14 @@ class GeminiRagLlmClient:
         if isinstance(parsed, dict):
             return parsed
         return None
+
+    def _to_float(self, value: object) -> float | None:
+        try:
+            if value is None:
+                return None
+            return float(value)
+        except Exception:
+            return None
 
 
 class MockRagLlmClient:

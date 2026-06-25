@@ -1,4 +1,4 @@
-export { getCurrentUser, login, refreshAccessToken, register } from '../services/auth.service';
+export { getCurrentUser, login, logout, refreshAccessToken, register } from '../services/auth.service';
 export type {
   ApiResponse,
   AuthMeResponse,

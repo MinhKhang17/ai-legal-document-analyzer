@@ -11,6 +11,4 @@ public interface PaymentTransactionService {
     List<PaymentTransactionResponseDTO> getAllTransactions();
     PaymentUrlResponseDTO createVnPayPaymentUrl(Long transactionId, Long customerId, String clientIp);
     PaymentTransactionResponseDTO handleVnPayCallback(Map<String, String> callbackParams);
-    PaymentTransactionResponseDTO simulateSuccess(Long transactionId);
-    PaymentTransactionResponseDTO simulateFailed(Long transactionId);
 }

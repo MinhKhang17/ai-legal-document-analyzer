@@ -1,25 +1,26 @@
-import { ArrowUpRight, Download, Receipt, RefreshCw, ShieldCheck, Sparkles } from 'lucide-react';
+import { ArrowUpRight, Receipt, RefreshCw, ShieldCheck, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SubscriptionStatusBadge } from '../../components/billing/SubscriptionStatusBadge';
-import { Badge } from '../../components/common/Badge';
+import { Badge, type BadgeTone } from '../../components/common/Badge';
 import { Button } from '../../components/common/Button';
 import { Card } from '../../components/common/Card';
 import { DataTable, type DataTableColumn } from '../../components/common/DataTable';
 import { EmptyState } from '../../components/common/EmptyState';
 import { PageHeader } from '../../components/common/PageHeader';
 import { ProgressBar } from '../../components/common/ProgressBar';
-import { StatusBadge } from '../../components/common/StatusBadge';
-import { invoices } from '../../api/mockData';
 import { useI18n } from '../../hooks/useI18n';
+import { useToast } from '../../hooks/useToast';
+import { createVnPayPaymentUrl, getMyPaymentTransactions } from '../../services/paymentTransaction.service';
 import {
+  cancelCustomerPlan,
   getMyCustomerPlan,
   isCustomerPlanMissingError,
   isSubscriptionUnauthorizedError,
 } from '../../services/subscription.service';
-import type { Invoice } from '../../types/billing';
+import type { PaymentTransaction } from '../../types/paymentTransaction';
 import type { CustomerPlan } from '../../types/subscription';
-import { formatCurrency, formatDisplayDate, formatNumber, formatVndCurrency } from '../../utils/format';
+import { formatDisplayDate, formatNumber, formatVndCurrency } from '../../utils/format';
 
 interface BillingMetricCardProps {
   label: string;
@@ -58,13 +59,35 @@ const getQuotaPercent = (customerPlan: CustomerPlan) => {
   return Math.max(0, Math.min(100, Math.round((customerPlan.usedQuota / limit) * 100)));
 };
 
+const getPaymentStatusTone = (status: string): BadgeTone => {
+  switch (status.toUpperCase()) {
+    case 'SUCCESS':
+    case 'PAID':
+      return 'green';
+    case 'FAILED':
+    case 'CANCELLED':
+      return 'red';
+    case 'PENDING':
+      return 'amber';
+    default:
+      return 'slate';
+  }
+};
+
 export function BillingPage() {
   const { t, language } = useI18n();
+  const toast = useToast();
   const navigate = useNavigate();
   const [customerPlan, setCustomerPlan] = useState<CustomerPlan | null>(null);
   const [isLoadingPlan, setIsLoadingPlan] = useState(true);
+  const [paymentTransactions, setPaymentTransactions] = useState<PaymentTransaction[]>([]);
+  const [isLoadingTransactions, setIsLoadingTransactions] = useState(true);
   const [hasNoPlan, setHasNoPlan] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [transactionError, setTransactionError] = useState<string | null>(null);
+  const [transactionActionMessage, setTransactionActionMessage] = useState<string | null>(null);
+  const [payingTransactionId, setPayingTransactionId] = useState<number | null>(null);
+  const [isCancellingPlan, setIsCancellingPlan] = useState(false);
   const locale = language === 'vi' ? 'vi-VN' : 'en-US';
 
   const loadCustomerPlan = useCallback(async () => {
@@ -97,22 +120,128 @@ export function BillingPage() {
     }
   }, [t]);
 
+  const loadPaymentTransactions = useCallback(async () => {
+    setIsLoadingTransactions(true);
+    setTransactionError(null);
+
+    try {
+      const transactions = await getMyPaymentTransactions();
+      setPaymentTransactions(transactions);
+    } catch (error) {
+      console.error('Failed to load payment transactions:', error);
+      setPaymentTransactions([]);
+      setTransactionError(error instanceof Error ? error.message : t('billing.errors.loadTransactions'));
+    } finally {
+      setIsLoadingTransactions(false);
+    }
+  }, [t]);
+
   useEffect(() => {
     void loadCustomerPlan();
-  }, [loadCustomerPlan]);
+    void loadPaymentTransactions();
+  }, [loadCustomerPlan, loadPaymentTransactions]);
 
   const quotaPercent = useMemo(() => (customerPlan ? getQuotaPercent(customerPlan) : 0), [customerPlan]);
 
-  const columns: DataTableColumn<Invoice>[] = [
-    { header: t('billing.invoice'), cell: (invoice) => <span className="font-semibold text-primary dark:text-inverse-primary">{invoice.id}</span> },
-    { header: t('table.date'), cell: (invoice) => invoice.date },
-    { header: t('billing.amount'), cell: (invoice) => formatCurrency(invoice.amount) },
-    { header: t('table.status'), cell: (invoice) => <StatusBadge status={invoice.status} /> },
+  const handleCreatePaymentUrl = async (transaction: PaymentTransaction) => {
+    setPayingTransactionId(transaction.id);
+    setTransactionError(null);
+    setTransactionActionMessage(null);
+
+    try {
+      const response = await createVnPayPaymentUrl(transaction.id);
+
+      if (response.paymentUrl?.trim()) {
+        toast.info(t('billing.pay'), t('toast.infoTitle'));
+        window.location.assign(response.paymentUrl);
+        return;
+      }
+
+      setTransactionError(t('billing.paymentUrlMissing'));
+      toast.warning(t('billing.paymentUrlMissing'), t('toast.warningTitle'));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t('billing.paymentUrlError');
+      setTransactionError(message);
+      toast.error(message, t('toast.errorTitle'));
+    } finally {
+      setPayingTransactionId(null);
+    }
+  };
+
+  const handleCancelPlan = async () => {
+    if (!customerPlan) {
+      return;
+    }
+
+    if (!window.confirm(t('billing.cancelConfirm'))) {
+      return;
+    }
+
+    setIsCancellingPlan(true);
+    setErrorMessage(null);
+    setTransactionActionMessage(null);
+
+    try {
+      const response = await cancelCustomerPlan(customerPlan.id);
+      const nextCustomerPlan = response.data ?? null;
+      setCustomerPlan(nextCustomerPlan);
+      setHasNoPlan(nextCustomerPlan === null);
+      const message = t('billing.cancelSuccess');
+      setTransactionActionMessage(message);
+      toast.success(message, t('toast.successTitle'));
+      await loadPaymentTransactions();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t('billing.cancelError');
+      setErrorMessage(message);
+      toast.error(message, t('toast.errorTitle'));
+    } finally {
+      setIsCancellingPlan(false);
+    }
+  };
+
+  const columns: DataTableColumn<PaymentTransaction>[] = [
+    {
+      header: t('billing.invoice'),
+      cell: (transaction) => (
+        <span className="font-semibold text-primary dark:text-inverse-primary">
+          {transaction.transactionCode || `#${transaction.id}`}
+        </span>
+      ),
+    },
+    {
+      header: t('table.date'),
+      cell: (transaction) => formatDisplayDate(transaction.createdAt, '-', locale),
+    },
+    {
+      header: t('billing.amount'),
+      cell: (transaction) => formatVndCurrency(transaction.amount, t('billing.free')),
+    },
+    {
+      header: t('billing.paymentMethod'),
+      cell: (transaction) => t(`billing.paymentMethod.${transaction.paymentMethod}`),
+    },
+    {
+      header: t('table.status'),
+      cell: (transaction) => (
+        <Badge tone={getPaymentStatusTone(transaction.paymentStatus)}>
+          {transaction.paymentStatus}
+        </Badge>
+      ),
+    },
     {
       header: t('table.actions'),
-      cell: () => (
-        <Button variant="ghost" size="icon" aria-label={t('billing.downloadInvoice')}>
-          <Download className="h-4 w-4" />
+      cell: (transaction) => (
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={
+            payingTransactionId === transaction.id ||
+            transaction.paymentMethod !== 'VNPAY' ||
+            transaction.paymentStatus.toUpperCase() !== 'PENDING'
+          }
+          onClick={() => void handleCreatePaymentUrl(transaction)}
+        >
+          {payingTransactionId === transaction.id ? t('billing.creatingPaymentUrl') : t('billing.pay')}
         </Button>
       ),
     },
@@ -201,7 +330,21 @@ export function BillingPage() {
           <Card
             className="bg-primary text-white dark:bg-slate-900"
             title={<span className="text-white dark:text-slate-100">{customerPlan.subscriptionPlan.planName}</span>}
-            actions={<SubscriptionStatusBadge status={customerPlan.status} />}
+            actions={
+              <div className="flex flex-wrap items-center justify-end gap-sm">
+                <SubscriptionStatusBadge status={customerPlan.status} />
+                {!['CANCELLED', 'EXPIRED'].includes(customerPlan.status.toUpperCase()) && (
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={() => void handleCancelPlan()}
+                    disabled={isCancellingPlan}
+                  >
+                    {isCancellingPlan ? t('billing.cancellingPlan') : t('billing.cancelPlan')}
+                  </Button>
+                )}
+              </div>
+            }
           >
             <div className="space-y-md">
               <p className="text-sm text-surface-container">
@@ -248,10 +391,31 @@ export function BillingPage() {
 
           <Card
             title={t('billing.invoices')}
-            subtitle={t('billing.mockInvoicesNote')}
+            subtitle={t('billing.paymentTransactionsSubtitle')}
             actions={<Receipt className="h-5 w-5 text-primary dark:text-inverse-primary" />}
           >
-            <DataTable columns={columns} data={invoices} getRowKey={(invoice) => invoice.id} />
+            {transactionActionMessage && (
+              <p className="mb-md rounded-lg bg-emerald-50 px-md py-sm text-sm font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200">
+                {transactionActionMessage}
+              </p>
+            )}
+            {transactionError && (
+              <p className="mb-md rounded-lg bg-error-container px-md py-sm text-sm font-semibold text-risk-high-text dark:bg-red-950/40 dark:text-red-200">
+                {transactionError}
+              </p>
+            )}
+            {isLoadingTransactions ? (
+              <p className="text-sm text-on-surface-variant dark:text-slate-400">
+                {t('billing.loadingPaymentHistory')}
+              </p>
+            ) : (
+              <DataTable
+                columns={columns}
+                data={paymentTransactions}
+                getRowKey={(transaction) => String(transaction.id)}
+                emptyMessage={t('billing.noTransactions')}
+              />
+            )}
           </Card>
         </section>
       </>
@@ -268,8 +432,11 @@ export function BillingPage() {
             <Button
               variant="secondary"
               leftIcon={<RefreshCw className="h-4 w-4" />}
-              onClick={() => void loadCustomerPlan()}
-              disabled={isLoadingPlan}
+              onClick={() => {
+                void loadCustomerPlan();
+                void loadPaymentTransactions();
+              }}
+              disabled={isLoadingPlan || isLoadingTransactions}
             >
               {t('billing.refresh')}
             </Button>

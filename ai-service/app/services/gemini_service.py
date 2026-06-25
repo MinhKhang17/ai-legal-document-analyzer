@@ -3,11 +3,28 @@ from __future__ import annotations
 
 import json
 import logging
+from dataclasses import dataclass
 from typing import Any, Dict, List, Sequence
 
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class LegalQueryResult:
+    """Structured response for legal query answers and ticket-suggestion metadata."""
+
+    answer: str | None
+    confidence_score: float | None
+    should_suggest_ticket: bool
+    suggestion_type: str
+    suggestion_reason: str | None
+    missing_information: str | None
+    risk_level: str
+    legal_domain: str | None
+    user_action_hint: str
+    error: str | None = None
 
 
 def build_legal_review_prompt(
@@ -367,6 +384,43 @@ class GeminiService:
             logger.error(f"Error generating answer with Gemini: {e}")
             return self._generate_fallback_answer(question, checklist_results, knowledge_chunks)
 
+    def generate_legal_query_result(
+        self,
+        question: str,
+        user_chunks: List[Dict[str, Any]],
+        knowledge_chunks: List[Dict[str, Any]],
+    ) -> LegalQueryResult:
+        """Return the legal answer plus ticket-suggestion metadata."""
+        if not self.model:
+            logger.warning("Gemini not initialized, using fallback query answer generation")
+            return self._build_query_fallback_result(
+                question,
+                user_chunks,
+                knowledge_chunks,
+                error="LLM not initialized",
+            )
+
+        if not user_chunks and not knowledge_chunks:
+            return self._build_query_fallback_result(question, user_chunks, knowledge_chunks)
+
+        try:
+            prompt = build_legal_query_prompt(question, user_chunks, knowledge_chunks)
+            logger.info("Generating query answer with Gemini...")
+            response = self.model.generate_content(
+                prompt,
+                generation_config=self._build_generation_config(),
+            )
+
+            if response and response.text:
+                logger.info("Query answer generated successfully")
+                return self._parse_legal_query_result(response.text.strip(), question, user_chunks, knowledge_chunks)
+
+            logger.warning("Empty query response from Gemini, using fallback")
+            return self._build_query_fallback_result(question, user_chunks, knowledge_chunks)
+        except Exception as e:
+            logger.error(f"Error generating query answer with Gemini: {e}")
+            return self._build_query_fallback_result(question, user_chunks, knowledge_chunks, error=str(e))
+
     def generate_query_answer(
         self,
         question: str,
@@ -615,6 +669,148 @@ class GeminiService:
             ]
         )
         return "\n".join(answer_parts)
+
+    def _parse_legal_query_result(
+        self,
+        raw_text: str,
+        question: str,
+        user_chunks: List[Dict[str, Any]],
+        knowledge_chunks: List[Dict[str, Any]],
+    ) -> LegalQueryResult:
+        payload = self._extract_json_payload(raw_text)
+        if not payload:
+            return self._build_query_fallback_result(question, user_chunks, knowledge_chunks)
+
+        answer = self._normalize_text(payload.get("answer") or payload.get("response") or raw_text)
+        confidence_score = self._to_float(payload.get("confidenceScore") or payload.get("confidence_score"))
+        should_suggest_ticket = bool(payload.get("shouldSuggestTicket", payload.get("should_suggest_ticket", False)))
+        suggestion_type = self._normalize_query_enum(
+            payload.get("suggestionType") or payload.get("suggestion_type"),
+            default="NONE",
+            allowed={"NONE", "ASK_MORE_INFO", "SUGGEST_LAWYER", "REQUIRE_LAWYER"},
+        )
+        suggestion_reason = self._normalize_text(payload.get("suggestionReason") or payload.get("suggestion_reason")) or None
+        missing_information = self._normalize_text(payload.get("missingInformation") or payload.get("missing_information")) or None
+        risk_level = self._normalize_query_enum(
+            payload.get("riskLevel") or payload.get("risk_level"),
+            default="MEDIUM" if should_suggest_ticket else "LOW",
+            allowed={"LOW", "MEDIUM", "HIGH"},
+        )
+        legal_domain = self._normalize_text(payload.get("legalDomain") or payload.get("legal_domain")) or None
+        user_action_hint = self._normalize_query_enum(
+            payload.get("userActionHint") or payload.get("user_action_hint"),
+            default="CREATE_TICKET" if should_suggest_ticket else "CONTINUE_CHAT",
+            allowed={"CONTINUE_CHAT", "PROVIDE_MORE_INFO", "CREATE_TICKET"},
+        )
+
+        if should_suggest_ticket and suggestion_type == "NONE":
+            suggestion_type = "REQUIRE_LAWYER" if risk_level == "HIGH" else "SUGGEST_LAWYER"
+        if should_suggest_ticket and user_action_hint == "CONTINUE_CHAT":
+            user_action_hint = "CREATE_TICKET"
+        if confidence_score is None:
+            confidence_score = self._estimate_query_confidence(user_chunks, knowledge_chunks, risk_level)
+
+        return LegalQueryResult(
+            answer=answer or None,
+            confidence_score=confidence_score,
+            should_suggest_ticket=should_suggest_ticket,
+            suggestion_type=suggestion_type,
+            suggestion_reason=suggestion_reason,
+            missing_information=missing_information,
+            risk_level=risk_level,
+            legal_domain=legal_domain,
+            user_action_hint=user_action_hint,
+            error=None,
+        )
+
+    def _build_query_fallback_result(
+        self,
+        question: str,
+        user_chunks: List[Dict[str, Any]],
+        knowledge_chunks: List[Dict[str, Any]],
+        *,
+        error: str | None = None,
+    ) -> LegalQueryResult:
+        answer = self._generate_query_fallback_answer(question, user_chunks, knowledge_chunks)
+        has_context = bool(user_chunks or knowledge_chunks)
+        risk_level = "HIGH" if not has_context else "MEDIUM"
+        should_suggest_ticket = not has_context or len(knowledge_chunks) == 0
+        suggestion_type = "REQUIRE_LAWYER" if not has_context else "SUGGEST_LAWYER"
+        user_action_hint = "CREATE_TICKET" if should_suggest_ticket else "PROVIDE_MORE_INFO"
+        missing_information = "Thiếu dữ liệu đầu vào để kết luận chắc chắn." if should_suggest_ticket else "Cần thêm thông tin và căn cứ pháp lý."
+        suggestion_reason = error or "Câu hỏi chưa đủ dữ liệu hoặc cần chuyên gia pháp lý rà soát thêm."
+        return LegalQueryResult(
+            answer=answer,
+            confidence_score=self._estimate_query_confidence(user_chunks, knowledge_chunks, risk_level),
+            should_suggest_ticket=should_suggest_ticket,
+            suggestion_type=suggestion_type,
+            suggestion_reason=suggestion_reason,
+            missing_information=missing_information,
+            risk_level=risk_level,
+            legal_domain=self._detect_legal_domain(user_chunks, knowledge_chunks),
+            user_action_hint=user_action_hint,
+            error=error,
+        )
+
+    def _extract_json_payload(self, text: str) -> Dict[str, Any] | None:
+        compact = text.strip()
+        if compact.startswith("```"):
+            compact = compact.removeprefix("```").strip()
+            if compact.lower().startswith("json"):
+                compact = compact[4:].lstrip()
+            if compact.endswith("```"):
+                compact = compact[:-3].strip()
+        try:
+            parsed = json.loads(compact)
+        except json.JSONDecodeError:
+            return None
+        return parsed if isinstance(parsed, dict) else None
+
+    def _normalize_query_enum(self, value: Any, *, default: str, allowed: set[str]) -> str:
+        normalized = self._normalize_text(value).upper().replace(" ", "_")
+        if normalized in allowed:
+            return normalized
+        return default
+
+    def _estimate_query_confidence(
+        self,
+        user_chunks: Sequence[Dict[str, Any]],
+        knowledge_chunks: Sequence[Dict[str, Any]],
+        risk_level: str,
+    ) -> float:
+        score = 0.4
+        score += min(len(user_chunks), 3) * 0.12
+        score += min(len(knowledge_chunks), 3) * 0.1
+        if risk_level == "HIGH":
+            score -= 0.15
+        elif risk_level == "LOW":
+            score += 0.1
+        return max(0.05, min(0.98, round(score, 2)))
+
+    def _detect_legal_domain(
+        self,
+        user_chunks: Sequence[Dict[str, Any]],
+        knowledge_chunks: Sequence[Dict[str, Any]],
+    ) -> str | None:
+        candidates = list(user_chunks) + list(knowledge_chunks)
+        for chunk in candidates:
+            domain = self._normalize_text(
+                chunk.get("legalDomain")
+                or chunk.get("legal_domain")
+                or chunk.get("category")
+                or chunk.get("title")
+            )
+            if domain:
+                return domain[:120]
+        return None
+
+    def _to_float(self, value: Any) -> float | None:
+        try:
+            if value is None:
+                return None
+            return float(value)
+        except Exception:
+            return None
 
     def _generate_query_fallback_answer(
         self,

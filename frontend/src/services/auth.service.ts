@@ -1,4 +1,5 @@
 import { API_ENDPOINTS, buildApiUrl } from "../config/api";
+import { buildAuthHeaders } from "./http";
 import type {
   ApiErrorResponse,
   AuthMeResponse,
@@ -196,5 +197,14 @@ export async function refreshAccessToken(): Promise<RefreshResponse> {
     API_ENDPOINTS.auth.refresh,
     null,
     "Session refresh failed. Please sign in again.",
+  );
+}
+
+export async function logout(): Promise<void> {
+  await postJson<unknown>(
+    API_ENDPOINTS.auth.logout,
+    null,
+    "Logout failed. Your local session will still be cleared.",
+    buildAuthHeaders({ Accept: "application/json" }),
   );
 }

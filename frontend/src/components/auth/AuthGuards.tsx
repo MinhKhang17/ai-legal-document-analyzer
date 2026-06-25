@@ -26,6 +26,20 @@ function resolveRedirectToDashboardOrAdmin(user: CurrentUserState) {
   return "/dashboard";
 }
 
+function RoleAccessDeniedView() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-ivory px-6 text-on-surface dark:bg-slate-950 dark:text-slate-100">
+      <div className="max-w-md text-center">
+        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-primary dark:text-inverse-primary">Access restricted</p>
+        <h1 className="mt-3 font-domine text-2xl font-bold">This account cannot access this page.</h1>
+        <p className="mt-3 text-sm text-on-surface-variant dark:text-slate-400">
+          Please switch to an account with the matching role or return to the correct workspace area.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function PublicRoute({ children }: RouteGuardProps) {
   const { isAuthLoading, isAuthReady, isAuthenticated, user } = useAppStore();
 
@@ -62,6 +76,38 @@ export function AuthenticatedRoute({ children }: RouteGuardProps) {
   }
 
   return <>{children}</>;
+}
+
+export function CustomerRoute({ children }: RouteGuardProps) {
+  const { isAuthLoading, isAuthReady, isAuthenticated, user } = useAppStore();
+  const location = useLocation();
+
+  if (isAuthLoading || !isAuthReady) {
+    return <AuthLoadingView />;
+  }
+
+  if (!isAuthenticated || user === null || user.active === false) {
+    return (
+      <Navigate
+        to="/login"
+        replace
+        state={{
+          errorMessage: "You must be signed in to access this page.",
+          from: location.pathname,
+        }}
+      />
+    );
+  }
+
+  if (user.role === "CUSTOMER") {
+    return <>{children}</>;
+  }
+
+  if (user.role === "ADMIN") {
+    return <Navigate to="/admin" replace />;
+  }
+
+  return <RoleAccessDeniedView />;
 }
 
 export function AdminRoute({ children }: RouteGuardProps) {

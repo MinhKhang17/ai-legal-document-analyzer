@@ -91,7 +91,7 @@ export function LoginPage() {
             }
 
             if (!currentUser.active) {
-              signOut();
+              void signOut({ remote: false });
               localStorage.removeItem("accessToken");
               setError("Your account is inactive.");
               return;
@@ -106,7 +106,7 @@ export function LoginPage() {
             }
           } catch (error) {
             localStorage.removeItem("accessToken");
-            signOut();
+            void signOut({ remote: false });
             setError(error instanceof Error ? error.message : "Login failed");
           } finally {
             setLoading(false);
