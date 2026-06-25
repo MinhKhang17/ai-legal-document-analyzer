@@ -1,0 +1,122 @@
+# KIẾN THỨC PHÁP LÝ CƠ BẢN VỀ HỢP ĐỒNG DÂN SỰ VIỆT NAM
+
+## 1. NGUYÊN TẮC CƠ BẢN CỦA PHÁP LUẬT HỢP ĐỒNG
+
+### Nguyên tắc tự do giao kết hợp đồng
+Theo Điều 3 Bộ luật Dân sự 2015, các bên có quyền tự do thỏa thuận về nội dung hợp đồng, miễn là không trái pháp luật, đạo đức xã hội.
+
+### Nguyên tắc thiện chí, trung thực
+Các bên phải thiện chí, trung thực trong giao kết và thực hiện hợp đồng, không bên nào được lừa dối bên kia.
+
+### Nguyên tắc bình đẳng
+Các bên đều bình đẳng trước pháp luật, không ai bị ép buộc, không bên nào có quyền áp đặt.
+
+## 2. ĐIỀU KIỆN HỢP ĐỒNG CÓ HIỆU LỰC
+
+### Hợp đồng có hiệu lực khi nào?
+Theo Điều 117 Bộ luật Dân sự 2015, hợp đồng có hiệu lực khi:
+- Chủ thể có năng lực pháp luật dân sự, năng lực hành vi dân sự
+- Chủ thể tham gia giao dịch hoàn toàn tự nguyện
+- Mục đích và nội dung không vi phạm điều cấm, không trái đạo đức xã hội
+- Hình thức phù hợp quy định pháp luật (nếu có yêu cầu)
+
+### Hợp đồng vô hiệu là gì?
+Hợp đồng vô hiệu khi vi phạm một trong các điều kiện có hiệu lực. Hậu quả: các bên hoàn trả cho nhau những gì đã nhận, bên có lỗi phải bồi thường thiệt hại.
+
+### Hợp đồng vô hiệu do giả tạo là gì?
+Khi các bên xác lập hợp đồng giả tạo để che giấu hợp đồng khác (ví dụ: hợp đồng mua bán ghi giá thấp hơn thực tế để trốn thuế), hợp đồng giả tạo vô hiệu, hợp đồng bị che giấu vẫn có hiệu lực nếu đáp ứng đủ điều kiện.
+
+## 3. PHẠT VI PHẠM VÀ BỒI THƯỜNG THIỆT HẠI
+
+### Phạt vi phạm hợp đồng
+Theo Điều 418 Bộ luật Dân sự 2015:
+- Phạt vi phạm là thỏa thuận của các bên, bên vi phạm phải nộp một khoản tiền cho bên bị vi phạm
+- Mức phạt do các bên thỏa thuận
+- Với hợp đồng thương mại: mức phạt tối đa 8% giá trị phần hợp đồng bị vi phạm (Điều 301 Luật Thương mại 2005)
+
+### Bồi thường thiệt hại
+Theo Điều 419 Bộ luật Dân sự 2015:
+- Thiệt hại được bồi thường bao gồm: thiệt hại thực tế và lợi ích trực tiếp bị mất
+- Bên yêu cầu bồi thường phải chứng minh thiệt hại
+- Bên vi phạm được giảm mức bồi thường nếu bên bị vi phạm không áp dụng biện pháp hạn chế thiệt hại
+
+### Có thể vừa phạt vi phạm vừa bồi thường thiệt hại không?
+Có. Các bên có thể thỏa thuận trong hợp đồng vừa phạt vi phạm vừa bồi thường thiệt hại. Nếu không thỏa thuận, bên bị vi phạm chỉ được yêu cầu bồi thường thiệt hại (không được phạt vi phạm).
+
+## 4. BẤT KHẢ KHÁNG VÀ MIỄN TRÁCH NHIỆM
+
+### Sự kiện bất khả kháng là gì?
+Theo Điều 156 Bộ luật Dân sự 2015, sự kiện bất khả kháng là:
+- Sự kiện xảy ra một cách khách quan
+- Không thể lường trước được
+- Không thể khắc phục mặc dù đã áp dụng mọi biện pháp cần thiết và khả năng cho phép
+- Ví dụ: thiên tai, dịch bệnh, chiến tranh, lệnh cấm của cơ quan nhà nước
+
+### Bên vi phạm có được miễn trách do bất khả kháng không?
+Có. Bên vi phạm nghĩa vụ do sự kiện bất khả kháng không phải chịu trách nhiệm dân sự, trừ trường hợp có thỏa thuận khác hoặc pháp luật có quy định khác. Tuy nhiên, bên gặp bất khả kháng phải thông báo kịp thời cho bên kia.
+
+## 5. CHẤM DỨT HỢP ĐỒNG
+
+### Các trường hợp chấm dứt hợp đồng
+Theo Điều 422 Bộ luật Dân sự 2015:
+- Hợp đồng đã được hoàn thành
+- Theo thỏa thuận của các bên
+- Cá nhân giao kết hợp đồng chết
+- Pháp nhân giao kết hợp đồng chấm dứt tồn tại
+- Hợp đồng bị hủy bỏ, đơn phương chấm dứt
+- Hợp đồng không thể thực hiện do đối tượng không còn
+- Các trường hợp khác theo quy định
+
+### Đơn phương chấm dứt hợp đồng
+Theo Điều 428 Bộ luật Dân sự 2015:
+- Một bên có quyền đơn phương chấm dứt nếu hợp đồng hoặc pháp luật quy định
+- Phải thông báo ngay cho bên kia
+- Nếu đơn phương chấm dứt trái pháp luật, phải bồi thường thiệt hại
+
+## 6. GIẢI QUYẾT TRANH CHẤP
+
+### Các phương thức giải quyết tranh chấp hợp đồng
+- Thương lượng trực tiếp giữa các bên
+- Hòa giải thông qua bên thứ ba
+- Trọng tài thương mại (nếu có thỏa thuận trọng tài)
+- Khởi kiện tại Tòa án nhân dân có thẩm quyền
+
+### Thời hiệu khởi kiện tranh chấp hợp đồng
+Theo Điều 429 Bộ luật Dân sự 2015, thời hiệu khởi kiện tranh chấp hợp đồng là 03 năm, kể từ ngày người có quyền yêu cầu biết hoặc phải biết quyền và lợi ích hợp pháp bị xâm phạm.
+
+### Tòa án nào có thẩm quyền giải quyết?
+- Tranh chấp dân sự: Tòa án nhân dân cấp huyện nơi bị đơn cư trú/trụ sở
+- Tranh chấp bất động sản: Tòa án nơi có bất động sản
+- Tranh chấp thương mại phức tạp: Tòa án nhân dân cấp tỉnh
+
+## 7. HỢP ĐỒNG DỊCH VỤ
+
+### Hợp đồng dịch vụ là gì?
+Theo Điều 513 Bộ luật Dân sự 2015, hợp đồng dịch vụ là sự thỏa thuận giữa các bên, theo đó bên cung ứng dịch vụ thực hiện công việc cho bên sử dụng dịch vụ, bên sử dụng dịch vụ phải trả tiền dịch vụ.
+
+### Nghĩa vụ của bên cung ứng dịch vụ
+- Thực hiện công việc đúng chất lượng, số lượng, thời hạn
+- Không được giao cho người khác thực hiện nếu không có thỏa thuận
+- Bảo quản, giữ gìn tài liệu, phương tiện được giao
+- Thông báo cho bên sử dụng dịch vụ nếu thông tin không đầy đủ
+
+### Nghĩa vụ của bên sử dụng dịch vụ
+- Cung cấp thông tin, tài liệu và phương tiện cần thiết
+- Trả tiền dịch vụ đầy đủ, đúng thời hạn
+- Hợp tác trong quá trình thực hiện dịch vụ
+
+## 8. HỢP ĐỒNG ĐẦU TƯ
+
+### Các loại hợp đồng đầu tư phổ biến
+- Hợp đồng hợp tác kinh doanh (BCC)
+- Hợp đồng liên doanh
+- Hợp đồng BOT, BTO, BT
+- Hợp đồng góp vốn
+- Hợp đồng chuyển nhượng vốn
+
+### Rủi ro phổ biến trong hợp đồng đầu tư
+- Không rõ ràng về tỷ lệ góp vốn và phân chia lợi nhuận
+- Thiếu cơ chế giải quyết bế tắc (deadlock)
+- Không quy định rõ quyền quản lý, điều hành
+- Thiếu điều khoản thoái vốn (exit clause)
+- Không có điều khoản chống pha loãng (anti-dilution)

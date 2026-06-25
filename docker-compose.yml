@@ -69,7 +69,7 @@ services:
       neo4j:
         condition: service_healthy
     volumes:
-      # - ./ai-service:/app  # COMMENTED: This overwrites container code, causing issues
+      - ./ai-service:/app
       - shared_uploads:/app/uploads
       - ai_service_models:/root/.cache
 

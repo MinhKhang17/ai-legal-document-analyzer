@@ -115,14 +115,22 @@ def _build_sentence_groups(text: str, target_tokens: int, max_tokens: int, overl
         return [cleaned]
 
     sentences = [piece.strip() for piece in _SENTENCE_SPLIT_PATTERN.split(cleaned) if piece.strip()]
+    
+    # Pre-split sentences that are too large to prevent infinite loops in grouping/flushing
+    split_sentences = []
+    for s in sentences:
+        if _token_count(s) <= max_tokens:
+            split_sentences.append(s)
+        else:
+            words = s.split()
+            start = 0
+            while start < len(words):
+                split_sentences.append(" ".join(words[start : start + target_tokens]).strip())
+                start += target_tokens
+    sentences = split_sentences
+
     if len(sentences) <= 1:
-        words = cleaned.split()
-        pieces: list[str] = []
-        start = 0
-        while start < len(words):
-            pieces.append(" ".join(words[start : start + max_tokens]).strip())
-            start += max_tokens
-        return [piece for piece in pieces if piece]
+        return sentences
 
     groups: list[str] = []
     current_sentences: list[str] = []
@@ -152,6 +160,10 @@ def _build_sentence_groups(text: str, target_tokens: int, max_tokens: int, overl
         sentence_tokens = _token_count(sentence)
         if current_sentences and current_tokens + sentence_tokens > max_tokens:
             flush(with_overlap=True)
+            # If after flushing, combining with the overlap still exceeds max_tokens, drop the overlap
+            if current_tokens + sentence_tokens > max_tokens:
+                current_sentences = []
+                current_tokens = 0
         current_sentences.append(sentence)
         current_tokens += sentence_tokens
         if current_tokens >= target_tokens and current_tokens <= max_tokens:
