@@ -143,6 +143,15 @@ public class LegalTicket {
     @Column(name = "reopened_at")
     private LocalDateTime reopenedAt;
 
+    @Column(name = "close_reason", columnDefinition = "TEXT")
+    private String closeReason;
+
+    @Column(name = "last_customer_message_at")
+    private LocalDateTime lastCustomerMessageAt;
+
+    @Column(name = "last_lawyer_message_at")
+    private LocalDateTime lastLawyerMessageAt;
+
     @Column(nullable = false)
     @Builder.Default
     private boolean deleted = false;

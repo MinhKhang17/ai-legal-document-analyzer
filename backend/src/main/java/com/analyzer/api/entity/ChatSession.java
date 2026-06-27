@@ -32,6 +32,22 @@ public class ChatSession {
     @Column(nullable = false)
     private String title;
 
+    @Column(columnDefinition = "TEXT")
+    private String summary;
+
+    @Column(name = "summary_updated_at")
+    private LocalDateTime summaryUpdatedAt;
+
+    @Column(name = "memory_json", columnDefinition = "TEXT")
+    private String memoryJson;
+
+    @Column(name = "context_json", columnDefinition = "TEXT")
+    private String contextJson;
+
+    @Column(name = "context_version")
+    @Builder.Default
+    private Long contextVersion = 1L;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private ChatSessionStatus status;
