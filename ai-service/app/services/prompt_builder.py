@@ -266,5 +266,21 @@ def build_user_prompt(question: str, user_hits: list[RagChunkHit], knowledge_hit
         f"{user_context or '[none]'}\n\n"
         "==================================================\n\n"
         "# KIẾN THỨC PHÁP LÝ\n\n"
-        f"{knowledge_context or '[none]'}"
+        f"{knowledge_context or '[none]'}\n\n"
+        "==================================================\n\n"
+        "# OUTPUT CONTRACT\n\n"
+        "Trả về CHỈ JSON duy nhất, không bổ sung Markdown ngoài JSON.\n\n"
+        "Tất cả field bắt buộc dùng snake_case:\n"
+        "{\n"
+        '  "answer": "string",\n'
+        '  "confidence_score": 0.0,\n'
+        '  "should_suggest_ticket": false,\n'
+        '  "suggestion_type": "NONE | ASK_MORE_INFO | SUGGEST_LAWYER | REQUIRE_LAWYER",\n'
+        '  "suggestion_reason": "string or null",\n'
+        '  "missing_information": "string or null",\n'
+        '  "risk_level": "LOW | MEDIUM | HIGH",\n'
+        '  "legal_domain": "string or null",\n'
+        '  "user_action_hint": "CONTINUE_CHAT | PROVIDE_MORE_INFO | CREATE_TICKET"\n'
+        "}\n\n"
+        "Nếu không chắc chắn, hãy tạo answer an toàn và bật ticket suggestion bằng cách đặt should_suggest_ticket=true và user_action_hint=CREATE_TICKET."
     )

@@ -1,58 +1,154 @@
-import { Download, Eye, Filter, MessageSquareText, MoreHorizontal, UploadCloud } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { FolderOpen, MessageSquareText, UploadCloud } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FileUploadZone } from '../../components/upload/FileUploadZone';
-import { ProcessingTimeline } from '../../components/upload/ProcessingTimeline';
-import { Badge } from '../../components/common/Badge';
 import { Button } from '../../components/common/Button';
 import { Card } from '../../components/common/Card';
 import { DataTable, type DataTableColumn } from '../../components/common/DataTable';
+import { EmptyState } from '../../components/common/EmptyState';
 import { PageHeader } from '../../components/common/PageHeader';
-import { RiskBadge } from '../../components/common/RiskBadge';
 import { SearchInput } from '../../components/common/SearchInput';
 import { StatusBadge } from '../../components/common/StatusBadge';
-import { documents } from '../../api/mockData';
+import { getWorkspaceDocuments, getWorkspaces } from '../../api/workspaceApi';
 import { useI18n } from '../../hooks/useI18n';
-import type { LegalDocument } from '../../types/document';
+import type { Document, Workspace } from '../../types/workspace';
+
+const getAccessToken = () => localStorage.getItem('accessToken') ?? '';
+
+type DocumentRow = Document & {
+  workspaceName: string;
+};
 
 export function DocumentsPage() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [query, setQuery] = useState('');
-  const [fakeUploadActive, setFakeUploadActive] = useState(false);
+  const [documents, setDocuments] = useState<DocumentRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+
+    const loadDocuments = async () => {
+      setLoading(true);
+      setError('');
+
+      try {
+        const workspaces = await getWorkspaces(getAccessToken());
+        const documentGroups = await Promise.all(
+          workspaces.map(async (workspace: Workspace) => {
+            const workspaceDocuments = await getWorkspaceDocuments(getAccessToken(), workspace.workspaceId);
+            return workspaceDocuments.map((document) => ({
+              ...document,
+              workspaceName: workspace.name,
+            }));
+          }),
+        );
+
+        if (active) {
+          setDocuments(documentGroups.flat());
+        }
+      } catch (err) {
+        if (active) {
+          setError(err instanceof Error ? err.message : t('documents.loadError'));
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void loadDocuments();
+
+    return () => {
+      active = false;
+    };
+  }, [t]);
+
   const filteredDocuments = useMemo(
-    () => documents.filter((document) => `${document.name} ${document.type} ${document.projectName}`.toLowerCase().includes(query.toLowerCase())),
-    [query],
+    () =>
+      documents.filter((document) =>
+        `${document.originalFileName} ${document.fileType} ${document.workspaceName}`.toLowerCase().includes(query.toLowerCase()),
+      ),
+    [documents, query],
   );
 
-  const columns: DataTableColumn<LegalDocument>[] = [
+  const columns: DataTableColumn<DocumentRow>[] = [
     {
       header: t('table.document'),
       cell: (document) => (
         <div>
-          <Link to={`/documents/${document.id}`} className="font-semibold text-primary hover:underline dark:text-inverse-primary">
-            {document.name}
-          </Link>
-          <p className="text-xs text-on-surface-variant dark:text-slate-400">{document.size} · {document.pages} pages</p>
+          <p className="font-semibold text-on-surface dark:text-slate-100">
+            {document.originalFileName}
+          </p>
+          <p className="text-xs text-on-surface-variant dark:text-slate-400">
+            {document.fileType} · {new Intl.NumberFormat(language === 'vi' ? 'vi-VN' : 'en-US').format(document.fileSize)} bytes
+          </p>
         </div>
       ),
     },
-    { header: t('documents.type'), cell: (document) => document.type },
-    { header: t('table.project'), cell: (document) => document.projectName },
-    { header: t('table.risk'), cell: (document) => <RiskBadge level={document.riskLevel} /> },
+    {
+      header: t('table.project'),
+      cell: (document) => (
+        <Link to={`/projects/${document.workspaceId}`} className="font-semibold text-primary hover:underline dark:text-inverse-primary">
+          {document.workspaceName}
+        </Link>
+      ),
+    },
+    { header: t('documents.type'), cell: (document) => document.fileType },
     { header: t('table.status'), cell: (document) => <StatusBadge status={document.status} /> },
+    {
+      header: t('table.date'),
+      cell: (document) =>
+        new Intl.DateTimeFormat(language === 'vi' ? 'vi-VN' : 'en-US', {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+        }).format(new Date(document.uploadedAt)),
+    },
     {
       header: t('table.actions'),
       cell: (document) => (
-        <div className="flex items-center gap-xs">
-          <Link to={`/documents/${document.id}`} aria-label={`${t('actions.open')} ${document.name}`}>
-            <Button variant="ghost" size="icon"><Eye className="h-4 w-4" /></Button>
-          </Link>
-          <Button variant="ghost" size="icon" aria-label={t('actions.download')}><Download className="h-4 w-4" /></Button>
-          <Button variant="ghost" size="icon" aria-label={t('table.actions')}><MoreHorizontal className="h-4 w-4" /></Button>
-        </div>
+        <Link to={`/projects/${document.workspaceId}`} aria-label={`${t('actions.openWorkspace')} ${document.workspaceName}`}>
+          <Button variant="ghost" size="sm" leftIcon={<FolderOpen className="h-4 w-4" />}>
+            {t('actions.openWorkspace')}
+          </Button>
+        </Link>
       ),
     },
   ];
+
+  const renderContent = () => {
+    if (loading) {
+      return <p className="text-sm text-on-surface-variant dark:text-slate-400">{t('documents.loading')}</p>;
+    }
+
+    if (error) {
+      return (
+        <EmptyState
+          title={t('documents.loadErrorTitle')}
+          description={error}
+        />
+      );
+    }
+
+    if (documents.length === 0) {
+      return (
+        <EmptyState
+          title={t('documents.emptyTitle')}
+          description={t('documents.emptyDescription')}
+        />
+      );
+    }
+
+    return (
+      <>
+        <div className="mb-lg">
+          <SearchInput value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('documents.searchPlaceholder')} containerClassName="lg:w-96" />
+        </div>
+        <DataTable columns={columns} data={filteredDocuments} getRowKey={(document) => document.documentId} emptyMessage={t('documents.noSearchResults')} />
+      </>
+    );
+  };
 
   return (
     <div>
@@ -66,23 +162,8 @@ export function DocumentsPage() {
         }
       />
 
-      <section className="grid gap-gutter xl:grid-cols-[0.85fr_1.15fr]">
-        <FileUploadZone onUpload={() => setFakeUploadActive(true)} />
-        <Card title={t('documents.aiProcessingFlow')} actions={<Badge tone={fakeUploadActive ? 'gold' : 'green'}>{fakeUploadActive ? t('status.processing') : t('status.ready')}</Badge>}>
-          <ProcessingTimeline orientation="horizontal" />
-        </Card>
-      </section>
-
-      <Card className="mt-xl" title={t('documents.recent')} actions={<Button variant="secondary" leftIcon={<Filter className="h-4 w-4" />}>{t('actions.filter')}</Button>}>
-        <div className="mb-lg flex flex-col gap-md lg:flex-row lg:items-center lg:justify-between">
-          <SearchInput value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('documents.searchPlaceholder')} containerClassName="lg:w-96" />
-          <div className="flex flex-wrap gap-sm">
-            <Badge tone="blue">{t('documents.reviewed')}</Badge>
-            <Badge tone="gold">{t('status.processing')}</Badge>
-            <Badge tone="red">{t('documents.highRisk')}</Badge>
-          </div>
-        </div>
-        <DataTable columns={columns} data={filteredDocuments} getRowKey={(document) => document.id} />
+      <Card title={t('documents.recent')}>
+        {renderContent()}
       </Card>
 
       <div className="fixed bottom-lg right-lg hidden rounded-full shadow-raised xl:block">

@@ -1,4 +1,5 @@
-import { API_ENDPOINTS, buildApiUrl } from "../config/api";
+import { API_ENDPOINTS } from "../config/api";
+import { buildBearerHeaders, requestApiData } from "./http";
 import type {
   CreateWorkspaceRequest,
   Document,
@@ -13,27 +14,21 @@ type DocumentResponse = Omit<Document, "status"> & {
   status: string;
 };
 
-const getAuthHeaders = (accessToken: string): HeadersInit => ({
-  Authorization: `Bearer ${accessToken}`,
-});
-
 const normalizeStatus = <T extends { status: string }>(item: T) => ({
   ...item,
   status: item.status.toLowerCase(),
 });
 
 export async function getWorkspaces(accessToken: string): Promise<Workspace[]> {
-  const response = await fetch(buildApiUrl(API_ENDPOINTS.workspaces.list), {
-    method: "GET",
-    headers: getAuthHeaders(accessToken),
-    credentials: "include",
-  });
-
-  if (!response.ok) {
-    throw new Error("Không thể tải danh sách workspace");
-  }
-
-  const data: WorkspaceResponse[] = await response.json();
+  const data = await requestApiData<WorkspaceResponse[]>(
+    API_ENDPOINTS.workspaces.list,
+    {
+      method: "GET",
+      headers: buildBearerHeaders(accessToken),
+      credentials: "include",
+    },
+    "Không thể tải danh sách workspace",
+  );
 
   return data.map((workspace) => normalizeStatus(workspace) as Workspace);
 }
@@ -42,20 +37,15 @@ export async function getWorkspaceDetail(
   accessToken: string,
   workspaceId: string,
 ): Promise<Workspace> {
-  const response = await fetch(
-    buildApiUrl(API_ENDPOINTS.workspaces.detail(workspaceId)),
+  const data = await requestApiData<WorkspaceResponse>(
+    API_ENDPOINTS.workspaces.detail(workspaceId),
     {
       method: "GET",
-      headers: getAuthHeaders(accessToken),
+      headers: buildBearerHeaders(accessToken),
       credentials: "include",
     },
+    "Không thể tải workspace",
   );
-
-  if (!response.ok) {
-    throw new Error("Không thể tải workspace");
-  }
-
-  const data: WorkspaceResponse = await response.json();
 
   return normalizeStatus(data) as Workspace;
 }
@@ -64,21 +54,18 @@ export async function createWorkspace(
   accessToken: string,
   payload: CreateWorkspaceRequest,
 ): Promise<Workspace> {
-  const response = await fetch(buildApiUrl(API_ENDPOINTS.workspaces.create), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...getAuthHeaders(accessToken),
+  const data = await requestApiData<WorkspaceResponse>(
+    API_ENDPOINTS.workspaces.create,
+    {
+      method: "POST",
+      headers: buildBearerHeaders(accessToken, {
+        "Content-Type": "application/json",
+      }),
+      credentials: "include",
+      body: JSON.stringify(payload),
     },
-    credentials: "include",
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    throw new Error("Tạo workspace thất bại");
-  }
-
-  const data: WorkspaceResponse = await response.json();
+    "Tạo workspace thất bại",
+  );
 
   return normalizeStatus(data) as Workspace;
 }
@@ -91,21 +78,16 @@ export async function uploadDocument(
   const formData = new FormData();
   formData.append("file", file);
 
-  const response = await fetch(
-    buildApiUrl(API_ENDPOINTS.workspaces.documents(workspaceId)),
+  const data = await requestApiData<DocumentResponse>(
+    API_ENDPOINTS.workspaces.documents(workspaceId),
     {
       method: "POST",
-      headers: getAuthHeaders(accessToken),
+      headers: buildBearerHeaders(accessToken),
       credentials: "include",
       body: formData,
     },
+    "Upload tài liệu thất bại",
   );
-
-  if (!response.ok) {
-    throw new Error("Upload tài liệu thất bại");
-  }
-
-  const data: DocumentResponse = await response.json();
 
   return normalizeStatus(data) as Document;
 }
@@ -114,20 +96,15 @@ export async function getWorkspaceDocuments(
   accessToken: string,
   workspaceId: string,
 ): Promise<Document[]> {
-  const response = await fetch(
-    buildApiUrl(API_ENDPOINTS.workspaces.documents(workspaceId)),
+  const data = await requestApiData<DocumentResponse[]>(
+    API_ENDPOINTS.workspaces.documents(workspaceId),
     {
       method: "GET",
-      headers: getAuthHeaders(accessToken),
+      headers: buildBearerHeaders(accessToken),
       credentials: "include",
     },
+    "Không thể tải danh sách tài liệu",
   );
-
-  if (!response.ok) {
-    throw new Error("Không thể tải danh sách tài liệu");
-  }
-
-  const data: DocumentResponse[] = await response.json();
 
   return data.map((document) => normalizeStatus(document) as Document);
 }

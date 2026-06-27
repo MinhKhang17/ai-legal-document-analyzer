@@ -24,6 +24,30 @@ class RAGService:
         try:
             user_hits, legal_search_query, knowledge_hits = self._retrieve_query_context(request)
             if not user_hits and not knowledge_hits:
+                query_result = gemini_service.generate_legal_query_result(
+                    question=request.question,
+                    user_chunks=[],
+                    knowledge_chunks=[],
+                )
+                return RAGQueryResponse(
+                    request_id=request.request_id,
+                    success=True,
+                    answer=query_result.answer,
+                    confidence_score=query_result.confidence_score,
+                    should_suggest_ticket=query_result.should_suggest_ticket,
+                    suggestion_type=query_result.suggestion_type,
+                    suggestion_reason=query_result.suggestion_reason,
+                    missing_information=query_result.missing_information,
+                    risk_level=query_result.risk_level,
+                    legal_domain=query_result.legal_domain,
+                    user_action_hint=query_result.user_action_hint,
+                    checklist_results=[],
+                    knowledge_chunks=[],
+                    total_checklist_items=0,
+                    total_user_chunks=0,
+                    total_knowledge_chunks=0,
+                    processing_time_ms=(time.time() - start_time) * 1000,
+                )
                 return RAGQueryResponse(
                     request_id=request.request_id,
                     success=True,
@@ -36,7 +60,7 @@ class RAGService:
                     processing_time_ms=(time.time() - start_time) * 1000,
                 )
 
-            answer = gemini_service.generate_query_answer(
+            query_result = gemini_service.generate_legal_query_result(
                 question=request.question,
                 user_chunks=[self._hit_to_context_dict(hit) for hit in user_hits],
                 knowledge_chunks=[self._hit_to_context_dict(hit) for hit in knowledge_hits],
@@ -45,7 +69,15 @@ class RAGService:
             return RAGQueryResponse(
                 request_id=request.request_id,
                 success=True,
-                answer=answer,
+                answer=query_result.answer,
+                confidence_score=query_result.confidence_score,
+                should_suggest_ticket=query_result.should_suggest_ticket,
+                suggestion_type=query_result.suggestion_type,
+                suggestion_reason=query_result.suggestion_reason,
+                missing_information=query_result.missing_information,
+                risk_level=query_result.risk_level,
+                legal_domain=query_result.legal_domain,
+                user_action_hint=query_result.user_action_hint,
                 checklist_results=[],
                 knowledge_chunks=[self._hit_to_context_dict(hit) for hit in knowledge_hits],
                 total_checklist_items=0,
@@ -58,6 +90,14 @@ class RAGService:
             return RAGQueryResponse(
                 request_id=request.request_id,
                 success=False,
+                confidence_score=0.0,
+                should_suggest_ticket=True,
+                suggestion_type="REQUIRE_LAWYER",
+                suggestion_reason=f"Lá»—i xá»­ lÃ½: {str(e)}",
+                missing_information="Thiếu dữ liệu hoặc lỗi xử lý AI.",
+                risk_level="HIGH",
+                legal_domain=None,
+                user_action_hint="CREATE_TICKET",
                 answer="Không đủ thông tin để kết luận.",
                 checklist_results=[],
                 knowledge_chunks=[],

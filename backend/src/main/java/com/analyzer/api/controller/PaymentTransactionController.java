@@ -3,19 +3,30 @@ package com.analyzer.api.controller;
 import com.analyzer.api.dto.ApiResponseDTO;
 import com.analyzer.api.dto.paymenttransaction.PaymentTransactionResponseDTO;
 import com.analyzer.api.dto.paymenttransaction.PaymentUrlResponseDTO;
+import com.analyzer.api.dto.paymenttransaction.VnPayIpnResponseDTO;
 import com.analyzer.api.security.UserDetailsImpl;
 import com.analyzer.api.service.PaymentTransactionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.util.UriComponentsBuilder;
 
-import java.util.HashMap;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 
@@ -29,6 +40,9 @@ import java.util.Map;
 public class PaymentTransactionController {
 
     private final PaymentTransactionService paymentTransactionService;
+
+    @Value("${app.frontend.payment-result-url:http://localhost:5173/billing/payment-result}")
+    private String paymentResultUrl;
 
     @GetMapping("/me")
     @PreAuthorize("isAuthenticated()")
@@ -76,10 +90,13 @@ public class PaymentTransactionController {
             summary = "Xử lý kết quả trả về từ VNPAY",
             description = "Xác thực các tham số VNPAY trả về và cập nhật trạng thái giao dịch."
     )
-    public ResponseEntity<ApiResponseDTO<PaymentTransactionResponseDTO>> handleVnPayReturn(
+    public ResponseEntity<Void> handleVnPayReturn(
             @RequestParam Map<String, String> params) {
-        PaymentTransactionResponseDTO response = paymentTransactionService.handleVnPayCallback(params);
-        return ResponseEntity.ok(ApiResponseDTO.success("Xử lý kết quả thanh toán VNPAY thành công", response));
+        paymentTransactionService.handleVnPayCallback(params);
+        URI redirectUri = buildPaymentResultRedirectUri(params);
+        return ResponseEntity.status(HttpStatus.FOUND)
+                .header(HttpHeaders.LOCATION, redirectUri.toString())
+                .build();
     }
 
     @GetMapping("/vnpay-ipn")
@@ -87,36 +104,9 @@ public class PaymentTransactionController {
             summary = "Xử lý IPN từ VNPAY",
             description = "Xác thực thông báo IPN từ VNPAY và cập nhật trạng thái giao dịch."
     )
-    public ResponseEntity<Map<String, String>> handleVnPayIpn(@RequestParam Map<String, String> params) {
+    public ResponseEntity<VnPayIpnResponseDTO> handleVnPayIpn(@RequestParam Map<String, String> params) {
         paymentTransactionService.handleVnPayCallback(params);
-
-        Map<String, String> response = new HashMap<>();
-        response.put("RspCode", "00");
-        response.put("Message", "Confirm Success");
-
-        return ResponseEntity.ok(response);
-    }
-
-    @PutMapping("/{id}/success")
-    @PreAuthorize("isAuthenticated()")
-    @Operation(
-            summary = "Giả lập thanh toán thành công",
-            description = "Giả lập giao dịch thanh toán thành công và kích hoạt gói dịch vụ của khách hàng."
-    )
-    public ResponseEntity<ApiResponseDTO<PaymentTransactionResponseDTO>> simulateSuccess(@PathVariable Long id) {
-        PaymentTransactionResponseDTO response = paymentTransactionService.simulateSuccess(id);
-        return ResponseEntity.ok(ApiResponseDTO.success("Giả lập thanh toán thành công", response));
-    }
-
-    @PutMapping("/{id}/failed")
-    @PreAuthorize("isAuthenticated()")
-    @Operation(
-            summary = "Giả lập thanh toán thất bại",
-            description = "Giả lập giao dịch thanh toán thất bại. Gói dịch vụ vẫn ở trạng thái chờ thanh toán."
-    )
-    public ResponseEntity<ApiResponseDTO<PaymentTransactionResponseDTO>> simulateFailed(@PathVariable Long id) {
-        PaymentTransactionResponseDTO response = paymentTransactionService.simulateFailed(id);
-        return ResponseEntity.ok(ApiResponseDTO.success("Giả lập thanh toán thất bại", response));
+        return ResponseEntity.ok(new VnPayIpnResponseDTO("00", "Confirm Success"));
     }
 
     private Long getCurrentUserId() {
@@ -144,5 +134,13 @@ public class PaymentTransactionController {
         }
 
         return request.getRemoteAddr();
+    }
+
+    private URI buildPaymentResultRedirectUri(Map<String, String> params) {
+        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(paymentResultUrl);
+        params.forEach(builder::queryParam);
+        return builder.build()
+                .encode(StandardCharsets.UTF_8)
+                .toUri();
     }
 }

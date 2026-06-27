@@ -3,6 +3,9 @@ package com.analyzer.api.entity;
 import com.analyzer.api.enums.ChatMessageRole;
 import com.analyzer.api.enums.ChatMessageStatus;
 import com.analyzer.api.enums.ChatMessageType;
+import com.analyzer.api.enums.RiskLevel;
+import com.analyzer.api.enums.SuggestionType;
+import com.analyzer.api.enums.UserActionHint;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -48,6 +51,33 @@ public class ChatMessage {
 
     @Column(name = "ai_model")
     private String aiModel;
+
+    @Column(name = "confidence_score")
+    private Double confidenceScore;
+
+    @Column(name = "should_suggest_ticket")
+    private Boolean shouldSuggestTicket;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "suggestion_type")
+    private SuggestionType suggestionType;
+
+    @Column(name = "suggestion_reason", columnDefinition = "TEXT")
+    private String suggestionReason;
+
+    @Column(name = "missing_information", columnDefinition = "TEXT")
+    private String missingInformation;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "risk_level")
+    private RiskLevel riskLevel;
+
+    @Column(name = "legal_domain")
+    private String legalDomain;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "user_action_hint")
+    private UserActionHint userActionHint;
 
     @Column(name = "prompt_tokens")
     private Integer promptTokens;

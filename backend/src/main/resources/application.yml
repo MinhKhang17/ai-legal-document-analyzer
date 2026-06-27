@@ -1,14 +1,17 @@
 spring:
   application:
     name: ai-legal-document-analyzer
+
   jackson:
     parser:
       allow-unquoted-control-chars: true
+
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/ai_legal_db}
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:12345}
     driver-class-name: org.postgresql.Driver
+
   jpa:
     hibernate:
       ddl-auto: update
@@ -17,6 +20,7 @@ spring:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
+
   servlet:
     multipart:
       max-file-size: 50MB
@@ -34,19 +38,30 @@ springdoc:
 
 app:
   api:
-    callback-base-url: ${APP_CALLBACK_BASE_URL:http://localhost:8080}
+    callback-base-url: http://localhost:8080
+
   ai-service:
-    base-url: ${AI_SERVICE_BASE_URL:http://localhost:8000}
+    base-url: http://localhost:8000
+
   storage:
-    upload-root: ${UPLOAD_ROOT:uploads}
+    upload-root: uploads
+
   jwt:
     secret: a-very-secure-secret-key-that-should-be-at-least-256-bits-long-for-hmac-sha-256
-    access-token-expiration-ms: 900000       # 15 minutes
-    refresh-token-expiration-ms: 604800000   # 7 days
+    access-token-expiration-ms: 900000
+    refresh-token-expiration-ms: 604800000
     refresh-cookie-name: refreshToken
+
   payment:
     vnpay:
-      pay-url: ${VNPAY_PAY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
-      return-url: ${VNPAY_RETURN_URL:http://localhost:8080/api/v1/payment-transactions/vnpay-return}
-      tmn-code: ${VNPAY_TMN_CODE:CHANGE_ME}
-      hash-secret: ${VNPAY_HASH_SECRET:CHANGE_ME}
+      pay-url: https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
+      return-url: http://localhost:8080/api/v1/payment-transactions/vnpay-return
+
+      tmn-code: JSLOYW6T
+      hash-secret: QPZPU6FGA8L3WXRHEWV1UQHFBHLMWUPP
+
+      version: 2.1.0
+      command: pay
+      curr-code: VND
+      order-type: other
+      locale: vn

@@ -1,5 +1,5 @@
 import { UploadCloud } from 'lucide-react';
-import { useCallback, useId, useState, type DragEvent } from 'react';
+import { useCallback, useRef, useState, type DragEvent } from 'react';
 import { Button } from '../common/Button';
 import { cn } from '../../utils/cn';
 import { useI18n } from '../../hooks/useI18n';
@@ -16,7 +16,7 @@ export function FileUploadZone({
   disabled = false,
 }: FileUploadZoneProps) {
   const { t } = useI18n();
-  const inputId = useId();
+  const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
   const handleFiles = useCallback(
@@ -42,7 +42,8 @@ export function FileUploadZone({
     <div
       className={cn(
         'rounded-xl border-2 border-dashed border-outline-variant bg-white p-xl text-center transition dark:border-slate-700 dark:bg-slate-900',
-        dragging && 'border-primary bg-surface-container-low dark:border-inverse-primary dark:bg-slate-800',
+        dragging &&
+          'border-primary bg-surface-container-low dark:border-inverse-primary dark:bg-slate-800',
         compact && 'p-lg',
         disabled && 'cursor-not-allowed opacity-60',
       )}
@@ -57,10 +58,10 @@ export function FileUploadZone({
       aria-label={t('documents.dropzoneTitle')}
     >
       <input
-        id={inputId}
+        ref={inputRef}
         type="file"
         accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        hidden
+        className="hidden"
         disabled={disabled}
         onChange={(event) => {
           handleFiles(event.target.files);
@@ -80,11 +81,15 @@ export function FileUploadZone({
         {t('documents.dropzoneHint')}
       </p>
 
-      <label htmlFor={inputId} className="inline-block">
-        <Button className="mt-lg" variant="primary" disabled={disabled}>
-          {disabled ? 'Đang tải lên...' : t('actions.selectFiles')}
-        </Button>
-      </label>
+      <Button
+        type="button"
+        className="mt-lg"
+        variant="primary"
+        disabled={disabled}
+        onClick={() => inputRef.current?.click()}
+      >
+        {disabled ? 'Đang tải lên...' : t('actions.selectFiles')}
+      </Button>
     </div>
   );
 }

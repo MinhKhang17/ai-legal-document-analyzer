@@ -1,4 +1,4 @@
-import { AlertTriangle, FileText, Plus, Sparkles } from "lucide-react";
+import { FileText, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -12,16 +12,17 @@ import { Badge } from "../../components/common/Badge";
 import { Button } from "../../components/common/Button";
 import { Card } from "../../components/common/Card";
 import { PageHeader } from "../../components/common/PageHeader";
-import { ProgressBar } from "../../components/common/ProgressBar";
 import { StatusBadge } from "../../components/common/StatusBadge";
 import { FileUploadZone } from "../../components/upload/FileUploadZone";
 import { ProcessingTimeline } from "../../components/upload/ProcessingTimeline";
 import { useI18n } from "../../hooks/useI18n";
+import { useToast } from "../../hooks/useToast";
 
 const getAccessToken = () => localStorage.getItem("accessToken") ?? "";
 
 export function UploadPage() {
   const { t } = useI18n();
+  const toast = useToast();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -38,7 +39,6 @@ export function UploadPage() {
   const [creatingWorkspace, setCreatingWorkspace] = useState(false);
   const [loadingWorkspaces, setLoadingWorkspaces] = useState(false);
   const [loadingDocuments, setLoadingDocuments] = useState(false);
-  const [progress, setProgress] = useState(65);
   const [error, setError] = useState("");
 
   const hasProcessingDocument = documents.some(
@@ -106,16 +106,6 @@ export function UploadPage() {
   }, [selectedWorkspaceId, t]);
 
   useEffect(() => {
-    if (!hasProcessingDocument) return undefined;
-
-    const timer = window.setInterval(() => {
-      setProgress((previous) => (previous >= 96 ? 65 : previous + 5));
-    }, 900);
-
-    return () => window.clearInterval(timer);
-  }, [hasProcessingDocument]);
-
-  useEffect(() => {
     if (!selectedWorkspaceId || !hasProcessingDocument) return undefined;
 
     const timer = window.setInterval(async () => {
@@ -138,6 +128,7 @@ export function UploadPage() {
 
     if (!workspaceName.trim()) {
       setError(t("upload.workspaceNameRequired"));
+      toast.warning(t("upload.workspaceNameRequired"), t("toast.warningTitle"));
       return;
     }
 
@@ -154,10 +145,12 @@ export function UploadPage() {
       setSearchParams({ workspaceId: workspace.workspaceId });
       setWorkspaceName("");
       setWorkspaceDescription("");
+      toast.success(t("workspace.createSuccess"), t("toast.successTitle"));
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : t("upload.createWorkspaceFailed"),
-      );
+      const message =
+        err instanceof Error ? err.message : t("workspace.createError");
+      setError(message);
+      toast.error(message, t("toast.errorTitle"));
     } finally {
       setCreatingWorkspace(false);
     }
@@ -168,6 +161,7 @@ export function UploadPage() {
 
     if (!selectedWorkspaceId) {
       setError(t("upload.selectWorkspaceRequired"));
+      toast.warning(t("upload.selectWorkspaceRequired"), t("toast.warningTitle"));
       return;
     }
 
@@ -181,9 +175,13 @@ export function UploadPage() {
       );
 
       setDocuments((previous) => [uploadedDocument, ...previous]);
+      toast.success(t("workspace.uploadDocumentSuccess"), t("toast.successTitle"));
       void navigate(`/projects/${selectedWorkspaceId}`, { replace: false });
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("upload.uploadFailed"));
+      const message =
+        err instanceof Error ? err.message : t("workspace.uploadDocumentError");
+      setError(message);
+      toast.error(message, t("toast.errorTitle"));
     } finally {
       setUploading(false);
     }
@@ -289,10 +287,10 @@ export function UploadPage() {
               {selectedWorkspaceId && (
                 <div className="flex flex-wrap gap-sm">
                   <Link to={`/projects/${selectedWorkspaceId}`}>
-                    <Button variant="secondary">Open workspace</Button>
+                    <Button variant="secondary">{t("actions.openWorkspace")}</Button>
                   </Link>
                   <Link to={`/chat?workspaceId=${selectedWorkspaceId}`}>
-                    <Button variant="secondary">Open chat</Button>
+                    <Button variant="secondary">{t("actions.openChat")}</Button>
                   </Link>
                 </div>
               )}
@@ -363,12 +361,8 @@ export function UploadPage() {
                   </div>
 
                   {document.status === "processing" && (
-                    <div className="mt-md">
-                      <div className="mb-xs flex items-center justify-between text-sm">
-                        <span>{t("upload.extractingTextAndTables")}</span>
-                        <span>{progress}%</span>
-                      </div>
-                      <ProgressBar value={progress} />
+                    <div className="mt-md rounded-lg bg-surface-container-low p-sm text-sm text-on-surface-variant dark:bg-slate-800 dark:text-slate-400">
+                      {t("upload.processingStatusDescription")}
                     </div>
                   )}
                 </div>
@@ -386,31 +380,24 @@ export function UploadPage() {
             <div className="flex items-center gap-sm">
               <Sparkles className="h-5 w-5 text-secondary dark:text-accent-gold" />
               <h2 className="text-title-lg font-semibold">
-                {t("upload.recentIntelligence")}
+                {t("upload.workspaceStatus")}
               </h2>
             </div>
 
             <div className="mt-md space-y-md text-sm">
-              <div className="rounded-lg bg-white p-md dark:bg-slate-950">
-                <p className="label-uppercase text-secondary dark:text-accent-gold">
-                  {t("upload.aiSuggestion")}
-                </p>
-                <p className="mt-xs font-semibold">
-                  {t("upload.aiSuggestionTitle")}
-                </p>
-                <p className="mt-xs text-on-surface-variant dark:text-slate-400">
-                  {t("upload.aiSuggestionDescription")}
-                </p>
-              </div>
+              <p className="leading-6 text-on-surface-variant dark:text-slate-300">
+                {selectedWorkspace
+                  ? t("upload.workspaceStatusDescription")
+                      .replace("{workspace}", selectedWorkspace.name)
+                      .replace("{count}", String(documents.length))
+                  : t("upload.selectWorkspaceForStatus")}
+              </p>
 
-              <div className="flex items-start gap-sm text-on-surface-variant dark:text-slate-400">
-                <AlertTriangle className="mt-0.5 h-4 w-4 text-error" />
-                {t("upload.riskVariance")}
-              </div>
-
-              <Button variant="gold" rightIcon={<Plus className="h-4 w-4" />}>
-                {t("actions.viewDetails")}
-              </Button>
+              {selectedWorkspaceId && (
+                <Link to={`/projects/${selectedWorkspaceId}`}>
+                  <Button variant="gold">{t("actions.openWorkspace")}</Button>
+                </Link>
+              )}
             </div>
           </Card>
         </aside>

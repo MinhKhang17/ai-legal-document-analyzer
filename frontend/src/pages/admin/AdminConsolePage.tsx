@@ -1,24 +1,41 @@
-import { CheckCircle2, Cpu, Database, LockKeyhole, Monitor, Moon, MoreHorizontal, Palette, ShieldCheck, Sun, UserPlus, UsersRound } from 'lucide-react';
-import { useState } from 'react';
+import { Cpu, Database, Monitor, Moon, MoreHorizontal, Palette, Receipt, RefreshCw, ShieldCheck, Sun, UserPlus, UsersRound } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AdminMetricCard } from '../../components/admin/AdminMetricCard';
 import { Badge } from '../../components/common/Badge';
 import { Button } from '../../components/common/Button';
 import { Card } from '../../components/common/Card';
 import { DataTable, type DataTableColumn } from '../../components/common/DataTable';
+import { EmptyState } from '../../components/common/EmptyState';
+import { Modal } from '../../components/common/Modal';
 import { PageHeader } from '../../components/common/PageHeader';
 import { ProgressBar } from '../../components/common/ProgressBar';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { Tabs } from '../../components/common/Tabs';
 import { LanguageToggle } from '../../components/common/LanguageToggle';
-import { workspaceUsers } from '../../api/mockData';
 import { useI18n } from '../../hooks/useI18n';
+import { useToast } from '../../hooks/useToast';
+import { assignLawyerToLegalTicket, getAdminLegalTickets } from '../../services/legalTicket.service';
+import { getAllPaymentTransactions, simulatePaymentFailed, simulatePaymentSuccess } from '../../services/paymentTransaction.service';
+import {
+  createSubscriptionPlan,
+  deleteSubscriptionPlan,
+  getSubscriptionPlans,
+  updateSubscriptionPlan,
+} from '../../services/subscription.service';
+import { getUserDetail, getUsers, type BackendUser } from '../../services/user.service';
 import { useAppStore, type ThemeMode } from '../../store/AppStore';
+import type { LegalTicket } from '../../types/legalTicket';
+import type { PaymentTransaction } from '../../types/paymentTransaction';
+import type { SubscriptionPlan, SubscriptionPlanRequest } from '../../types/subscription';
 import type { WorkspaceUser } from '../../types/user';
+import { formatDisplayDate, formatVndCurrency } from '../../utils/format';
 
-type AdminTabId = 'users' | 'workspace' | 'language' | 'theme' | 'security' | 'aiConfig';
+type AdminTabId = 'users' | 'plans' | 'tickets' | 'workspace' | 'language' | 'theme' | 'security' | 'aiConfig';
 
-const adminTabs: Array<{ id: AdminTabId; labelKey: string }> = [
+const adminTabs: Array<{ id: AdminTabId; labelKey?: string; label?: string }> = [
   { id: 'users', labelKey: 'admin.tabs.users' },
+  { id: 'plans', labelKey: 'admin.tabs.plans' },
+  { id: 'tickets', labelKey: 'admin.tabs.tickets' },
   { id: 'workspace', labelKey: 'admin.tabs.workspace' },
   { id: 'language', labelKey: 'admin.tabs.language' },
   { id: 'theme', labelKey: 'admin.tabs.theme' },
@@ -34,14 +51,294 @@ const themeOptions: Array<{ mode: ThemeMode; labelKey: string; icon: typeof Sun 
 
 const legalTextSizes = ['16px', '18px', '20px'] as const;
 
+const emptyPlanForm: SubscriptionPlanRequest = {
+  planName: '',
+  planType: 'MONTHLY',
+  description: '',
+  price: 0,
+  durationDays: 30,
+  maxQuota: 100,
+  active: true,
+};
+
 const getTabId = (tab: AdminTabId) => `admin-tab-${tab}`;
 const getPanelId = (tab: AdminTabId) => `admin-panel-${tab}`;
 
+const getInitials = (user: BackendUser) => {
+  const source = `${user.firstName} ${user.lastName}`.trim() || user.email;
+  return source
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((segment) => segment[0]?.toUpperCase())
+    .join('')
+    .slice(0, 2);
+};
+
+const toWorkspaceUser = (user: BackendUser): WorkspaceUser => ({
+  id: String(user.id),
+  name: `${user.firstName} ${user.lastName}`.trim() || user.email,
+  email: user.email,
+  role: user.role,
+  status: user.active ? 'active' : 'offline',
+  lastAccess: 'Backend does not provide last access',
+  initials: getInitials(user),
+});
+
 export function AdminConsolePage() {
   const { t } = useI18n();
+  const toast = useToast();
   const { theme, setTheme } = useAppStore();
   const [activeTab, setActiveTab] = useState<AdminTabId>('users');
   const [legalTextSize, setLegalTextSize] = useState<(typeof legalTextSizes)[number]>('18px');
+  const [backendUsers, setBackendUsers] = useState<BackendUser[]>([]);
+  const [adminUsers, setAdminUsers] = useState<WorkspaceUser[]>([]);
+  const [paymentTransactions, setPaymentTransactions] = useState<PaymentTransaction[]>([]);
+  const [subscriptionPlans, setSubscriptionPlans] = useState<SubscriptionPlan[]>([]);
+  const [legalTickets, setLegalTickets] = useState<LegalTicket[]>([]);
+  const [isLoadingAdminData, setIsLoadingAdminData] = useState(true);
+  const [adminError, setAdminError] = useState<string | null>(null);
+  const [selectedUserDetail, setSelectedUserDetail] = useState<BackendUser | null>(null);
+  const [userDetailOpen, setUserDetailOpen] = useState(false);
+  const [userDetailLoading, setUserDetailLoading] = useState(false);
+  const [planForm, setPlanForm] = useState<SubscriptionPlanRequest>(emptyPlanForm);
+  const [editingPlanId, setEditingPlanId] = useState<number | null>(null);
+  const [planActionMessage, setPlanActionMessage] = useState<string | null>(null);
+  const [planError, setPlanError] = useState<string | null>(null);
+  const [savingPlan, setSavingPlan] = useState(false);
+  const [ticketAssigneeById, setTicketAssigneeById] = useState<Record<string, string>>({});
+  const [ticketActionMessage, setTicketActionMessage] = useState<string | null>(null);
+  const [ticketError, setTicketError] = useState<string | null>(null);
+  const [assigningTicketId, setAssigningTicketId] = useState<string | null>(null);
+  const [paymentActionId, setPaymentActionId] = useState<number | null>(null);
+
+  const loadAdminData = useCallback(async () => {
+    setIsLoadingAdminData(true);
+    setAdminError(null);
+
+    const [usersResult, paymentsResult, plansResult, ticketsResult] = await Promise.allSettled([
+      getUsers(),
+      getAllPaymentTransactions(),
+      getSubscriptionPlans(),
+      getAdminLegalTickets(),
+    ]);
+
+    if (usersResult.status === 'fulfilled') {
+      setBackendUsers(usersResult.value);
+      setAdminUsers(usersResult.value.map(toWorkspaceUser));
+    } else {
+      setBackendUsers([]);
+      setAdminUsers([]);
+      setAdminError(usersResult.reason instanceof Error ? usersResult.reason.message : 'Không thể tải danh sách người dùng');
+    }
+
+    if (paymentsResult.status === 'fulfilled') {
+      setPaymentTransactions(paymentsResult.value);
+    } else {
+      setPaymentTransactions([]);
+      setAdminError((previous) => {
+        const nextMessage =
+          paymentsResult.reason instanceof Error
+            ? paymentsResult.reason.message
+            : 'Không thể tải lịch sử thanh toán admin';
+        return previous ? `${previous} ${nextMessage}` : nextMessage;
+      });
+    }
+
+    if (plansResult.status === 'fulfilled') {
+      setSubscriptionPlans(plansResult.value.data ?? []);
+    } else {
+      setSubscriptionPlans([]);
+      setAdminError((previous) => {
+        const nextMessage =
+          plansResult.reason instanceof Error
+            ? plansResult.reason.message
+            : 'Không thể tải subscription plans';
+        return previous ? `${previous} ${nextMessage}` : nextMessage;
+      });
+    }
+
+    if (ticketsResult.status === 'fulfilled') {
+      setLegalTickets(ticketsResult.value);
+    } else {
+      setLegalTickets([]);
+      setTicketError(ticketsResult.reason instanceof Error ? ticketsResult.reason.message : 'Không thể tải legal tickets');
+    }
+
+    setIsLoadingAdminData(false);
+  }, []);
+
+  useEffect(() => {
+    void loadAdminData();
+  }, [loadAdminData]);
+
+  const activeUsersCount = useMemo(
+    () => adminUsers.filter((user) => user.status === 'active').length,
+    [adminUsers],
+  );
+  const expertUsers = useMemo(
+    () => backendUsers.filter((user) => user.active && user.role === 'EXPERT'),
+    [backendUsers],
+  );
+
+  const handleOpenUserDetail = async (userId: string) => {
+    setUserDetailOpen(true);
+    setUserDetailLoading(true);
+    setSelectedUserDetail(null);
+
+    try {
+      const user = await getUserDetail(userId);
+      setSelectedUserDetail(user);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t('admin.userDetailError');
+      setAdminError(message);
+      toast.error(message, t('toast.errorTitle'));
+    } finally {
+      setUserDetailLoading(false);
+    }
+  };
+
+  const resetPlanForm = () => {
+    setEditingPlanId(null);
+    setPlanForm(emptyPlanForm);
+    setPlanError(null);
+  };
+
+  const handleSavePlan = async () => {
+    if (!planForm.planName.trim() || !planForm.planType.trim()) {
+      setPlanError(t('admin.planNameRequired'));
+      toast.warning(t('admin.planNameRequired'), t('toast.warningTitle'));
+      return;
+    }
+
+    setSavingPlan(true);
+    setPlanError(null);
+    setPlanActionMessage(null);
+
+    try {
+      const response = editingPlanId
+        ? await updateSubscriptionPlan(editingPlanId, planForm)
+        : await createSubscriptionPlan(planForm);
+
+      const savedPlan = response.data;
+      if (savedPlan) {
+        setSubscriptionPlans((previous) =>
+          editingPlanId
+            ? previous.map((plan) => (plan.id === savedPlan.id ? savedPlan : plan))
+            : [savedPlan, ...previous],
+        );
+      }
+      const message = editingPlanId ? t('admin.planUpdated') : t('admin.planCreated');
+      setPlanActionMessage(message);
+      toast.success(message, t('toast.successTitle'));
+      resetPlanForm();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t('admin.planSaveError');
+      setPlanError(message);
+      toast.error(message, t('toast.errorTitle'));
+    } finally {
+      setSavingPlan(false);
+    }
+  };
+
+  const handleEditPlan = (plan: SubscriptionPlan) => {
+    setEditingPlanId(plan.id);
+    setPlanForm({
+      planName: plan.planName,
+      planType: plan.planType,
+      description: plan.description ?? '',
+      price: plan.price,
+      durationDays: plan.durationDays,
+      maxQuota: plan.maxQuota,
+      active: plan.active,
+    });
+    setActiveTab('plans');
+  };
+
+  const handleDeletePlan = async (planId: number) => {
+    if (!window.confirm(t('admin.deletePlanConfirm'))) {
+      return;
+    }
+
+    setSavingPlan(true);
+    setPlanError(null);
+    setPlanActionMessage(null);
+
+    try {
+      await deleteSubscriptionPlan(planId);
+      setSubscriptionPlans((previous) => previous.filter((plan) => plan.id !== planId));
+      const message = t('admin.planDeleted');
+      setPlanActionMessage(message);
+      toast.success(message, t('toast.successTitle'));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t('admin.planDeleteError');
+      setPlanError(message);
+      toast.error(message, t('toast.errorTitle'));
+    } finally {
+      setSavingPlan(false);
+    }
+  };
+
+  const handleAssignTicket = async (ticketId: string) => {
+    const lawyerId = ticketAssigneeById[ticketId]?.trim();
+
+    if (!lawyerId) {
+      setTicketError(t('admin.ticketSelectExpert'));
+      toast.warning(t('admin.ticketSelectExpert'), t('toast.warningTitle'));
+      return;
+    }
+
+    setAssigningTicketId(ticketId);
+    setTicketError(null);
+    setTicketActionMessage(null);
+
+    try {
+      const updatedTicket = await assignLawyerToLegalTicket(ticketId, lawyerId);
+      setLegalTickets((previous) =>
+        previous.map((ticket) => (ticket.id === ticketId ? updatedTicket : ticket)),
+      );
+      const message = `${t('admin.ticketAssigned')} ${ticketId}.`;
+      setTicketActionMessage(message);
+      toast.success(message, t('toast.successTitle'));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t('admin.ticketAssignError');
+      setTicketError(message);
+      toast.error(message, t('toast.errorTitle'));
+    } finally {
+      setAssigningTicketId(null);
+    }
+  };
+
+  const handleSimulatePayment = async (
+    transaction: PaymentTransaction,
+    outcome: 'success' | 'failed',
+  ) => {
+    setPaymentActionId(transaction.id);
+    setAdminError(null);
+
+    try {
+      const updatedTransaction =
+        outcome === 'success'
+          ? await simulatePaymentSuccess(transaction.id)
+          : await simulatePaymentFailed(transaction.id);
+      setPaymentTransactions((previous) =>
+        previous.map((item) =>
+          item.id === updatedTransaction.id ? updatedTransaction : item,
+        ),
+      );
+      toast.success(
+        outcome === 'success'
+          ? t('admin.paymentSimulatedSuccess')
+          : t('admin.paymentSimulatedFailed'),
+        t('toast.successTitle'),
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t('admin.paymentSimulateError');
+      setAdminError(message);
+      toast.error(message, t('toast.errorTitle'));
+    } finally {
+      setPaymentActionId(null);
+    }
+  };
 
   const columns: DataTableColumn<WorkspaceUser>[] = [
     {
@@ -73,69 +370,340 @@ export function AdminConsolePage() {
     { header: t('admin.users.lastAccess'), cell: (user) => <span className="whitespace-nowrap">{user.lastAccess}</span> },
     {
       header: t('table.actions'),
-      cell: () => (
-        <Button variant="ghost" size="icon" aria-label={t('admin.users.userActions')}>
+      cell: (user) => (
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={t('admin.users.userActions')}
+          onClick={() => void handleOpenUserDetail(user.id)}
+        >
           <MoreHorizontal className="h-4 w-4" />
         </Button>
       ),
     },
   ];
 
+  const paymentColumns: DataTableColumn<PaymentTransaction>[] = [
+    {
+      header: t('admin.transaction'),
+      cell: (transaction) => (
+        <span className="font-semibold text-primary dark:text-inverse-primary">
+          {transaction.transactionCode || `#${transaction.id}`}
+        </span>
+      ),
+    },
+    { header: t('admin.plan'), cell: (transaction) => transaction.planName },
+    { header: t('billing.amount'), cell: (transaction) => formatVndCurrency(transaction.amount, t('billing.free')) },
+    { header: t('table.status'), cell: (transaction) => <Badge tone={transaction.paymentStatus === 'SUCCESS' ? 'green' : transaction.paymentStatus === 'FAILED' ? 'red' : 'amber'}>{transaction.paymentStatus}</Badge> },
+    { header: t('table.date'), cell: (transaction) => formatDisplayDate(transaction.createdAt, '-', 'vi-VN') },
+    {
+      header: t('admin.devAction'),
+      cell: (transaction) => (
+        <div className="flex flex-wrap gap-xs">
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={paymentActionId === transaction.id}
+            onClick={() => void handleSimulatePayment(transaction, 'success')}
+          >
+            {t('admin.simulateSuccess')}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={paymentActionId === transaction.id}
+            onClick={() => void handleSimulatePayment(transaction, 'failed')}
+          >
+            {t('admin.simulateFailed')}
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
+  const planColumns: DataTableColumn<SubscriptionPlan>[] = [
+    { header: t('billing.planName'), cell: (plan) => <span className="font-semibold">{plan.planName}</span> },
+    { header: t('billing.planType'), cell: (plan) => plan.planType },
+    { header: t('billing.price'), cell: (plan) => formatVndCurrency(plan.price, t('billing.free')) },
+    { header: t('billing.maxQuota'), cell: (plan) => plan.maxQuota.toLocaleString() },
+    { header: t('admin.duration'), cell: (plan) => `${plan.durationDays} ${t('billing.days')}` },
+    { header: t('table.status'), cell: (plan) => <Badge tone={plan.active ? 'green' : 'slate'}>{plan.active ? t('admin.active') : t('admin.inactive')}</Badge> },
+    {
+      header: t('table.actions'),
+      cell: (plan) => (
+        <div className="flex flex-wrap gap-xs">
+          <Button variant="ghost" size="sm" onClick={() => handleEditPlan(plan)}>
+            {t('actions.edit')}
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => void handleDeletePlan(plan.id)}>
+            {t('actions.delete')}
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
+  const ticketColumns: DataTableColumn<LegalTicket>[] = [
+    { header: t('admin.ticket'), cell: (ticket) => <span className="break-all font-semibold">{ticket.id}</span> },
+    { header: t('table.status'), cell: (ticket) => <Badge tone="amber">{ticket.status ?? 'UNKNOWN'}</Badge> },
+    { header: t('table.risk'), cell: (ticket) => ticket.risk_level ? <Badge tone={ticket.risk_level === 'HIGH' ? 'red' : 'amber'}>{ticket.risk_level}</Badge> : '-' },
+    { header: 'Domain', cell: (ticket) => ticket.legal_domain ?? '-' },
+    { header: t('workspace.createdAt'), cell: (ticket) => formatDisplayDate(ticket.created_at, '-', 'vi-VN') },
+    {
+      header: t('admin.assign'),
+      cell: (ticket) => (
+        <div className="flex min-w-56 flex-wrap gap-xs">
+          <select
+            className="rounded-lg border border-outline-variant bg-white px-sm py-xs text-xs dark:border-slate-700 dark:bg-slate-900"
+            value={ticketAssigneeById[ticket.id] ?? ticket.assigned_lawyer_id ?? ''}
+            onChange={(event) =>
+              setTicketAssigneeById((previous) => ({
+                ...previous,
+                [ticket.id]: event.target.value,
+              }))
+            }
+            disabled={expertUsers.length === 0}
+          >
+            <option value="">{expertUsers.length === 0 ? t('admin.noExpertUsers') : t('admin.selectExpert')}</option>
+            {expertUsers.map((user) => (
+              <option key={user.id} value={String(user.id)}>
+                {`${user.firstName} ${user.lastName}`.trim() || user.email}
+              </option>
+            ))}
+          </select>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={assigningTicketId === ticket.id || expertUsers.length === 0}
+            onClick={() => void handleAssignTicket(ticket.id)}
+          >
+            {t('admin.assign')}
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   const renderUsersTab = () => (
     <>
+      {adminError && (
+        <div className="mb-lg rounded-xl border border-error/40 bg-error/10 p-md text-sm text-error">
+          {adminError}
+        </div>
+      )}
       <section className="grid gap-gutter md:grid-cols-3">
-        <AdminMetricCard label={t('admin.users.activeUsersLabel')} value="24" detail={t('admin.users.activeUsersDetail')} icon={<UsersRound className="h-5 w-5" />} />
-        <AdminMetricCard label={t('admin.users.twoFaAdoptionLabel')} value="85%" detail={t('admin.users.twoFaAdoptionDetail')} icon={<ShieldCheck className="h-5 w-5" />} tone="green" />
-        <AdminMetricCard label={t('admin.users.passwordExpiryLabel')} value="12%" detail={t('admin.users.passwordExpiryDetail')} icon={<LockKeyhole className="h-5 w-5" />} tone="red" />
+        <AdminMetricCard label={t('admin.users.activeUsersLabel')} value={isLoadingAdminData ? '...' : String(activeUsersCount)} detail={t('admin.users.activeUsersDetail')} icon={<UsersRound className="h-5 w-5" />} />
+        <AdminMetricCard label={t('admin.users.totalUsersLabel')} value={isLoadingAdminData ? '...' : String(adminUsers.length)} detail={t('admin.users.totalUsersDetail')} icon={<ShieldCheck className="h-5 w-5" />} tone="green" />
+        <AdminMetricCard label={t('admin.users.paymentRowsLabel')} value={isLoadingAdminData ? '...' : String(paymentTransactions.length)} detail={t('admin.users.paymentRowsDetail')} icon={<Receipt className="h-5 w-5" />} tone="gold" />
       </section>
 
       <div className="mt-xl grid gap-gutter xl:grid-cols-[1.2fr_0.8fr]">
-        <Card title={t('admin.users')} actions={<Badge tone="blue">{t('admin.users.badgeCount')}</Badge>}>
-          <DataTable columns={columns} data={workspaceUsers} getRowKey={(user) => user.id} />
-        </Card>
+        <div className="space-y-gutter">
+          <Card
+            title={t('admin.users')}
+            actions={<Badge tone="blue">{isLoadingAdminData ? '...' : `${adminUsers.length} users`}</Badge>}
+          >
+            {isLoadingAdminData ? (
+              <p className="text-sm text-on-surface-variant dark:text-slate-400">{t('admin.loadingUsers')}</p>
+            ) : (
+              <DataTable
+                columns={columns}
+                data={adminUsers}
+                getRowKey={(user) => user.id}
+                emptyMessage={t('admin.noUsers')}
+              />
+            )}
+          </Card>
+
+          <Card
+            title={t('admin.paymentTransactions')}
+            subtitle={t('admin.paymentTransactionsSubtitle')}
+            actions={<Receipt className="h-5 w-5 text-primary dark:text-inverse-primary" />}
+          >
+            {isLoadingAdminData ? (
+              <p className="text-sm text-on-surface-variant dark:text-slate-400">{t('admin.loadingPayments')}</p>
+            ) : (
+              <DataTable
+                columns={paymentColumns}
+                data={paymentTransactions}
+                getRowKey={(transaction) => String(transaction.id)}
+                emptyMessage={t('admin.noPayments')}
+              />
+            )}
+          </Card>
+        </div>
 
         <aside className="space-y-gutter">
           <Card tone="ai">
-            <h2 className="text-title-lg font-semibold">{t('admin.users.aiRecommendationTitle')}</h2>
-            <p className="mt-sm text-sm leading-6 text-on-surface-variant dark:text-slate-300">
-              {t('admin.users.aiRecommendationText')}
-            </p>
-            <div className="mt-md grid grid-cols-2 gap-sm">
-              <div className="rounded-lg bg-white p-md dark:bg-slate-950">
-                <p className="label-uppercase">{t('table.risk')}</p>
-                <p className="mt-xs font-bold text-secondary dark:text-accent-gold">{t('risk.medium')}</p>
-              </div>
-              <div className="rounded-lg bg-white p-md dark:bg-slate-950">
-                <p className="label-uppercase">{t('table.updated')}</p>
-                <p className="mt-xs font-bold">{t('admin.users.justNow')}</p>
-              </div>
-            </div>
+            <EmptyState
+              title={t('admin.users.aiRecommendationUnavailableTitle')}
+              description={t('admin.users.aiRecommendationUnavailableDescription')}
+            />
           </Card>
 
           <Card title={t('admin.security')}>
-            <div className="space-y-md">
-              <div>
-                <div className="mb-xs flex items-center justify-between text-sm">
-                  <span>{t('admin.users.twoFactorAuthentication')}</span>
-                  <span>85%</span>
-                </div>
-                <ProgressBar value={85} />
-              </div>
-              <div>
-                <div className="mb-xs flex items-center justify-between text-sm">
-                  <span>{t('admin.users.passwordRotation')}</span>
-                  <span>12%</span>
-                </div>
-                <ProgressBar value={12} />
-              </div>
-              <Button variant="secondary" className="w-full" leftIcon={<CheckCircle2 className="h-4 w-4" />}>
-                {t('admin.users.manageSecurityPolicy')}
-              </Button>
-            </div>
+            <EmptyState
+              title={t('admin.securityMetricsUnavailableTitle')}
+              description={t('admin.securityMetricsUnavailableDescription')}
+            />
           </Card>
         </aside>
       </div>
     </>
+  );
+
+  const renderPlansTab = () => (
+    <div className="grid gap-gutter xl:grid-cols-[0.9fr_1.1fr]">
+      <Card title={editingPlanId ? t('admin.updatePlan') : t('admin.createPlan')}>
+        <div className="space-y-md">
+          {planError && (
+            <p className="rounded-lg bg-error-container px-md py-sm text-sm font-semibold text-risk-high-text dark:bg-red-950/40 dark:text-red-200">
+              {planError}
+            </p>
+          )}
+          {planActionMessage && (
+            <p className="rounded-lg bg-emerald-50 px-md py-sm text-sm font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200">
+              {planActionMessage}
+            </p>
+          )}
+          <div className="grid gap-md md:grid-cols-2">
+            <label className="text-sm font-semibold">
+              {t('billing.planName')}
+              <input
+                className="form-field mt-xs"
+                value={planForm.planName}
+                onChange={(event) => setPlanForm((previous) => ({ ...previous, planName: event.target.value }))}
+              />
+            </label>
+            <label className="text-sm font-semibold">
+              {t('billing.planType')}
+              <input
+                className="form-field mt-xs"
+                value={planForm.planType}
+                onChange={(event) => setPlanForm((previous) => ({ ...previous, planType: event.target.value }))}
+              />
+            </label>
+            <label className="text-sm font-semibold">
+              {t('billing.price')}
+              <input
+                className="form-field mt-xs"
+                type="number"
+                min={0}
+                value={planForm.price}
+                onChange={(event) => setPlanForm((previous) => ({ ...previous, price: Number(event.target.value) }))}
+              />
+            </label>
+            <label className="text-sm font-semibold">
+              {t('admin.duration')}
+              <input
+                className="form-field mt-xs"
+                type="number"
+                min={1}
+                value={planForm.durationDays}
+                onChange={(event) => setPlanForm((previous) => ({ ...previous, durationDays: Number(event.target.value) }))}
+              />
+            </label>
+            <label className="text-sm font-semibold">
+              {t('billing.maxQuota')}
+              <input
+                className="form-field mt-xs"
+                type="number"
+                min={0}
+                value={planForm.maxQuota}
+                onChange={(event) => setPlanForm((previous) => ({ ...previous, maxQuota: Number(event.target.value) }))}
+              />
+            </label>
+            <label className="flex items-center gap-sm pt-lg text-sm font-semibold">
+              <input
+                type="checkbox"
+                checked={Boolean(planForm.active)}
+                onChange={(event) => setPlanForm((previous) => ({ ...previous, active: event.target.checked }))}
+              />
+              {t('admin.active')}
+            </label>
+          </div>
+          <label className="block text-sm font-semibold">
+            {t('common.description')}
+            <textarea
+              className="form-field mt-xs min-h-24"
+              value={planForm.description ?? ''}
+              onChange={(event) => setPlanForm((previous) => ({ ...previous, description: event.target.value }))}
+            />
+          </label>
+          <div className="flex flex-wrap gap-sm">
+            <Button onClick={() => void handleSavePlan()} disabled={savingPlan}>
+              {savingPlan ? t('admin.saving') : editingPlanId ? t('admin.updatePlan') : t('admin.createPlan')}
+            </Button>
+            <Button variant="secondary" onClick={resetPlanForm} disabled={savingPlan}>
+              {t('actions.reset')}
+            </Button>
+          </div>
+        </div>
+      </Card>
+
+      <Card title={t('admin.plans')} actions={<Badge tone="blue">{subscriptionPlans.length} {t('admin.tabs.plans')}</Badge>}>
+        {isLoadingAdminData ? (
+          <p className="text-sm text-on-surface-variant dark:text-slate-400">{t('admin.loadingPlans')}</p>
+        ) : (
+          <DataTable
+            columns={planColumns}
+            data={subscriptionPlans}
+            getRowKey={(plan) => String(plan.id)}
+            emptyMessage={t('admin.noPlans')}
+          />
+        )}
+      </Card>
+    </div>
+  );
+
+  const renderTicketsTab = () => (
+    <div className="grid gap-gutter xl:grid-cols-[1.2fr_0.8fr]">
+      <Card title={t('admin.tabs.tickets')} subtitle="Backend currently returns persisted tickets when available.">
+        {ticketError && (
+          <p className="mb-md rounded-lg bg-error-container px-md py-sm text-sm font-semibold text-risk-high-text dark:bg-red-950/40 dark:text-red-200">
+            {ticketError}
+          </p>
+        )}
+        {ticketActionMessage && (
+          <p className="mb-md rounded-lg bg-emerald-50 px-md py-sm text-sm font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200">
+            {ticketActionMessage}
+          </p>
+        )}
+        {isLoadingAdminData ? (
+          <p className="text-sm text-on-surface-variant dark:text-slate-400">{t('admin.loadingTickets')}</p>
+        ) : (
+          <DataTable
+            columns={ticketColumns}
+            data={legalTickets}
+            getRowKey={(ticket) => ticket.id}
+            emptyMessage={t('admin.noTickets')}
+          />
+        )}
+      </Card>
+
+      <aside className="space-y-gutter">
+        <Card tone="ai">
+          <h2 className="text-title-lg font-semibold">{t('admin.ticketAssignmentContract')}</h2>
+          <p className="mt-sm text-sm leading-6 text-on-surface-variant dark:text-slate-300">
+            {t('admin.ticketAssignmentDescription')}
+          </p>
+        </Card>
+        <Card title={t('admin.availableExperts')} actions={<Badge tone="blue">{expertUsers.length}</Badge>}>
+          <div className="space-y-sm">
+            {expertUsers.length === 0 ? (
+              <p className="text-sm text-on-surface-variant dark:text-slate-400">{t('admin.noExpertsReturned')}</p>
+            ) : (
+              expertUsers.map((user) => (
+                <div key={user.id} className="rounded-lg border border-legal-border p-sm text-sm dark:border-slate-700">
+                  <p className="font-semibold">{`${user.firstName} ${user.lastName}`.trim() || user.email}</p>
+                  <p className="text-xs text-on-surface-variant dark:text-slate-400">{user.email}</p>
+                </div>
+              ))
+            )}
+          </div>
+        </Card>
+      </aside>
+    </div>
   );
 
   const renderWorkspaceTab = () => (
@@ -160,7 +728,7 @@ export function AdminConsolePage() {
           </div>
         </div>
         <div className="mt-md flex flex-wrap gap-sm">
-          <Button variant="secondary">{t('actions.save')}</Button>
+          <Button variant="secondary" onClick={() => toast.success(t('admin.workspaceSaved'), t('toast.successTitle'))}>{t('actions.save')}</Button>
           <Button variant="ghost">{t('actions.cancel')}</Button>
         </div>
       </Card>
@@ -286,37 +854,17 @@ export function AdminConsolePage() {
   const renderSecurityTab = () => (
     <div className="grid gap-gutter xl:grid-cols-[1.15fr_0.85fr]">
       <Card title={t('admin.security')} subtitle={t('admin.security.subtitle')}>
-        <div className="space-y-md">
-          <div>
-            <div className="mb-xs flex items-center justify-between text-sm">
-              <span>{t('admin.security.twoFactorAuthentication')}</span>
-              <span className="font-semibold">85%</span>
-            </div>
-            <ProgressBar value={85} />
-          </div>
-          <div>
-            <div className="mb-xs flex items-center justify-between text-sm">
-              <span>{t('admin.security.passwordRotation')}</span>
-              <span className="font-semibold">88%</span>
-            </div>
-            <ProgressBar value={88} />
-          </div>
-          <div>
-            <div className="mb-xs flex items-center justify-between text-sm">
-              <span>{t('admin.security.sessionTimeout')}</span>
-              <span className="font-semibold">92%</span>
-            </div>
-            <ProgressBar value={92} />
-          </div>
-          <Button leftIcon={<CheckCircle2 className="h-4 w-4" />}>{t('admin.security.applyPolicyUpdates')}</Button>
-        </div>
+        <EmptyState
+          title={t('admin.securityMetricsUnavailableTitle')}
+          description={t('admin.securityMetricsUnavailableDescription')}
+        />
       </Card>
 
       <Card tone="ai">
-        <h2 className="text-title-lg font-semibold">{t('admin.security.guidance')}</h2>
-        <p className="mt-sm text-sm leading-6 text-on-surface-variant dark:text-slate-300">
-          {t('admin.security.guidanceText')}
-        </p>
+        <EmptyState
+          title={t('admin.securityGuidanceUnavailableTitle')}
+          description={t('admin.securityGuidanceUnavailableDescription')}
+        />
       </Card>
     </div>
   );
@@ -341,8 +889,8 @@ export function AdminConsolePage() {
           </div>
         </div>
         <div className="mt-md flex flex-wrap gap-sm">
-          <Button variant="secondary">{t('actions.save')}</Button>
-          <Button variant="ghost">{t('admin.aiConfig.runValidation')}</Button>
+          <Button variant="secondary" onClick={() => toast.success(t('editor.saveQueued'), t('toast.successTitle'))}>{t('actions.save')}</Button>
+          <Button variant="ghost" onClick={() => toast.info(t('admin.validationQueued'), t('toast.infoTitle'))}>{t('admin.aiConfig.runValidation')}</Button>
         </div>
       </Card>
 
@@ -360,6 +908,10 @@ export function AdminConsolePage() {
     switch (activeTab) {
       case 'users':
         return renderUsersTab();
+      case 'plans':
+        return renderPlansTab();
+      case 'tickets':
+        return renderTicketsTab();
       case 'workspace':
         return renderWorkspaceTab();
       case 'language':
@@ -380,7 +932,19 @@ export function AdminConsolePage() {
       <PageHeader
         title={t('admin.title')}
         subtitle={t('admin.subtitle')}
-        actions={<Button leftIcon={<UserPlus className="h-4 w-4" />}>{t('admin.addUser')}</Button>}
+        actions={
+          <>
+            <Button
+              variant="secondary"
+              leftIcon={<RefreshCw className="h-4 w-4" />}
+              onClick={() => void loadAdminData()}
+              disabled={isLoadingAdminData}
+            >
+              {t('billing.refresh')}
+            </Button>
+            <Button leftIcon={<UserPlus className="h-4 w-4" />}>{t('admin.addUser')}</Button>
+          </>
+        }
       />
 
       <Tabs
@@ -390,7 +954,7 @@ export function AdminConsolePage() {
         getTabId={(id) => getTabId(id as AdminTabId)}
         getPanelId={(id) => getPanelId(id as AdminTabId)}
         onChange={(id) => setActiveTab(id as AdminTabId)}
-        items={adminTabs.map((tab) => ({ id: tab.id, label: t(tab.labelKey) }))}
+        items={adminTabs.map((tab) => ({ id: tab.id, label: tab.label ?? t(tab.labelKey ?? '') }))}
       />
 
       <section
@@ -401,6 +965,50 @@ export function AdminConsolePage() {
       >
         {renderActiveTab()}
       </section>
+
+      <Modal
+        open={userDetailOpen}
+        title={t('admin.userDetailTitle')}
+        onClose={() => setUserDetailOpen(false)}
+        footer={
+          <Button variant="secondary" onClick={() => setUserDetailOpen(false)}>
+            {t('actions.close')}
+          </Button>
+        }
+      >
+        {userDetailLoading ? (
+          <p className="text-sm text-on-surface-variant dark:text-slate-400">{t('admin.loadingUserDetail')}</p>
+        ) : selectedUserDetail ? (
+          <dl className="grid gap-md text-sm sm:grid-cols-2">
+            <div>
+              <dt className="label-uppercase">ID</dt>
+              <dd className="mt-xs font-semibold">{selectedUserDetail.id}</dd>
+            </div>
+            <div>
+              <dt className="label-uppercase">Status</dt>
+              <dd className="mt-xs">
+                <StatusBadge status={selectedUserDetail.active ? 'active' : 'offline'} />
+              </dd>
+            </div>
+            <div>
+              <dt className="label-uppercase">Name</dt>
+              <dd className="mt-xs font-semibold">
+                {`${selectedUserDetail.firstName} ${selectedUserDetail.lastName}`.trim() || selectedUserDetail.email}
+              </dd>
+            </div>
+            <div>
+              <dt className="label-uppercase">Email</dt>
+              <dd className="mt-xs">{selectedUserDetail.email}</dd>
+            </div>
+            <div>
+              <dt className="label-uppercase">Role</dt>
+              <dd className="mt-xs">{selectedUserDetail.role}</dd>
+            </div>
+          </dl>
+        ) : (
+          <p className="text-sm text-on-surface-variant dark:text-slate-400">{t('admin.noUserDetail')}</p>
+        )}
+      </Modal>
     </div>
   );
 }

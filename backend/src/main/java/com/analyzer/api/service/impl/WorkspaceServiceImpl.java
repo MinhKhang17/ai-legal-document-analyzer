@@ -70,8 +70,8 @@ public class WorkspaceServiceImpl implements WorkspaceService {
         Workspace workspace = Workspace.builder()
                 .id(generateWorkspaceId())
                 .user(User.builder().id(userId).build())
-                .name(request.getName().trim())
-                .description(request.getDescription())
+                .name(request.name().trim())
+                .description(request.description())
                 .status(STATUS_ACTIVE)
                 .build();
 
@@ -283,24 +283,24 @@ public class WorkspaceServiceImpl implements WorkspaceService {
     }
 
     private WorkspaceResponseDTO toWorkspaceResponse(Workspace workspace) {
-        return WorkspaceResponseDTO.builder()
-                .workspaceId(workspace.getId())
-                .name(workspace.getName())
-                .description(workspace.getDescription())
-                .status(workspace.getStatus())
-                .createdAt(workspace.getCreatedAt())
-                .build();
+        return new WorkspaceResponseDTO(
+                workspace.getId(),
+                workspace.getName(),
+                workspace.getDescription(),
+                workspace.getStatus(),
+                workspace.getCreatedAt()
+        );
     }
 
     private DocumentResponseDTO toDocumentResponse(Document document) {
-        return DocumentResponseDTO.builder()
-                .documentId(document.getId())
-                .workspaceId(document.getWorkspace().getId())
-                .originalFileName(document.getOriginalFileName())
-                .fileType(document.getFileType())
-                .fileSize(document.getFileSize())
-                .status(document.getStatus())
-                .uploadedAt(document.getUploadedAt())
-                .build();
+        return new DocumentResponseDTO(
+                document.getId(),
+                document.getWorkspace().getId(),
+                document.getOriginalFileName(),
+                document.getFileType(),
+                document.getFileSize(),
+                document.getStatus(),
+                document.getUploadedAt()
+        );
     }
 }

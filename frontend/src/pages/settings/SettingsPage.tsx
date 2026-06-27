@@ -2,8 +2,10 @@ import { Check, Languages, Monitor, Moon, Palette, Sun } from 'lucide-react';
 import { Card } from '../../components/common/Card';
 import { PageHeader } from '../../components/common/PageHeader';
 import { useI18n } from '../../hooks/useI18n';
+import { useToast } from '../../hooks/useToast';
 import { useAppStore, type Language, type ThemeMode } from '../../store/AppStore';
 import { cn } from '../../utils/cn';
+import { translate } from '../../utils/i18n';
 
 const themeOptions: Array<{ mode: ThemeMode; labelKey: string; icon: typeof Sun }> = [
   { mode: 'light', labelKey: 'theme.light', icon: Sun },
@@ -18,6 +20,7 @@ const languageOptions: Array<{ language: Language; labelKey: string; shortLabel:
 
 export function SettingsPage() {
   const { t } = useI18n();
+  const toast = useToast();
   const { language, setLanguage, theme, setTheme } = useAppStore();
 
   return (
@@ -46,7 +49,10 @@ export function SettingsPage() {
                       ? 'border-primary bg-primary text-white shadow-sm dark:border-inverse-primary dark:bg-inverse-primary dark:text-slate-950'
                       : 'border-legal-border bg-white text-on-surface hover:bg-surface-container-low dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800',
                   )}
-                  onClick={() => setTheme(option.mode)}
+                  onClick={() => {
+                    setTheme(option.mode);
+                    toast.success(t('settings.themeChanged'), t('toast.successTitle'));
+                  }}
                 >
                   <span className="flex w-full items-center justify-between gap-sm">
                     <Icon className="h-5 w-5" aria-hidden="true" />
@@ -84,7 +90,13 @@ export function SettingsPage() {
                       ? 'border-primary bg-primary text-white shadow-sm dark:border-inverse-primary dark:bg-inverse-primary dark:text-slate-950'
                       : 'border-legal-border bg-white text-on-surface hover:bg-surface-container-low dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800',
                   )}
-                  onClick={() => setLanguage(option.language)}
+                  onClick={() => {
+                    setLanguage(option.language);
+                    toast.success(
+                      translate(option.language, 'settings.languageChanged'),
+                      translate(option.language, 'toast.successTitle'),
+                    );
+                  }}
                 >
                   <span className={cn(
                     'flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold',
