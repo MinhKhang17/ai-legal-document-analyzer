@@ -1,0 +1,75 @@
+# CÂU HỎI THƯỜNG GẶP VỀ HỢP ĐỒNG MUA BÁN
+
+## 1. KHÁI NIỆM VÀ HÌNH THỨC
+
+### Hợp đồng mua bán là gì?
+Hợp đồng mua bán tài sản là sự thỏa thuận giữa các bên, theo đó bên bán chuyển quyền sở hữu tài sản cho bên mua và bên mua trả tiền cho bên bán. Căn cứ Điều 430 Bộ luật Dân sự 2015.
+
+### Hợp đồng mua bán có bắt buộc bằng văn bản không?
+Theo nguyên tắc chung, hợp đồng có thể giao kết bằng lời nói, văn bản hoặc hành vi. Tuy nhiên, đối với một số loại tài sản đặc biệt (bất động sản, phương tiện giao thông), hợp đồng phải bằng văn bản và có công chứng/chứng thực.
+
+### Hợp đồng mua bán nhà đất cần công chứng không?
+Có. Hợp đồng mua bán nhà ở, quyền sử dụng đất phải được công chứng hoặc chứng thực theo quy định (Điều 122 Luật Nhà ở 2023, Điều 27 Luật Đất đai 2024).
+
+## 2. QUYỀN VÀ NGHĨA VỤ
+
+### Bên bán có nghĩa vụ gì?
+Theo Bộ luật Dân sự 2015:
+- Giao tài sản đúng đối tượng, chất lượng, số lượng, chủng loại
+- Cung cấp thông tin cần thiết về tài sản, hướng dẫn sử dụng
+- Bảo đảm quyền sở hữu tài sản cho bên mua
+- Bảo hành tài sản theo thỏa thuận hoặc theo quy định
+- Giao giấy tờ liên quan đến tài sản
+
+### Bên mua có nghĩa vụ gì?
+- Thanh toán tiền mua đúng thời hạn, phương thức đã thỏa thuận
+- Nhận tài sản đúng thời hạn, địa điểm đã thỏa thuận
+- Chịu rủi ro đối với tài sản kể từ thời điểm nhận tài sản
+
+### Thời điểm chuyển quyền sở hữu là khi nào?
+- Đối với tài sản không phải đăng ký: quyền sở hữu chuyển từ thời điểm giao tài sản
+- Đối với tài sản phải đăng ký (nhà đất, xe cộ): quyền sở hữu chuyển từ thời điểm đăng ký
+
+## 3. GIÁ CẢ VÀ THANH TOÁN
+
+### Giá mua bán do ai quyết định?
+Giá mua bán do các bên tự thỏa thuận. Trường hợp pháp luật quy định giá do Nhà nước định thì các bên phải tuân theo.
+
+### Nếu không thỏa thuận giá thì sao?
+Nếu hợp đồng không thỏa thuận hoặc thỏa thuận không rõ về giá, giá được xác định theo giá thị trường tại thời điểm và địa điểm giao kết hợp đồng (Điều 433 Bộ luật Dân sự 2015).
+
+### Phương thức thanh toán thường gặp?
+- Trả một lần khi nhận tài sản
+- Trả góp (trả nhiều đợt theo lịch)
+- Trả trước một phần, phần còn lại trả sau
+- Chuyển khoản ngân hàng
+- Thanh toán qua ký quỹ/escrow
+
+## 4. BẢO HÀNH VÀ BẢO ĐẢM CHẤT LƯỢNG
+
+### Bên bán có phải bảo hành không?
+Bên bán có nghĩa vụ bảo hành tài sản trong thời hạn đã thỏa thuận hoặc do pháp luật quy định. Nếu phát hiện khuyết tật trong thời hạn bảo hành, bên mua có quyền yêu cầu sửa chữa, giảm giá, đổi tài sản hoặc trả lại tài sản.
+
+### Quyền đối với hàng hóa có khuyết tật ẩn?
+Bên bán phải chịu trách nhiệm về khuyết tật ẩn của tài sản mà bên mua không biết hoặc không buộc phải biết tại thời điểm giao kết hợp đồng (Điều 446 Bộ luật Dân sự 2015).
+
+## 5. RỦI RO THƯỜNG GẶP
+
+### Rủi ro khi mua bán nhà đất không công chứng?
+- Hợp đồng bị vô hiệu
+- Không thể sang tên, đăng ký quyền sở hữu
+- Mất tiền nếu bên bán bán cho người khác
+- Không được pháp luật bảo vệ khi tranh chấp
+
+### Rủi ro khi mua hàng hóa không kiểm tra chất lượng?
+- Hàng hóa không đúng mô tả, chất lượng kém
+- Khó đòi bồi thường nếu không có biên bản nghiệm thu
+- Hết thời hạn khiếu nại chất lượng
+
+### Rủi ro khi thanh toán trước toàn bộ?
+- Bên bán không giao hàng
+- Hàng giao không đúng chất lượng nhưng đã mất quyền giữ tiền
+- Khuyến nghị: Thanh toán theo đợt gắn với tiến độ giao hàng
+
+### Hợp đồng mua bán tài sản tranh chấp có hiệu lực không?
+Nếu tài sản đang có tranh chấp, hợp đồng mua bán có thể bị tuyên vô hiệu do vi phạm điều kiện về đối tượng hợp đồng. Bên mua cần kiểm tra tình trạng pháp lý của tài sản trước khi ký hợp đồng.
