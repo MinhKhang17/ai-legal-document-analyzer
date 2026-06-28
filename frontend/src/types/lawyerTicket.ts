@@ -73,3 +73,15 @@ export interface CreateLawyerTicketMessageResponse {
   messageId: string;
   message: string;
 }
+
+export interface LawyerTicketFile {
+  documentId: string;
+  originalFileName: string;
+  storedFileName: string;
+  filePath: string;
+  fileType: string;
+  fileSize: number;
+  documentPurpose: string;
+  visibilityScope: string;
+  uploadedAt: string;
+}

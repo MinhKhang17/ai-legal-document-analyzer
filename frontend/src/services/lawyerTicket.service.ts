@@ -1,11 +1,11 @@
 import { API_ENDPOINTS } from "../config/api";
 import type {
-  LawyerTicket,
   LawyerTicketPageResponse,
   LawyerTicketDetail,
   CreateLawyerTicketMessageRequest,
   CreateLawyerTicketMessageResponse,
   LawyerTicketMessage,
+  LawyerTicketFile,
 } from "../types/lawyerTicket";
 import { buildAuthHeaders, requestApiData } from "./http";
 
@@ -64,4 +64,18 @@ export const getMyLawyerTickets = async (): Promise<LawyerTicketPageResponse> =>
       body: JSON.stringify(payload),
     },
     "Không thể gửi tin nhắn",
+  );
+  export const getLawyerTicketFiles = async (
+  ticketId: string,
+): Promise<LawyerTicketFile[]> =>
+  requestApiData<LawyerTicketFile[]>(
+    API_ENDPOINTS.lawyerTickets.files(ticketId),
+    {
+      method: "GET",
+      headers: buildAuthHeaders({
+        Accept: "application/json",
+      }),
+      credentials: "include",
+    },
+    "Không thể tải tệp đính kèm",
   );

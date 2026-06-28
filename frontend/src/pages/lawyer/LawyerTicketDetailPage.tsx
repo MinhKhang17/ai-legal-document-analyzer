@@ -10,6 +10,8 @@ import {
   Send,
   ShieldAlert,
   UserRound,
+  Download,
+  Paperclip,
 } from "lucide-react";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
@@ -19,6 +21,8 @@ import {
   getLawyerTicketMessages,
   sendLawyerTicketMessage,
   type LawyerTicketMessage,
+  getLawyerTicketFiles,
+  type LawyerTicketFile,
 } from "../../api/lawyerTicketApi";
 import { Badge } from "../../components/common/Badge";
 import { Button } from "../../components/common/Button";
@@ -43,6 +47,9 @@ export function LawyerTicketDetailPage() {
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [messageValue, setMessageValue] = useState("");
   const [sendingMessage, setSendingMessage] = useState(false);
+
+  const [files, setFiles] = useState<LawyerTicketFile[]>([]);
+  const [filesLoading, setFilesLoading] = useState(false);
 
   const loadTicket = useCallback(async () => {
     if (!ticketId) return;
@@ -90,10 +97,25 @@ export function LawyerTicketDetailPage() {
     }
   }, [ticketId, messageValue, toast, t, loadMessages]);
 
+  const loadFiles = useCallback(async () => {
+    if (!ticketId) return;
+
+    try {
+      setFilesLoading(true);
+      const data = await getLawyerTicketFiles(ticketId);
+      setFiles(data ?? []);
+    } catch {
+      toast.error(t("lawyerTickets.files.loadError"));
+    } finally {
+      setFilesLoading(false);
+    }
+  }, [ticketId, toast, t]);
+
   useEffect(() => {
     loadTicket();
     loadMessages();
-  }, [loadTicket, loadMessages]);
+    loadFiles();
+  }, [loadTicket, loadMessages, loadFiles]);
 
   return (
     <div className="space-y-6">
@@ -347,6 +369,79 @@ export function LawyerTicketDetailPage() {
               </Button>
             </div>
           </Card>
+
+          <Card className="p-6">
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Paperclip className="h-5 w-5" />
+                  <h3 className="font-semibold">
+                    {t("lawyerTickets.files.title")}
+                  </h3>
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {t("lawyerTickets.files.description")}
+                </p>
+              </div>
+
+              <Button onClick={loadFiles} disabled={filesLoading}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                {t("lawyerTickets.files.refresh")}
+              </Button>
+            </div>
+
+            {filesLoading ? (
+              <p className="text-sm text-muted-foreground">
+                {t("lawyerTickets.files.loading")}
+              </p>
+            ) : files.length === 0 ? (
+              <div className="rounded-lg border p-4">
+                <p className="font-medium">
+                  {t("lawyerTickets.files.emptyTitle")}
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {t("lawyerTickets.files.emptyDescription")}
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-3">
+                {files.map((file) => (
+                  <div
+                    key={file.documentId}
+                    className="flex flex-col gap-3 rounded-lg border p-4 md:flex-row md:items-center md:justify-between"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 shrink-0" />
+                        <p className="truncate font-medium">
+                          {getValue(file.originalFileName)}
+                        </p>
+                      </div>
+
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {getValue(file.fileType)} ·{" "}
+                        {formatFileSize(file.fileSize)} ·{" "}
+                        {formatDisplayDate(file.uploadedAt, "—")}
+                      </p>
+
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {getValue(file.documentPurpose)} ·{" "}
+                        {getValue(file.visibilityScope)}
+                      </p>
+                    </div>
+
+                    <Button
+                      onClick={() => window.open(file.filePath, "_blank")}
+                      disabled={!file.filePath}
+                    >
+                      <Download className="mr-2 h-4 w-4" />
+                      {t("lawyerTickets.files.open")}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
         </>
       )}
     </div>
@@ -374,6 +469,16 @@ function SectionCard({
     </Card>
   );
 }
+
+const formatFileSize = (size?: number | null) => {
+  if (!size) return "—";
+
+  if (size < 1024) return `${size} B`;
+
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+};
 
 function InfoItem({
   icon,

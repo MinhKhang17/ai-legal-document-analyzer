@@ -3,6 +3,7 @@ export {
   getLawyerTicketDetail,
   getLawyerTicketMessages,
   sendLawyerTicketMessage,
+  getLawyerTicketFiles,
 } from "../services/lawyerTicket.service";
 
 export type {
@@ -12,4 +13,5 @@ export type {
    LawyerTicketMessage,
   CreateLawyerTicketMessageRequest,
   CreateLawyerTicketMessageResponse,
+  LawyerTicketFile,
 } from "../types/lawyerTicket";
