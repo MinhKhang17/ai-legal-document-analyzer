@@ -85,3 +85,15 @@ export interface LawyerTicketFile {
   visibilityScope: string;
   uploadedAt: string;
 }
+
+export interface UploadLawyerTicketFileRequest {
+  uploadedById: number;
+  originalFileName: string;
+  fileType: string;
+  contentBase64: string;
+  visibilityScope: "CUSTOMER" | "LAWYER" | "ADMIN";
+}
+
+export interface CloseLawyerTicketRequest {
+  feedback: string;
+}

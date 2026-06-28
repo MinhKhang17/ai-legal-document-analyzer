@@ -3,26 +3,34 @@ import {
   Bot,
   Briefcase,
   CalendarDays,
+  Download,
   FileText,
   Lightbulb,
   MessageSquare,
+  Paperclip,
   RefreshCw,
   Send,
   ShieldAlert,
   UserRound,
-  Download,
-  Paperclip,
 } from "lucide-react";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useState,
+  type ChangeEvent,
+  type ReactNode,
+} from "react";
 import { Link, useParams } from "react-router-dom";
 import {
+  closeLawyerTicket,
   getLawyerTicketDetail,
-  type LawyerTicketDetail,
+  getLawyerTicketFiles,
   getLawyerTicketMessages,
   sendLawyerTicketMessage,
-  type LawyerTicketMessage,
-  getLawyerTicketFiles,
+  type LawyerTicketDetail,
   type LawyerTicketFile,
+  type LawyerTicketMessage,
+  uploadLawyerTicketFile,
 } from "../../api/lawyerTicketApi";
 import { Badge } from "../../components/common/Badge";
 import { Button } from "../../components/common/Button";
@@ -34,6 +42,26 @@ import { formatDisplayDate } from "../../utils/format";
 
 const getValue = (value?: string | number | null) =>
   value === undefined || value === null || value === "" ? "—" : String(value);
+
+const formatFileSize = (size?: number | null) => {
+  if (!size) return "—";
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+const fileToBase64 = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      const result = String(reader.result);
+      resolve(result.split(",")[1] ?? "");
+    };
+
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 
 export function LawyerTicketDetailPage() {
   const { t } = useI18n();
@@ -50,6 +78,11 @@ export function LawyerTicketDetailPage() {
 
   const [files, setFiles] = useState<LawyerTicketFile[]>([]);
   const [filesLoading, setFilesLoading] = useState(false);
+  const [uploadingFile, setUploadingFile] = useState(false);
+
+  const [closingTicket, setClosingTicket] = useState(false);
+
+  const isClosed = ticket?.status === "CLOSED";
 
   const loadTicket = useCallback(async () => {
     if (!ticketId) return;
@@ -79,24 +112,6 @@ export function LawyerTicketDetailPage() {
     }
   }, [ticketId, toast, t]);
 
-  const handleSendMessage = useCallback(async () => {
-    if (!ticketId || !messageValue.trim()) return;
-
-    try {
-      setSendingMessage(true);
-      await sendLawyerTicketMessage(ticketId, {
-        message: messageValue.trim(),
-      });
-      setMessageValue("");
-      toast.success(t("lawyerTickets.messages.sendSuccess"));
-      await loadMessages();
-    } catch {
-      toast.error(t("lawyerTickets.messages.sendError"));
-    } finally {
-      setSendingMessage(false);
-    }
-  }, [ticketId, messageValue, toast, t, loadMessages]);
-
   const loadFiles = useCallback(async () => {
     if (!ticketId) return;
 
@@ -111,11 +126,96 @@ export function LawyerTicketDetailPage() {
     }
   }, [ticketId, toast, t]);
 
-  useEffect(() => {
-    loadTicket();
-    loadMessages();
-    loadFiles();
+  const refreshAll = useCallback(async () => {
+    await Promise.all([loadTicket(), loadMessages(), loadFiles()]);
   }, [loadTicket, loadMessages, loadFiles]);
+
+  const handleSendMessage = useCallback(async () => {
+    if (!ticketId || !messageValue.trim()) return;
+
+    try {
+      setSendingMessage(true);
+      await sendLawyerTicketMessage(ticketId, {
+        message: messageValue.trim(),
+      });
+
+      setMessageValue("");
+      toast.success(t("lawyerTickets.messages.sendSuccess"));
+      await loadMessages();
+    } catch {
+      toast.error(t("lawyerTickets.messages.sendError"));
+    } finally {
+      setSendingMessage(false);
+    }
+  }, [ticketId, messageValue, toast, t, loadMessages]);
+
+  const handleUploadFile = useCallback(
+    async (event: ChangeEvent<HTMLInputElement>) => {
+      if (!ticketId || !ticket) return;
+
+      const file = event.target.files?.[0];
+      event.target.value = "";
+
+      if (!file) return;
+
+      if (!ticket.assigned_lawyer_id) {
+        toast.error(t("lawyerTickets.files.uploadError"));
+        return;
+      }
+
+      try {
+        setUploadingFile(true);
+
+        const contentBase64 = await fileToBase64(file);
+
+        await uploadLawyerTicketFile(ticketId, {
+          uploadedById: ticket.assigned_lawyer_id,
+          originalFileName: file.name,
+          fileType: file.type || "application/octet-stream",
+          contentBase64,
+          visibilityScope: "CUSTOMER",
+        });
+
+        toast.success(t("lawyerTickets.files.uploadSuccess"));
+        await loadFiles();
+      } catch {
+        toast.error(t("lawyerTickets.files.uploadError"));
+      } finally {
+        setUploadingFile(false);
+      }
+    },
+    [ticketId, ticket, loadFiles, toast, t],
+  );
+
+  const handleCloseTicket = useCallback(async () => {
+    if (!ticketId || isClosed) return;
+
+    const confirmed = window.confirm(
+      t("lawyerTickets.close.confirmDescription"),
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setClosingTicket(true);
+
+      const data = await closeLawyerTicket(ticketId, {
+        feedback: t("lawyerTickets.close.defaultFeedback"),
+      });
+
+      setTicket(data);
+      toast.success(t("lawyerTickets.close.success"));
+      await loadTicket();
+    } catch {
+      toast.error(t("lawyerTickets.close.error"));
+    } finally {
+      setClosingTicket(false);
+    }
+  }, [ticketId, isClosed, loadTicket, toast, t]);
+
+  useEffect(() => {
+    void refreshAll();
+  }, [refreshAll]);
 
   return (
     <div className="space-y-6">
@@ -123,7 +223,7 @@ export function LawyerTicketDetailPage() {
         title={t("lawyerTickets.detail.title")}
         subtitle={t("lawyerTickets.detail.subtitle")}
         actions={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Link to="/lawyer/tickets">
               <Button>
                 <ArrowLeft className="mr-2 h-4 w-4" />
@@ -131,9 +231,18 @@ export function LawyerTicketDetailPage() {
               </Button>
             </Link>
 
-            <Button onClick={loadTicket} disabled={loading}>
+            <Button onClick={() => void refreshAll()} disabled={loading}>
               <RefreshCw className="mr-2 h-4 w-4" />
               {t("lawyerTickets.detail.refresh")}
+            </Button>
+
+            <Button
+              onClick={handleCloseTicket}
+              disabled={loading || closingTicket || isClosed}
+            >
+              {closingTicket
+                ? t("common.loading")
+                : t("lawyerTickets.close.button")}
             </Button>
           </div>
         }
@@ -198,13 +307,11 @@ export function LawyerTicketDetailPage() {
               title={t("lawyerTickets.detail.aiAnalysis")}
               content={ticket.answer}
             />
-
             <SectionCard
               icon={<Lightbulb className="h-5 w-5" />}
               title={t("lawyerTickets.detail.recommendation")}
               content={ticket.recommended_action}
             />
-
             <SectionCard
               icon={<ShieldAlert className="h-5 w-5" />}
               title={t("lawyerTickets.detail.evidence")}
@@ -230,6 +337,7 @@ export function LawyerTicketDetailPage() {
                   {t("lawyerTickets.detail.customerInfo")}
                 </h3>
               </div>
+
               <div className="space-y-3">
                 <InfoLine
                   label={t("lawyerTickets.detail.customerName")}
@@ -249,6 +357,7 @@ export function LawyerTicketDetailPage() {
                   {t("lawyerTickets.detail.workspace")}
                 </h3>
               </div>
+
               <div className="space-y-3">
                 <InfoLine
                   label={t("lawyerTickets.detail.workspaceName")}
@@ -268,6 +377,7 @@ export function LawyerTicketDetailPage() {
                   {t("lawyerTickets.detail.document")}
                 </h3>
               </div>
+
               <div className="space-y-3">
                 <InfoLine
                   label={t("lawyerTickets.detail.documentName")}
@@ -292,6 +402,7 @@ export function LawyerTicketDetailPage() {
                 {t("lawyerTickets.detail.problematicClause")}
               </h3>
             </div>
+
             <p className="whitespace-pre-line text-sm text-muted-foreground">
               {getValue(ticket.problematic_clause)}
             </p>
@@ -342,9 +453,12 @@ export function LawyerTicketDetailPage() {
                         {formatDisplayDate(message.created_at, "—")}
                       </p>
                     </div>
+
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {getValue(message.sender_role)}
+                      {getValue(message.sender_role)} ·{" "}
+                      {getValue(message.message_type)}
                     </p>
+
                     <p className="mt-3 whitespace-pre-line text-sm">
                       {getValue(message.content)}
                     </p>
@@ -384,10 +498,24 @@ export function LawyerTicketDetailPage() {
                 </p>
               </div>
 
-              <Button onClick={loadFiles} disabled={filesLoading}>
-                <RefreshCw className="mr-2 h-4 w-4" />
-                {t("lawyerTickets.files.refresh")}
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <label className="inline-flex cursor-pointer items-center rounded-lg border px-4 py-2 text-sm font-medium">
+                  <input
+                    type="file"
+                    className="hidden"
+                    onChange={handleUploadFile}
+                    disabled={uploadingFile}
+                  />
+                  {uploadingFile
+                    ? t("common.loading")
+                    : t("lawyerTickets.files.upload")}
+                </label>
+
+                <Button onClick={loadFiles} disabled={filesLoading}>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  {t("lawyerTickets.files.refresh")}
+                </Button>
+              </div>
             </div>
 
             {filesLoading ? (
@@ -469,16 +597,6 @@ function SectionCard({
     </Card>
   );
 }
-
-const formatFileSize = (size?: number | null) => {
-  if (!size) return "—";
-
-  if (size < 1024) return `${size} B`;
-
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
-
-  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
-};
 
 function InfoItem({
   icon,
