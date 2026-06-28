@@ -26,7 +26,7 @@ export interface LawyerTicket {
   issue_summary: string;
   problematic_clause: string;
   clause_reference: string;
-  page_number: number;
+  page_number: number | null;
   ai_evidence: string;
   recommended_action: string;
   expert_answer: string;
@@ -49,3 +49,5 @@ export interface LawyerTicketPageResponse {
   totalItems: number;
   totalPages: number;
 }
+
+export type LawyerTicketDetail = LawyerTicket;

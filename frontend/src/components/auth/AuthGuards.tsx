@@ -31,10 +31,6 @@ function resolveRedirectToDashboardOrAdmin(user: CurrentUserState) {
   return "/dashboard";
 }
 
-function isExpert(user: CurrentUserState) {
-  return user?.role === "EXPERT";
-}
-
 function RoleAccessDeniedView() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-ivory px-6 text-on-surface dark:bg-slate-950 dark:text-slate-100">

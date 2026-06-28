@@ -37,6 +37,7 @@ import { TemplatesPage } from "../pages/templates/TemplatesPage";
 import { SettingsPage } from "../pages/settings/SettingsPage";
 import { PaymentResultRedirect } from "../pages/billing/PaymentResultRedirect";
 import { LawyerTicketsPage } from "../pages/lawyer/LawyerTicketsPage";
+import { LawyerTicketDetailPage } from "../pages/lawyer/LawyerTicketDetailPage";
 
 export const router = createBrowserRouter([
   {
@@ -242,6 +243,14 @@ export const router = createBrowserRouter([
         element: (
           <ExpertRoute>
             <LawyerTicketsPage />
+          </ExpertRoute>
+        ),
+      },
+      {
+        path: "/lawyer/tickets/:ticketId",
+        element: (
+          <ExpertRoute>
+            <LawyerTicketDetailPage />,
           </ExpertRoute>
         ),
       },
