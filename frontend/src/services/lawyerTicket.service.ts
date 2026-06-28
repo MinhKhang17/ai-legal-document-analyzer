@@ -3,6 +3,9 @@ import type {
   LawyerTicket,
   LawyerTicketPageResponse,
   LawyerTicketDetail,
+  CreateLawyerTicketMessageRequest,
+  CreateLawyerTicketMessageResponse,
+  LawyerTicketMessage,
 } from "../types/lawyerTicket";
 import { buildAuthHeaders, requestApiData } from "./http";
 
@@ -30,4 +33,35 @@ export const getMyLawyerTickets = async (): Promise<LawyerTicketPageResponse> =>
       credentials: "include",
     },
     "Không thể tải chi tiết ticket",
+  );
+  export const getLawyerTicketMessages = async (
+  ticketId: string,
+): Promise<LawyerTicketMessage[]> =>
+  requestApiData<LawyerTicketMessage[]>(
+    API_ENDPOINTS.lawyerTickets.messages(ticketId),
+    {
+      method: "GET",
+      headers: buildAuthHeaders({
+        Accept: "application/json",
+      }),
+      credentials: "include",
+    },
+    "Không thể tải tin nhắn ticket",
+  );
+  export const sendLawyerTicketMessage = async (
+  ticketId: string,
+  payload: CreateLawyerTicketMessageRequest,
+): Promise<CreateLawyerTicketMessageResponse> =>
+  requestApiData<CreateLawyerTicketMessageResponse>(
+    API_ENDPOINTS.lawyerTickets.messages(ticketId),
+    {
+      method: "POST",
+      headers: buildAuthHeaders({
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      }),
+      credentials: "include",
+      body: JSON.stringify(payload),
+    },
+    "Không thể gửi tin nhắn",
   );

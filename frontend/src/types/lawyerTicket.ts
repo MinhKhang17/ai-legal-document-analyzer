@@ -51,3 +51,25 @@ export interface LawyerTicketPageResponse {
 }
 
 export type LawyerTicketDetail = LawyerTicket;
+
+export interface LawyerTicketMessage {
+  id: string;
+  ticket_id: string;
+  sender_id: number;
+  sender_name: string;
+  sender_role: string;
+  content: string;
+  message_type: string;
+  created_at: string;
+  internal_only: boolean;
+}
+
+export interface CreateLawyerTicketMessageRequest {
+  message: string;
+}
+
+export interface CreateLawyerTicketMessageResponse {
+  ticketId: string;
+  messageId: string;
+  message: string;
+}

@@ -5,7 +5,9 @@ import {
   CalendarDays,
   FileText,
   Lightbulb,
+  MessageSquare,
   RefreshCw,
+  Send,
   ShieldAlert,
   UserRound,
 } from "lucide-react";
@@ -14,6 +16,9 @@ import { Link, useParams } from "react-router-dom";
 import {
   getLawyerTicketDetail,
   type LawyerTicketDetail,
+  getLawyerTicketMessages,
+  sendLawyerTicketMessage,
+  type LawyerTicketMessage,
 } from "../../api/lawyerTicketApi";
 import { Badge } from "../../components/common/Badge";
 import { Button } from "../../components/common/Button";
@@ -34,6 +39,11 @@ export function LawyerTicketDetailPage() {
   const [ticket, setTicket] = useState<LawyerTicketDetail | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const [messages, setMessages] = useState<LawyerTicketMessage[]>([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [messageValue, setMessageValue] = useState("");
+  const [sendingMessage, setSendingMessage] = useState(false);
+
   const loadTicket = useCallback(async () => {
     if (!ticketId) return;
 
@@ -48,9 +58,42 @@ export function LawyerTicketDetailPage() {
     }
   }, [ticketId, toast, t]);
 
+  const loadMessages = useCallback(async () => {
+    if (!ticketId) return;
+
+    try {
+      setMessagesLoading(true);
+      const data = await getLawyerTicketMessages(ticketId);
+      setMessages(data ?? []);
+    } catch {
+      toast.error(t("lawyerTickets.messages.loadError"));
+    } finally {
+      setMessagesLoading(false);
+    }
+  }, [ticketId, toast, t]);
+
+  const handleSendMessage = useCallback(async () => {
+    if (!ticketId || !messageValue.trim()) return;
+
+    try {
+      setSendingMessage(true);
+      await sendLawyerTicketMessage(ticketId, {
+        message: messageValue.trim(),
+      });
+      setMessageValue("");
+      toast.success(t("lawyerTickets.messages.sendSuccess"));
+      await loadMessages();
+    } catch {
+      toast.error(t("lawyerTickets.messages.sendError"));
+    } finally {
+      setSendingMessage(false);
+    }
+  }, [ticketId, messageValue, toast, t, loadMessages]);
+
   useEffect(() => {
     loadTicket();
-  }, [loadTicket]);
+    loadMessages();
+  }, [loadTicket, loadMessages]);
 
   return (
     <div className="space-y-6">
@@ -230,6 +273,79 @@ export function LawyerTicketDetailPage() {
             <p className="whitespace-pre-line text-sm text-muted-foreground">
               {getValue(ticket.problematic_clause)}
             </p>
+          </Card>
+
+          <Card className="p-6">
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="h-5 w-5" />
+                  <h3 className="font-semibold">
+                    {t("lawyerTickets.messages.title")}
+                  </h3>
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {t("lawyerTickets.messages.description")}
+                </p>
+              </div>
+
+              <Button onClick={loadMessages} disabled={messagesLoading}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                {t("lawyerTickets.messages.refresh")}
+              </Button>
+            </div>
+
+            {messagesLoading ? (
+              <p className="text-sm text-muted-foreground">
+                {t("lawyerTickets.messages.loading")}
+              </p>
+            ) : messages.length === 0 ? (
+              <div className="rounded-lg border p-4">
+                <p className="font-medium">
+                  {t("lawyerTickets.messages.emptyTitle")}
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {t("lawyerTickets.messages.emptyDescription")}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {messages.map((message) => (
+                  <div key={message.id} className="rounded-lg border p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-semibold">
+                        {getValue(message.sender_name)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDisplayDate(message.created_at, "—")}
+                      </p>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {getValue(message.sender_role)}
+                    </p>
+                    <p className="mt-3 whitespace-pre-line text-sm">
+                      {getValue(message.content)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="mt-4 flex gap-2">
+              <textarea
+                value={messageValue}
+                onChange={(event) => setMessageValue(event.target.value)}
+                placeholder={t("lawyerTickets.messages.placeholder")}
+                className="min-h-24 flex-1 rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+              />
+              <Button
+                onClick={handleSendMessage}
+                disabled={sendingMessage || !messageValue.trim()}
+              >
+                <Send className="mr-2 h-4 w-4" />
+                {t("lawyerTickets.messages.send")}
+              </Button>
+            </div>
           </Card>
         </>
       )}
