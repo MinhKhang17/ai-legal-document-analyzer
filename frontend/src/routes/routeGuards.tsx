@@ -21,8 +21,14 @@ type GuardResult = {
 
 const isAdminRole = (role: CurrentUser['role']) => role === 'ADMIN';
 
-const getHomeRouteForRole = (role: CurrentUser['role']) =>
-  isAdminRole(role) ? '/admin' : '/dashboard';
+const isExpertRole = (role: CurrentUser['role']) => role === 'EXPERT';
+
+const getHomeRouteForRole = (role: CurrentUser['role']) => {
+  if (isAdminRole(role)) return '/admin';
+  if (isExpertRole(role)) return '/lawyer/tickets';
+
+  return '/dashboard';
+};
 
 const useAuthGuardState = (requiresAdmin = false): GuardResult => {
   const { isAuthLoading, isAuthReady, isAuthenticated, user } = useAppStore();
@@ -36,8 +42,11 @@ const useAuthGuardState = (requiresAdmin = false): GuardResult => {
   }
 
   if (requiresAdmin && !isAdminRole(user.role)) {
-    return { isReady: true, shouldRedirect: { to: '/dashboard' } };
-  }
+  return {
+    isReady: true,
+    shouldRedirect: { to: getHomeRouteForRole(user.role) },
+  };
+}
 
   return { isReady: true };
 };

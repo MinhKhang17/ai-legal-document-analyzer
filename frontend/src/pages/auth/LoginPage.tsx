@@ -78,7 +78,9 @@ export function LoginPage() {
             const accessToken = response.data.accessToken?.trim();
 
             if (!accessToken) {
-              throw new Error("Login response did not include an access token.");
+              throw new Error(
+                "Login response did not include an access token.",
+              );
             }
 
             localStorage.setItem("accessToken", accessToken);
@@ -101,6 +103,8 @@ export function LoginPage() {
 
             if (currentUser.role === "ADMIN") {
               navigate("/admin", { replace: true });
+            } else if (currentUser.role === "EXPERT") {
+              navigate("/lawyer/tickets", { replace: true });
             } else {
               navigate("/dashboard", { replace: true });
             }

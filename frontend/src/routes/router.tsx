@@ -5,6 +5,7 @@ import {
   AuthenticatedRoute,
   CustomerRoute,
   PublicRoute,
+  ExpertRoute,
 } from "../components/auth/AuthGuards";
 import { AuthLayout } from "../layouts/AuthLayout";
 import { LoginPage } from "../pages/auth/LoginPage";
@@ -35,6 +36,8 @@ import { JobsPage } from "../pages/jobs/JobsPage";
 import { TemplatesPage } from "../pages/templates/TemplatesPage";
 import { SettingsPage } from "../pages/settings/SettingsPage";
 import { PaymentResultRedirect } from "../pages/billing/PaymentResultRedirect";
+import { LawyerTicketsPage } from "../pages/lawyer/LawyerTicketsPage";
+import { LawyerTicketDetailPage } from "../pages/lawyer/LawyerTicketDetailPage";
 
 export const router = createBrowserRouter([
   {
@@ -233,6 +236,22 @@ export const router = createBrowserRouter([
           <AdminRoute>
             <SystemHealthPage />
           </AdminRoute>
+        ),
+      },
+      {
+        path: "/lawyer/tickets",
+        element: (
+          <ExpertRoute>
+            <LawyerTicketsPage />
+          </ExpertRoute>
+        ),
+      },
+      {
+        path: "/lawyer/tickets/:ticketId",
+        element: (
+          <ExpertRoute>
+            <LawyerTicketDetailPage />,
+          </ExpertRoute>
         ),
       },
     ],

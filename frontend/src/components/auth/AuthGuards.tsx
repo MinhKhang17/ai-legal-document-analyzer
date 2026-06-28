@@ -23,6 +23,11 @@ function resolveRedirectToDashboardOrAdmin(user: CurrentUserState) {
   if (user?.role === "ADMIN") {
     return "/admin";
   }
+
+  if (user?.role === "EXPERT") {
+    return "/lawyer/tickets";
+  }
+
   return "/dashboard";
 }
 
@@ -122,7 +127,25 @@ export function AdminRoute({ children }: RouteGuardProps) {
   }
 
   if (user.role !== "ADMIN") {
-    return <Navigate to="/dashboard" replace />;
+  return <Navigate to={resolveRedirectToDashboardOrAdmin(user)} replace />;
+}
+
+  return <>{children}</>;
+}
+
+export function ExpertRoute({ children }: RouteGuardProps) {
+  const { isAuthLoading, isAuthReady, isAuthenticated, user } = useAppStore();
+
+  if (isAuthLoading || !isAuthReady) {
+    return <AuthLoadingView />;
+  }
+
+  if (!isAuthenticated || user === null || user.active === false) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (user.role !== "EXPERT") {
+    return <Navigate to={resolveRedirectToDashboardOrAdmin(user)} replace />;
   }
 
   return <>{children}</>;

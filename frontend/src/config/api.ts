@@ -11,7 +11,9 @@ const getRequiredEnvValue = (key: string): string => {
 };
 
 export const API_BASE_URL = getRequiredEnvValue("VITE_API_BASE_URL");
-export const AI_SERVICE_BASE_URL = getRequiredEnvValue("VITE_AI_SERVICE_BASE_URL");
+export const AI_SERVICE_BASE_URL = getRequiredEnvValue(
+  "VITE_AI_SERVICE_BASE_URL",
+);
 
 export const API_ENDPOINTS = {
   auth: {
@@ -63,7 +65,9 @@ export const API_ENDPOINTS = {
     adminList: getRequiredEnvValue("VITE_PAYMENT_TRANSACTIONS_ADMIN_API"),
     vnPayUrl: (transactionId: number | string) =>
       `${getRequiredEnvValue("VITE_PAYMENT_TRANSACTION_VNPAY_URL_API")}/${transactionId}/vnpay-url`,
-    vnPayReturn: getRequiredEnvValue("VITE_PAYMENT_TRANSACTION_VNPAY_RETURN_API"),
+    vnPayReturn: getRequiredEnvValue(
+      "VITE_PAYMENT_TRANSACTION_VNPAY_RETURN_API",
+    ),
     vnPayIpn: getRequiredEnvValue("VITE_PAYMENT_TRANSACTION_VNPAY_IPN_API"),
     simulateSuccess: (transactionId: number | string) =>
       `${getRequiredEnvValue("VITE_PAYMENT_TRANSACTIONS_ADMIN_API")}/${transactionId}/success`,
@@ -86,6 +90,21 @@ export const API_ENDPOINTS = {
       `${getRequiredEnvValue("VITE_ADMIN_LEGAL_TICKETS_API")}/${ticketId}/assign-lawyer`,
   },
 
+  lawyerTickets: {
+    my: getRequiredEnvValue("VITE_LAWYER_TICKETS_MY_API"),
+
+    detail: (ticketId: number | string) =>
+      `${getRequiredEnvValue("VITE_LAWYER_TICKETS_API")}/${ticketId}`,
+
+    messages: (ticketId: number | string) =>
+      `${getRequiredEnvValue("VITE_LAWYER_TICKETS_API")}/${ticketId}/messages`,
+
+    files: (ticketId: number | string) =>
+      `${getRequiredEnvValue("VITE_LAWYER_TICKETS_API")}/${ticketId}/files`,
+
+    close: (ticketId: number | string) =>
+      `${getRequiredEnvValue("VITE_LAWYER_TICKETS_API")}/${ticketId}/close`,
+  },
   aiLegal: {
     query: getRequiredEnvValue("VITE_AI_LEGAL_QUERY_API"),
   },
@@ -102,7 +121,9 @@ export const API_ENDPOINTS = {
   },
 
   aiKnowledge: {
-    supportedFormats: getRequiredEnvValue("VITE_AI_KNOWLEDGE_SUPPORTED_FORMATS_API"),
+    supportedFormats: getRequiredEnvValue(
+      "VITE_AI_KNOWLEDGE_SUPPORTED_FORMATS_API",
+    ),
     ingest: getRequiredEnvValue("VITE_AI_KNOWLEDGE_INGEST_API"),
     ingestV2: getRequiredEnvValue("VITE_AI_KNOWLEDGE_INGEST_V2_API"),
     search: getRequiredEnvValue("VITE_AI_KNOWLEDGE_SEARCH_API"),
@@ -116,7 +137,9 @@ export const API_ENDPOINTS = {
   },
 
   aiRiskKnowledge: {
-    supportedFormats: getRequiredEnvValue("VITE_AI_RISK_KNOWLEDGE_SUPPORTED_FORMATS_API"),
+    supportedFormats: getRequiredEnvValue(
+      "VITE_AI_RISK_KNOWLEDGE_SUPPORTED_FORMATS_API",
+    ),
     import: getRequiredEnvValue("VITE_AI_RISK_KNOWLEDGE_IMPORT_API"),
     importV2: getRequiredEnvValue("VITE_AI_RISK_KNOWLEDGE_IMPORT_V2_API"),
     query: getRequiredEnvValue("VITE_AI_RISK_KNOWLEDGE_QUERY_API"),
@@ -124,7 +147,9 @@ export const API_ENDPOINTS = {
   },
 
   aiContracts: {
-    supportedFormats: getRequiredEnvValue("VITE_AI_CONTRACT_SUPPORTED_FORMATS_API"),
+    supportedFormats: getRequiredEnvValue(
+      "VITE_AI_CONTRACT_SUPPORTED_FORMATS_API",
+    ),
     upload: getRequiredEnvValue("VITE_AI_CONTRACT_UPLOAD_API"),
   },
 } as const;
