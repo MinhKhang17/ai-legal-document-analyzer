@@ -14,7 +14,7 @@ import lombok.NoArgsConstructor;
 public class SaveContractRequest {
 
     @NotNull
-    private Long workspaceId;
+    private String workspaceId;
 
     private Long templateId;
 

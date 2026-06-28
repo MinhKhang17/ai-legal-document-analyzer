@@ -17,7 +17,7 @@ public class ContractGenerationResponse {
     private String id;
     private String requestId;
     private Long requesterId;
-    private Long workspaceId;
+    private String workspaceId;
     private Long templateId;
     private String sourceDocumentId;
     private String inputJson;

@@ -28,7 +28,7 @@ AI_SERVICE_URL = "http://localhost:8000"
 KNOWLEDGE_INGEST_ENDPOINT = f"{AI_SERVICE_URL}/api/knowledge/ingest"
 SOURCE_DIR = r"C:\Users\DELL\Documents\VBPL\extracted"
 FAQ_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "ai-service", "data")
-SUPPORTED_EXTENSIONS = {'.pdf', '.docx', '.doc', '.txt'}
+SUPPORTED_EXTENSIONS = {'.docx', '.doc', '.txt'}
 SKIP_FILES = {'Template.pdf'}  # Skip known template files
 
 # Statistics

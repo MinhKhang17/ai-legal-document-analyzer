@@ -23,6 +23,14 @@ class RagQueryService:
         self.llm_client = llm_client or build_default_llm_client()
 
     def query(self, request: RagQueryRequest) -> RagQueryResponse:
+        from app.services.contract_generation_service import ContractGenerationService, is_contract_generation_intent
+        if is_contract_generation_intent(request.question):
+            gen_service = ContractGenerationService(
+                retrieval_service=self.retrieval_service,
+                llm_client=self.llm_client
+            )
+            return gen_service.generate_contract(request)
+
         user_hits, legal_search_query, knowledge_hits = self._retrieve(request)
 
         system_prompt = build_system_prompt()

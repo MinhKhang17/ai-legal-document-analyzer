@@ -303,4 +303,78 @@ public class WorkspaceServiceImpl implements WorkspaceService {
                 document.getUploadedAt()
         );
     }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public org.springframework.core.io.Resource downloadDocumentFile(Long userId, String workspaceId, String documentId) {
+        workspaceRepository.findByIdAndUserIdAndStatus(workspaceId, userId, STATUS_ACTIVE)
+                .orElseThrow(() -> new RuntimeException("Workspace khong ton tai hoac khong thuoc user hien tai"));
+
+        Document document = documentRepository.findById(documentId)
+                .orElseThrow(() -> new RuntimeException("Khong tim thay document voi id: " + documentId));
+
+        if (!document.getWorkspace().getId().equals(workspaceId)) {
+            throw new RuntimeException("Document khong thuoc workspace nay");
+        }
+
+        try {
+            java.nio.file.Path filePath = java.nio.file.Path.of(document.getFilePath()).toAbsolutePath().normalize();
+            org.springframework.core.io.Resource resource = new org.springframework.core.io.UrlResource(filePath.toUri());
+            if (resource.exists() || resource.isReadable()) {
+                return resource;
+            } else {
+                throw new RuntimeException("File khong ton tai hoac khong the doc");
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Loi khi doc file: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public org.springframework.core.io.Resource downloadDocumentFilePublic(String workspaceId, String documentId) {
+        Document document = documentRepository.findById(documentId)
+                .orElseThrow(() -> new RuntimeException("Khong tim thay document voi id: " + documentId));
+
+        if (!document.getWorkspace().getId().equals(workspaceId)) {
+            throw new RuntimeException("Document khong thuoc workspace nay");
+        }
+
+        try {
+            java.nio.file.Path filePath = java.nio.file.Path.of(document.getFilePath()).toAbsolutePath().normalize();
+            org.springframework.core.io.Resource resource = new org.springframework.core.io.UrlResource(filePath.toUri());
+            if (resource.exists() || resource.isReadable()) {
+                return resource;
+            } else {
+                throw new RuntimeException("File khong ton tai hoac khong the doc");
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Loi khi doc file: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional
+    public DocumentResponseDTO registerGeneratedDocument(com.analyzer.api.dto.document.RegisterDocumentRequestDTO request) {
+        String documentId = generateDocumentId();
+        Document document = Document.builder()
+                .id(documentId)
+                .workspace(Workspace.builder().id(request.getWorkspaceId()).build())
+                .user(User.builder().id(Long.valueOf(request.getUserId())).build())
+                .originalFileName(request.getOriginalFileName())
+                .storedFileName(request.getStoredFileName())
+                .filePath(request.getFilePath())
+                .fileType(request.getOriginalFileName().endsWith(".docx")
+                        ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                        : "application/pdf")
+                .fileSize(request.getFileSize())
+                .sourceType(SOURCE_TYPE_USER_DOCUMENT)
+                .status(STATUS_READY)
+                .chunkCount(0)
+                .processedAt(LocalDateTime.now())
+                .build();
+
+        Document saved = documentRepository.save(document);
+        return toDocumentResponse(saved);
+    }
 }
