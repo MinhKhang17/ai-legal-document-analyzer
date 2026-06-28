@@ -657,6 +657,26 @@ const en: TranslationDictionary = {
   "actions.query": "Query",
   "actions.querying": "Querying...",
   "actions.startWorker": "Start worker",
+  "nav.section.lawyer": "Lawyer",
+  "nav.lawyerTickets": "My Tickets",
+"lawyerTickets.title": "My Tickets",
+"lawyerTickets.subtitle":
+  "Review legal tickets assigned to you and respond based on the AI findings.",
+"lawyerTickets.assignedTickets": "Assigned tickets",
+"lawyerTickets.totalTickets": "Total tickets",
+"lawyerTickets.openTickets": "Open tickets",
+"lawyerTickets.highRiskTickets": "High risk tickets",
+"lawyerTickets.loading": "Loading assigned tickets...",
+"lawyerTickets.emptyTitle": "No assigned tickets",
+"lawyerTickets.emptyDescription":
+  "Tickets assigned to you will appear here.",
+"lawyerTickets.loadError": "Unable to load assigned tickets.",
+"lawyerTickets.ticketQueue": "Ticket queue",
+"lawyerTickets.ticketQueueDescription":
+  "These tickets are assigned to your expert account.",
+"lawyerTickets.createdBy": "Created by",
+"lawyerTickets.workspace": "Workspace",
+"lawyerTickets.document": "Document",
   "workspace.title": "Workspaces",
   "workspace.subtitle":
     "Create a workspace, upload documents, and chat on the same legal context.",
@@ -1282,6 +1302,26 @@ const vi: TranslationDictionary = {
   "knowledge.citationReliabilityAlert": "Cảnh báo độ tin cậy trích dẫn",
   "knowledge.citationReliabilityDescription":
     "Chỉ số độ tin cậy trích dẫn cần dữ liệu tri thức đã index và tham chiếu hợp đồng thật từ AI-service.",
+    "nav.section.lawyer": "Luật sư",
+"nav.lawyerTickets": "Ticket của tôi",
+"lawyerTickets.title": "Ticket của tôi",
+"lawyerTickets.subtitle":
+  "Rà soát các ticket pháp lý được gán cho bạn và phản hồi dựa trên phát hiện của AI.",
+"lawyerTickets.assignedTickets": "Ticket được gán",
+"lawyerTickets.totalTickets": "Tổng ticket",
+"lawyerTickets.openTickets": "Ticket đang mở",
+"lawyerTickets.highRiskTickets": "Ticket rủi ro cao",
+"lawyerTickets.loading": "Đang tải ticket được gán...",
+"lawyerTickets.emptyTitle": "Chưa có ticket được gán",
+"lawyerTickets.emptyDescription":
+  "Các ticket được gán cho bạn sẽ hiển thị tại đây.",
+"lawyerTickets.loadError": "Không thể tải danh sách ticket được gán.",
+"lawyerTickets.ticketQueue": "Danh sách ticket",
+"lawyerTickets.ticketQueueDescription":
+  "Các ticket này được gán cho tài khoản expert hiện tại.",
+"lawyerTickets.createdBy": "Tạo bởi",
+"lawyerTickets.workspace": "Workspace",
+"lawyerTickets.document": "Tài liệu",
 "upload.title": "Tải tài liệu",
 "upload.subtitle":"Tải lên và xử lý tài liệu pháp lý bằng AI.",
 "upload.createWorkspaceHelp":
