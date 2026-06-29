@@ -1,4 +1,5 @@
 import { type ReactNode } from 'react';
+import { useI18n } from '../../hooks/useI18n';
 import { cn } from '../../utils/cn';
 
 export interface DataTableColumn<T> {
@@ -16,7 +17,10 @@ interface DataTableProps<T> {
   onRowClick?: (row: T) => void;
 }
 
-export function DataTable<T>({ columns, data, getRowKey, emptyMessage = 'No records found.', onRowClick }: DataTableProps<T>) {
+export function DataTable<T>({ columns, data, getRowKey, emptyMessage, onRowClick }: DataTableProps<T>) {
+  const { t } = useI18n();
+  const resolvedEmptyMessage = emptyMessage ?? t('common.noRecords');
+
   return (
     <div className="overflow-hidden rounded-xl border border-legal-border bg-white dark:border-slate-700 dark:bg-slate-900">
       <div className="overflow-x-auto">
@@ -51,7 +55,7 @@ export function DataTable<T>({ columns, data, getRowKey, emptyMessage = 'No reco
           </tbody>
         </table>
       </div>
-      {data.length === 0 && <div className="p-xl text-center text-sm text-on-surface-variant dark:text-slate-400">{emptyMessage}</div>}
+      {data.length === 0 && <div className="p-xl text-center text-sm text-on-surface-variant dark:text-slate-400">{resolvedEmptyMessage}</div>}
     </div>
   );
 }

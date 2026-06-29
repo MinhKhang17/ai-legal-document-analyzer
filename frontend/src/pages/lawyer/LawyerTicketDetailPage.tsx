@@ -23,6 +23,7 @@ import {
 import { Link, useParams } from "react-router-dom";
 import {
   closeLawyerTicket,
+  downloadLawyerTicketFile,
   getLawyerTicketDetail,
   getLawyerTicketFiles,
   getLawyerTicketMessages,
@@ -35,6 +36,7 @@ import {
 import { Badge } from "../../components/common/Badge";
 import { Button } from "../../components/common/Button";
 import { Card } from "../../components/common/Card";
+import { EmptyState } from "../../components/common/EmptyState";
 import { PageHeader } from "../../components/common/PageHeader";
 import { useI18n } from "../../hooks/useI18n";
 import { useToast } from "../../hooks/useToast";
@@ -70,6 +72,7 @@ export function LawyerTicketDetailPage() {
 
   const [ticket, setTicket] = useState<LawyerTicketDetail | null>(null);
   const [loading, setLoading] = useState(false);
+  const [detailError, setDetailError] = useState("");
 
   const [messages, setMessages] = useState<LawyerTicketMessage[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
@@ -79,24 +82,29 @@ export function LawyerTicketDetailPage() {
   const [files, setFiles] = useState<LawyerTicketFile[]>([]);
   const [filesLoading, setFilesLoading] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [openingDocumentId, setOpeningDocumentId] = useState("");
 
   const [closingTicket, setClosingTicket] = useState(false);
 
   const isClosed = ticket?.status === "CLOSED";
 
   const loadTicket = useCallback(async () => {
-    if (!ticketId) return;
+    if (!ticketId) return false;
 
     try {
       setLoading(true);
+      setDetailError("");
       const data = await getLawyerTicketDetail(ticketId);
       setTicket(data);
+      return true;
     } catch {
-      toast.error(t("lawyerTickets.detail.loadError"));
+      setTicket(null);
+      setDetailError(t("lawyerTickets.detail.loadError"));
+      return false;
     } finally {
       setLoading(false);
     }
-  }, [ticketId, toast, t]);
+  }, [ticketId, t]);
 
   const loadMessages = useCallback(async () => {
     if (!ticketId) return;
@@ -127,7 +135,15 @@ export function LawyerTicketDetailPage() {
   }, [ticketId, toast, t]);
 
   const refreshAll = useCallback(async () => {
-    await Promise.all([loadTicket(), loadMessages(), loadFiles()]);
+    const loadedTicket = await loadTicket();
+
+    if (!loadedTicket) {
+      setMessages([]);
+      setFiles([]);
+      return;
+    }
+
+    await Promise.all([loadMessages(), loadFiles()]);
   }, [loadTicket, loadMessages, loadFiles]);
 
   const handleSendMessage = useCallback(async () => {
@@ -213,6 +229,29 @@ export function LawyerTicketDetailPage() {
     }
   }, [ticketId, isClosed, loadTicket, toast, t]);
 
+  const handleOpenFile = useCallback(
+    async (file: LawyerTicketFile) => {
+      if (!ticketId) return;
+
+      try {
+        setOpeningDocumentId(file.documentId);
+        const fileInfo = await downloadLawyerTicketFile(ticketId, file.documentId);
+
+        if (fileInfo.filePath) {
+          window.open(fileInfo.filePath, "_blank", "noopener,noreferrer");
+          return;
+        }
+
+        toast.error(t("lawyerTickets.files.openError"));
+      } catch {
+        toast.error(t("lawyerTickets.files.openError"));
+      } finally {
+        setOpeningDocumentId("");
+      }
+    },
+    [ticketId, toast, t],
+  );
+
   useEffect(() => {
     void refreshAll();
   }, [refreshAll]);
@@ -238,7 +277,7 @@ export function LawyerTicketDetailPage() {
 
             <Button
               onClick={handleCloseTicket}
-              disabled={loading || closingTicket || isClosed}
+              disabled={!ticket || loading || closingTicket || isClosed}
             >
               {closingTicket
                 ? t("common.loading")
@@ -255,14 +294,22 @@ export function LawyerTicketDetailPage() {
       )}
 
       {!loading && !ticket && (
-        <Card className="p-6">
-          <h3 className="font-semibold">
-            {t("lawyerTickets.detail.emptyTitle")}
-          </h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {t("lawyerTickets.detail.emptyDescription")}
-          </p>
-        </Card>
+        <div className="space-y-md">
+          {detailError && (
+            <div className="rounded-xl border border-error/40 bg-error/10 p-md text-sm text-error">
+              {detailError}
+            </div>
+          )}
+          <EmptyState
+            title={t("lawyerTickets.detail.emptyTitle")}
+            description={t("lawyerTickets.detail.emptyDescription")}
+          />
+          <Link to="/lawyer/tickets">
+            <Button variant="secondary" leftIcon={<ArrowLeft className="h-4 w-4" />}>
+              {t("lawyerTickets.detail.back")}
+            </Button>
+          </Link>
+        </div>
       )}
 
       {!loading && ticket && (
@@ -559,11 +606,13 @@ export function LawyerTicketDetailPage() {
                     </div>
 
                     <Button
-                      onClick={() => window.open(file.filePath, "_blank")}
-                      disabled={!file.filePath}
+                      onClick={() => void handleOpenFile(file)}
+                      disabled={openingDocumentId === file.documentId}
                     >
                       <Download className="mr-2 h-4 w-4" />
-                      {t("lawyerTickets.files.open")}
+                      {openingDocumentId === file.documentId
+                        ? t("common.loading")
+                        : t("lawyerTickets.files.open")}
                     </Button>
                   </div>
                 ))}

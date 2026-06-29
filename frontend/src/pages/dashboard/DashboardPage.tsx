@@ -17,10 +17,11 @@ const getAccessToken = () => localStorage.getItem('accessToken') ?? '';
 type WorkspaceWithDocs = Workspace & { documents: Document[] };
 
 export function DashboardPage() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [workspaces, setWorkspaces] = useState<WorkspaceWithDocs[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const locale = language === 'vi' ? 'vi-VN' : 'en-US';
 
   useEffect(() => {
     let active = true;
@@ -43,7 +44,7 @@ export function DashboardPage() {
         }
       } catch (err) {
         if (active) {
-          setError(err instanceof Error ? err.message : 'Không thể tải dashboard');
+          setError(err instanceof Error ? err.message : t('dashboard.loadError'));
         }
       } finally {
         if (active) {
@@ -57,7 +58,7 @@ export function DashboardPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [t]);
 
   const stats = useMemo(() => {
     const totalWorkspaces = workspaces.length;
@@ -125,10 +126,10 @@ export function DashboardPage() {
       )}
 
       <section className="grid gap-gutter md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label={t('dashboard.totalDocuments')} value={loading ? '...' : String(stats.totalDocuments)} change={loading ? undefined : `${stats.readyDocuments} ready`} trend="up" icon={<FileText className="h-5 w-5" />} />
-        <StatCard label={t('dashboard.reviewedContracts')} value={loading ? '...' : String(stats.readyDocuments)} change={loading ? undefined : `${processingPercent}% processing`} trend="up" icon={<SearchCheck className="h-5 w-5" />} accent="green" />
+        <StatCard label={t('dashboard.totalDocuments')} value={loading ? '...' : String(stats.totalDocuments)} change={loading ? undefined : t('dashboard.readyCount').replace('{count}', String(stats.readyDocuments))} trend="up" icon={<FileText className="h-5 w-5" />} />
+        <StatCard label={t('dashboard.reviewedContracts')} value={loading ? '...' : String(stats.readyDocuments)} change={loading ? undefined : t('dashboard.processingPercent').replace('{percent}', String(processingPercent))} trend="up" icon={<SearchCheck className="h-5 w-5" />} accent="green" />
         <StatCard label={t('dashboard.processingDocuments')} value={loading ? '...' : String(stats.processingDocuments)} change={loading ? undefined : t('dashboard.fromActiveUploads')} trend="neutral" icon={<ShieldAlert className="h-5 w-5" />} accent="red" />
-        <StatCard label={t('dashboard.activeProjects')} value={loading ? '...' : String(stats.totalWorkspaces)} change={loading ? undefined : 'User workspaces'} trend="neutral" icon={<FolderOpen className="h-5 w-5" />} accent="gold" />
+        <StatCard label={t('dashboard.activeProjects')} value={loading ? '...' : String(stats.totalWorkspaces)} change={loading ? undefined : t('dashboard.userWorkspaces')} trend="neutral" icon={<FolderOpen className="h-5 w-5" />} accent="gold" />
       </section>
 
       <section className="mt-xl grid gap-gutter xl:grid-cols-[1.2fr_0.8fr]">
@@ -199,7 +200,7 @@ export function DashboardPage() {
           )}
         </Card>
 
-        <Card title={t('dashboard.processingQueue')} actions={<Badge tone="gold">{stats.processingDocuments} active</Badge>}>
+        <Card title={t('dashboard.processingQueue')} actions={<Badge tone="gold">{t('dashboard.activeCount').replace('{count}', String(stats.processingDocuments))}</Badge>}>
           <div className="space-y-md">
             {recentDocuments.length === 0 ? (
               <p className="text-sm text-on-surface-variant dark:text-slate-400">{t('documents.emptyTitle')}</p>
@@ -214,7 +215,7 @@ export function DashboardPage() {
                     <StatusBadge status={document.status} />
                   </div>
                   <p className="mt-sm text-xs text-on-surface-variant dark:text-slate-400">
-                    {new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(document.uploadedAt))}
+                    {new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(document.uploadedAt))}
                   </p>
                 </div>
               ))
@@ -280,7 +281,7 @@ export function DashboardPage() {
                     </td>
                     <td className="px-md py-sm text-xs text-on-surface-variant dark:text-slate-400">
                       <span className="whitespace-nowrap">
-                        {new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(document.uploadedAt))}
+                        {new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(document.uploadedAt))}
                       </span>
                     </td>
                   </tr>
@@ -329,7 +330,7 @@ export function DashboardPage() {
                       {t('documents.uploadedAt')}
                     </p>
                     <p className="mt-0.5 whitespace-nowrap text-sm text-on-surface dark:text-slate-100">
-                      {new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(document.uploadedAt))}
+                      {new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(document.uploadedAt))}
                     </p>
                   </div>
                 </div>

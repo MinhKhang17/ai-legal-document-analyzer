@@ -1,5 +1,6 @@
 import { Cpu, Database, Monitor, Moon, MoreHorizontal, Palette, Receipt, RefreshCw, ShieldCheck, Sun, UserPlus, UsersRound } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { AdminMetricCard } from '../../components/admin/AdminMetricCard';
 import { Badge } from '../../components/common/Badge';
 import { Button } from '../../components/common/Button';
@@ -15,7 +16,7 @@ import { LanguageToggle } from '../../components/common/LanguageToggle';
 import { useI18n } from '../../hooks/useI18n';
 import { useToast } from '../../hooks/useToast';
 import { assignLawyerToLegalTicket, getAdminLegalTickets } from '../../services/legalTicket.service';
-import { getAllPaymentTransactions, simulatePaymentFailed, simulatePaymentSuccess } from '../../services/paymentTransaction.service';
+import { getAllPaymentTransactions } from '../../services/paymentTransaction.service';
 import {
   createSubscriptionPlan,
   deleteSubscriptionPlan,
@@ -25,6 +26,7 @@ import {
 import { getUserDetail, getUsers, type BackendUser } from '../../services/user.service';
 import { useAppStore, type ThemeMode } from '../../store/AppStore';
 import type { LegalTicket } from '../../types/legalTicket';
+import { getLegalTicketStatusLabel } from '../../types/legalTicketStatus';
 import type { PaymentTransaction } from '../../types/paymentTransaction';
 import type { SubscriptionPlan, SubscriptionPlanRequest } from '../../types/subscription';
 import type { WorkspaceUser } from '../../types/user';
@@ -85,9 +87,10 @@ const toWorkspaceUser = (user: BackendUser): WorkspaceUser => ({
 });
 
 export function AdminConsolePage() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const toast = useToast();
   const { theme, setTheme } = useAppStore();
+  const locale = language === 'vi' ? 'vi-VN' : 'en-US';
   const [activeTab, setActiveTab] = useState<AdminTabId>('users');
   const [legalTextSize, setLegalTextSize] = useState<(typeof legalTextSizes)[number]>('18px');
   const [backendUsers, setBackendUsers] = useState<BackendUser[]>([]);
@@ -109,7 +112,6 @@ export function AdminConsolePage() {
   const [ticketActionMessage, setTicketActionMessage] = useState<string | null>(null);
   const [ticketError, setTicketError] = useState<string | null>(null);
   const [assigningTicketId, setAssigningTicketId] = useState<string | null>(null);
-  const [paymentActionId, setPaymentActionId] = useState<number | null>(null);
 
   const loadAdminData = useCallback(async () => {
     setIsLoadingAdminData(true);
@@ -158,7 +160,7 @@ export function AdminConsolePage() {
     }
 
     if (ticketsResult.status === 'fulfilled') {
-      setLegalTickets(ticketsResult.value);
+      setLegalTickets(ticketsResult.value.items ?? []);
     } else {
       setLegalTickets([]);
       setTicketError(ticketsResult.reason instanceof Error ? ticketsResult.reason.message : 'Không thể tải legal tickets');
@@ -292,7 +294,11 @@ export function AdminConsolePage() {
     setTicketActionMessage(null);
 
     try {
-      const updatedTicket = await assignLawyerToLegalTicket(ticketId, lawyerId);
+      const updatedTicket = await assignLawyerToLegalTicket(ticketId, {
+        lawyer_id: Number(lawyerId),
+        admin_note: 'Assigned from Admin Console',
+        force_reassign: false,
+      });
       setLegalTickets((previous) =>
         previous.map((ticket) => (ticket.id === ticketId ? updatedTicket : ticket)),
       );
@@ -305,38 +311,6 @@ export function AdminConsolePage() {
       toast.error(message, t('toast.errorTitle'));
     } finally {
       setAssigningTicketId(null);
-    }
-  };
-
-  const handleSimulatePayment = async (
-    transaction: PaymentTransaction,
-    outcome: 'success' | 'failed',
-  ) => {
-    setPaymentActionId(transaction.id);
-    setAdminError(null);
-
-    try {
-      const updatedTransaction =
-        outcome === 'success'
-          ? await simulatePaymentSuccess(transaction.id)
-          : await simulatePaymentFailed(transaction.id);
-      setPaymentTransactions((previous) =>
-        previous.map((item) =>
-          item.id === updatedTransaction.id ? updatedTransaction : item,
-        ),
-      );
-      toast.success(
-        outcome === 'success'
-          ? t('admin.paymentSimulatedSuccess')
-          : t('admin.paymentSimulatedFailed'),
-        t('toast.successTitle'),
-      );
-    } catch (error) {
-      const message = error instanceof Error ? error.message : t('admin.paymentSimulateError');
-      setAdminError(message);
-      toast.error(message, t('toast.errorTitle'));
-    } finally {
-      setPaymentActionId(null);
     }
   };
 
@@ -395,30 +369,7 @@ export function AdminConsolePage() {
     { header: t('admin.plan'), cell: (transaction) => transaction.planName },
     { header: t('billing.amount'), cell: (transaction) => formatVndCurrency(transaction.amount, t('billing.free')) },
     { header: t('table.status'), cell: (transaction) => <Badge tone={transaction.paymentStatus === 'SUCCESS' ? 'green' : transaction.paymentStatus === 'FAILED' ? 'red' : 'amber'}>{transaction.paymentStatus}</Badge> },
-    { header: t('table.date'), cell: (transaction) => formatDisplayDate(transaction.createdAt, '-', 'vi-VN') },
-    {
-      header: t('admin.devAction'),
-      cell: (transaction) => (
-        <div className="flex flex-wrap gap-xs">
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={paymentActionId === transaction.id}
-            onClick={() => void handleSimulatePayment(transaction, 'success')}
-          >
-            {t('admin.simulateSuccess')}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={paymentActionId === transaction.id}
-            onClick={() => void handleSimulatePayment(transaction, 'failed')}
-          >
-            {t('admin.simulateFailed')}
-          </Button>
-        </div>
-      ),
-    },
+    { header: t('table.date'), cell: (transaction) => formatDisplayDate(transaction.createdAt, '-', locale) },
   ];
 
   const planColumns: DataTableColumn<SubscriptionPlan>[] = [
@@ -444,11 +395,26 @@ export function AdminConsolePage() {
   ];
 
   const ticketColumns: DataTableColumn<LegalTicket>[] = [
-    { header: t('admin.ticket'), cell: (ticket) => <span className="break-all font-semibold">{ticket.id}</span> },
-    { header: t('table.status'), cell: (ticket) => <Badge tone="amber">{ticket.status ?? 'UNKNOWN'}</Badge> },
-    { header: t('table.risk'), cell: (ticket) => ticket.risk_level ? <Badge tone={ticket.risk_level === 'HIGH' ? 'red' : 'amber'}>{ticket.risk_level}</Badge> : '-' },
-    { header: 'Domain', cell: (ticket) => ticket.legal_domain ?? '-' },
-    { header: t('workspace.createdAt'), cell: (ticket) => formatDisplayDate(ticket.created_at, '-', 'vi-VN') },
+    {
+      header: t('admin.ticket'),
+      cell: (ticket) => (
+        <Link className="break-all font-semibold text-primary hover:underline dark:text-inverse-primary" to={`/admin/tickets/${ticket.id}`}>
+          {ticket.id}
+        </Link>
+      ),
+    },
+    { header: t('table.status'), cell: (ticket) => <Badge tone="amber">{getLegalTicketStatusLabel(ticket.status, t)}</Badge> },
+    {
+      header: t('table.risk'),
+      cell: (ticket) =>
+        ticket.risk_level ? (
+          <Badge tone={ticket.risk_level === 'HIGH' ? 'red' : 'amber'}>
+            {t(`risk.${ticket.risk_level.toLowerCase()}`)}
+          </Badge>
+        ) : '-',
+    },
+    { header: t('chat.legalDomain'), cell: (ticket) => ticket.legal_domain ?? '-' },
+    { header: t('workspace.createdAt'), cell: (ticket) => formatDisplayDate(ticket.created_at, '-', locale) },
     {
       header: t('admin.assign'),
       cell: (ticket) => (
@@ -712,19 +678,19 @@ export function AdminConsolePage() {
         <div className="grid gap-md sm:grid-cols-2">
           <div className="rounded-lg bg-surface-container-low p-md dark:bg-slate-800">
             <p className="label-uppercase">{t('admin.workspace.workspaceName')}</p>
-            <p className="mt-xs text-sm font-semibold">LexiGuard Legal Team</p>
+            <p className="mt-xs text-sm font-semibold">{t('admin.workspace.legalTeamName')}</p>
           </div>
           <div className="rounded-lg bg-surface-container-low p-md dark:bg-slate-800">
             <p className="label-uppercase">{t('admin.workspace.dataRegion')}</p>
-            <p className="mt-xs text-sm font-semibold">Singapore / Vietnam</p>
+            <p className="mt-xs text-sm font-semibold">{t('admin.workspace.dataRegionValue')}</p>
           </div>
           <div className="rounded-lg bg-surface-container-low p-md dark:bg-slate-800">
             <p className="label-uppercase">{t('admin.workspace.defaultJurisdiction')}</p>
-            <p className="mt-xs text-sm font-semibold">Vietnam Commercial Law</p>
+            <p className="mt-xs text-sm font-semibold">{t('admin.workspace.defaultJurisdictionValue')}</p>
           </div>
           <div className="rounded-lg bg-surface-container-low p-md dark:bg-slate-800">
             <p className="label-uppercase">{t('admin.workspace.retentionPolicy')}</p>
-            <p className="mt-xs text-sm font-semibold">7 years encrypted archive</p>
+            <p className="mt-xs text-sm font-semibold">{t('admin.workspace.retentionPolicyValue')}</p>
           </div>
         </div>
         <div className="mt-md flex flex-wrap gap-sm">
@@ -981,27 +947,27 @@ export function AdminConsolePage() {
         ) : selectedUserDetail ? (
           <dl className="grid gap-md text-sm sm:grid-cols-2">
             <div>
-              <dt className="label-uppercase">ID</dt>
+              <dt className="label-uppercase">{t('common.id')}</dt>
               <dd className="mt-xs font-semibold">{selectedUserDetail.id}</dd>
             </div>
             <div>
-              <dt className="label-uppercase">Status</dt>
+              <dt className="label-uppercase">{t('table.status')}</dt>
               <dd className="mt-xs">
                 <StatusBadge status={selectedUserDetail.active ? 'active' : 'offline'} />
               </dd>
             </div>
             <div>
-              <dt className="label-uppercase">Name</dt>
+              <dt className="label-uppercase">{t('common.name')}</dt>
               <dd className="mt-xs font-semibold">
                 {`${selectedUserDetail.firstName} ${selectedUserDetail.lastName}`.trim() || selectedUserDetail.email}
               </dd>
             </div>
             <div>
-              <dt className="label-uppercase">Email</dt>
+              <dt className="label-uppercase">{t('auth.corporateEmail')}</dt>
               <dd className="mt-xs">{selectedUserDetail.email}</dd>
             </div>
             <div>
-              <dt className="label-uppercase">Role</dt>
+              <dt className="label-uppercase">{t('table.role')}</dt>
               <dd className="mt-xs">{selectedUserDetail.role}</dd>
             </div>
           </dl>

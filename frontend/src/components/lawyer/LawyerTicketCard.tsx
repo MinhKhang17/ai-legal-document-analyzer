@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Badge } from "../common/Badge";
+import { useI18n } from "../../hooks/useI18n";
 import type { LawyerTicket } from "../../types/lawyerTicket";
 
 interface LawyerTicketCardProps {
@@ -7,6 +8,8 @@ interface LawyerTicketCardProps {
 }
 
 export function LawyerTicketCard({ ticket }: LawyerTicketCardProps) {
+  const { t } = useI18n();
+
   return (
     <Link
       to={`/lawyer/tickets/${ticket.id}`}
@@ -15,7 +18,7 @@ export function LawyerTicketCard({ ticket }: LawyerTicketCardProps) {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h3 className="font-semibold">
-            {ticket.issue_title || ticket.question || `Ticket #${ticket.id}`}
+            {ticket.issue_title || ticket.question || `${t("legalTickets.table.ticket")} #${ticket.id}`}
           </h3>
 
           <p className="mt-2 text-sm text-on-surface-variant">
@@ -23,7 +26,7 @@ export function LawyerTicketCard({ ticket }: LawyerTicketCardProps) {
           </p>
 
           <p className="mt-2 text-xs text-on-surface-variant">
-            Workspace: {ticket.workspace_name || "Unknown workspace"}
+            {t("lawyerTickets.workspace")}: {ticket.workspace_name || t("common.unknown")}
           </p>
         </div>
 

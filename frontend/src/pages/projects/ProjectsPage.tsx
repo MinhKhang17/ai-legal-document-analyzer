@@ -139,7 +139,7 @@ export function ProjectsPage() {
                     : "text-on-surface-variant"
                 }`}
                 type="button"
-                aria-label="Grid view"
+                aria-label={t("projects.gridView")}
                 onClick={() => setView("grid")}
               >
                 <Grid2X2 className="h-4 w-4" />
@@ -151,7 +151,7 @@ export function ProjectsPage() {
                     : "text-on-surface-variant"
                 }`}
                 type="button"
-                aria-label="List view"
+                aria-label={t("projects.listView")}
                 onClick={() => setView("list")}
               >
                 <List className="h-4 w-4" />
