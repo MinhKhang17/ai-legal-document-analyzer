@@ -11,6 +11,8 @@ import {
   createChatSession,
   deleteChatSession,
   getChatMessageDetail,
+  getChatSessionMemory,
+  getChatSessionSummary,
   getChatSessionDetail,
   getChatSessionMessages,
   getWorkspaceChatSessions,
@@ -18,21 +20,27 @@ import {
   sendWorkspaceMessage,
   updateChatSession,
 } from "../../api/chatApi";
+import { getChatMessageAiCitations } from "../../api/aiFeatureApi";
 import { createLegalTicket } from "../../api/legalTicketApi";
 import { getWorkspaceDocuments, getWorkspaces } from "../../api/workspaceApi";
 import { useI18n } from "../../hooks/useI18n";
 import { useToast } from "../../hooks/useToast";
 import { ChatMessageContent } from "../../components/chat/ChatMessageContent";
-import type { ChatMessage } from "../../types/chat";
+import type { ChatMessage, ChatSessionMemory, ChatSessionSummary } from "../../types/chat";
 import type { Document, Workspace } from "../../types/workspace";
 import type { WorkspaceChatMessage, WorkspaceChatSession } from "../../types/chat";
+import type { AiCitation } from "../../types/aiFeature";
 import { useRef } from "react";
 
 const getAccessToken = () => localStorage.getItem("accessToken") ?? "";
 
-const formatTimestamp = (value: string | null | undefined, language: "en" | "vi") => {
+const formatTimestamp = (
+  value: string | null | undefined,
+  language: "en" | "vi",
+  justNowLabel: string,
+) => {
   if (!value) {
-    return language === "vi" ? "Vừa xong" : "Just now";
+    return justNowLabel;
   }
 
   return new Intl.DateTimeFormat(language === "vi" ? "vi-VN" : "en-US", {
@@ -44,11 +52,12 @@ const formatTimestamp = (value: string | null | undefined, language: "en" | "vi"
 const toDisplayMessage = (
   message: WorkspaceChatMessage,
   language: "en" | "vi",
+  justNowLabel: string,
 ): ChatMessage => ({
   id: message.messageId,
   role: message.role.toLowerCase() === "assistant" ? "assistant" : "user",
   content: message.content,
-  timestamp: formatTimestamp(message.createdAt, language),
+  timestamp: formatTimestamp(message.createdAt, language, justNowLabel),
   status: message.status.toLowerCase() === "failed"
     ? "error"
     : message.status.toLowerCase() === "processing"
@@ -66,11 +75,15 @@ const toDisplayMessage = (
   userActionHint: message.userActionHint,
 });
 
-const createOptimisticUserMessage = (message: string, language: "en" | "vi"): ChatMessage => ({
+const createOptimisticUserMessage = (
+  message: string,
+  language: "en" | "vi",
+  justNowLabel: string,
+): ChatMessage => ({
   id: `local-user-${Date.now()}`,
   role: "user",
   content: message,
-  timestamp: formatTimestamp(null, language),
+  timestamp: formatTimestamp(null, language, justNowLabel),
   status: "done",
 });
 
@@ -79,6 +92,7 @@ type DisplayMessage = ChatMessage;
 export function LegalChatPage() {
   const { t, language } = useI18n();
   const toast = useToast();
+  const locale = language === "vi" ? "vi-VN" : "en-US";
   const [searchParams, setSearchParams] = useSearchParams();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [workspaceDocuments, setWorkspaceDocuments] = useState<Document[]>([]);
@@ -108,6 +122,11 @@ export function LegalChatPage() {
   const [messageDetailOpen, setMessageDetailOpen] = useState(false);
   const [messageDetail, setMessageDetail] = useState<WorkspaceChatMessage | null>(null);
   const [messageDetailLoading, setMessageDetailLoading] = useState(false);
+  const [messageCitations, setMessageCitations] = useState<AiCitation[]>([]);
+  const [sessionSummary, setSessionSummary] = useState<ChatSessionSummary | null>(null);
+  const [sessionMemory, setSessionMemory] = useState<ChatSessionMemory | null>(null);
+  const [sessionContextLoading, setSessionContextLoading] = useState(false);
+  const [sessionContextError, setSessionContextError] = useState("");
   const lastSubmissionRef = useRef<{
     workspaceId: string;
     sessionId: string;
@@ -148,7 +167,7 @@ export function LegalChatPage() {
         }
       } catch (err) {
         if (active) {
-          setError(err instanceof Error ? err.message : "Không thể tải workspace");
+          setError(err instanceof Error ? err.message : t("chat.loadWorkspaceError"));
         }
       } finally {
         if (active) {
@@ -231,7 +250,7 @@ export function LegalChatPage() {
         }
       } catch (err) {
         if (active) {
-          setError(err instanceof Error ? err.message : "Không thể tải dữ liệu workspace");
+          setError(err instanceof Error ? err.message : t("chat.loadWorkspaceDataError"));
         }
       } finally {
         if (active) {
@@ -265,10 +284,10 @@ export function LegalChatPage() {
         );
 
         if (!active) return;
-        setMessages(data.items.map((message) => toDisplayMessage(message, language)));
+        setMessages(data.items.map((message) => toDisplayMessage(message, language, t("common.justNow"))));
       } catch (err) {
         if (active) {
-          setError(err instanceof Error ? err.message : "Không thể tải lịch sử chat");
+          setError(err instanceof Error ? err.message : t("chat.loadHistoryError"));
         }
       }
     };
@@ -280,6 +299,54 @@ export function LegalChatPage() {
     };
   }, [language, selectedSessionId]);
 
+  useEffect(() => {
+    if (!selectedSessionId) {
+      setSessionSummary(null);
+      setSessionMemory(null);
+      setSessionContextError("");
+      return;
+    }
+
+    let active = true;
+
+    const loadSessionContext = async () => {
+      setSessionContextLoading(true);
+      setSessionContextError("");
+
+      const [summaryResult, memoryResult] = await Promise.allSettled([
+        getChatSessionSummary(getAccessToken(), selectedSessionId),
+        getChatSessionMemory(getAccessToken(), selectedSessionId),
+      ]);
+
+      if (!active) return;
+
+      setSessionSummary(
+        summaryResult.status === "fulfilled" ? summaryResult.value : null,
+      );
+      setSessionMemory(
+        memoryResult.status === "fulfilled" ? memoryResult.value : null,
+      );
+
+      const firstError =
+        summaryResult.status === "rejected"
+          ? summaryResult.reason
+          : memoryResult.status === "rejected"
+            ? memoryResult.reason
+            : null;
+
+      setSessionContextError(
+        firstError instanceof Error ? firstError.message : "",
+      );
+      setSessionContextLoading(false);
+    };
+
+    void loadSessionContext();
+
+    return () => {
+      active = false;
+    };
+  }, [selectedSessionId]);
+
   const handleCreateSession = async () => {
     if (!selectedWorkspaceId) {
       return;
@@ -289,7 +356,7 @@ export function LegalChatPage() {
       const session = await createChatSession(
         getAccessToken(),
         selectedWorkspaceId,
-        `Workspace chat ${new Date().toLocaleString()}`,
+        t("chat.sessionDefaultTitle").replace("{time}", new Date().toLocaleString(locale)),
       );
       setChatSessions((previous) => [session, ...previous.filter((item) => item.chatSessionId !== session.chatSessionId)]);
       setSelectedSessionId(session.chatSessionId);
@@ -406,9 +473,33 @@ export function LegalChatPage() {
   };
 
   const handleCreateTicket = async (assistantMessage: DisplayMessage, question: string) => {
+    const getCreateTicketErrorMessage = (err: unknown) => {
+      if (!(err instanceof Error)) {
+        return t("chat.ticketCreateError");
+      }
+
+      const normalizedMessage = err.message.toUpperCase();
+
+      if (
+        normalizedMessage.includes("AI_ANALYSIS_NOT_FOUND") ||
+        normalizedMessage.includes("ANALYSIS_NOT_FOUND")
+      ) {
+        return t("chat.ticketMissingAnalysis");
+      }
+
+      return err.message || t("chat.ticketCreateError");
+    };
+
     if (!selectedWorkspaceId) {
       setError(t("chat.ticketSelectWorkspace"));
       toast.warning(t("chat.ticketSelectWorkspace"), t("toast.warningTitle"));
+      return;
+    }
+
+    if (!assistantMessage.requestId?.trim()) {
+      const message = t("chat.ticketMissingRequestId");
+      setError(message);
+      toast.warning(message, t("toast.warningTitle"));
       return;
     }
 
@@ -420,16 +511,11 @@ export function LegalChatPage() {
         request_id: assistantMessage.requestId,
         workspace_id: selectedWorkspaceId,
         document_id: selectedDocumentId || null,
-        question,
-        answer: assistantMessage.content,
-        confidence_score: assistantMessage.confidenceScore,
-        should_suggest_ticket: assistantMessage.shouldSuggestTicket,
-        suggestion_type: assistantMessage.suggestionType,
-        suggestion_reason: assistantMessage.suggestionReason,
-        missing_information: assistantMessage.missingInformation,
-        risk_level: assistantMessage.riskLevel,
-        legal_domain: assistantMessage.legalDomain,
-        user_action_hint: assistantMessage.userActionHint,
+        issue_fingerprint: assistantMessage.id,
+        customer_note:
+          question.trim() ||
+          assistantMessage.suggestionReason ||
+          assistantMessage.content.slice(0, 500),
       });
 
       setTicketNotices((previous) => ({
@@ -438,7 +524,7 @@ export function LegalChatPage() {
       }));
       toast.success(`${t("chat.ticketCreated")} ${ticket.id}.`, t("toast.successTitle"));
     } catch (err) {
-      const message = err instanceof Error ? err.message : t("chat.ticketCreateError");
+      const message = getCreateTicketErrorMessage(err);
       setError(message);
       toast.error(message, t("toast.errorTitle"));
     } finally {
@@ -454,11 +540,16 @@ export function LegalChatPage() {
     setMessageDetailOpen(true);
     setMessageDetailLoading(true);
     setMessageDetail(null);
+    setMessageCitations([]);
     setError("");
 
     try {
-      const detail = await getChatMessageDetail(getAccessToken(), messageId);
+      const [detail, citations] = await Promise.all([
+        getChatMessageDetail(getAccessToken(), messageId),
+        getChatMessageAiCitations(messageId).catch(() => []),
+      ]);
       setMessageDetail(detail);
+      setMessageCitations(citations);
     } catch (err) {
       const message = err instanceof Error ? err.message : t("chat.messageDetailError");
       setError(message);
@@ -483,7 +574,7 @@ export function LegalChatPage() {
       return;
     }
 
-    const optimisticUserMessage = createOptimisticUserMessage(question, language);
+    const optimisticUserMessage = createOptimisticUserMessage(question, language, t("common.justNow"));
     const assistantMessageId = `local-assistant-${Date.now()}`;
 
     setMessages((previous) => [
@@ -527,7 +618,7 @@ export function LegalChatPage() {
         setMessages((previous) => [
           ...previous,
           {
-            ...toDisplayMessage(conversation.assistantMessage, language),
+            ...toDisplayMessage(conversation.assistantMessage, language, t("common.justNow")),
             id: conversation.assistantMessage.messageId ?? assistantMessageId,
           },
         ]);
@@ -813,7 +904,7 @@ export function LegalChatPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          aria-label="Rename chat session"
+                          aria-label={t("chat.renameSession")}
                           onClick={() => {
                             setRenamingSessionId(session.chatSessionId);
                             setRenameTitle(session.title);
@@ -826,7 +917,7 @@ export function LegalChatPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          aria-label="Delete chat session"
+                          aria-label={t("chat.deleteSession")}
                           disabled={sessionActionBusyId === session.chatSessionId}
                           onClick={() => void handleDeleteSession(session.chatSessionId)}
                         >
@@ -835,12 +926,39 @@ export function LegalChatPage() {
                       </div>
                     </div>
                     <p className="mt-xs text-xs text-on-surface-variant dark:text-slate-400">
-                      {t("chat.updated")} {formatTimestamp(session.updatedAt, language)}
+                      {t("chat.updated")} {formatTimestamp(session.updatedAt, language, t("common.justNow"))}
                     </p>
                   </article>
                 ))
               )}
             </div>
+          </Card>
+
+          <Card title={t("chat.sessionMemory")} subtitle={selectedSessionId || t("chat.noSessionSelected")}>
+            {sessionContextLoading ? (
+              <p className="text-sm text-on-surface-variant dark:text-slate-400">
+                {t("common.loading")}
+              </p>
+            ) : sessionContextError ? (
+              <p className="rounded-lg bg-error-container px-md py-sm text-sm font-semibold text-risk-high-text dark:bg-red-950/40 dark:text-red-200">
+                {sessionContextError}
+              </p>
+            ) : (
+              <div className="space-y-md text-sm">
+                <div>
+                  <p className="label-uppercase mb-xs">{t("chat.summary")}</p>
+                  <p className="leading-6 text-on-surface-variant dark:text-slate-400">
+                    {sessionSummary?.summary || sessionMemory?.summary || t("common.noData")}
+                  </p>
+                </div>
+                <div>
+                  <p className="label-uppercase mb-xs">{t("chat.contextJson")}</p>
+                  <pre className="max-h-40 overflow-auto rounded-lg bg-surface-container-low p-sm text-xs dark:bg-slate-800">
+                    {sessionMemory?.contextJson || sessionMemory?.memoryJson || "{}"}
+                  </pre>
+                </div>
+              </div>
+            )}
           </Card>
         </aside>
 
@@ -940,7 +1058,7 @@ export function LegalChatPage() {
                                   )}
                                   {typeof message.confidenceScore === "number" && (
                                     <Badge tone="blue">
-                                      Confidence {Math.round(message.confidenceScore * 100)}%
+                                      {t("chat.confidence")} {Math.round(message.confidenceScore * 100)}%
                                     </Badge>
                                   )}
                                   {message.suggestionType && (
@@ -1025,7 +1143,7 @@ export function LegalChatPage() {
                 <Button
                   type="submit"
                   size="icon"
-                  aria-label="Ask"
+                  aria-label={t("actions.ask")}
                   disabled={!input.trim() || !selectedWorkspaceId || sending}
                 >
                   <Send className="h-5 w-5" />
@@ -1051,25 +1169,53 @@ export function LegalChatPage() {
         ) : messageDetail ? (
           <div className="space-y-md text-sm">
             <dl className="grid gap-md sm:grid-cols-2">
-              <div><dt className="label-uppercase">Message ID</dt><dd className="mt-xs break-all font-semibold">{messageDetail.messageId}</dd></div>
-              <div><dt className="label-uppercase">Session ID</dt><dd className="mt-xs break-all">{messageDetail.chatSessionId}</dd></div>
-              <div><dt className="label-uppercase">Role</dt><dd className="mt-xs">{messageDetail.role}</dd></div>
-              <div><dt className="label-uppercase">Status</dt><dd className="mt-xs"><Badge tone="slate">{messageDetail.status}</Badge></dd></div>
-              <div><dt className="label-uppercase">Model</dt><dd className="mt-xs">{messageDetail.aiModel ?? '-'}</dd></div>
-              <div><dt className="label-uppercase">Request ID</dt><dd className="mt-xs break-all">{messageDetail.requestId ?? '-'}</dd></div>
-              <div><dt className="label-uppercase">Prompt tokens</dt><dd className="mt-xs">{messageDetail.promptTokens ?? '-'}</dd></div>
-              <div><dt className="label-uppercase">Completion tokens</dt><dd className="mt-xs">{messageDetail.completionTokens ?? '-'}</dd></div>
-              <div><dt className="label-uppercase">Total tokens</dt><dd className="mt-xs">{messageDetail.totalTokens ?? '-'}</dd></div>
-              <div><dt className="label-uppercase">Confidence</dt><dd className="mt-xs">{typeof messageDetail.confidenceScore === 'number' ? `${Math.round(messageDetail.confidenceScore * 100)}%` : '-'}</dd></div>
-              <div><dt className="label-uppercase">Risk level</dt><dd className="mt-xs">{messageDetail.riskLevel ?? '-'}</dd></div>
-              <div><dt className="label-uppercase">Legal domain</dt><dd className="mt-xs">{messageDetail.legalDomain ?? '-'}</dd></div>
+              <div><dt className="label-uppercase">{t("chat.messageId")}</dt><dd className="mt-xs break-all font-semibold">{messageDetail.messageId}</dd></div>
+              <div><dt className="label-uppercase">{t("chat.sessionIdLabel")}</dt><dd className="mt-xs break-all">{messageDetail.chatSessionId}</dd></div>
+              <div><dt className="label-uppercase">{t("chat.role")}</dt><dd className="mt-xs">{messageDetail.role}</dd></div>
+              <div><dt className="label-uppercase">{t("chat.status")}</dt><dd className="mt-xs"><Badge tone="slate">{messageDetail.status}</Badge></dd></div>
+              <div><dt className="label-uppercase">{t("chat.model")}</dt><dd className="mt-xs">{messageDetail.aiModel ?? '-'}</dd></div>
+              <div><dt className="label-uppercase">{t("chat.requestId")}</dt><dd className="mt-xs break-all">{messageDetail.requestId ?? '-'}</dd></div>
+              <div><dt className="label-uppercase">{t("chat.promptTokens")}</dt><dd className="mt-xs">{messageDetail.promptTokens ?? '-'}</dd></div>
+              <div><dt className="label-uppercase">{t("chat.completionTokens")}</dt><dd className="mt-xs">{messageDetail.completionTokens ?? '-'}</dd></div>
+              <div><dt className="label-uppercase">{t("chat.totalTokens")}</dt><dd className="mt-xs">{messageDetail.totalTokens ?? '-'}</dd></div>
+              <div><dt className="label-uppercase">{t("chat.confidence")}</dt><dd className="mt-xs">{typeof messageDetail.confidenceScore === 'number' ? `${Math.round(messageDetail.confidenceScore * 100)}%` : '-'}</dd></div>
+              <div><dt className="label-uppercase">{t("chat.riskLevel")}</dt><dd className="mt-xs">{messageDetail.riskLevel ?? '-'}</dd></div>
+              <div><dt className="label-uppercase">{t("chat.legalDomain")}</dt><dd className="mt-xs">{messageDetail.legalDomain ?? '-'}</dd></div>
             </dl>
             {messageDetail.suggestionReason && (
               <div className="rounded-lg bg-surface-container-low p-md dark:bg-slate-800">
-                <p className="label-uppercase mb-xs">Suggestion reason</p>
+                <p className="label-uppercase mb-xs">{t("chat.suggestionReason")}</p>
                 {messageDetail.suggestionReason}
               </div>
             )}
+            <div className="rounded-lg bg-surface-container-low p-md dark:bg-slate-800">
+              <p className="label-uppercase mb-xs">{t("chat.aiCitations")}</p>
+              {messageCitations.length === 0 ? (
+                <p className="text-on-surface-variant dark:text-slate-400">
+                  {t("common.noData")}
+                </p>
+              ) : (
+                <div className="space-y-sm">
+                  {messageCitations.map((citation) => (
+                    <article key={citation.id} className="rounded-lg border border-legal-border p-sm dark:border-slate-700">
+                      <p className="font-semibold">{citation.label || citation.sourceReferenceId || citation.id}</p>
+                      <p className="mt-xs text-on-surface-variant dark:text-slate-400">
+                        {citation.excerpt || citation.uri || "-"}
+                      </p>
+                      <div className="mt-sm flex flex-wrap gap-xs">
+                        {citation.sourceType && <Badge>{citation.sourceType}</Badge>}
+                        {typeof citation.score === "number" && (
+                          <Badge tone="blue">{Math.round(citation.score * 100)}%</Badge>
+                        )}
+                        {typeof citation.pageNumber === "number" && (
+                          <Badge tone="gold">{t("common.page")} {citation.pageNumber}</Badge>
+                        )}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         ) : (
           <p className="text-sm text-on-surface-variant dark:text-slate-400">{t("chat.noMessageDetail")}</p>

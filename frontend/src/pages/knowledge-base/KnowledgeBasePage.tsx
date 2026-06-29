@@ -1,262 +1,181 @@
-import { AlertTriangle, RefreshCw, Search, Upload } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Badge } from '../../components/common/Badge';
-import { Button } from '../../components/common/Button';
-import { Card } from '../../components/common/Card';
-import { DataTable, type DataTableColumn } from '../../components/common/DataTable';
-import { PageHeader } from '../../components/common/PageHeader';
-import { StatCard } from '../../components/common/StatCard';
+import { RefreshCw, Upload } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { Badge } from "../../components/common/Badge";
+import { Button } from "../../components/common/Button";
+import { Card } from "../../components/common/Card";
+import { DataTable, type DataTableColumn } from "../../components/common/DataTable";
+import { PageHeader } from "../../components/common/PageHeader";
 import {
-  askAiKnowledge,
-  getAiKnowledgeSupportedFormats,
-  ingestAiKnowledgeDocument,
-  ingestAiKnowledgeDocumentV2,
-  queryAiKnowledgeV2,
-  searchAiKnowledge,
-} from '../../services/aiKnowledge.service';
-import { AI_SERVICE_UNAVAILABLE_MESSAGE, getReadableErrorMessage } from '../../services/http';
-import { useI18n } from '../../hooks/useI18n';
-import { useToast } from '../../hooks/useToast';
-import type { AiChunk, AiIngestionResult, AiKnowledgeAskResponse, AiKnowledgeQueryResponse } from '../../types/ai';
+  getKnowledgeBaseEntries,
+  uploadKnowledgeBaseEntry,
+} from "../../services/knowledgeBase.service";
+import { useI18n } from "../../hooks/useI18n";
+import { useToast } from "../../hooks/useToast";
+import { useAppStore } from "../../store/AppStore";
+import type { KnowledgeBaseEntry, UploadKnowledgeRequest } from "../../types/knowledgeBase";
+import { formatDisplayDate } from "../../utils/format";
 
-type KnowledgeMode = 'search' | 'ask' | 'query-v2';
-type KnowledgeIngestVersion = 'v1' | 'v2';
+const emptyForm = {
+  code: "",
+  title: "",
+  category: "LEGAL_SOURCE",
+  scope: "GLOBAL",
+  extractedContent: "",
+  rawContent: "",
+};
 
 export function KnowledgeBasePage() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const toast = useToast();
-  const [formats, setFormats] = useState<string[]>([]);
-  const [query, setQuery] = useState('');
-  const [mode, setMode] = useState<KnowledgeMode>('query-v2');
-  const [ingestVersion, setIngestVersion] = useState<KnowledgeIngestVersion>('v2');
-  const [topK, setTopK] = useState(5);
-  const [chunks, setChunks] = useState<AiChunk[]>([]);
-  const [answer, setAnswer] = useState('');
-  const [llmStatus, setLlmStatus] = useState('');
-  const [ingestionResult, setIngestionResult] = useState<AiIngestionResult | null>(null);
-  const [loadingFormats, setLoadingFormats] = useState(true);
-  const [runningQuery, setRunningQuery] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState('');
+  const { user } = useAppStore();
+  const locale = language === "vi" ? "vi-VN" : "en-US";
+  const [entries, setEntries] = useState<KnowledgeBaseEntry[]>([]);
+  const [totalItems, setTotalItems] = useState(0);
+  const [form, setForm] = useState(emptyForm);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
-  const loadFormats = useCallback(async () => {
-    setLoadingFormats(true);
-    setError('');
+  const loadEntries = useCallback(async () => {
+    setLoading(true);
+    setError("");
 
     try {
-      setFormats(await getAiKnowledgeSupportedFormats());
-    } catch (err) {
-      setFormats([]);
-      setError(getReadableErrorMessage(err, AI_SERVICE_UNAVAILABLE_MESSAGE));
+      const response = await getKnowledgeBaseEntries(0, 20);
+      setEntries(response.items ?? []);
+      setTotalItems(response.totalItems ?? 0);
+    } catch (loadError) {
+      const message = loadError instanceof Error ? loadError.message : t("knowledge.loadError");
+      setError(message);
+      setEntries([]);
+      setTotalItems(0);
     } finally {
-      setLoadingFormats(false);
+      setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
-    void loadFormats();
-  }, [loadFormats]);
+    void loadEntries();
+  }, [loadEntries]);
 
-  const handleUpload = async (file: File, useV2: boolean) => {
-    setUploading(true);
-    setError('');
-    setIngestionResult(null);
-
-    try {
-      const result = useV2
-        ? await ingestAiKnowledgeDocumentV2(file, file.name)
-        : await ingestAiKnowledgeDocument(file, file.name);
-      setIngestionResult(result);
-      toast.success(t('knowledge.importSuccess'), t('toast.successTitle'));
-    } catch (err) {
-      const message = getReadableErrorMessage(err, AI_SERVICE_UNAVAILABLE_MESSAGE);
-      setError(message);
-      toast.error(message || t('knowledge.importError'), t('toast.errorTitle'));
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleRunQuery = async () => {
-    const normalizedQuery = query.trim();
-
-    if (!normalizedQuery) {
-      setError(t('knowledge.queryRequired'));
-      toast.warning(t('knowledge.queryRequired'), t('toast.warningTitle'));
+  const handleUpload = async () => {
+    if (!user?.id || !form.code.trim() || !form.title.trim() || !form.extractedContent.trim()) {
+      toast.warning(t("knowledge.requiredFields"));
       return;
     }
 
-    setRunningQuery(true);
-    setError('');
-    setAnswer('');
-    setLlmStatus('');
-    setChunks([]);
+    setSaving(true);
+    setError("");
 
     try {
-      if (mode === 'search') {
-        const response = await searchAiKnowledge({ query: normalizedQuery, top_k: topK });
-        setChunks(response);
-        toast.success(t('knowledge.querySuccess'), t('toast.successTitle'));
-        return;
-      }
-
-      if (mode === 'ask') {
-        const response: AiKnowledgeQueryResponse = await askAiKnowledge({ query: normalizedQuery, top_k: topK });
-        setAnswer(response.answer_preview);
-        setChunks(response.chunks);
-        toast.success(t('knowledge.querySuccess'), t('toast.successTitle'));
-        return;
-      }
-
-      const response: AiKnowledgeAskResponse = await queryAiKnowledgeV2({ query: normalizedQuery, top_k: topK });
-      setAnswer(response.answer);
-      setLlmStatus(response.llm_status + (response.llm_error ? `: ${response.llm_error}` : ''));
-      setChunks(response.chunks);
-      toast.success(t('knowledge.querySuccess'), t('toast.successTitle'));
-    } catch (err) {
-      const message = getReadableErrorMessage(err, AI_SERVICE_UNAVAILABLE_MESSAGE);
+      const payload: UploadKnowledgeRequest = {
+        code: form.code.trim(),
+        title: form.title.trim(),
+        category: form.category.trim() || "LEGAL_SOURCE",
+        scope: form.scope,
+        createdById: user.id,
+        extractedContent: form.extractedContent.trim(),
+        rawContent: form.rawContent.trim() || null,
+      };
+      await uploadKnowledgeBaseEntry(payload);
+      toast.success(t("knowledge.uploadSuccess"));
+      setForm(emptyForm);
+      await loadEntries();
+    } catch (uploadError) {
+      const message = uploadError instanceof Error ? uploadError.message : t("knowledge.uploadError");
       setError(message);
-      toast.error(message || t('knowledge.queryError'), t('toast.errorTitle'));
+      toast.error(message);
     } finally {
-      setRunningQuery(false);
+      setSaving(false);
     }
   };
 
-  const columns: DataTableColumn<AiChunk>[] = [
-    { header: 'Chunk', cell: (chunk) => <span className="break-all font-semibold">{chunk.chunk_id}</span> },
-    { header: 'Tiêu đề', cell: (chunk) => chunk.title },
-    { header: 'Điểm', cell: (chunk) => chunk.score.toFixed(3) },
-    { header: 'Xem trước', cell: (chunk) => <span className="line-clamp-3">{chunk.text}</span> },
+  const columns: DataTableColumn<KnowledgeBaseEntry>[] = [
+    {
+      header: t("knowledge.titleField"),
+      cell: (entry) => (
+        <Link className="font-semibold text-primary hover:underline dark:text-inverse-primary" to={`/knowledge-base/${entry.id}`}>
+          {entry.title}
+        </Link>
+      ),
+    },
+    { header: t("knowledge.code"), cell: (entry) => entry.code },
+    { header: t("knowledge.category"), cell: (entry) => entry.category },
+    { header: t("knowledge.scope"), cell: (entry) => <Badge>{entry.scope}</Badge> },
+    { header: t("table.status"), cell: (entry) => <Badge>{entry.currentStatus || t("common.unknown")}</Badge> },
+    { header: t("table.updated"), cell: (entry) => formatDisplayDate(entry.updatedAt, "-", locale) },
   ];
-
-  const supportedFormatsLabel = useMemo(
-    () => (formats.length > 0 ? formats.join(', ') : loadingFormats ? t('common.loading') : t('knowledge.noFormats')),
-    [formats, loadingFormats, t],
-  );
 
   return (
     <div>
       <PageHeader
-        title={t('knowledge.title')}
-        subtitle={t('knowledge.subtitle')}
+        title={t("knowledge.title")}
+        subtitle={t("knowledge.subtitle")}
         actions={
-          <Button variant="secondary" leftIcon={<RefreshCw className="h-4 w-4" />} onClick={() => void loadFormats()} disabled={loadingFormats}>
-            {t('billing.refresh')}
+          <Button
+            variant="secondary"
+            leftIcon={<RefreshCw className="h-4 w-4" />}
+            onClick={() => void loadEntries()}
+            disabled={loading}
+          >
+            {t("common.refresh")}
           </Button>
         }
       />
 
       {error && (
-        <div className="mb-lg rounded-xl border border-amber-300 bg-amber-50 p-md text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-100">
-          <div className="flex flex-col gap-md md:flex-row md:items-start md:justify-between">
-            <div className="flex gap-sm">
-              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
-              <div>
-                <p className="font-semibold">{t('knowledge.serviceUnavailableTitle')}</p>
-                <p className="mt-xs leading-6">{error}</p>
-                <p className="mt-xs text-xs opacity-80">{t('knowledge.serviceUnavailableHint')}</p>
-              </div>
-            </div>
-            <Button variant="secondary" size="sm" onClick={() => void loadFormats()} disabled={loadingFormats}>
-              {t('billing.refresh')}
-            </Button>
-          </div>
+        <div className="mb-lg rounded-xl border border-error/40 bg-error/10 p-md text-sm text-error">
+          {error}
         </div>
       )}
 
-      <section className="grid gap-gutter md:grid-cols-3">
-        <StatCard label={t('knowledge.supportedFormats')} value={String(formats.length)} change={supportedFormatsLabel} trend="neutral" />
-        <StatCard label={t('knowledge.retrievedChunks')} value={String(chunks.length)} change={mode} trend="neutral" accent="green" />
-        <StatCard label={t('knowledge.lastImport')} value={ingestionResult ? String(ingestionResult.total_chunks) : '-'} change={ingestionResult?.title ?? t('knowledge.noUpload')} trend="neutral" accent="gold" />
-      </section>
-
-      <section className="mt-xl grid gap-gutter xl:grid-cols-[0.85fr_1.15fr]">
-        <Card title={t('knowledge.uploadImportTitle')} subtitle={t('knowledge.uploadImportSubtitle')}>
+      <section className="mb-xl grid gap-gutter xl:grid-cols-[0.85fr_1.15fr]">
+        <Card title={t("knowledge.uploadEntry")} subtitle={t("knowledge.uploadEntrySubtitle")}>
           <div className="space-y-md">
-            <label className="block rounded-xl border border-dashed border-outline-variant p-lg text-center dark:border-slate-700">
-              <Upload className="mx-auto h-8 w-8 text-primary dark:text-inverse-primary" />
-              <span className="mt-sm block text-sm font-semibold">{t('knowledge.chooseFile')}</span>
-              <input
-                className="sr-only"
-                type="file"
-                disabled={uploading}
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) void handleUpload(file, ingestVersion === 'v2');
-                  event.currentTarget.value = '';
-                }}
-              />
-            </label>
-            <select
-              className="form-field"
-              value={ingestVersion}
-              onChange={(event) => setIngestVersion(event.target.value as KnowledgeIngestVersion)}
-              disabled={uploading}
-            >
-              <option value="v2">Import v2</option>
-              <option value="v1">Import v1</option>
-            </select>
-            {loadingFormats && (
-              <p className="text-sm text-on-surface-variant dark:text-slate-400">{t('knowledge.checkingFormats')}</p>
-            )}
-            {!loadingFormats && formats.length === 0 && (
-              <p className="rounded-lg bg-surface-container-low p-sm text-sm text-on-surface-variant dark:bg-slate-800 dark:text-slate-400">
-                {t('knowledge.noSupportedFormats')}
-              </p>
-            )}
-            <div className="flex flex-wrap gap-xs">
-              {formats.map((format) => <Badge key={format} tone="blue">{format}</Badge>)}
+            <div className="grid gap-md md:grid-cols-2">
+              <label className="text-sm font-semibold">
+                {t("knowledge.code")}
+                <input className="form-field mt-xs" value={form.code} onChange={(event) => setForm((previous) => ({ ...previous, code: event.target.value }))} />
+              </label>
+              <label className="text-sm font-semibold">
+                {t("knowledge.titleField")}
+                <input className="form-field mt-xs" value={form.title} onChange={(event) => setForm((previous) => ({ ...previous, title: event.target.value }))} />
+              </label>
+              <label className="text-sm font-semibold">
+                {t("knowledge.category")}
+                <input className="form-field mt-xs" value={form.category} onChange={(event) => setForm((previous) => ({ ...previous, category: event.target.value }))} />
+              </label>
+              <label className="text-sm font-semibold">
+                {t("knowledge.scope")}
+                <select className="form-field mt-xs" value={form.scope} onChange={(event) => setForm((previous) => ({ ...previous, scope: event.target.value }))}>
+                  <option value="GLOBAL">GLOBAL</option>
+                  <option value="WORKSPACE">WORKSPACE</option>
+                </select>
+              </label>
             </div>
-            {uploading && <p className="text-sm text-on-surface-variant dark:text-slate-400">{t('knowledge.uploading')}</p>}
-            {ingestionResult && (
-              <div className="rounded-lg bg-surface-container-low p-md text-sm dark:bg-slate-800">
-                <p className="font-semibold">{ingestionResult.title}</p>
-                <p className="mt-xs text-on-surface-variant dark:text-slate-400">
-                  {ingestionResult.total_chunks} chunks · {ingestionResult.file_type} · v{ingestionResult.ingestion_version ?? 1}
-                </p>
-              </div>
-            )}
+            <label className="block text-sm font-semibold">
+              {t("knowledge.extractedContent")}
+              <textarea className="form-field mt-xs min-h-40" value={form.extractedContent} onChange={(event) => setForm((previous) => ({ ...previous, extractedContent: event.target.value }))} />
+            </label>
+            <label className="block text-sm font-semibold">
+              {t("knowledge.rawContent")}
+              <textarea className="form-field mt-xs min-h-24" value={form.rawContent} onChange={(event) => setForm((previous) => ({ ...previous, rawContent: event.target.value }))} />
+            </label>
+            <Button leftIcon={<Upload className="h-4 w-4" />} onClick={() => void handleUpload()} disabled={saving}>
+              {saving ? t("knowledge.uploading") : t("knowledge.upload")}
+            </Button>
           </div>
         </Card>
 
-        <Card title={t('knowledge.queryTitle')} subtitle={t('knowledge.querySubtitle')}>
-          <div className="grid gap-md lg:grid-cols-[1fr_160px_140px_auto]">
-            <input
-              className="form-field"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder={t('knowledge.searchPlaceholder')}
-            />
-            <select className="form-field" value={mode} onChange={(event) => setMode(event.target.value as KnowledgeMode)}>
-              <option value="query-v2">Query v2</option>
-              <option value="ask">Ask</option>
-              <option value="search">Search</option>
-            </select>
-            <input
-              className="form-field"
-              type="number"
-              min={1}
-              max={20}
-              value={topK}
-              onChange={(event) => setTopK(Number(event.target.value))}
-            />
-            <Button leftIcon={<Search className="h-4 w-4" />} onClick={() => void handleRunQuery()} disabled={runningQuery}>
-              {runningQuery ? t('actions.running') : t('actions.run')}
-            </Button>
-          </div>
-          {answer && (
-            <div className="mt-md rounded-xl bg-surface-container-low p-md text-sm leading-6 dark:bg-slate-800">
-              <p className="label-uppercase mb-xs">{t('knowledge.answer')}</p>
-              <p>{answer}</p>
-              {llmStatus && <p className="mt-sm text-xs font-semibold text-on-surface-variant dark:text-slate-400">{llmStatus}</p>}
-            </div>
+        <Card title={t("knowledge.entries")} actions={<Badge tone="blue">{totalItems}</Badge>}>
+          {loading ? (
+            <p className="text-sm text-on-surface-variant dark:text-slate-400">{t("knowledge.loading")}</p>
+          ) : (
+            <DataTable columns={columns} data={entries} getRowKey={(entry) => entry.id} emptyMessage={t("knowledge.empty")} />
           )}
         </Card>
       </section>
-
-      <Card className="mt-xl" title={t('knowledge.chunksReturned')}>
-        <DataTable columns={columns} data={chunks} getRowKey={(chunk) => chunk.chunk_id} emptyMessage={t('knowledge.noChunks')} />
-      </Card>
     </div>
   );
 }

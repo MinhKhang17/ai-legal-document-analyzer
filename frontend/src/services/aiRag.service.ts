@@ -15,17 +15,18 @@ export const queryAiRagInternal = async (
     "Không thể query AI RAG internal",
   );
 
-export const runAiRagTestQuery = async (
-  question: string,
-  userId: string,
-): Promise<AiRagQueryResponse> => {
-  const query = new URLSearchParams({ question, user_id: userId });
-  return requestAiJson<AiRagQueryResponse>(
-    `${API_ENDPOINTS.aiRag.testQuery}?${query.toString()}`,
-    { method: "GET" },
-    "Không thể chạy AI RAG test query",
+export const previewAiRagInternal = async (
+  payload: AiRagQueryRequest,
+): Promise<AiRagQueryResponse> =>
+  requestAiJson<AiRagQueryResponse>(
+    API_ENDPOINTS.aiRag.preview,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+    "Không thể preview AI RAG internal",
   );
-};
 
 export const queryInternalRagDirect = queryAiRagInternal;
-export const runAiTestQuery = runAiRagTestQuery;
+export const previewInternalRagDirect = previewAiRagInternal;

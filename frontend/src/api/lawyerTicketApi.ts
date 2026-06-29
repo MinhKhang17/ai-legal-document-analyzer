@@ -4,6 +4,7 @@ export {
   getLawyerTicketMessages,
   sendLawyerTicketMessage,
   getLawyerTicketFiles,
+  downloadLawyerTicketFile,
   uploadLawyerTicketFile,
   closeLawyerTicket,
 } from "../services/lawyerTicket.service";

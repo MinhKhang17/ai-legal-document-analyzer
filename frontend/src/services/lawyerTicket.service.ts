@@ -79,6 +79,20 @@ export const getLawyerTicketFiles = async (
     "Không thể tải tệp đính kèm",
   );
 
+export const downloadLawyerTicketFile = async (
+  ticketId: string,
+  documentId: string,
+): Promise<LawyerTicketFile> =>
+  requestApiData<LawyerTicketFile>(
+    API_ENDPOINTS.lawyerTickets.download(ticketId, documentId),
+    {
+      method: "GET",
+      headers: buildAuthHeaders({ Accept: "application/json" }),
+      credentials: "include",
+    },
+    "Không thể tải thông tin tệp đính kèm",
+  );
+
 export const uploadLawyerTicketFile = async (
   ticketId: string,
   payload: UploadLawyerTicketFileRequest,

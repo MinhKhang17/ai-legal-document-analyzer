@@ -26,8 +26,9 @@ const getRiskTone = (risk?: string) => {
 };
 
 export function LawyerTicketsPage() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const toast = useToast();
+  const locale = language === "vi" ? "vi-VN" : "en-US";
 
   const [tickets, setTickets] = useState<LawyerTicket[]>([]);
   const [totalItems, setTotalItems] = useState(0);
@@ -152,7 +153,7 @@ export function LawyerTicketsPage() {
                     <h3 className="mt-2 text-lg font-semibold">
                       {ticket.issue_title ||
                         ticket.question ||
-                        `Ticket #${ticket.id}`}
+                        `${t("legalTickets.table.ticket")} #${ticket.id}`}
                     </h3>
 
                     <p className="mt-2 line-clamp-2 text-sm text-on-surface-variant">
@@ -165,7 +166,7 @@ export function LawyerTicketsPage() {
                     <p className="mt-3 text-xs text-on-surface-variant">
                       {t("lawyerTickets.createdBy")}{" "}
                       {ticket.created_by_name || "-"} ·{" "}
-                      {formatDisplayDate(ticket.created_at, "-", "vi-VN")}
+                      {formatDisplayDate(ticket.created_at, "-", locale)}
                     </p>
                   </div>
 

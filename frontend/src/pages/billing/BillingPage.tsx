@@ -15,11 +15,13 @@ import { createVnPayPaymentUrl, getMyPaymentTransactions } from '../../services/
 import {
   cancelCustomerPlan,
   getMyCustomerPlan,
+  getMySubscriptionUsage,
   isCustomerPlanMissingError,
   isSubscriptionUnauthorizedError,
+  requestSubscriptionRefund,
 } from '../../services/subscription.service';
 import type { PaymentTransaction } from '../../types/paymentTransaction';
-import type { CustomerPlan } from '../../types/subscription';
+import type { CustomerPlan, SubscriptionUsage } from '../../types/subscription';
 import { formatDisplayDate, formatNumber, formatVndCurrency } from '../../utils/format';
 
 interface BillingMetricCardProps {
@@ -87,7 +89,10 @@ export function BillingPage() {
   const [transactionError, setTransactionError] = useState<string | null>(null);
   const [transactionActionMessage, setTransactionActionMessage] = useState<string | null>(null);
   const [payingTransactionId, setPayingTransactionId] = useState<number | null>(null);
+  const [refundingTransactionId, setRefundingTransactionId] = useState<number | null>(null);
   const [isCancellingPlan, setIsCancellingPlan] = useState(false);
+  const [usageRows, setUsageRows] = useState<SubscriptionUsage[]>([]);
+  const [isLoadingUsage, setIsLoadingUsage] = useState(true);
   const locale = language === 'vi' ? 'vi-VN' : 'en-US';
 
   const loadCustomerPlan = useCallback(async () => {
@@ -136,10 +141,25 @@ export function BillingPage() {
     }
   }, [t]);
 
+  const loadUsage = useCallback(async () => {
+    setIsLoadingUsage(true);
+
+    try {
+      const response = await getMySubscriptionUsage(0, 8);
+      setUsageRows(response.data?.items ?? []);
+    } catch (error) {
+      console.error('Failed to load subscription usage:', error);
+      setUsageRows([]);
+    } finally {
+      setIsLoadingUsage(false);
+    }
+  }, []);
+
   useEffect(() => {
     void loadCustomerPlan();
     void loadPaymentTransactions();
-  }, [loadCustomerPlan, loadPaymentTransactions]);
+    void loadUsage();
+  }, [loadCustomerPlan, loadPaymentTransactions, loadUsage]);
 
   const quotaPercent = useMemo(() => (customerPlan ? getQuotaPercent(customerPlan) : 0), [customerPlan]);
 
@@ -199,6 +219,36 @@ export function BillingPage() {
     }
   };
 
+  const handleRequestRefund = async (transaction: PaymentTransaction) => {
+    const reason = window.prompt(t('billing.refundPrompt'));
+
+    if (!reason?.trim()) {
+      return;
+    }
+
+    setRefundingTransactionId(transaction.id);
+    setTransactionError(null);
+    setTransactionActionMessage(null);
+
+    try {
+      await requestSubscriptionRefund({
+        paymentTransactionId: transaction.id,
+        customerPlanId: transaction.customerPlanId,
+        reason: reason.trim(),
+        amount: transaction.amount,
+      });
+      const message = t('billing.refundSuccess');
+      setTransactionActionMessage(message);
+      toast.success(message, t('toast.successTitle'));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t('billing.refundError');
+      setTransactionError(message);
+      toast.error(message, t('toast.errorTitle'));
+    } finally {
+      setRefundingTransactionId(null);
+    }
+  };
+
   const columns: DataTableColumn<PaymentTransaction>[] = [
     {
       header: t('billing.invoice'),
@@ -231,21 +281,89 @@ export function BillingPage() {
     {
       header: t('table.actions'),
       cell: (transaction) => (
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled={
-            payingTransactionId === transaction.id ||
-            transaction.paymentMethod !== 'VNPAY' ||
-            transaction.paymentStatus.toUpperCase() !== 'PENDING'
-          }
-          onClick={() => void handleCreatePaymentUrl(transaction)}
-        >
-          {payingTransactionId === transaction.id ? t('billing.creatingPaymentUrl') : t('billing.pay')}
-        </Button>
+        <div className="flex flex-wrap gap-xs">
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={
+              payingTransactionId === transaction.id ||
+              transaction.paymentMethod !== 'VNPAY' ||
+              transaction.paymentStatus.toUpperCase() !== 'PENDING'
+            }
+            onClick={() => void handleCreatePaymentUrl(transaction)}
+          >
+            {payingTransactionId === transaction.id ? t('billing.creatingPaymentUrl') : t('billing.pay')}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={
+              refundingTransactionId === transaction.id ||
+              transaction.paymentStatus.toUpperCase() !== 'SUCCESS'
+            }
+            onClick={() => void handleRequestRefund(transaction)}
+          >
+            {refundingTransactionId === transaction.id ? t('common.loading') : t('billing.refund')}
+          </Button>
+        </div>
       ),
     },
   ];
+
+  const usageColumns: DataTableColumn<SubscriptionUsage>[] = [
+    { header: t('billing.usage'), cell: (usage) => <span className="font-semibold">{usage.usageType}</span> },
+    { header: t('billing.reference'), cell: (usage) => usage.referenceId ?? '-' },
+    { header: t('billing.units'), cell: (usage) => formatNumber(usage.consumedUnits) },
+    { header: t('table.date'), cell: (usage) => formatDisplayDate(usage.createdAt, '-', locale) },
+  ];
+
+  const renderTransactionsCard = () => (
+    <Card
+      title={t('billing.invoices')}
+      subtitle={t('billing.paymentTransactionsSubtitle')}
+      actions={<Receipt className="h-5 w-5 text-primary dark:text-inverse-primary" />}
+    >
+      {transactionActionMessage && (
+        <p className="mb-md rounded-lg bg-emerald-50 px-md py-sm text-sm font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200">
+          {transactionActionMessage}
+        </p>
+      )}
+      {transactionError && (
+        <p className="mb-md rounded-lg bg-error-container px-md py-sm text-sm font-semibold text-risk-high-text dark:bg-red-950/40 dark:text-red-200">
+          {transactionError}
+        </p>
+      )}
+      {isLoadingTransactions ? (
+        <p className="text-sm text-on-surface-variant dark:text-slate-400">
+          {t('billing.loadingPaymentHistory')}
+        </p>
+      ) : (
+        <DataTable
+          columns={columns}
+          data={paymentTransactions}
+          getRowKey={(transaction) => String(transaction.id)}
+          emptyMessage={t('billing.noTransactions')}
+        />
+      )}
+    </Card>
+  );
+
+  const renderUsageCard = () => (
+    <Card className="mt-xl" title={t('billing.subscriptionUsage')} subtitle={t('billing.subscriptionUsageSubtitle')}>
+      {isLoadingUsage ? (
+        <p className="text-sm text-on-surface-variant dark:text-slate-400">
+          {t('common.loading')}
+        </p>
+      ) : (
+        <DataTable
+          columns={usageColumns}
+          data={usageRows}
+          getRowKey={(usage) => String(usage.id)}
+          emptyMessage={t('billing.noUsageHistory')}
+        />
+      )}
+    </Card>
+  );
 
   const renderPlanContent = () => {
     if (isLoadingPlan) {
@@ -282,12 +400,20 @@ export function BillingPage() {
 
     if (hasNoPlan || !customerPlan) {
       return (
-        <EmptyState
-          title={t('billing.noPlanTitle')}
-          description={t('billing.errors.noPlan')}
-          actionLabel={t('billing.choosePlan')}
-          onAction={() => navigate('/billing/subscribe')}
-        />
+        <>
+          <EmptyState
+            title={t('billing.noPlanTitle')}
+            description={t('billing.errors.noPlan')}
+            actionLabel={t('billing.choosePlan')}
+            onAction={() => navigate('/billing/subscribe')}
+          />
+
+          <section className="mt-xl">
+            {renderTransactionsCard()}
+          </section>
+
+          {renderUsageCard()}
+        </>
       );
     }
 
@@ -389,35 +515,10 @@ export function BillingPage() {
             </div>
           </Card>
 
-          <Card
-            title={t('billing.invoices')}
-            subtitle={t('billing.paymentTransactionsSubtitle')}
-            actions={<Receipt className="h-5 w-5 text-primary dark:text-inverse-primary" />}
-          >
-            {transactionActionMessage && (
-              <p className="mb-md rounded-lg bg-emerald-50 px-md py-sm text-sm font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200">
-                {transactionActionMessage}
-              </p>
-            )}
-            {transactionError && (
-              <p className="mb-md rounded-lg bg-error-container px-md py-sm text-sm font-semibold text-risk-high-text dark:bg-red-950/40 dark:text-red-200">
-                {transactionError}
-              </p>
-            )}
-            {isLoadingTransactions ? (
-              <p className="text-sm text-on-surface-variant dark:text-slate-400">
-                {t('billing.loadingPaymentHistory')}
-              </p>
-            ) : (
-              <DataTable
-                columns={columns}
-                data={paymentTransactions}
-                getRowKey={(transaction) => String(transaction.id)}
-                emptyMessage={t('billing.noTransactions')}
-              />
-            )}
-          </Card>
+          {renderTransactionsCard()}
         </section>
+
+        {renderUsageCard()}
       </>
     );
   };
@@ -435,8 +536,9 @@ export function BillingPage() {
               onClick={() => {
                 void loadCustomerPlan();
                 void loadPaymentTransactions();
+                void loadUsage();
               }}
-              disabled={isLoadingPlan || isLoadingTransactions}
+              disabled={isLoadingPlan || isLoadingTransactions || isLoadingUsage}
             >
               {t('billing.refresh')}
             </Button>
