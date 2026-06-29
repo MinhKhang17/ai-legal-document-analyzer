@@ -5,6 +5,7 @@ import com.analyzer.api.dto.PageResponse;
 import com.analyzer.api.dto.legalticket.*;
 import com.analyzer.api.enums.LegalTicketStatus;
 import com.analyzer.api.security.UserDetailsImpl;
+import com.analyzer.api.service.ExpertLegalTicketService;
 import com.analyzer.api.service.LegalTicketService;
 import com.analyzer.api.service.lawyer.TicketConversationService;
 import com.analyzer.api.service.lawyer.TicketFileService;
@@ -30,6 +31,7 @@ public class LawyerTicketController {
     private final TicketConversationService ticketConversationService;
     private final TicketFileService ticketFileService;
     private final LegalTicketService legalTicketService;
+    private final ExpertLegalTicketService expertLegalTicketService;
 
     @GetMapping("/my")
     @PreAuthorize("hasRole('EXPERT')")
@@ -40,7 +42,7 @@ public class LawyerTicketController {
             @RequestParam(value = "size", defaultValue = "10") int size) {
         Long lawyerId = getCurrentUserId();
         return ResponseEntity.ok(ApiResponseDTO.success("Retrieved assigned tickets successfully",
-                legalTicketService.getMyTickets(lawyerId, status, page, size)));
+                expertLegalTicketService.getAssignedTickets(lawyerId, status, page, size)));
     }
 
     @GetMapping("/{id}")
@@ -123,7 +125,8 @@ public class LawyerTicketController {
 
     private Long getCurrentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {
+        if (authentication == null || !authentication.isAuthenticated()
+                || "anonymousUser".equals(authentication.getPrincipal())) {
             throw new RuntimeException("Bạn chưa đăng nhập");
         }
         if (authentication.getPrincipal() instanceof UserDetailsImpl userDetails) {
@@ -134,7 +137,8 @@ public class LawyerTicketController {
 
     private String getCurrentUserRole() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {
+        if (authentication == null || !authentication.isAuthenticated()
+                || "anonymousUser".equals(authentication.getPrincipal())) {
             throw new RuntimeException("Bạn chưa đăng nhập");
         }
         if (authentication.getPrincipal() instanceof UserDetailsImpl userDetails) {
