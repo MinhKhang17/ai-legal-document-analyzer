@@ -9,4 +9,9 @@ import java.util.List;
 public interface AiCitationRepository extends JpaRepository<AiCitation, String> {
 
     List<AiCitation> findBySourceTypeAndSourceReferenceId(CitationSourceType sourceType, String sourceReferenceId);
+
+    List<AiCitation> findByLegalTicket_Id(String ticketId);
+
+    List<AiCitation> findByChatMessage_Id(String chatMessageId);
 }
+

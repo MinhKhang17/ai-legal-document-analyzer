@@ -88,7 +88,7 @@ export function FileUploadZone({
         disabled={disabled}
         onClick={() => inputRef.current?.click()}
       >
-        {disabled ? 'Đang tải lên...' : t('actions.selectFiles')}
+        {disabled ? t('common.uploading') : t('actions.selectFiles')}
       </Button>
     </div>
   );

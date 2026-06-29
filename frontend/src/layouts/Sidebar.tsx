@@ -98,6 +98,20 @@ const navItems: NavItem[] = [
     allowedRoles: ['CUSTOMER'],
   },
   {
+    to: '/tickets',
+    labelKey: 'nav.legalTickets',
+    icon: TicketCheck,
+    section: 'intelligence',
+    allowedRoles: ['CUSTOMER'],
+  },
+  {
+    to: '/contracts',
+    labelKey: 'nav.contracts',
+    icon: FileText,
+    section: 'intelligence',
+    allowedRoles: ['CUSTOMER'],
+  },
+  {
     to: '/editor/version-comparison',
     labelKey: 'nav.versionComparison',
     icon: Scale,
@@ -156,6 +170,13 @@ const navItems: NavItem[] = [
     allowedRoles: ['ADMIN'],
   },
   {
+    to: '/admin/tickets',
+    labelKey: 'nav.adminTickets',
+    icon: TicketCheck,
+    section: 'admin',
+    allowedRoles: ['ADMIN'],
+  },
+  {
     to: '/admin/audit-logs',
     labelKey: 'nav.auditLogs',
     icon: FileClock,
@@ -166,6 +187,13 @@ const navItems: NavItem[] = [
     to: '/admin/system-health',
     labelKey: 'nav.systemHealth',
     icon: Activity,
+    section: 'admin',
+    allowedRoles: ['ADMIN'],
+  },
+  {
+    to: '/admin/feedback',
+    labelKey: 'nav.feedback',
+    icon: MessageSquareText,
     section: 'admin',
     allowedRoles: ['ADMIN'],
   },

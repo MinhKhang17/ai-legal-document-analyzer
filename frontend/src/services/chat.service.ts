@@ -5,6 +5,9 @@ import {
 } from "./http";
 import type {
   DeleteChatSessionResponse,
+  AppendChatContextRequest,
+  ChatSessionMemory,
+  ChatSessionSummary,
   WorkspaceChatConversation,
   WorkspaceChatMessage,
   WorkspaceChatSession,
@@ -245,6 +248,47 @@ export async function getChatMessageDetail(
   );
 
   return mapMessage(response.data);
+}
+
+export async function getChatSessionSummary(
+  accessToken: string,
+  chatSessionId: string,
+): Promise<ChatSessionSummary> {
+  const response = await getJson<ApiResponse<ChatSessionSummary>>(
+    API_ENDPOINTS.chat.summary(chatSessionId),
+    "Không thể tải tóm tắt chat session",
+    accessToken,
+  );
+
+  return response.data;
+}
+
+export async function getChatSessionMemory(
+  accessToken: string,
+  chatSessionId: string,
+): Promise<ChatSessionMemory> {
+  const response = await getJson<ApiResponse<ChatSessionMemory>>(
+    API_ENDPOINTS.chat.memory(chatSessionId),
+    "Không thể tải memory chat session",
+    accessToken,
+  );
+
+  return response.data;
+}
+
+export async function appendChatSessionContext(
+  accessToken: string,
+  chatSessionId: string,
+  payload: AppendChatContextRequest,
+): Promise<ChatSessionMemory> {
+  const response = await postJson<ApiResponse<ChatSessionMemory>>(
+    API_ENDPOINTS.chat.context(chatSessionId),
+    payload,
+    "Không thể bổ sung context chat session",
+    accessToken,
+  );
+
+  return response.data;
 }
 
 export async function createChatSession(
