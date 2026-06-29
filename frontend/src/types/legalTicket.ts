@@ -9,11 +9,21 @@ export interface PageResponse<T> {
 }
 
 export interface CreateLegalTicketRequest {
-  request_id: string;
+  request_id?: string | null;
   workspace_id: string;
   document_id?: string | null;
   issue_fingerprint?: string | null;
   customer_note?: string | null;
+  question?: string | null;
+  answer?: string | null;
+  confidence_score?: number | null;
+  should_suggest_ticket?: boolean | null;
+  suggestion_type?: string | null;
+  suggestion_reason?: string | null;
+  missing_information?: string | null;
+  risk_level?: string | null;
+  legal_domain?: string | null;
+  user_action_hint?: string | null;
 }
 
 export interface AssignLawyerRequest {
@@ -62,7 +72,7 @@ export interface LegalTicket {
   legal_domain: string | null;
   user_action_hint: string | null;
   status: LegalTicketStatus | null;
-  assigned_lawyer_id: number | null;
+  assigned_lawyer_id: string | null;
   assigned_lawyer_name: string | null;
   issue_fingerprint?: string | null;
   customer_note?: string | null;
