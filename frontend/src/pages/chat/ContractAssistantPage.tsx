@@ -1,12 +1,11 @@
-import { Bot, Check, ClipboardCheck, FileText, Pencil, Plus, RefreshCw, Send, Trash2, UserRound, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Bot, Check, ClipboardCheck, Pencil, Plus, RefreshCw, Send, Trash2, UserRound, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Badge } from "../../components/common/Badge";
 import { Button } from "../../components/common/Button";
 import { Card } from "../../components/common/Card";
 import { Modal } from "../../components/common/Modal";
 import { PageHeader } from "../../components/common/PageHeader";
-import { StatusBadge } from "../../components/common/StatusBadge";
 import {
   createChatSession,
   deleteChatSession,
@@ -19,12 +18,11 @@ import {
   updateChatSession,
 } from "../../api/chatApi";
 import { createLegalTicket } from "../../api/legalTicketApi";
-import { getWorkspaceDocuments, getWorkspaces } from "../../api/workspaceApi";
+import { getWorkspaces, createWorkspace } from "../../api/workspaceApi";
 import { useI18n } from "../../hooks/useI18n";
 import { useToast } from "../../hooks/useToast";
 import { ChatMessageContent } from "../../components/chat/ChatMessageContent";
 import type { ChatMessage } from "../../types/chat";
-import type { Document, Workspace } from "../../types/workspace";
 import type { WorkspaceChatMessage, WorkspaceChatSession } from "../../types/chat";
 import { useRef } from "react";
 
@@ -76,26 +74,19 @@ const createOptimisticUserMessage = (message: string, language: "en" | "vi"): Ch
 
 type DisplayMessage = ChatMessage;
 
-export function LegalChatPage() {
+export function ContractAssistantPage() {
   const { t, language } = useI18n();
   const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-  const [workspaceDocuments, setWorkspaceDocuments] = useState<Document[]>([]);
+  const [sandboxWorkspaceId, setSandboxWorkspaceId] = useState("");
   const [chatSessions, setChatSessions] = useState<WorkspaceChatSession[]>([]);
-  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(
-    searchParams.get("workspaceId") ?? "",
-  );
   const [selectedSessionId, setSelectedSessionId] = useState(
     searchParams.get("sessionId") ?? "",
-  );
-  const [selectedDocumentId, setSelectedDocumentId] = useState(
-    searchParams.get("documentId") ?? "",
   );
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(true);
-  const [loadingContext, setLoadingContext] = useState(false);
+  const [loadingSessions, setLoadingSessions] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [sessionActionError, setSessionActionError] = useState("");
@@ -111,46 +102,39 @@ export function LegalChatPage() {
   const lastSubmissionRef = useRef<{
     workspaceId: string;
     sessionId: string;
-    documentId?: string;
     message: string;
   } | null>(null);
 
-  const selectedWorkspace = useMemo(
-    () => workspaces.find((workspace) => workspace.workspaceId === selectedWorkspaceId),
-    [selectedWorkspaceId, workspaces],
-  );
-
-  const selectedDocument = useMemo(
-    () => workspaceDocuments.find((document) => document.documentId === selectedDocumentId),
-    [selectedDocumentId, workspaceDocuments],
-  );
-
+  // Phase 1: Resolve Sandbox Workspace on mount
   useEffect(() => {
     let active = true;
 
-    const loadWorkspaces = async () => {
+    const resolveSandboxWorkspace = async () => {
       try {
         setLoading(true);
-        const data = (await getWorkspaces(getAccessToken())).filter(
-          (ws) => ws.description !== "System workspace for general contract assistant chat"
-        );
+        setError("");
+        const workspaces = await getWorkspaces(getAccessToken());
         if (!active) return;
-        setWorkspaces(data);
 
-        const workspaceIdFromQuery = searchParams.get("workspaceId") ?? "";
-        const matchedWorkspace =
-          data.find((workspace) => workspace.workspaceId === workspaceIdFromQuery) ??
-          data[0];
+        // Find existing system sandbox workspace
+        let sandbox = workspaces.find(
+          (ws) => ws.description === "System workspace for general contract assistant chat"
+        );
 
-        if (matchedWorkspace) {
-          setSelectedWorkspaceId(matchedWorkspace.workspaceId);
-          if (workspaceIdFromQuery !== matchedWorkspace.workspaceId) {
-            setSearchParams({ workspaceId: matchedWorkspace.workspaceId });
-          }
+        if (!sandbox) {
+          // Create the hidden sandbox workspace automatically
+          sandbox = await createWorkspace(getAccessToken(), {
+            name: "Contract Assistant Sandbox",
+            description: "System workspace for general contract assistant chat",
+          });
+        }
+
+        if (sandbox && active) {
+          setSandboxWorkspaceId(sandbox.workspaceId);
         }
       } catch (err) {
         if (active) {
-          setError(err instanceof Error ? err.message : "Không thể tải workspace");
+          setError(err instanceof Error ? err.message : "Không thể khởi tạo trợ lý");
         }
       } finally {
         if (active) {
@@ -159,16 +143,16 @@ export function LegalChatPage() {
       }
     };
 
-    void loadWorkspaces();
+    void resolveSandboxWorkspace();
 
     return () => {
       active = false;
     };
-  }, [searchParams, setSearchParams]);
+  }, []);
 
+  // Phase 2: Load chat sessions once sandbox workspace is resolved
   useEffect(() => {
-    if (!selectedWorkspaceId) {
-      setWorkspaceDocuments([]);
+    if (!sandboxWorkspaceId) {
       setChatSessions([]);
       setMessages([]);
       return;
@@ -176,29 +160,13 @@ export function LegalChatPage() {
 
     let active = true;
 
-    const loadWorkspaceContext = async () => {
+    const loadSessions = async () => {
       try {
-        setLoadingContext(true);
-        const [documents, sessions] = await Promise.all([
-          getWorkspaceDocuments(getAccessToken(), selectedWorkspaceId),
-          getWorkspaceChatSessions(getAccessToken(), selectedWorkspaceId),
-        ]);
-
+        setLoadingSessions(true);
+        const sessions = await getWorkspaceChatSessions(getAccessToken(), sandboxWorkspaceId);
         if (!active) return;
-        setWorkspaceDocuments(documents);
+
         setChatSessions(sessions.items);
-
-        const documentFromQuery = searchParams.get("documentId") ?? "";
-        const readyDocument =
-          documents.find((document) => document.documentId === documentFromQuery) ??
-          documents.find((document) => document.status.toUpperCase() === "READY") ??
-          documents[0];
-
-        if (readyDocument) {
-          setSelectedDocumentId(readyDocument.documentId);
-        } else {
-          setSelectedDocumentId("");
-        }
 
         const sessionFromQuery = searchParams.get("sessionId") ?? "";
         const nextSessionId =
@@ -210,45 +178,31 @@ export function LegalChatPage() {
 
         setSelectedSessionId(nextSessionId);
         if (nextSessionId) {
-          if (
-            searchParams.get("workspaceId") !== selectedWorkspaceId ||
-            searchParams.get("sessionId") !== nextSessionId ||
-            searchParams.get("documentId") !== (readyDocument?.documentId ?? "")
-          ) {
-            const nextParams: Record<string, string> = {
-              workspaceId: selectedWorkspaceId,
-              sessionId: nextSessionId,
-            };
-            if (readyDocument?.documentId) {
-              nextParams.documentId = readyDocument.documentId;
-            }
-            setSearchParams(nextParams);
+          if (searchParams.get("sessionId") !== nextSessionId) {
+            setSearchParams({ sessionId: nextSessionId });
           }
-        } else if (searchParams.get("workspaceId") !== selectedWorkspaceId) {
-          const nextParams: Record<string, string> = { workspaceId: selectedWorkspaceId };
-          if (readyDocument?.documentId) {
-            nextParams.documentId = readyDocument.documentId;
-          }
-          setSearchParams(nextParams);
+        } else {
+          setSearchParams({});
         }
       } catch (err) {
         if (active) {
-          setError(err instanceof Error ? err.message : "Không thể tải dữ liệu workspace");
+          setError(err instanceof Error ? err.message : "Không thể tải danh sách phiên chat");
         }
       } finally {
         if (active) {
-          setLoadingContext(false);
+          setLoadingSessions(false);
         }
       }
     };
 
-    void loadWorkspaceContext();
+    void loadSessions();
 
     return () => {
       active = false;
     };
-  }, [searchParams, selectedWorkspaceId, setSearchParams]);
+  }, [sandboxWorkspaceId, searchParams, setSearchParams]);
 
+  // Phase 3: Load messages once a session is selected
   useEffect(() => {
     if (!selectedSessionId) {
       setMessages([]);
@@ -283,22 +237,19 @@ export function LegalChatPage() {
   }, [language, selectedSessionId]);
 
   const handleCreateSession = async () => {
-    if (!selectedWorkspaceId) {
+    if (!sandboxWorkspaceId) {
       return;
     }
 
     try {
       const session = await createChatSession(
         getAccessToken(),
-        selectedWorkspaceId,
-        `Workspace chat ${new Date().toLocaleString()}`,
+        sandboxWorkspaceId,
+        `Trợ lý hợp đồng ${new Date().toLocaleString()}`,
       );
       setChatSessions((previous) => [session, ...previous.filter((item) => item.chatSessionId !== session.chatSessionId)]);
       setSelectedSessionId(session.chatSessionId);
-      setSearchParams({
-        workspaceId: selectedWorkspaceId,
-        sessionId: session.chatSessionId,
-      });
+      setSearchParams({ sessionId: session.chatSessionId });
     } catch (err) {
       const message = err instanceof Error ? err.message : t("chat.sessionCreateError");
       setError(message);
@@ -312,14 +263,8 @@ export function LegalChatPage() {
     setSelectedSessionId(session.chatSessionId);
     setSessionActionError("");
 
-    if (
-      searchParams.get("workspaceId") !== selectedWorkspaceId ||
-      searchParams.get("sessionId") !== session.chatSessionId
-    ) {
-      setSearchParams({
-        workspaceId: selectedWorkspaceId,
-        sessionId: session.chatSessionId,
-      });
+    if (searchParams.get("sessionId") !== session.chatSessionId) {
+      setSearchParams({ sessionId: session.chatSessionId });
     }
 
     try {
@@ -389,11 +334,7 @@ export function LegalChatPage() {
 
         setSelectedSessionId(nextSessionId);
         setMessages([]);
-        setSearchParams(
-          nextSessionId
-            ? { workspaceId: selectedWorkspaceId, sessionId: nextSessionId }
-            : { workspaceId: selectedWorkspaceId },
-        );
+        setSearchParams(nextSessionId ? { sessionId: nextSessionId } : {});
       }
 
       setSessionActionMessage(t("chat.sessionDeleted"));
@@ -408,7 +349,7 @@ export function LegalChatPage() {
   };
 
   const handleCreateTicket = async (assistantMessage: DisplayMessage, question: string) => {
-    if (!selectedWorkspaceId) {
+    if (!sandboxWorkspaceId) {
       setError(t("chat.ticketSelectWorkspace"));
       toast.warning(t("chat.ticketSelectWorkspace"), t("toast.warningTitle"));
       return;
@@ -420,8 +361,8 @@ export function LegalChatPage() {
     try {
       const ticket = await createLegalTicket({
         request_id: assistantMessage.requestId,
-        workspace_id: selectedWorkspaceId,
-        document_id: selectedDocumentId || null,
+        workspace_id: sandboxWorkspaceId,
+        document_id: null,
         question,
         answer: assistantMessage.content,
         confidence_score: assistantMessage.confidenceScore,
@@ -474,12 +415,10 @@ export function LegalChatPage() {
     message: string;
     workspaceId: string;
     sessionId?: string;
-    documentId?: string;
   }) => {
     const question = (override?.message ?? input).trim();
-    const targetWorkspaceId = override?.workspaceId ?? selectedWorkspaceId;
+    const targetWorkspaceId = override?.workspaceId ?? sandboxWorkspaceId;
     const targetSessionId = override?.sessionId ?? selectedSessionId;
-    const targetDocumentId = override?.documentId ?? (selectedDocumentId || undefined);
 
     if (!question || !targetWorkspaceId) {
       return;
@@ -498,7 +437,6 @@ export function LegalChatPage() {
     lastSubmissionRef.current = {
       workspaceId: targetWorkspaceId,
       sessionId: targetSessionId ?? "",
-      documentId: targetDocumentId,
       message: question,
     };
 
@@ -508,13 +446,11 @@ export function LegalChatPage() {
             getAccessToken(),
             targetSessionId,
             question,
-            targetDocumentId,
           )
         : await sendWorkspaceMessage(
             getAccessToken(),
             targetWorkspaceId,
             question,
-            targetDocumentId,
           );
 
       if (conversation?.chatSession) {
@@ -546,19 +482,18 @@ export function LegalChatPage() {
   return (
     <div>
       <PageHeader
-        title={t("chat.title")}
-        subtitle={t("chat.subtitleWorkspace")}
+        title={t("nav.contractAssistant")}
+        subtitle={t("chat.contractAssistantSubtitle")}
         actions={
           <>
             <Button
               variant="secondary"
               leftIcon={<RefreshCw className="h-4 w-4" />}
               onClick={() => {
-                if (!selectedWorkspaceId) return;
-                setSearchParams({
-                  workspaceId: selectedWorkspaceId,
-                  ...(selectedSessionId ? { sessionId: selectedSessionId } : {}),
-                });
+                if (!sandboxWorkspaceId) return;
+                setSearchParams(
+                  selectedSessionId ? { sessionId: selectedSessionId } : {}
+                );
               }}
             >
               {t("chat.refreshContext")}
@@ -566,7 +501,7 @@ export function LegalChatPage() {
             <Button
               leftIcon={<Plus className="h-4 w-4" />}
               onClick={handleCreateSession}
-              disabled={!selectedWorkspaceId}
+              disabled={!sandboxWorkspaceId}
             >
               {t("chat.newSession")}
             </Button>
@@ -582,149 +517,6 @@ export function LegalChatPage() {
 
       <div className="grid gap-gutter xl:grid-cols-[360px_minmax(0,1fr)]">
         <aside className="space-y-gutter">
-          <Card title={t("admin.workspace")}>
-            <div className="space-y-md">
-              <select
-                className="form-field"
-                value={selectedWorkspaceId}
-                onChange={(event) => {
-                  const nextWorkspaceId = event.target.value;
-                  setSelectedWorkspaceId(nextWorkspaceId);
-                  setSelectedSessionId("");
-                  setSelectedDocumentId("");
-                  setMessages([]);
-                  if (nextWorkspaceId) {
-                    if (searchParams.get("workspaceId") !== nextWorkspaceId) {
-                      setSearchParams({ workspaceId: nextWorkspaceId });
-                    }
-                  } else {
-                    setSearchParams({});
-                  }
-                }}
-                disabled={loading}
-              >
-                <option value="">
-                  {loading ? t("chat.loadingWorkspaces") : t("chat.selectWorkspace")}
-                </option>
-                {workspaces.map((workspace) => (
-                  <option key={workspace.workspaceId} value={workspace.workspaceId}>
-                    {workspace.name}
-                  </option>
-                ))}
-              </select>
-
-              {selectedWorkspace ? (
-                <div className="rounded-lg bg-surface-container-low p-md dark:bg-slate-800">
-                  <p className="font-semibold">{selectedWorkspace.name}</p>
-                  <p className="mt-xs text-sm text-on-surface-variant dark:text-slate-400">
-                    {selectedWorkspace.description || t("workspace.noDescription")}
-                  </p>
-                  <div className="mt-sm flex items-center gap-sm">
-                    <StatusBadge status={selectedWorkspace.status} />
-                    <Link
-                      className="text-sm font-semibold text-primary hover:underline dark:text-inverse-primary"
-                      to={`/projects/${selectedWorkspace.workspaceId}`}
-                    >
-                      Open detail
-                    </Link>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-sm text-on-surface-variant dark:text-slate-400">
-                  Create a workspace first or choose one with uploaded documents.
-                </p>
-              )}
-            </div>
-          </Card>
-
-          <Card title="Documents in workspace">
-            <div className="space-y-md">
-              {workspaceDocuments.length > 0 && (
-                <div className="space-y-sm">
-                  <label className="label-uppercase" htmlFor="documentSelect">
-                    Current document
-                  </label>
-                  <select
-                    id="documentSelect"
-                    className="form-field"
-                    value={selectedDocumentId}
-                    onChange={(event) => {
-                      const nextDocumentId = event.target.value;
-                      setSelectedDocumentId(nextDocumentId);
-                      const nextParams: Record<string, string> = {
-                        workspaceId: selectedWorkspaceId,
-                      };
-                      if (selectedSessionId) {
-                        nextParams.sessionId = selectedSessionId;
-                      }
-                      if (nextDocumentId) {
-                        nextParams.documentId = nextDocumentId;
-                      }
-                      setSearchParams(nextParams);
-                    }}
-                    disabled={loadingContext}
-                  >
-                    {workspaceDocuments.map((document) => (
-                      <option key={document.documentId} value={document.documentId}>
-                        {document.originalFileName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {loadingContext && (
-                <p className="text-sm text-on-surface-variant dark:text-slate-400">
-                  {t("upload.loadingDocuments")}
-                </p>
-              )}
-
-              {workspaceDocuments.length === 0 && !loadingContext ? (
-                <p className="text-sm text-on-surface-variant dark:text-slate-400">
-                  {t("chat.noDocuments")}
-                </p>
-              ) : (
-                workspaceDocuments.map((document) => (
-                  <button
-                    type="button"
-                    key={document.documentId}
-                    onClick={() => {
-                      setSelectedDocumentId(document.documentId);
-                      const nextParams: Record<string, string> = {
-                        workspaceId: selectedWorkspaceId,
-                      };
-                      if (selectedSessionId) {
-                        nextParams.sessionId = selectedSessionId;
-                      }
-                      nextParams.documentId = document.documentId;
-                      setSearchParams(nextParams);
-                    }}
-                    className={`w-full rounded-xl border p-md text-left transition ${
-                      selectedDocumentId === document.documentId
-                        ? "border-primary bg-surface-container-high dark:border-inverse-primary dark:bg-slate-800"
-                        : "border-legal-border hover:bg-surface-container-low dark:border-slate-700 dark:hover:bg-slate-800"
-                    }`}
-                  >
-                    <div className="flex items-start gap-md">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-surface-container-high text-primary dark:bg-slate-800 dark:text-inverse-primary">
-                        <FileText className="h-5 w-5" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-semibold">{document.originalFileName}</p>
-                        <p className="text-sm text-on-surface-variant dark:text-slate-400">
-                          {(document.fileSize / 1024 / 1024).toFixed(2)} MB · {document.fileType}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="mt-md">
-                      <StatusBadge status={document.status} />
-                    </div>
-                  </button>
-                ))
-              )}
-            </div>
-          </Card>
-
           <Card title={t("chatHistory.conversations")}>
             <div className="space-y-md">
               {sessionActionError && (
@@ -737,7 +529,11 @@ export function LegalChatPage() {
                   {sessionActionMessage}
                 </p>
               )}
-              {chatSessions.length === 0 ? (
+              {loadingSessions ? (
+                <p className="text-sm text-on-surface-variant dark:text-slate-400">
+                  {t("chatHistory.loadingSessions")}
+                </p>
+              ) : chatSessions.length === 0 ? (
                 <p className="text-sm text-on-surface-variant dark:text-slate-400">
                   {t("chat.noSessions")}
                 </p>
@@ -849,44 +645,40 @@ export function LegalChatPage() {
         <section className="space-y-gutter">
           <Card
             className="flex min-h-[680px] flex-col p-0"
-            title={selectedWorkspace?.name ?? t("chat.legalChat")}
+            title={t("nav.contractAssistant")}
             subtitle={
-              selectedDocument
-                ? `${t("chat.documentLabel")}: ${selectedDocument.originalFileName}`
-                : selectedSessionId
-                  ? `${t("chat.sessionIdLabel")}: ${selectedSessionId}`
-                  : t("chat.noSessionSelected")
+              selectedSessionId
+                ? `${t("chat.sessionIdLabel")}: ${selectedSessionId}`
+                : t("chat.noSessionSelected")
             }
-            actions={<Badge tone="gold">RAG</Badge>}
+            actions={<Badge tone="gold">AI Chat</Badge>}
           >
             <div className="flex-1 space-y-md overflow-y-auto bg-surface-container-low/60 p-lg dark:bg-slate-950/40">
-                {messages.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-outline-variant p-lg text-sm text-on-surface-variant dark:border-slate-700 dark:text-slate-400">
-                    {selectedWorkspaceId
-                      ? t("chat.askToStart")
-                      : t("chat.pickWorkspaceFirst")}
-                  </div>
-                ) : (
-                  messages.map((message, messageIndex) => {
-                    const assistant = message.role === "assistant";
-                    const isError = message.status === "error";
-                    const previousUserMessage = assistant
-                      ? [...messages]
-                          .slice(0, messageIndex)
-                          .reverse()
-                          .find((item) => item.role === "user")
-                      : undefined;
-                    const shouldShowTicketAction =
-                      assistant &&
-                      !isError &&
-                      Boolean(
-                        message.shouldSuggestTicket ||
-                          message.userActionHint ||
-                          message.suggestionType ||
-                          message.riskLevel ||
-                          typeof message.confidenceScore === "number",
-                      );
-                    return (
+              {messages.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-outline-variant p-lg text-sm text-on-surface-variant dark:border-slate-700 dark:text-slate-400">
+                  {loading ? t("common.loading") : t("chat.askToStart")}
+                </div>
+              ) : (
+                messages.map((message, messageIndex) => {
+                  const assistant = message.role === "assistant";
+                  const isError = message.status === "error";
+                  const previousUserMessage = assistant
+                    ? [...messages]
+                        .slice(0, messageIndex)
+                        .reverse()
+                        .find((item) => item.role === "user")
+                    : undefined;
+                  const shouldShowTicketAction =
+                    assistant &&
+                    !isError &&
+                    Boolean(
+                      message.shouldSuggestTicket ||
+                        message.userActionHint ||
+                        message.suggestionType ||
+                        message.riskLevel ||
+                        typeof message.confidenceScore === "number",
+                    );
+                  return (
                     <article
                       key={message.id}
                       className={`flex gap-md ${assistant ? "" : "justify-end"}`}
@@ -916,9 +708,6 @@ export function LegalChatPage() {
                                 onClick={() => {
                                   const payload = lastSubmissionRef.current;
                                   if (!payload) return;
-                                  setSelectedWorkspaceId(payload.workspaceId);
-                                  setSelectedSessionId(payload.sessionId);
-                                  setSelectedDocumentId(payload.documentId ?? "");
                                   void handleSend(payload);
                                 }}
                               >
@@ -1022,13 +811,13 @@ export function LegalChatPage() {
                   value={input}
                   onChange={(event) => setInput(event.target.value)}
                   placeholder={t("chat.inputPlaceholder")}
-                  disabled={!selectedWorkspaceId || sending}
+                  disabled={!sandboxWorkspaceId || sending}
                 />
                 <Button
                   type="submit"
                   size="icon"
                   aria-label="Ask"
-                  disabled={!input.trim() || !selectedWorkspaceId || sending}
+                  disabled={!input.trim() || !sandboxWorkspaceId || sending}
                 >
                   <Send className="h-5 w-5" />
                 </Button>

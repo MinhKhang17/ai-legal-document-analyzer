@@ -16,21 +16,29 @@ logger = logging.getLogger(__name__)
 def is_contract_generation_intent(question: str) -> bool:
     question_lower = question.lower().strip()
     
-    # Informational question starters that should go to QA instead of contract generation
-    info_question_starters = [
+    # Informational or QA keywords that should bypass contract generation
+    qa_keywords = [
         "what is", "why ", "how to", "how do", "how can", "is there", "are there",
-        "là gì", "như thế nào", "làm sao", "làm thế nào", "có được", "có nên"
+        "là gì", "như thế nào", "làm sao", "làm thế nào", "có được", "có nên",
+        "tại sao", "giải thích", "khái niệm", "quy định", "luật nào", "thủ tục",
+        "cần lưu ý gì", "rủi ro gì", "bắt buộc", "yêu cầu", "điều kiện",
+        "liệt kê", "danh sách", "kể tên", "cho biết các", "những hợp đồng nào",
+        "gồm những", "có bao nhiêu", "ở đâu", "từ đâu", "phân tích", "so sánh",
+        "kiểm tra", "đánh giá", "nhận xét", "góp ý", "sửa lỗi", "rà soát",
+        "nguồn nào", "file nào", "tệp nào", "thông tin lấy từ", "lấy từ đâu"
     ]
-    if any(question_lower.startswith(starter) for starter in info_question_starters):
+    if any(kw in question_lower for kw in qa_keywords):
         return False
         
     creation_keywords = [
         "generate", "create", "draft", "provide", "give", "make", "write",
-        "tạo", "soạn", "soạn thảo", "viết", "cung cấp", "bản thảo", "lập"
+        "tạo", "soạn", "soạn thảo", "viết", "cung cấp", "bản thảo", "lập",
+        "in", "xuất", "tải", "lấy", "mẫu", "bản", "cho tôi"
     ]
     contract_keywords = [
         "contract", "agreement", "lease", "tenancy", "rental",
-        "hợp đồng", "thoả thuận", "thuê nhà", "thuê trọ", "thuê văn phòng", "thuê mặt bằng"
+        "hợp đồng", "thoả thuận", "thuê nhà", "thuê trọ", "thuê văn phòng", "thuê mặt bằng",
+        "lao động", "mua bán", "dịch vụ", "chuyển nhượng", "tặng cho", "vay tiền", "ủy quyền"
     ]
     
     has_creation = any(kw in question_lower for kw in creation_keywords)
@@ -38,7 +46,9 @@ def is_contract_generation_intent(question: str) -> bool:
     
     direct_patterns = [
         "lease agreement", "tenancy agreement", "rental agreement", 
-        "rental contract", "lease contract", "tenancy contract"
+        "rental contract", "lease contract", "tenancy contract",
+        "mẫu hợp đồng", "bản hợp đồng", "hợp đồng lao động", "hợp đồng thuê",
+        "hợp đồng mua bán", "hợp đồng dịch vụ"
     ]
     has_direct = any(pat in question_lower for pat in direct_patterns)
     
@@ -65,8 +75,45 @@ class ContractGenerationService:
 
         documents_text = ""
         if retrieved_chunks:
-            for idx, chunk in enumerate(retrieved_chunks, start=1):
-                documents_text += f"Reference Document {idx}:\n{chunk.chunkText}\n\n"
+            # 1. Identify the best matched template document ID
+            best_chunk = retrieved_chunks[0]
+            best_doc_id = best_chunk.knowledgeDocumentId or best_chunk.documentId
+            
+            reconstructed_full_text = ""
+            if best_doc_id:
+                try:
+                    from app.database.neo4j_client import neo4j_client
+                    if not neo4j_client.driver:
+                        neo4j_client.connect()
+                    
+                    query = """
+                    MATCH (d:Document {node_id: $doc_id})
+                    MATCH (c:Chunk {source_path: d.source_path})
+                    RETURN c.text as text, c.order as order
+                    ORDER BY c.order ASC, c.node_id ASC
+                    """
+                    records = neo4j_client.execute_query(query, {"doc_id": best_doc_id})
+                    if records:
+                        reconstructed_full_text = "\n\n".join(rec["text"] for rec in records if rec["text"])
+                        logger.info(f"Reconstructed full template document for ID {best_doc_id}, length {len(reconstructed_full_text)} chars")
+                except Exception as e:
+                    logger.error(f"Failed to reconstruct full template document: {e}")
+            
+            if reconstructed_full_text:
+                template_name = best_chunk.fileName or best_chunk.title or "Matched Template"
+                documents_text += f"Primary Template (Full Document: {template_name}):\n{reconstructed_full_text}\n\n"
+                
+                # Append other chunks as auxiliary references (skipping the primary document's chunks to avoid duplicates)
+                aux_idx = 1
+                for chunk in retrieved_chunks[1:]:
+                    chunk_doc_id = chunk.knowledgeDocumentId or chunk.documentId
+                    if chunk_doc_id != best_doc_id:
+                        documents_text += f"Auxiliary Reference {aux_idx}:\n{chunk.chunkText}\n\n"
+                        aux_idx += 1
+            else:
+                # Fallback to standard chunk list
+                for idx, chunk in enumerate(retrieved_chunks, start=1):
+                    documents_text += f"Reference Document {idx}:\n{chunk.chunkText}\n\n"
         else:
             documents_text = "[No reference documents found in knowledge base]"
 
@@ -107,14 +154,11 @@ Never copy personal information from them.
 -----------------------------------------------------
 
 # YOUR TASK
-Carefully analyze all reference agreements.
-Identify the common legal structure.
-Identify mandatory clauses.
-Identify optional clauses.
-Merge the best practices found in the references.
-Generate the document in the same language as the reference documents and the user's request (e.g. if the user asks in Vietnamese or the reference documents are in Vietnamese, write the document in Vietnamese).
-Use a logical structure.
-Use numbered headings.
+Carefully analyze the provided "Primary Template (Full Document)" and "Auxiliary References".
+You MUST strictly follow the exact structure, sections, articles, layout, and sequence of the "Primary Template (Full Document)".
+Keep all sections, headers, and clauses in the same order as in the Primary Template.
+Do not omit any sections or articles. Adapt the contents, terms, pricing, names, and specifics to match the user's request while maintaining the exact same structure and formatting style.
+Generate the document in the same language as the primary template and the user's request (typically Vietnamese).
 If some user information is missing, insert placeholders enclosed in square brackets.
 
 -----------------------------------------------------
@@ -130,25 +174,42 @@ If information is missing, use placeholders such as:
 -----------------------------------------------------
 
 # AVOID RECITATION / COPYRIGHT BLOCKS
-To prevent Google Gemini API recitation/copyright filters from cutting off the response mid-sentence, you MUST NOT copy the reference or user documents verbatim. Instead, professionally rephrase, paraphrase, and restructure the text into a clean legal draft while maintaining all original meanings, clauses, numbers, and facts. Ensure the response is complete and does not cut off.
+To prevent Google Gemini API recitation/copyright filters from cutting off the response mid-sentence, you MUST NOT copy the reference or user documents verbatim. Instead, professionally rephrase, paraphrase, and restructure the text into a clean legal draft while maintaining all original meanings, clauses, numbers, and facts. Ensure the response is complete and does not cut off. The document inside <noi_dung> MUST be a full-length, complete, detailed draft with all clauses, terms, rights, and responsibilities fully generated. Do NOT summarize, shorten, or simplify the content inside <noi_dung>.
 
 # OUTPUT RULES
-Return only the document content.
-Do not explain anything.
-Do not mention the reference documents.
-Do not use Markdown.
-Generate a document that is ready for export as DOCX or PDF.
-All Vietnamese administrative document rules (margins, font size, layout structure) will be applied during document rendering."""
+You MUST structure your entire response using the following XML-like tags:
+<tom_tat>
+[Write a brief summary of the generated document here in Vietnamese, about 2-3 sentences]
+</tom_tat>
+<noi_dung>
+[Write the complete, detailed document ready for export as DOCX or PDF here. Follow the format guidelines below]
+</noi_dung>
+
+Format guidelines for the content inside <noi_dung>:
+- Return only the document content.
+- Do not explain anything.
+- Do not mention the reference documents.
+- Do not use Markdown inside <noi_dung>.
+- Generate a document that is ready for export as DOCX or PDF.
+- All Vietnamese administrative document rules (margins, font size, layout structure) will be applied during document rendering."""
 
         system_prompt = (
             "Bạn là chuyên gia định dạng văn bản hành chính và văn bản quy phạm pháp luật Việt Nam.\n"
             "Nhiệm vụ của bạn là định dạng nội dung thành đúng mẫu văn bản Quyết định của Chính phủ Việt Nam theo Nghị định 30/2020/NĐ-CP.\n\n"
-            "YÊU CẦU QUAN TRỌNG: Để tránh bộ lọc sao chép (recitation/copyright filter) của API tự động cắt cụt văn bản giữa chừng, bạn TUYỆT ĐỐI KHÔNG sao chép nguyên văn các đoạn dài của tài liệu nguồn. Hãy viết lại, tóm tắt và diễn đạt lại (rephrase) nội dung pháp lý một cách mạch lạc thành các điều khoản ngắn gọn, súc tích.\n\n"
-            "Ví dụ minh họa cách định dạng và rephrase một văn bản dài thành Quyết định gọn gàng:\n"
+            "YÊU CẦU QUAN TRỌNG: Để tránh bộ lọc sao chép (recitation/copyright filter) của API tự động cắt cụt văn bản giữa chừng, bạn TUYỆT ĐỐI KHÔNG sao chép nguyên văn các đoạn dài của tài liệu nguồn. Hãy diễn đạt lại (rephrase) các điều khoản bằng văn phong pháp lý chuyên nghiệp của bạn. Lưu ý: Đối với phần nội dung trong thẻ <noi_dung>, bạn phải giữ lại toàn bộ các điều khoản chi tiết, quyền lợi, nghĩa vụ, điều kiện và các mục pháp lý quan trọng của tài liệu gốc, không được phép lược bỏ hay tóm tắt nội dung chi tiết này.\n\n"
+            "YÊU CẦU ĐẶC BIỆT VỀ CẤU TRÚC PHẢN HỒI (RẤT QUAN TRỌNG):\n"
+            "Bạn phải trả về phản hồi chính xác dưới cấu trúc sau:\n"
+            "1. Bọc phần tóm tắt ngắn gọn của tài liệu (2-3 câu) trong thẻ <tom_tat> và </tom_tat>.\n"
+            "2. Bọc toàn bộ nội dung chi tiết của văn bản hành chính/hợp đồng đầy đủ (không được tóm tắt hay cắt bớt phần chi tiết này) trong thẻ <noi_dung> và </noi_dung>.\n\n"
+            "Ví dụ minh họa cách định dạng và rephrase một văn bản dài thành Quyết định gọn gàng (Lưu ý ví dụ dưới đây rút ngắn để minh họa cấu trúc, còn khi thực hiện thực tế bạn phải sinh đầy đủ tất cả các điều khoản chi tiết):\n"
             "--- BẮT ĐẦU VÍ DỤ ---\n"
             "Đầu vào:\n"
             "\"Thông tư hướng dẫn về việc thu và quản lý tiền cho thuê nhà ở thuộc sở hữu nhà nước. Cán bộ công nhân viên chức và nhân dân thuê nhà đều phải nộp tiền... Đối tượng miễn giảm gồm thương binh, gia đình cách mạng...\"\n\n"
-            "Đầu ra Quyết định (Diễn đạt lại ngắn gọn, không sao chép nguyên văn):\n"
+            "Đầu ra Quyết định:\n"
+            "<tom_tat>\n"
+            "Quyết định hướng dẫn bổ sung các khoản thu ngân sách nhà nước đối với hoạt động cho thuê nhà, quy định các đối tượng có nghĩa vụ nộp tiền thuê nhà và các trường hợp được miễn giảm theo quy định hiện hành.\n"
+            "</tom_tat>\n"
+            "<noi_dung>\n"
             "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\n"
             "Độc lập - Tự do - Hạnh phúc\n"
             "---------------\n\n"
@@ -168,6 +229,7 @@ All Vietnamese administrative document rules (margins, font size, layout structu
             "Điều 4. Quyết định này có hiệu lực kể từ ngày ký. Các Bộ trưởng, Thủ trưởng cơ quan ngang Bộ và Chủ tịch Ủy ban nhân dân các tỉnh chịu trách nhiệm thi hành Quyết định này.\n\n"
             "THỦ TƯỚNG CHÍNH PHỦ\n"
             "(Đã ký)\n"
+            "</noi_dung>\n"
             "--- KẾT THÚC VÍ DỤ ---"
         )
 
@@ -186,10 +248,33 @@ All Vietnamese administrative document rules (margins, font size, layout structu
 
         raw_answer = llm_result.answer or "Failed to generate contract."
         from app.services.llm_client import sanitize_response
-        answer = sanitize_response(raw_answer)
+        answer_sanitized = sanitize_response(raw_answer)
 
-        # Parse the raw LLM answer to extract official header components dynamically
-        lines = answer.split("\n")
+        # Parse tags to separate summary and detailed content
+        summary_text = ""
+        content_text = ""
+
+        summary_match = re.search(r'<tom_tat>(.*?)</tom_tat>', answer_sanitized, re.DOTALL | re.IGNORECASE)
+        content_match = re.search(r'<noi_dung>(.*?)</noi_dung>', answer_sanitized, re.DOTALL | re.IGNORECASE)
+
+        if summary_match:
+            summary_text = summary_match.group(1).strip()
+        if content_match:
+            content_text = content_match.group(1).strip()
+
+        # Fallback logic if tags are missing or empty
+        if not content_text:
+            content_text = re.sub(r'</?(?:tom_tat|noi_dung)>', '', answer_sanitized).strip()
+            summary_text = "Hợp đồng đã được tạo lập thành công. Vui lòng tải về file DOCX/PDF bên dưới để xem toàn bộ nội dung chi tiết."
+
+        if not summary_text:
+            summary_text = "Hợp đồng đã được tạo lập thành công. Vui lòng tải về file DOCX/PDF bên dưới để xem toàn bộ nội dung chi tiết."
+
+        # The final answer returned in chat will show the summary
+        answer = summary_text
+
+        # Parse the detailed content (instead of answer) to extract official header components dynamically
+        lines = content_text.split("\n")
         national_name = ""
         national_motto = ""
         doc_date = ""

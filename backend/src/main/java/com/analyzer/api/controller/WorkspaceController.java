@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -93,6 +94,30 @@ public class WorkspaceController {
         return ResponseEntity.ok()
                 .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + resource.getFilename() + "\"")
                 .contentType(org.springframework.http.MediaType.APPLICATION_OCTET_STREAM)
+                .body(resource);
+    }
+
+    @GetMapping("/{workspaceId}/documents/system/download")
+    @Operation(summary = "Download system knowledge base document", description = "Download a system knowledge base document by filename.")
+    public ResponseEntity<org.springframework.core.io.Resource> downloadSystemDocument(
+            @PathVariable String workspaceId,
+            @RequestParam String filename) {
+        org.springframework.core.io.Resource resource = workspaceService.downloadSystemDocumentFile(filename);
+        
+        String contentType = "application/octet-stream";
+        if (filename.endsWith(".docx")) {
+            contentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        } else if (filename.endsWith(".doc")) {
+            contentType = "application/msword";
+        } else if (filename.endsWith(".pdf")) {
+            contentType = "application/pdf";
+        } else if (filename.endsWith(".txt")) {
+            contentType = "text/plain";
+        }
+
+        return ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + resource.getFilename() + "\"")
+                .contentType(org.springframework.http.MediaType.parseMediaType(contentType))
                 .body(resource);
     }
 

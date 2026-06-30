@@ -33,8 +33,50 @@ class RagQueryService:
 
         user_hits, legal_search_query, knowledge_hits = self._retrieve(request)
 
+        # Retrieve available documents list to tell the AI what's in the system
+        available_user_docs = []
+        available_system_docs = []
+        try:
+            from app.database.neo4j_client import neo4j_client
+            if not neo4j_client.driver:
+                neo4j_client.connect()
+            docs = neo4j_client.execute_query("MATCH (d:Document) RETURN d.title as title, d.metadata_json as metadata_json")
+            import json
+            user_docs = []
+            system_docs = []
+            for d in docs:
+                title = d.get("title") or "Untitled"
+                metadata = {}
+                if d.get("metadata_json"):
+                    try:
+                        metadata = json.loads(d["metadata_json"])
+                    except:
+                        pass
+                
+                ws_id = metadata.get("workspace_id") or metadata.get("workspaceId")
+                u_id = metadata.get("user_id") or metadata.get("userId")
+                
+                if ws_id == request.workspaceId:
+                    user_docs.append(title)
+                elif metadata.get("source_type") == "SYSTEM_KB" or not u_id:
+                    system_docs.append(title)
+            
+            # De-duplicate lists
+            available_user_docs = sorted(list(set(user_docs)))
+            available_system_docs = sorted(list(set(system_docs)))
+        except Exception as e:
+            logger.error(f"Failed to fetch documents list: {e}")
+
         system_prompt = build_system_prompt()
-        user_prompt = build_user_prompt(request.question, user_hits, knowledge_hits, chat_history=request.chatHistory)
+        user_prompt = build_user_prompt(
+            request.question, 
+            user_hits, 
+            knowledge_hits, 
+            chat_history=request.chatHistory,
+            available_user_docs=available_user_docs,
+            available_system_docs=available_system_docs,
+            workspace_id=request.workspaceId
+        )
         llm_result = self.llm_client.generate(system_prompt=system_prompt, user_prompt=user_prompt)
 
         raw_answer = llm_result.answer or self._build_fallback_answer(user_hits, knowledge_hits)
@@ -43,6 +85,8 @@ class RagQueryService:
 
         # Logging all details requested
         logger.info("=== RAG QUERY SERVICE LOGGING ===")
+        logger.info(f"Available User Docs: {available_user_docs}")
+        logger.info(f"Available System Docs: {available_system_docs}")
         logger.info(f"User Question: {request.question}")
         logger.info(f"Retrieved User Chunks (Total: {len(user_hits)}):")
         for idx, hit in enumerate(user_hits):

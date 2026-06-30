@@ -30,7 +30,9 @@ export function DashboardPage() {
         setLoading(true);
         setError('');
 
-        const workspaceList = await getWorkspaces(getAccessToken());
+        const workspaceList = (await getWorkspaces(getAccessToken())).filter(
+          (ws) => ws.description !== 'System workspace for general contract assistant chat',
+        );
         const workspaceDetails = await Promise.all(
           workspaceList.map(async (workspace) => ({
             ...workspace,

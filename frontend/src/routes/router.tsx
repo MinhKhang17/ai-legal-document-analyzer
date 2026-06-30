@@ -17,8 +17,7 @@ import { DocumentDetailPage } from "../pages/documents/DocumentDetailPage";
 import { UploadPage } from "../pages/upload/UploadPage";
 import { EditorPage } from "../pages/editor/EditorPage";
 import { RiskReviewPage } from "../pages/editor/RiskReviewPage";
-import { VersionComparisonPage } from "../pages/editor/VersionComparisonPage";
-import { ComparisonHistoryPage } from "../pages/editor/ComparisonHistoryPage";
+import { ContractAssistantPage } from "../pages/chat/ContractAssistantPage";
 import { LegalChatPage } from "../pages/chat/LegalChatPage";
 import { ChatHistoryPage } from "../pages/chat/ChatHistoryPage";
 import { ReportsPage } from "../pages/reports/ReportsPage";
@@ -124,16 +123,12 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: "/editor/version-comparison",
-        element: <VersionComparisonPage />,
-      },
-      {
-        path: "/editor/comparison-history",
-        element: <ComparisonHistoryPage />,
-      },
-      {
-        path: "/comparison-history",
-        element: <Navigate to="/editor/comparison-history" replace />,
+        path: "/chat/contract-assistant",
+        element: (
+          <CustomerRoute>
+            <ContractAssistantPage />
+          </CustomerRoute>
+        ),
       },
       {
         path: "/chat",
