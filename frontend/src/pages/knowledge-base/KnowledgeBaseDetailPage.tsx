@@ -7,6 +7,7 @@ import { Card } from "../../components/common/Card";
 import { DataTable, type DataTableColumn } from "../../components/common/DataTable";
 import { EmptyState } from "../../components/common/EmptyState";
 import { PageHeader } from "../../components/common/PageHeader";
+import { KnowledgeBaseIngestedDocumentsCard } from "../../components/knowledge-base/KnowledgeBaseIngestedDocumentsCard";
 import {
   archiveKnowledgeBaseEntry,
   getKnowledgeBaseEntry,
@@ -121,6 +122,12 @@ export function KnowledgeBaseDetailPage() {
                 <div><dt className="label-uppercase">{t("table.updated")}</dt><dd>{formatDisplayDate(entry.updatedAt, "-", locale)}</dd></div>
               </dl>
             </Card>
+
+            <KnowledgeBaseIngestedDocumentsCard
+              knowledgeBaseEntryId={entry.id}
+              title={entry.title}
+              documentCode={entry.code}
+            />
 
             <Card title={t("knowledge.versions")}>
               <DataTable columns={versionColumns} data={versions} getRowKey={(version) => version.id} emptyMessage={t("contracts.noVersions")} />
