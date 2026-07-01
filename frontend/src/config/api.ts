@@ -191,6 +191,10 @@ export const API_ENDPOINTS = {
       fillPathParams(fromEnv("VITE_ADMIN_KNOWLEDGE_BASE_DETAIL_API"), {
         knowledgeBaseEntryId,
       }),
+    ingestedDocuments: (knowledgeBaseEntryId: string) =>
+      fillPathParams(fromEnv("VITE_ADMIN_KNOWLEDGE_BASE_INGESTED_DOCUMENTS_API"), {
+        knowledgeBaseEntryId,
+      }),
     versions: (knowledgeBaseEntryId: string) =>
       fillPathParams(fromEnv("VITE_ADMIN_KNOWLEDGE_BASE_VERSIONS_API"), {
         knowledgeBaseEntryId,

@@ -677,9 +677,27 @@ const en: TranslationDictionary = {
   "legalTickets.currentFilter": "Current filter",
   "legalTickets.myLegalTickets": "My legal tickets",
   "legalTickets.loading": "Loading legal tickets...",
+  "legalTickets.createTitle": "Create a legal ticket",
+  "legalTickets.createSubtitle":
+    "Pick a workspace, choose a document if needed, and send your question to the admin queue.",
+  "legalTickets.createWorkspace": "Workspace",
+  "legalTickets.createDocument": "Document",
+  "legalTickets.createSelectWorkspace": "Select a workspace",
+  "legalTickets.createSelectDocument": "Select a document",
+  "legalTickets.createQuestion": "Question",
+  "legalTickets.createQuestionPlaceholder":
+    "Describe the issue you want the admin and lawyer to review.",
+  "legalTickets.createHint":
+    "The admin will review the ticket first and assign a lawyer to continue the conversation.",
+  "legalTickets.createSubmit": "Create ticket",
+  "legalTickets.createSubmitting": "Creating ticket...",
+  "legalTickets.createSuccess": "Legal ticket created successfully.",
+  "legalTickets.createError": "Unable to create legal ticket.",
+  "legalTickets.createWorkspaceRequired": "Please select a workspace.",
+  "legalTickets.createQuestionRequired": "Please enter your question.",
   "legalTickets.emptyTitle": "No legal tickets yet",
   "legalTickets.emptyDescription":
-    "When AI suggests legal support, you can create a ticket directly from chat.",
+    "You can create a ticket directly from a workspace and document without chatting with AI first.",
   "legalTickets.adminEmptyDescription":
     "The backend has not returned any real legal tickets yet. This page does not create or show fake data.",
   "legalTickets.errors.load":
@@ -2187,9 +2205,27 @@ const vi: TranslationDictionary = {
   "legalTickets.currentFilter": "Bộ lọc hiện tại",
   "legalTickets.myLegalTickets": "Ticket pháp lý của tôi",
   "legalTickets.loading": "Đang tải ticket pháp lý...",
+  "legalTickets.createTitle": "Tạo ticket pháp lý",
+  "legalTickets.createSubtitle":
+    "Chọn workspace, chọn tài liệu nếu cần và gửi câu hỏi thẳng cho admin.",
+  "legalTickets.createWorkspace": "Workspace",
+  "legalTickets.createDocument": "Tài liệu",
+  "legalTickets.createSelectWorkspace": "Chọn workspace",
+  "legalTickets.createSelectDocument": "Chọn tài liệu",
+  "legalTickets.createQuestion": "Câu hỏi",
+  "legalTickets.createQuestionPlaceholder":
+    "Mô tả vấn đề bạn muốn admin và luật sư xem xét.",
+  "legalTickets.createHint":
+    "Admin sẽ duyệt ticket trước rồi gán luật sư để tiếp tục trao đổi.",
+  "legalTickets.createSubmit": "Tạo ticket",
+  "legalTickets.createSubmitting": "Đang tạo ticket...",
+  "legalTickets.createSuccess": "Đã tạo ticket pháp lý thành công.",
+  "legalTickets.createError": "Không thể tạo ticket pháp lý.",
+  "legalTickets.createWorkspaceRequired": "Vui lòng chọn workspace.",
+  "legalTickets.createQuestionRequired": "Vui lòng nhập câu hỏi.",
   "legalTickets.emptyTitle": "Chưa có ticket pháp lý",
   "legalTickets.emptyDescription":
-    "Khi AI gợi ý cần luật sư, bạn có thể tạo ticket ngay trong trang chat.",
+    "Bạn có thể tạo ticket trực tiếp từ workspace và tài liệu mà không cần chat AI trước.",
   "legalTickets.adminEmptyDescription":
     "Backend chưa trả về ticket pháp lý thật. Trang này không tạo hoặc hiển thị dữ liệu giả.",
   "legalTickets.errors.load":

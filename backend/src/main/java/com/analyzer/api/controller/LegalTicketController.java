@@ -29,7 +29,7 @@ public class LegalTicketController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('CUSTOMER', 'ADMIN')")
-    @Operation(summary = "Create legal ticket", description = "Creates a ticket when the AI suggests human legal review.")
+    @Operation(summary = "Create legal ticket", description = "Creates a legal ticket from direct customer input or an AI suggestion.")
     public ResponseEntity<ApiResponseDTO<LegalTicketResponse>> createTicket(@Valid @RequestBody CreateLegalTicketRequest request) {
         Long currentUserId = getCurrentUserId();
         return new ResponseEntity<>(

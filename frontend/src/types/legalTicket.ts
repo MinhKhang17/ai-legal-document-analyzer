@@ -12,10 +12,10 @@ export interface CreateLegalTicketRequest {
   request_id?: string | null;
   workspace_id: string;
   document_id?: string | null;
+  question: string;
   issue_fingerprint?: string | null;
   customer_note?: string | null;
 
-  // Dữ liệu AI bổ sung (nếu tạo ticket trực tiếp từ chat)
   question?: string | null;
   answer?: string | null;
   confidence_score?: number | null;

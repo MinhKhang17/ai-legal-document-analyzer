@@ -31,6 +31,7 @@ import type { Document, Workspace } from "../../types/workspace";
 import type { WorkspaceChatMessage, WorkspaceChatSession } from "../../types/chat";
 import type { AiCitation } from "../../types/aiFeature";
 import { useRef } from "react";
+import { formatDisplayDateTime } from "../../utils/format";
 
 const getAccessToken = () => localStorage.getItem("accessToken") ?? "";
 
@@ -43,10 +44,7 @@ const formatTimestamp = (
     return justNowLabel;
   }
 
-  return new Intl.DateTimeFormat(language === "vi" ? "vi-VN" : "en-US", {
-    dateStyle: "short",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return formatDisplayDateTime(value, justNowLabel, language === "vi" ? "vi-VN" : "en-US");
 };
 
 const toDisplayMessage = (
@@ -511,6 +509,7 @@ export function LegalChatPage() {
         request_id: assistantMessage.requestId,
         workspace_id: selectedWorkspaceId,
         document_id: selectedDocumentId || null,
+        question: question.trim() || assistantMessage.content.slice(0, 500),
         issue_fingerprint: assistantMessage.id,
         customer_note:
           question.trim() ||

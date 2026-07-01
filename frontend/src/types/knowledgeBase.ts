@@ -70,6 +70,27 @@ export interface KnowledgeBaseVersion {
   updatedAt: string;
 }
 
+export interface KnowledgeBaseIngestedDocumentVersion {
+  versionId: string;
+  versionLabel: string;
+  effectiveFrom: string | null;
+  effectiveTo: string | null;
+  visibility: string | null;
+  ingestStatus: string | null;
+  chunkCount: number;
+  embeddedCount: number;
+  sourceFileId: string | null;
+  contentHash: string | null;
+  ingestedAt: string | null;
+}
+
+export interface KnowledgeBaseIngestedDocument {
+  legalDocumentId: string;
+  title: string | null;
+  documentCode: string | null;
+  versions: KnowledgeBaseIngestedDocumentVersion[];
+}
+
 export interface KnowledgeIngestionJob {
   id: string;
   knowledgeBaseVersionId: string;

@@ -86,6 +86,37 @@ public class LawyerTicketController {
                 legalTicketService.getMessages(lawyerId, role, ticketId)));
     }
 
+    @PostMapping("/{id}/start-review")
+    @PreAuthorize("hasRole('EXPERT')")
+    @Operation(summary = "Start reviewing the assigned ticket")
+    public ResponseEntity<ApiResponseDTO<LegalTicketResponse>> startReview(@PathVariable("id") String ticketId) {
+        Long lawyerId = getCurrentUserId();
+        return ResponseEntity.ok(ApiResponseDTO.success("Review started successfully",
+                expertLegalTicketService.startReview(lawyerId, ticketId)));
+    }
+
+    @PostMapping("/{id}/request-more-info")
+    @PreAuthorize("hasRole('EXPERT')")
+    @Operation(summary = "Request more information from the customer")
+    public ResponseEntity<ApiResponseDTO<LegalTicketResponse>> requestMoreInfo(
+            @PathVariable("id") String ticketId,
+            @Valid @RequestBody RequestMoreInfoRequest request) {
+        Long lawyerId = getCurrentUserId();
+        return ResponseEntity.ok(ApiResponseDTO.success("More information requested successfully",
+                expertLegalTicketService.requestMoreInfo(lawyerId, ticketId, request)));
+    }
+
+    @PostMapping("/{id}/resolve")
+    @PreAuthorize("hasRole('EXPERT')")
+    @Operation(summary = "Resolve the assigned ticket", description = "Allows the lawyer to send the final answer directly to the customer.")
+    public ResponseEntity<ApiResponseDTO<LegalTicketResponse>> resolveTicket(
+            @PathVariable("id") String ticketId,
+            @Valid @RequestBody ResolveLegalTicketRequest request) {
+        Long lawyerId = getCurrentUserId();
+        return ResponseEntity.ok(ApiResponseDTO.success("Ticket resolved successfully",
+                expertLegalTicketService.resolveTicket(lawyerId, ticketId, request)));
+    }
+
     @PostMapping("/{id}/messages")
     @PreAuthorize("hasRole('EXPERT')")
     @Operation(summary = "Send message to user on assigned ticket")
@@ -99,13 +130,17 @@ public class LawyerTicketController {
 
     @PostMapping("/{id}/close")
     @PreAuthorize("hasRole('EXPERT')")
-    @Operation(summary = "Close ticket")
+    @Operation(summary = "Resolve ticket")
     public ResponseEntity<ApiResponseDTO<LegalTicketResponse>> closeTicket(
             @PathVariable("id") String ticketId,
             @Valid @RequestBody CloseLegalTicketRequest request) {
         Long lawyerId = getCurrentUserId();
-        return ResponseEntity.ok(ApiResponseDTO.success("Ticket closed successfully",
-                legalTicketService.closeTicket(lawyerId, ticketId, request)));
+        ResolveLegalTicketRequest resolveRequest = ResolveLegalTicketRequest.builder()
+                .expertAnswer(request.getFeedback())
+                .expertInternalNote(null)
+                .build();
+        return ResponseEntity.ok(ApiResponseDTO.success("Ticket resolved successfully",
+                expertLegalTicketService.resolveTicket(lawyerId, ticketId, resolveRequest)));
     }
 
     @GetMapping("/{id}/download/{documentId}")

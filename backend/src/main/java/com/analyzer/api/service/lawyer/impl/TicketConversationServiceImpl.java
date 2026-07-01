@@ -54,6 +54,7 @@ public class TicketConversationServiceImpl implements TicketConversationService 
 
         LegalTicketMessage savedMessage = legalTicketMessageRepository.save(message);
 
+        ticket.setStatus(com.analyzer.api.enums.LegalTicketStatus.IN_REVIEW);
         ticket.setLastLawyerMessageAt(LocalDateTime.now());
         legalTicketRepository.save(ticket);
 
