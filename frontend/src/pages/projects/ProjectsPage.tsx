@@ -10,6 +10,7 @@ import { StatusBadge } from "../../components/common/StatusBadge";
 import { getWorkspaces } from "../../api/workspaceApi";
 import { useI18n } from "../../hooks/useI18n";
 import type { Workspace } from "../../types/workspace";
+import { formatDisplayDateTime } from "../../utils/format";
 
 const getAccessToken = () => localStorage.getItem("accessToken") ?? "";
 
@@ -83,10 +84,7 @@ export function ProjectsPage() {
     {
       header: t("workspace.createdAt"),
       cell: (workspace) =>
-        new Intl.DateTimeFormat(language === "vi" ? "vi-VN" : "en-US", {
-          dateStyle: "medium",
-          timeStyle: "short",
-        }).format(new Date(workspace.createdAt)),
+        formatDisplayDateTime(workspace.createdAt, "-", language === "vi" ? "vi-VN" : "en-US"),
     },
   ];
 
@@ -206,10 +204,7 @@ export function ProjectsPage() {
               <div className="mt-lg rounded-lg bg-surface-container-low p-md dark:bg-slate-800">
                 <p className="label-uppercase">{t("workspace.createdAt")}</p>
                 <p className="mt-xs text-sm">
-                  {new Intl.DateTimeFormat(language === "vi" ? "vi-VN" : "en-US", {
-                    dateStyle: "medium",
-                    timeStyle: "short",
-                  }).format(new Date(workspace.createdAt))}
+                  {formatDisplayDateTime(workspace.createdAt, "-", language === "vi" ? "vi-VN" : "en-US")}
                 </p>
               </div>
               <div className="mt-lg flex flex-wrap gap-sm">

@@ -1,17 +1,19 @@
 import { RefreshCw, TicketCheck } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Badge } from "../../components/common/Badge";
 import { Button } from "../../components/common/Button";
 import { Card } from "../../components/common/Card";
 import { DataTable, type DataTableColumn } from "../../components/common/DataTable";
 import { EmptyState } from "../../components/common/EmptyState";
 import { PageHeader } from "../../components/common/PageHeader";
-import { getMyLegalTickets } from "../../services/legalTicket.service";
+import { createLegalTicket, getMyLegalTickets } from "../../services/legalTicket.service";
+import { getWorkspaceDocuments, getWorkspaces } from "../../services/workspace.service";
 import { useI18n } from "../../hooks/useI18n";
 import { useToast } from "../../hooks/useToast";
 import type { LegalTicket } from "../../types/legalTicket";
 import type { LegalTicketFilter } from "../../types/legalTicketStatus";
+import type { Document, Workspace } from "../../types/workspace";
 import {
   getLegalTicketFilterLabel,
   getLegalTicketFilterOptions,
@@ -28,6 +30,8 @@ const getRiskTone = (risk?: string | null) => {
   if (risk === "LOW") return "green";
   return "slate";
 };
+
+const getAccessToken = () => localStorage.getItem("accessToken") ?? "";
 
 const getStatusTone = (status?: string | null) => {
   switch (normalizeLegalTicketStatus(status)) {
@@ -51,10 +55,19 @@ const getStatusTone = (status?: string | null) => {
 export function CustomerTicketsPage() {
   const { t, language } = useI18n();
   const toast = useToast();
+  const navigate = useNavigate();
   const [tickets, setTickets] = useState<LegalTicket[]>([]);
   const [totalItems, setTotalItems] = useState(0);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<LegalTicketFilter>("ALL");
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [workspaceLoading, setWorkspaceLoading] = useState(false);
+  const [documentLoading, setDocumentLoading] = useState(false);
+  const [ticketWorkspaceId, setTicketWorkspaceId] = useState("");
+  const [ticketDocumentId, setTicketDocumentId] = useState("");
+  const [ticketQuestion, setTicketQuestion] = useState("");
+  const [ticketSubmitting, setTicketSubmitting] = useState(false);
   const filterOptions = useMemo(() => getLegalTicketFilterOptions(t), [t]);
 
   const loadTickets = useCallback(async () => {
@@ -82,10 +95,118 @@ export function CustomerTicketsPage() {
     void loadTickets();
   }, [loadTickets]);
 
+  useEffect(() => {
+    let active = true;
+
+    const loadWorkspaces = async () => {
+      setWorkspaceLoading(true);
+
+      try {
+        const data = await getWorkspaces(getAccessToken());
+        if (!active) return;
+
+        setWorkspaces(data);
+        const firstWorkspaceId = data[0]?.workspaceId ?? "";
+        setTicketWorkspaceId((previous) => previous || firstWorkspaceId);
+      } catch (error) {
+        console.error("Failed to load workspaces for ticket creation", error);
+      } finally {
+        if (active) {
+          setWorkspaceLoading(false);
+        }
+      }
+    };
+
+    void loadWorkspaces();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!ticketWorkspaceId) {
+      setDocuments([]);
+      setTicketDocumentId("");
+      return;
+    }
+
+    let active = true;
+
+    const loadDocuments = async () => {
+      setDocumentLoading(true);
+
+      try {
+        const data = await getWorkspaceDocuments(getAccessToken(), ticketWorkspaceId);
+        if (!active) return;
+
+        setDocuments(data);
+        setTicketDocumentId((previous) => {
+          if (previous && data.some((document) => document.documentId === previous)) {
+            return previous;
+          }
+          return data[0]?.documentId ?? "";
+        });
+      } catch (error) {
+        console.error("Failed to load workspace documents for ticket creation", error);
+        if (active) {
+          setDocuments([]);
+          setTicketDocumentId("");
+        }
+      } finally {
+        if (active) {
+          setDocumentLoading(false);
+        }
+      }
+    };
+
+    void loadDocuments();
+
+    return () => {
+      active = false;
+    };
+  }, [ticketWorkspaceId]);
+
   const openCount = useMemo(
     () => tickets.filter((ticket) => !isTerminalLegalTicketStatus(ticket.status)).length,
     [tickets],
   );
+
+  const handleCreateTicket = async () => {
+    const question = ticketQuestion.trim();
+
+    if (!ticketWorkspaceId) {
+      toast.warning(t("legalTickets.createWorkspaceRequired"), t("toast.warningTitle"));
+      return;
+    }
+
+    if (!question) {
+      toast.warning(t("legalTickets.createQuestionRequired"), t("toast.warningTitle"));
+      return;
+    }
+
+    setTicketSubmitting(true);
+
+    try {
+      const ticket = await createLegalTicket({
+        workspace_id: ticketWorkspaceId,
+        document_id: ticketDocumentId || null,
+        question,
+        customer_note: question,
+      });
+
+      setTicketQuestion("");
+      setTicketDocumentId("");
+      await loadTickets();
+      toast.success(t("legalTickets.createSuccess"), t("toast.successTitle"));
+      navigate(`/tickets/${ticket.id}`);
+    } catch (error) {
+      console.error("Failed to create legal ticket", error);
+      toast.error(t("legalTickets.createError"), t("toast.errorTitle"));
+    } finally {
+      setTicketSubmitting(false);
+    }
+  };
 
   const columns: DataTableColumn<LegalTicket>[] = [
     {
@@ -148,6 +269,75 @@ export function CustomerTicketsPage() {
           </>
         }
       />
+
+      <Card title={t("legalTickets.createTitle")} subtitle={t("legalTickets.createSubtitle")} className="mb-xl">
+        <div className="grid gap-md lg:grid-cols-[1.2fr_1fr]">
+          <div className="space-y-sm">
+            <label className="label-uppercase" htmlFor="ticket-workspace">
+              {t("legalTickets.createWorkspace")}
+            </label>
+            <select
+              id="ticket-workspace"
+              className="form-field"
+              value={ticketWorkspaceId}
+              onChange={(event) => setTicketWorkspaceId(event.target.value)}
+              disabled={workspaceLoading || workspaces.length === 0}
+            >
+              <option value="">{workspaceLoading ? t("common.loading") : t("legalTickets.createSelectWorkspace")}</option>
+              {workspaces.map((workspace) => (
+                <option key={workspace.workspaceId} value={workspace.workspaceId}>
+                  {workspace.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-sm">
+            <label className="label-uppercase" htmlFor="ticket-document">
+              {t("legalTickets.createDocument")}
+            </label>
+            <select
+              id="ticket-document"
+              className="form-field"
+              value={ticketDocumentId}
+              onChange={(event) => setTicketDocumentId(event.target.value)}
+              disabled={!ticketWorkspaceId || documentLoading}
+            >
+              <option value="">{documentLoading ? t("common.loading") : t("legalTickets.createSelectDocument")}</option>
+              {documents.map((document) => (
+                <option key={document.documentId} value={document.documentId}>
+                  {document.originalFileName}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="mt-md space-y-sm">
+          <label className="label-uppercase" htmlFor="ticket-question">
+            {t("legalTickets.createQuestion")}
+          </label>
+          <textarea
+            id="ticket-question"
+            className="form-field min-h-32"
+            value={ticketQuestion}
+            onChange={(event) => setTicketQuestion(event.target.value)}
+            placeholder={t("legalTickets.createQuestionPlaceholder")}
+          />
+        </div>
+
+        <div className="mt-md flex flex-wrap items-center gap-sm">
+          <Button
+            onClick={() => void handleCreateTicket()}
+            disabled={ticketSubmitting || workspaceLoading || workspaces.length === 0}
+          >
+            {ticketSubmitting ? t("legalTickets.createSubmitting") : t("legalTickets.createSubmit")}
+          </Button>
+          <p className="text-sm text-on-surface-variant dark:text-slate-400">
+            {t("legalTickets.createHint")}
+          </p>
+        </div>
+      </Card>
 
       <section className="mb-xl grid gap-gutter md:grid-cols-3">
         <Card title={t("legalTickets.totalTickets")}><p className="text-3xl font-bold">{totalItems}</p></Card>

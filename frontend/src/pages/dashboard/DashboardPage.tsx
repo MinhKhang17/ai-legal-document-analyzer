@@ -11,6 +11,7 @@ import { StatusBadge } from '../../components/common/StatusBadge';
 import { getWorkspaceDocuments, getWorkspaces } from '../../api/workspaceApi';
 import { useI18n } from '../../hooks/useI18n';
 import type { Document, Workspace } from '../../types/workspace';
+import { formatDisplayDateTime } from '../../utils/format';
 
 const getAccessToken = () => localStorage.getItem('accessToken') ?? '';
 
@@ -215,7 +216,7 @@ export function DashboardPage() {
                     <StatusBadge status={document.status} />
                   </div>
                   <p className="mt-sm text-xs text-on-surface-variant dark:text-slate-400">
-                    {new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(document.uploadedAt))}
+                    {formatDisplayDateTime(document.uploadedAt, '-', locale)}
                   </p>
                 </div>
               ))
@@ -281,7 +282,7 @@ export function DashboardPage() {
                     </td>
                     <td className="px-md py-sm text-xs text-on-surface-variant dark:text-slate-400">
                       <span className="whitespace-nowrap">
-                        {new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(document.uploadedAt))}
+                        {formatDisplayDateTime(document.uploadedAt, '-', locale)}
                       </span>
                     </td>
                   </tr>
@@ -330,7 +331,7 @@ export function DashboardPage() {
                       {t('documents.uploadedAt')}
                     </p>
                     <p className="mt-0.5 whitespace-nowrap text-sm text-on-surface dark:text-slate-100">
-                      {new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(document.uploadedAt))}
+                      {formatDisplayDateTime(document.uploadedAt, '-', locale)}
                     </p>
                   </div>
                 </div>

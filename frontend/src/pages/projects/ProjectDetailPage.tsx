@@ -11,6 +11,7 @@ import { StatusBadge } from "../../components/common/StatusBadge";
 import { getWorkspaceDetail, getWorkspaceDocuments } from "../../api/workspaceApi";
 import { useI18n } from "../../hooks/useI18n";
 import type { Document, Workspace } from "../../types/workspace";
+import { formatDisplayDateTime } from "../../utils/format";
 
 const getAccessToken = () => localStorage.getItem("accessToken") ?? "";
 
@@ -75,10 +76,7 @@ export function ProjectDetailPage() {
     {
       header: t("table.date"),
       cell: (document) =>
-        new Intl.DateTimeFormat(language === "vi" ? "vi-VN" : "en-US", {
-          dateStyle: "medium",
-          timeStyle: "short",
-        }).format(new Date(document.uploadedAt)),
+        formatDisplayDateTime(document.uploadedAt, "-", language === "vi" ? "vi-VN" : "en-US"),
     },
   ];
 
@@ -230,10 +228,7 @@ export function ProjectDetailPage() {
                 <div>
                   <p className="label-uppercase">{t("workspace.createdAt")}</p>
                   <p className="mt-xs text-sm">
-                    {new Intl.DateTimeFormat(language === "vi" ? "vi-VN" : "en-US", {
-                      dateStyle: "medium",
-                      timeStyle: "short",
-                    }).format(new Date(workspace.createdAt))}
+                    {formatDisplayDateTime(workspace.createdAt, "-", language === "vi" ? "vi-VN" : "en-US")}
                   </p>
                 </div>
                 <div>
