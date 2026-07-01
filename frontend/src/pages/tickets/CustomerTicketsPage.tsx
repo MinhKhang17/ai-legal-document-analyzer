@@ -1,10 +1,13 @@
-import { RefreshCw, TicketCheck } from "lucide-react";
+import { RefreshCw, TicketCheck, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Badge } from "../../components/common/Badge";
 import { Button } from "../../components/common/Button";
 import { Card } from "../../components/common/Card";
-import { DataTable, type DataTableColumn } from "../../components/common/DataTable";
+import {
+  DataTable,
+  type DataTableColumn,
+} from "../../components/common/DataTable";
 import { EmptyState } from "../../components/common/EmptyState";
 import { PageHeader } from "../../components/common/PageHeader";
 import { getMyLegalTickets } from "../../services/legalTicket.service";
@@ -83,7 +86,9 @@ export function CustomerTicketsPage() {
   }, [loadTickets]);
 
   const openCount = useMemo(
-    () => tickets.filter((ticket) => !isTerminalLegalTicketStatus(ticket.status)).length,
+    () =>
+      tickets.filter((ticket) => !isTerminalLegalTicketStatus(ticket.status))
+        .length,
     [tickets],
   );
 
@@ -91,7 +96,10 @@ export function CustomerTicketsPage() {
     {
       header: t("legalTickets.table.ticket"),
       cell: (ticket) => (
-        <Link className="font-semibold text-primary hover:underline dark:text-inverse-primary" to={`/tickets/${ticket.id}`}>
+        <Link
+          className="font-semibold text-primary hover:underline dark:text-inverse-primary"
+          to={`/tickets/${ticket.id}`}
+        >
           {ticket.issue_title || ticket.question || ticket.id}
         </Link>
       ),
@@ -108,14 +116,24 @@ export function CustomerTicketsPage() {
       header: t("table.risk"),
       cell: (ticket) => (
         <Badge tone={getRiskTone(ticket.risk_level)}>
-          {ticket.risk_level ? t(`risk.${ticket.risk_level.toLowerCase()}`) : t("risk.none")}
+          {ticket.risk_level
+            ? t(`risk.${ticket.risk_level.toLowerCase()}`)
+            : t("risk.none")}
         </Badge>
       ),
     },
-    { header: t("legalTickets.table.expert"), cell: (ticket) => ticket.assigned_lawyer_name || "-" },
+    {
+      header: t("legalTickets.table.expert"),
+      cell: (ticket) => ticket.assigned_lawyer_name || "-",
+    },
     {
       header: t("legalTickets.table.created"),
-      cell: (ticket) => formatDisplayDate(ticket.created_at, "-", language === "vi" ? "vi-VN" : "en-US"),
+      cell: (ticket) =>
+        formatDisplayDate(
+          ticket.created_at,
+          "-",
+          language === "vi" ? "vi-VN" : "en-US",
+        ),
     },
   ];
 
@@ -126,10 +144,18 @@ export function CustomerTicketsPage() {
         subtitle={t("legalTickets.subtitle")}
         actions={
           <>
+            <Link to="/tickets/create">
+              <Button leftIcon={<Plus className="h-4 w-4" />}>
+                {t("legalTickets.createButton")}
+              </Button>
+            </Link>
+
             <select
               className="form-field max-w-48"
               value={statusFilter}
-              onChange={(event) => setStatusFilter(toLegalTicketFilter(event.target.value))}
+              onChange={(event) =>
+                setStatusFilter(toLegalTicketFilter(event.target.value))
+              }
             >
               {filterOptions.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -137,6 +163,7 @@ export function CustomerTicketsPage() {
                 </option>
               ))}
             </select>
+
             <Button
               variant="secondary"
               leftIcon={<RefreshCw className="h-4 w-4" />}
@@ -150,8 +177,12 @@ export function CustomerTicketsPage() {
       />
 
       <section className="mb-xl grid gap-gutter md:grid-cols-3">
-        <Card title={t("legalTickets.totalTickets")}><p className="text-3xl font-bold">{totalItems}</p></Card>
-        <Card title={t("legalTickets.openTickets")}><p className="text-3xl font-bold">{openCount}</p></Card>
+        <Card title={t("legalTickets.totalTickets")}>
+          <p className="text-3xl font-bold">{totalItems}</p>
+        </Card>
+        <Card title={t("legalTickets.openTickets")}>
+          <p className="text-3xl font-bold">{openCount}</p>
+        </Card>
         <Card title={t("legalTickets.currentFilter")}>
           <p className="break-words text-2xl font-bold">
             {getLegalTicketFilterLabel(statusFilter, t)}
@@ -159,9 +190,14 @@ export function CustomerTicketsPage() {
         </Card>
       </section>
 
-      <Card title={t("legalTickets.myLegalTickets")} actions={<Badge tone="blue">{tickets.length}</Badge>}>
+      <Card
+        title={t("legalTickets.myLegalTickets")}
+        actions={<Badge tone="blue">{tickets.length}</Badge>}
+      >
         {loading ? (
-          <p className="text-sm text-on-surface-variant dark:text-slate-400">{t("legalTickets.loading")}</p>
+          <p className="text-sm text-on-surface-variant dark:text-slate-400">
+            {t("legalTickets.loading")}
+          </p>
         ) : tickets.length === 0 ? (
           <EmptyState
             icon={<TicketCheck className="h-6 w-6" />}
@@ -169,7 +205,11 @@ export function CustomerTicketsPage() {
             description={t("legalTickets.emptyDescription")}
           />
         ) : (
-          <DataTable columns={columns} data={tickets} getRowKey={(ticket) => ticket.id} />
+          <DataTable
+            columns={columns}
+            data={tickets}
+            getRowKey={(ticket) => ticket.id}
+          />
         )}
       </Card>
     </div>

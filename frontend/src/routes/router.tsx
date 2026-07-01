@@ -45,6 +45,7 @@ import { SettingsPage } from "../pages/settings/SettingsPage";
 import { PaymentResultRedirect } from "../pages/billing/PaymentResultRedirect";
 import { LawyerTicketsPage } from "../pages/lawyer/LawyerTicketsPage";
 import { LawyerTicketDetailPage } from "../pages/lawyer/LawyerTicketDetailPage";
+import { CreateCustomerTicketPage } from "../pages/tickets/CreateCustomerTicketPage";
 
 export const router = createBrowserRouter([
   {
@@ -166,6 +167,14 @@ export const router = createBrowserRouter([
         element: (
           <CustomerRoute>
             <CustomerTicketsPage />
+          </CustomerRoute>
+        ),
+      },
+      {
+        path: "/tickets/create",
+        element: (
+          <CustomerRoute>
+            <CreateCustomerTicketPage />
           </CustomerRoute>
         ),
       },

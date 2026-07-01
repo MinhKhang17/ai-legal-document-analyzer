@@ -714,6 +714,47 @@ const en: TranslationDictionary = {
   "legalTickets.detail.emptyTitle": "Ticket not found",
   "legalTickets.detail.emptyDescription":
     "The backend did not return this ticket for the current account.",
+    "legalTickets.createButton": "Tạo ticket",
+
+"legalTickets.create.title": "Create legal ticket",
+"legalTickets.create.subtitle":
+  "Select a workspace and document, then describe the legal issue you need lawyer support for.",
+"legalTickets.create.formTitle": "Ticket information",
+
+"legalTickets.create.workspace": "Workspace",
+"legalTickets.create.document": "Document",
+
+"legalTickets.create.selectWorkspace": "Choose workspace",
+"legalTickets.create.selectDocument": "Choose document",
+
+"legalTickets.create.loadingWorkspaces": "Loading workspaces...",
+"legalTickets.create.loadingDocuments": "Loading documents...",
+
+"legalTickets.create.issueFingerprint": "Issue Fingerprint",
+"legalTickets.create.issueFingerprintPlaceholder":
+  "Example: payment_clause_penalty",
+
+"legalTickets.create.customerNote": "Customer Note",
+"legalTickets.create.customerNotePlaceholder":
+  "Provide more details about the content you want the lawyer to review...",
+
+"legalTickets.create.submit": "Create Ticket",
+"legalTickets.create.submitting": "Creating Ticket...",
+
+"legalTickets.create.success": "Legal ticket created successfully.",
+"legalTickets.create.submitError": "Unable to create legal ticket.",
+
+"legalTickets.create.validationError":
+  "Please fill in all required fields.",
+
+"legalTickets.create.loadWorkspacesError":
+  "Unable to load workspace list.",
+
+"legalTickets.create.loadDocumentsError":
+  "Unable to load document list.",
+  "legalTickets.create.question": "Question",
+"legalTickets.create.questionPlaceholder":
+  "Describe the legal issue you want the lawyer to review...",
   "legalTickets.detail.fallbackSubtitle": "Legal ticket",
   "legalTickets.detail.aiSummary": "AI summary",
   "legalTickets.detail.noSummary": "No summary yet.",
@@ -2202,6 +2243,47 @@ const vi: TranslationDictionary = {
   "legalTickets.detail.cancelSuccess": "Đã hủy ticket.",
   "legalTickets.detail.closeSuccess": "Đã đóng ticket.",
   "legalTickets.detail.reopenSuccess": "Đã mở lại ticket.",
+  "legalTickets.createButton": "Tạo ticket",
+
+"legalTickets.create.title": "Tạo ticket pháp lý",
+"legalTickets.create.subtitle":
+  "Chọn workspace và tài liệu, sau đó mô tả vấn đề cần luật sư hỗ trợ.",
+"legalTickets.create.formTitle": "Thông tin ticket",
+
+"legalTickets.create.workspace": "Workspace",
+"legalTickets.create.document": "Tài liệu",
+
+"legalTickets.create.selectWorkspace": "Chọn workspace",
+"legalTickets.create.selectDocument": "Chọn tài liệu",
+
+"legalTickets.create.loadingWorkspaces": "Đang tải workspace...",
+"legalTickets.create.loadingDocuments": "Đang tải tài liệu...",
+
+"legalTickets.create.issueFingerprint": "Mã định danh vấn đề",
+"legalTickets.create.issueFingerprintPlaceholder":
+  "Ví dụ: payment_clause_penalty",
+
+"legalTickets.create.customerNote": "Ghi chú cho luật sư",
+"legalTickets.create.customerNotePlaceholder":
+  "Mô tả chi tiết hơn nội dung bạn muốn luật sư rà soát...",
+
+"legalTickets.create.submit": "Tạo ticket",
+"legalTickets.create.submitting": "Đang tạo ticket...",
+
+"legalTickets.create.success": "Tạo ticket pháp lý thành công.",
+"legalTickets.create.submitError": "Không thể tạo ticket pháp lý.",
+
+"legalTickets.create.validationError":
+  "Vui lòng nhập đầy đủ các trường bắt buộc.",
+
+"legalTickets.create.loadWorkspacesError":
+  "Không thể tải danh sách workspace.",
+
+"legalTickets.create.loadDocumentsError":
+  "Không thể tải danh sách tài liệu.",
+  "legalTickets.create.question": "Câu hỏi",
+"legalTickets.create.questionPlaceholder":
+  "Mô tả vấn đề pháp lý bạn muốn luật sư hỗ trợ...",
   "workspace.title": "Workspaces",
   "workspace.subtitle":
     "Tạo workspace, tải tài liệu và trò chuyện trên cùng một ngữ cảnh pháp lý.",
