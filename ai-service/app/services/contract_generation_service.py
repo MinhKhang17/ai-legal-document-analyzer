@@ -25,7 +25,8 @@ def is_contract_generation_intent(question: str) -> bool:
         "liệt kê", "danh sách", "kể tên", "cho biết các", "những hợp đồng nào",
         "gồm những", "có bao nhiêu", "ở đâu", "từ đâu", "phân tích", "so sánh",
         "kiểm tra", "đánh giá", "nhận xét", "góp ý", "sửa lỗi", "rà soát",
-        "nguồn nào", "file nào", "tệp nào", "thông tin lấy từ", "lấy từ đâu"
+        "nguồn nào", "file nào", "tệp nào", "thông tin lấy từ", "lấy từ đâu",
+        "tham khảo", "đã tham khảo", "tham chiếu", "đã dùng", "đã sử dụng", "nguồn gốc"
     ]
     if any(kw in question_lower for kw in qa_keywords):
         return False

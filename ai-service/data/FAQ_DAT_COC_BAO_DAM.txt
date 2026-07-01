@@ -1,0 +1,159 @@
+# CÂU HỎI THƯỜNG GẶP VỀ ĐẶT CỌC VÀ BẢO ĐẢM THỰC HIỆN HỢP ĐỒNG
+
+## 1. KHÁI NIỆM ĐẶT CỌC
+
+### Đặt cọc là gì?
+Theo Điều 328 Bộ luật Dân sự 2015, đặt cọc là việc một bên (bên đặt cọc) giao cho bên kia (bên nhận đặt cọc) một khoản tiền hoặc kim khí quý, đá quý hoặc vật có giá trị khác trong một thời hạn để bảo đảm giao kết hoặc thực hiện hợp đồng.
+
+### Đặt cọc khác gì với trả trước?
+- **Đặt cọc**: Có tính chất bảo đảm. Nếu bên đặt cọc vi phạm thì mất cọc, nếu bên nhận đặt cọc vi phạm thì phải trả lại cọc và thêm một khoản tương đương (phạt cọc).
+- **Trả trước / tạm ứng**: Chỉ là thanh toán một phần giá trị hợp đồng, không có tính chất phạt khi vi phạm.
+
+### Đặt cọc có bắt buộc phải bằng tiền không?
+Không bắt buộc. Theo Điều 328 BLDS 2015, đặt cọc có thể bằng:
+- Tiền (phổ biến nhất)
+- Kim khí quý (vàng, bạc)
+- Đá quý
+- Vật có giá trị khác
+
+## 2. MỨC ĐẶT CỌC
+
+### Mức đặt cọc tối đa là bao nhiêu?
+Pháp luật Việt Nam KHÔNG quy định mức trần cho đặt cọc. Tuy nhiên:
+- Thông thường từ 1-3 tháng tiền thuê (đối với hợp đồng thuê nhà)
+- Từ 10-30% giá trị hợp đồng (đối với hợp đồng mua bán)
+- Mức quá cao (trên 50% giá trị) có thể bị xem là bất hợp lý
+
+### Đặt cọc 1 tháng tiền thuê có đủ không?
+- 1 tháng: Mức tối thiểu, bảo vệ bên cho thuê ít
+- 2 tháng: Mức phổ biến, cân bằng hợp lý
+- 3 tháng: Mức cao, bảo vệ bên cho thuê nhiều hơn
+- Trên 3 tháng: Mức rất cao, có thể gây bất lợi cho bên thuê
+
+### Có quy định mức đặt cọc tối thiểu không?
+Không có quy định tối thiểu. Các bên tự do thỏa thuận. Tuy nhiên nên quy định rõ trong hợp đồng.
+
+## 3. QUYỀN VÀ NGHĨA VỤ
+
+### Quyền của bên đặt cọc (bên thuê):
+- Được nhận lại tiền cọc khi hợp đồng kết thúc đúng hạn
+- Được khấu trừ tiền cọc vào tiền thuê (nếu có thỏa thuận)
+- Được bồi thường gấp đôi nếu bên nhận cọc vi phạm (Điều 328 Khoản 2 BLDS 2015)
+- Được yêu cầu biên nhận đặt cọc
+
+### Quyền của bên nhận đặt cọc (bên cho thuê):
+- Được giữ tiền đặt cọc trong suốt thời gian thuê
+- Được sử dụng tiền cọc để khấu trừ thiệt hại (nếu bên thuê gây ra)
+- Được giữ tiền cọc nếu bên thuê vi phạm hợp đồng (Điều 328 Khoản 2 BLDS 2015)
+
+## 4. HOÀN TRẢ ĐẶT CỌC
+
+### Khi nào phải hoàn trả đặt cọc?
+Theo Điều 328 BLDS 2015:
+- Khi hợp đồng được giao kết và thực hiện → cọc được trả lại hoặc khấu trừ vào nghĩa vụ thanh toán
+- Khi hợp đồng kết thúc đúng hạn → trả lại cọc sau khi trừ chi phí (nếu có)
+
+### Các khoản được trừ vào tiền cọc:
+- Tiền điện, nước, dịch vụ còn nợ
+- Chi phí sửa chữa hư hỏng do bên thuê gây ra
+- Tiền thuê chưa thanh toán
+- KHÔNG được trừ chi phí hao mòn tự nhiên
+
+### Thời hạn hoàn trả tiền cọc:
+- Pháp luật không quy định thời hạn cụ thể
+- Thông thường: trong vòng 7-30 ngày sau khi trả nhà
+- NÊN ghi rõ thời hạn hoàn trả trong hợp đồng
+- Nếu không ghi → có thể dẫn đến tranh chấp
+
+## 5. MẤT CỌC VÀ PHẠT CỌC
+
+### Khi nào bên đặt cọc bị mất cọc?
+Theo Điều 328 Khoản 2 BLDS 2015:
+- Bên đặt cọc từ chối giao kết hoặc thực hiện hợp đồng → mất tiền cọc
+- Trừ khi các bên có thỏa thuận khác
+
+### Khi nào bên nhận đặt cọc phải phạt cọc?
+Theo Điều 328 Khoản 2 BLDS 2015:
+- Bên nhận đặt cọc từ chối giao kết hoặc thực hiện hợp đồng → phải trả lại tiền cọc VÀ một khoản tiền tương đương giá trị tài sản đặt cọc
+- Trừ khi các bên có thỏa thuận khác
+
+### Có thể thỏa thuận mức phạt cọc khác không?
+CÓ. Điều 328 cho phép "trừ trường hợp có thỏa thuận khác". Các bên có thể:
+- Tăng mức phạt (ví dụ: gấp 3 lần tiền cọc)
+- Giảm mức phạt (ví dụ: chỉ hoàn trả cọc, không phạt)
+- Quy định mức phạt cố định
+
+## 6. CÁC RỦI RO THƯỜNG GẶP VỀ ĐẶT CỌC
+
+### Rủi ro khi hợp đồng KHÔNG có điều khoản đặt cọc:
+- Không có biện pháp bảo đảm thực hiện hợp đồng
+- Bên vi phạm không có ràng buộc tài chính
+- Khó đòi bồi thường khi có tranh chấp
+
+### Rủi ro khi điều khoản đặt cọc KHÔNG RÕ RÀNG:
+- Không ghi rõ mục đích đặt cọc (bảo đảm giao kết vs thực hiện)
+- Không ghi rõ điều kiện hoàn trả
+- Không ghi rõ các trường hợp mất cọc
+- Không ghi rõ thời hạn hoàn trả cọc
+- Không có biên nhận đặt cọc
+
+### Rủi ro khi mức cọc QUÁ CAO:
+- Gây bất lợi cho bên thuê/bên mua
+- Có thể bị xem là điều khoản không công bằng
+- Rủi ro mất số tiền lớn nếu vi phạm
+
+### Rủi ro khi mức cọc QUÁ THẤP:
+- Không đủ sức ràng buộc bên vi phạm
+- Bên vi phạm dễ chấp nhận mất cọc để hủy hợp đồng
+- Không đủ bù đắp thiệt hại thực tế
+
+## 7. CHECKLIST RÀ SOÁT ĐIỀU KHOẢN ĐẶT CỌC
+
+Khi rà soát điều khoản đặt cọc trong hợp đồng, cần kiểm tra:
+
+### Nội dung cơ bản:
+- [ ] Có ghi rõ số tiền đặt cọc không?
+- [ ] Có ghi rõ mục đích đặt cọc không? (bảo đảm giao kết / thực hiện)
+- [ ] Có ghi rõ thời điểm đặt cọc không?
+- [ ] Có ghi rõ hình thức đặt cọc không? (tiền mặt / chuyển khoản)
+
+### Điều kiện hoàn trả:
+- [ ] Có ghi rõ điều kiện hoàn trả cọc không?
+- [ ] Có ghi rõ thời hạn hoàn trả cọc không?
+- [ ] Có ghi rõ các khoản được khấu trừ từ cọc không?
+- [ ] Có ghi rõ quy trình kiểm tra/nghiệm thu trước khi hoàn trả không?
+
+### Xử lý vi phạm:
+- [ ] Có ghi rõ trường hợp mất cọc không?
+- [ ] Có ghi rõ mức phạt cọc không? (mặc định = gấp đôi theo BLDS)
+- [ ] Có thỏa thuận khác mức phạt mặc định không?
+
+### Bảo vệ quyền lợi:
+- [ ] Có biên nhận đặt cọc không?
+- [ ] Mức cọc có hợp lý không? (so với giá trị hợp đồng)
+- [ ] Có cân bằng quyền lợi giữa hai bên không?
+
+## 8. CĂN CỨ PHÁP LÝ
+
+### Bộ luật Dân sự 2015:
+- **Điều 328**: Đặt cọc — quy định về khái niệm, mục đích, hậu quả vi phạm
+- **Điều 329**: Ký cược — biện pháp bảo đảm bằng tài sản cho thuê
+- **Điều 330**: Ký quỹ — gửi tiền tại tổ chức tín dụng để bảo đảm
+- **Điều 292**: Các biện pháp bảo đảm thực hiện nghĩa vụ
+- **Điều 295**: Tài sản bảo đảm
+- **Điều 351**: Vi phạm nghĩa vụ dân sự
+
+### Luật Nhà ở 2014:
+- **Điều 129**: Quyền và nghĩa vụ của bên cho thuê
+- **Điều 130**: Quyền và nghĩa vụ của bên thuê
+
+### Nghị định 99/2015/NĐ-CP:
+- Quy định chi tiết về quản lý, sử dụng nhà ở
+
+---
+
+**LƯU Ý QUAN TRỌNG:**
+- Mọi thỏa thuận về đặt cọc nên được ghi rõ bằng văn bản
+- Nên có biên nhận khi giao nhận tiền cọc
+- Nếu đặt cọc bằng chuyển khoản, giữ lại chứng từ chuyển tiền
+- Nếu tranh chấp về đặt cọc, cần có bằng chứng thỏa thuận rõ ràng

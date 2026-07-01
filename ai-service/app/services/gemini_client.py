@@ -26,7 +26,7 @@ class GeminiClient:
         model: str,
         base_url: str = "https://generativelanguage.googleapis.com/v1beta",
         timeout_seconds: float = 30.0,
-        max_output_tokens: int = 128,
+        max_output_tokens: int = 8192,
         max_retries: int = 4,
         retry_backoff_seconds: float = 2.0,
     ) -> None:
