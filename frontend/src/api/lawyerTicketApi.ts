@@ -2,7 +2,10 @@ export {
   getMyLawyerTickets,
   getLawyerTicketDetail,
   getLawyerTicketMessages,
+  requestMoreInfoLawyerTicket,
+  resolveLawyerTicket,
   sendLawyerTicketMessage,
+  startReviewLawyerTicket,
   getLawyerTicketFiles,
   downloadLawyerTicketFile,
   uploadLawyerTicketFile,
@@ -19,4 +22,6 @@ export type {
   LawyerTicketFile,
   UploadLawyerTicketFileRequest,
   CloseLawyerTicketRequest,
+  RequestMoreInfoLawyerTicketRequest,
+  ResolveLawyerTicketRequest,
 } from "../types/lawyerTicket";
