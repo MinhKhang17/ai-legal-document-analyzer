@@ -96,5 +96,6 @@ export interface ChatSessionMemory {
 }
 
 export interface AppendChatContextRequest {
+  userId?: number;
   contextJson: string;
 }

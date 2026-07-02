@@ -43,6 +43,10 @@ export interface UpdateContractTemplateRequest {
 
 export interface GenerateContractRequest {
   requestId: string;
+  /**
+   * BLOCKED_BY_BACKEND: contract endpoints currently require numeric workspaceId
+   * while workspace APIs return ids such as "ws_...".
+   */
   workspaceId: number;
   templateId?: number | null;
   sourceDocumentId?: string | null;
@@ -66,6 +70,10 @@ export interface ContractGenerationJob {
 }
 
 export interface SaveContractRequest {
+  /**
+   * BLOCKED_BY_BACKEND: contract endpoints currently require numeric workspaceId
+   * while workspace APIs return ids such as "ws_...".
+   */
   workspaceId: number;
   templateId?: number | null;
   generationJobId?: string | null;
