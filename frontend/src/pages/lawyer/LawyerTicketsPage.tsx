@@ -18,7 +18,7 @@ import { useToast } from "../../hooks/useToast";
 import type { LawyerTicket } from "../../types/lawyerTicket";
 import { formatDisplayDate } from "../../utils/format";
 
-const getRiskTone = (risk?: string) => {
+const getRiskTone = (risk?: string | null) => {
   if (risk === "HIGH") return "red";
   if (risk === "MEDIUM") return "amber";
   if (risk === "LOW") return "green";

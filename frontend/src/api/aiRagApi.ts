@@ -1,2 +1,6 @@
 export { previewAiRagInternal, queryAiRagInternal } from "../services/aiRag.service";
-export type { AiRagQueryRequest, AiRagQueryResponse } from "../types/ai";
+export type {
+  AiRagPreviewResponse,
+  AiRagQueryRequest,
+  AiRagQueryResponse,
+} from "../types/ai";

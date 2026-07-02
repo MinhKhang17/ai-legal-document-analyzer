@@ -12,19 +12,9 @@ export interface CreateLegalTicketRequest {
   request_id?: string | null;
   workspace_id: string;
   document_id?: string | null;
-  question?: string | null;
+  question: string;
   issue_fingerprint?: string | null;
   customer_note?: string | null;
-
-  answer?: string | null;
-  confidence_score?: number | null;
-  should_suggest_ticket?: boolean | null;
-  suggestion_type?: string | null;
-  suggestion_reason?: string | null;
-  missing_information?: string | null;
-  risk_level?: string | null;
-  legal_domain?: string | null;
-  user_action_hint?: string | null;
 }
 
 export interface AssignLawyerRequest {

@@ -7,9 +7,36 @@ import type {
   LawyerTicketFile,
   LawyerTicketMessage,
   LawyerTicketPageResponse,
+  RequestMoreInfoLawyerTicketRequest,
+  ResolveLawyerTicketRequest,
   UploadLawyerTicketFileRequest,
 } from "../types/lawyerTicket";
+import type { LegalTicket } from "../types/legalTicket";
 import { buildAuthHeaders, requestApiData } from "./http";
+
+const jsonHeaders = {
+  Accept: "application/json",
+  "Content-Type": "application/json",
+};
+
+const lawyerTicketActionEndpoint = (ticketId: string, action: string) =>
+  `${API_ENDPOINTS.lawyerTickets.detail(ticketId)}/${action}`;
+
+const postLawyerTicketAction = <TResponse>(
+  endpoint: string,
+  payload: object | undefined,
+  errorMessage: string,
+): Promise<TResponse> =>
+  requestApiData<TResponse>(
+    endpoint,
+    {
+      method: "POST",
+      headers: buildAuthHeaders(jsonHeaders),
+      credentials: "include",
+      body: payload ? JSON.stringify(payload) : undefined,
+    },
+    errorMessage,
+  );
 
 export const getMyLawyerTickets = async (): Promise<LawyerTicketPageResponse> =>
   requestApiData<LawyerTicketPageResponse>(
@@ -114,17 +141,38 @@ export const uploadLawyerTicketFile = async (
 export const closeLawyerTicket = async (
   ticketId: string,
   payload: CloseLawyerTicketRequest,
-): Promise<LawyerTicketDetail> =>
-  requestApiData<LawyerTicketDetail>(
+): Promise<LegalTicket> =>
+  postLawyerTicketAction<LegalTicket>(
     API_ENDPOINTS.lawyerTickets.close(ticketId),
-    {
-      method: "POST",
-      headers: buildAuthHeaders({
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      }),
-      credentials: "include",
-      body: JSON.stringify(payload),
-    },
+    payload,
     "Không thể đóng ticket",
+  );
+
+export const startReviewLawyerTicket = async (
+  ticketId: string,
+): Promise<LegalTicket> =>
+  postLawyerTicketAction<LegalTicket>(
+    lawyerTicketActionEndpoint(ticketId, "start-review"),
+    undefined,
+    "Không thể bắt đầu xử lý ticket",
+  );
+
+export const requestMoreInfoLawyerTicket = async (
+  ticketId: string,
+  payload: RequestMoreInfoLawyerTicketRequest,
+): Promise<LegalTicket> =>
+  postLawyerTicketAction<LegalTicket>(
+    lawyerTicketActionEndpoint(ticketId, "request-more-info"),
+    payload,
+    "Không thể gửi yêu cầu bổ sung thông tin",
+  );
+
+export const resolveLawyerTicket = async (
+  ticketId: string,
+  payload: ResolveLawyerTicketRequest,
+): Promise<LegalTicket> =>
+  postLawyerTicketAction<LegalTicket>(
+    lawyerTicketActionEndpoint(ticketId, "resolve"),
+    payload,
+    "Không thể gửi kết luận xử lý ticket",
   );
