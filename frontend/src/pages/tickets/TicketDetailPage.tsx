@@ -1,4 +1,10 @@
-import { ArrowLeft, RefreshCw, Reply, ShieldAlert, XCircle } from "lucide-react";
+import {
+  ArrowLeft,
+  RefreshCw,
+  Reply,
+  ShieldAlert,
+  XCircle,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
@@ -27,7 +33,9 @@ export function TicketDetailPage() {
   const [messages, setMessages] = useState<LegalTicketMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [messageValue, setMessageValue] = useState("");
-  const [busyAction, setBusyAction] = useState<"reply" | "cancel" | "close" | "reopen" | null>(null);
+  const [busyAction, setBusyAction] = useState<
+    "reply" | "cancel" | "close" | "reopen" | null
+  >(null);
 
   const loadTicket = useCallback(async () => {
     if (!ticketId) return;
@@ -41,7 +49,8 @@ export function TicketDetailPage() {
       setTicket(detail);
       setMessages(history);
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("tickets.detail.loadError");
+      const message =
+        error instanceof Error ? error.message : t("tickets.detail.loadError");
       toast.error(message);
       setTicket(null);
       setMessages([]);
@@ -68,11 +77,18 @@ export function TicketDetailPage() {
         actions={
           <div className="flex flex-wrap gap-sm">
             <Link to="/tickets">
-              <Button variant="secondary" leftIcon={<ArrowLeft className="h-4 w-4" />}>
+              <Button
+                variant="secondary"
+                leftIcon={<ArrowLeft className="h-4 w-4" />}
+              >
                 {t("tickets.detail.back")}
               </Button>
             </Link>
-            <Button variant="secondary" onClick={() => void loadTicket()} disabled={loading}>
+            <Button
+              variant="secondary"
+              onClick={() => void loadTicket()}
+              disabled={loading}
+            >
               <RefreshCw className="h-4 w-4" />
               {t("tickets.detail.refresh")}
             </Button>
@@ -82,64 +98,117 @@ export function TicketDetailPage() {
 
       {loading ? (
         <Card>
-          <p className="text-sm text-on-surface-variant">{t("tickets.detail.loading")}</p>
+          <p className="text-sm text-on-surface-variant">
+            {t("tickets.detail.loading")}
+          </p>
         </Card>
       ) : !ticket ? (
         <Card>
-          <p className="text-sm text-on-surface-variant">{t("tickets.detail.empty")}</p>
+          <p className="text-sm text-on-surface-variant">
+            {t("tickets.detail.empty")}
+          </p>
         </Card>
       ) : (
         <div className="grid gap-gutter xl:grid-cols-[1.08fr_0.92fr]">
           <div className="space-y-gutter">
             <Card
               title={ticket.issue_title || ticket.question || ticket.id}
-              subtitle={ticket.issue_summary || ticket.customer_note || ticket.answer || t("common.noData")}
+              subtitle={
+                ticket.issue_summary ||
+                ticket.customer_note ||
+                ticket.answer ||
+                t("common.noData")
+              }
               actions={
                 <div className="flex flex-wrap gap-xs">
                   <Badge>{ticket.status || "UNKNOWN"}</Badge>
-                  <Badge tone={ticket.risk_level === "HIGH" ? "red" : ticket.risk_level === "MEDIUM" ? "amber" : "green"}>
+                  <Badge
+                    tone={
+                      ticket.risk_level === "HIGH"
+                        ? "red"
+                        : ticket.risk_level === "MEDIUM"
+                          ? "amber"
+                          : "green"
+                    }
+                  >
                     {ticket.risk_level || "NONE"}
                   </Badge>
                 </div>
               }
             >
               <div className="grid gap-md sm:grid-cols-2">
-                <Meta label={t("tickets.detail.workspace")} value={ticket.workspace_id || "-"} />
-                <Meta label={t("tickets.detail.document")} value={ticket.document_id || "-"} />
+                <Meta
+                  label={t("tickets.detail.workspace")}
+                  value={ticket.workspace_id || "-"}
+                />
+                <Meta
+                  label={t("tickets.detail.document")}
+                  value={ticket.document_id || "-"}
+                />
                 <Meta
                   label={t("tickets.detail.assignedLawyer")}
-                  value={ticket.assigned_lawyer_name || ticket.assigned_lawyer_id || "-"}
+                  value={
+                    ticket.assigned_lawyer_name ||
+                    String(ticket.assigned_lawyer_id ?? "-")
+                  }
                 />
-                <Meta label={t("tickets.detail.domain")} value={ticket.legal_domain || "-"} />
-                <Meta label={t("tickets.detail.createdAt")} value={formatDisplayDate(ticket.created_at, "-", "vi-VN")} />
-                <Meta label={t("tickets.detail.updatedAt")} value={formatDisplayDate(ticket.updated_at, "-", "vi-VN")} />
+                <Meta
+                  label={t("tickets.detail.domain")}
+                  value={ticket.legal_domain || "-"}
+                />
+                <Meta
+                  label={t("tickets.detail.createdAt")}
+                  value={formatDisplayDate(ticket.created_at, "-", "vi-VN")}
+                />
+                <Meta
+                  label={t("tickets.detail.updatedAt")}
+                  value={formatDisplayDate(ticket.updated_at, "-", "vi-VN")}
+                />
               </div>
 
               <div className="mt-md space-y-sm">
-                <p className="label-uppercase">{t("tickets.detail.question")}</p>
-                <p className="whitespace-pre-line text-sm leading-6 text-on-surface-variant">{ticket.question || t("common.noData")}</p>
+                <p className="label-uppercase">
+                  {t("tickets.detail.question")}
+                </p>
+                <p className="whitespace-pre-line text-sm leading-6 text-on-surface-variant">
+                  {ticket.question || t("common.noData")}
+                </p>
               </div>
 
               <div className="mt-md space-y-sm">
                 <p className="label-uppercase">{t("tickets.detail.answer")}</p>
-                <p className="whitespace-pre-line text-sm leading-6 text-on-surface-variant">{ticket.answer || t("common.noData")}</p>
+                <p className="whitespace-pre-line text-sm leading-6 text-on-surface-variant">
+                  {ticket.answer || t("common.noData")}
+                </p>
               </div>
 
               {ticket.suggestion_reason && (
                 <div className="mt-md rounded-xl bg-surface-container-low p-md dark:bg-slate-800">
-                  <p className="label-uppercase mb-xs">{t("tickets.detail.suggestionReason")}</p>
-                  <p className="text-sm leading-6 text-on-surface-variant">{ticket.suggestion_reason}</p>
+                  <p className="label-uppercase mb-xs">
+                    {t("tickets.detail.suggestionReason")}
+                  </p>
+                  <p className="text-sm leading-6 text-on-surface-variant">
+                    {ticket.suggestion_reason}
+                  </p>
                 </div>
               )}
             </Card>
 
-            <Card title={t("tickets.detail.messages")} actions={<Badge tone="blue">{messageCount}</Badge>}>
+            <Card
+              title={t("tickets.detail.messages")}
+              actions={<Badge tone="blue">{messageCount}</Badge>}
+            >
               <div className="space-y-md">
                 {messages.length === 0 ? (
-                  <p className="text-sm text-on-surface-variant">{t("tickets.detail.noMessages")}</p>
+                  <p className="text-sm text-on-surface-variant">
+                    {t("tickets.detail.noMessages")}
+                  </p>
                 ) : (
                   messages.map((message) => (
-                    <article key={message.id} className="rounded-xl border border-legal-border p-md dark:border-slate-700">
+                    <article
+                      key={message.id}
+                      className="rounded-xl border border-legal-border p-md dark:border-slate-700"
+                    >
                       <div className="flex items-start justify-between gap-md">
                         <div>
                           <p className="font-semibold">{message.sender_name}</p>
@@ -147,9 +216,13 @@ export function TicketDetailPage() {
                             {message.sender_role} · {message.message_type}
                           </p>
                         </div>
-                        <p className="text-xs text-on-surface-variant">{formatDisplayDate(message.created_at, "-", "vi-VN")}</p>
+                        <p className="text-xs text-on-surface-variant">
+                          {formatDisplayDate(message.created_at, "-", "vi-VN")}
+                        </p>
                       </div>
-                      <p className="mt-sm whitespace-pre-line text-sm leading-6">{message.content}</p>
+                      <p className="mt-sm whitespace-pre-line text-sm leading-6">
+                        {message.content}
+                      </p>
                     </article>
                   ))
                 )}
@@ -173,25 +246,40 @@ export function TicketDetailPage() {
                 <div className="flex flex-wrap gap-sm">
                   <Button
                     leftIcon={<Reply className="h-4 w-4" />}
-                    disabled={busyAction !== null || isClosed || isCancelled || messageValue.trim().length === 0}
+                    disabled={
+                      busyAction !== null ||
+                      isClosed ||
+                      isCancelled ||
+                      messageValue.trim().length === 0
+                    }
                     onClick={async () => {
                       if (!ticketId || !messageValue.trim()) return;
                       setBusyAction("reply");
                       try {
-                        const updated = await replyToLegalTicket(ticketId, { message: messageValue.trim() });
+                        const updated = await replyToLegalTicket(ticketId, {
+                          message: messageValue.trim(),
+                        });
                         setTicket(updated);
                         setMessageValue("");
                         await loadTicket();
-                        toast.success(t("tickets.detail.replySuccess"), t("toast.successTitle"));
+                        toast.success(
+                          t("tickets.detail.replySuccess"),
+                          t("toast.successTitle"),
+                        );
                       } catch (error) {
-                        const message = error instanceof Error ? error.message : t("tickets.detail.replyError");
+                        const message =
+                          error instanceof Error
+                            ? error.message
+                            : t("tickets.detail.replyError");
                         toast.error(message, t("toast.errorTitle"));
                       } finally {
                         setBusyAction(null);
                       }
                     }}
                   >
-                    {busyAction === "reply" ? t("common.loading") : t("tickets.detail.sendReply")}
+                    {busyAction === "reply"
+                      ? t("common.loading")
+                      : t("tickets.detail.sendReply")}
                   </Button>
                 </div>
               </div>
@@ -207,19 +295,29 @@ export function TicketDetailPage() {
                     if (!ticketId) return;
                     setBusyAction("cancel");
                     try {
-                      const updated = await cancelLegalTicket(ticketId, { reason: t("tickets.detail.cancelReason") });
+                      const updated = await cancelLegalTicket(ticketId, {
+                        reason: t("tickets.detail.cancelReason"),
+                      });
                       setTicket(updated);
                       await loadTicket();
-                      toast.success(t("tickets.detail.cancelSuccess"), t("toast.successTitle"));
+                      toast.success(
+                        t("tickets.detail.cancelSuccess"),
+                        t("toast.successTitle"),
+                      );
                     } catch (error) {
-                      const message = error instanceof Error ? error.message : t("tickets.detail.cancelError");
+                      const message =
+                        error instanceof Error
+                          ? error.message
+                          : t("tickets.detail.cancelError");
                       toast.error(message, t("toast.errorTitle"));
                     } finally {
                       setBusyAction(null);
                     }
                   }}
                 >
-                  {busyAction === "cancel" ? t("common.loading") : t("tickets.detail.cancel")}
+                  {busyAction === "cancel"
+                    ? t("common.loading")
+                    : t("tickets.detail.cancel")}
                 </Button>
 
                 <Button
@@ -230,19 +328,29 @@ export function TicketDetailPage() {
                     if (!ticketId) return;
                     setBusyAction("close");
                     try {
-                      const updated = await closeLegalTicket(ticketId, { feedback: t("tickets.detail.closeFeedback") });
+                      const updated = await closeLegalTicket(ticketId, {
+                        feedback: t("tickets.detail.closeFeedback"),
+                      });
                       setTicket(updated);
                       await loadTicket();
-                      toast.success(t("tickets.detail.closeSuccess"), t("toast.successTitle"));
+                      toast.success(
+                        t("tickets.detail.closeSuccess"),
+                        t("toast.successTitle"),
+                      );
                     } catch (error) {
-                      const message = error instanceof Error ? error.message : t("tickets.detail.closeError");
+                      const message =
+                        error instanceof Error
+                          ? error.message
+                          : t("tickets.detail.closeError");
                       toast.error(message, t("toast.errorTitle"));
                     } finally {
                       setBusyAction(null);
                     }
                   }}
                 >
-                  {busyAction === "close" ? t("common.loading") : t("tickets.detail.close")}
+                  {busyAction === "close"
+                    ? t("common.loading")
+                    : t("tickets.detail.close")}
                 </Button>
 
                 <Button
@@ -252,19 +360,29 @@ export function TicketDetailPage() {
                     if (!ticketId) return;
                     setBusyAction("reopen");
                     try {
-                      const updated = await reopenLegalTicket(ticketId, { reason: t("tickets.detail.reopenReason") });
+                      const updated = await reopenLegalTicket(ticketId, {
+                        reason: t("tickets.detail.reopenReason"),
+                      });
                       setTicket(updated);
                       await loadTicket();
-                      toast.success(t("tickets.detail.reopenSuccess"), t("toast.successTitle"));
+                      toast.success(
+                        t("tickets.detail.reopenSuccess"),
+                        t("toast.successTitle"),
+                      );
                     } catch (error) {
-                      const message = error instanceof Error ? error.message : t("tickets.detail.reopenError");
+                      const message =
+                        error instanceof Error
+                          ? error.message
+                          : t("tickets.detail.reopenError");
                       toast.error(message, t("toast.errorTitle"));
                     } finally {
                       setBusyAction(null);
                     }
                   }}
                 >
-                  {busyAction === "reopen" ? t("common.loading") : t("tickets.detail.reopen")}
+                  {busyAction === "reopen"
+                    ? t("common.loading")
+                    : t("tickets.detail.reopen")}
                 </Button>
               </div>
             </Card>

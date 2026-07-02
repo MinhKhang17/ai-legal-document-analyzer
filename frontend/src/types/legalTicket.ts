@@ -12,11 +12,10 @@ export interface CreateLegalTicketRequest {
   request_id?: string | null;
   workspace_id: string;
   document_id?: string | null;
-  question: string;
+  question?: string | null;
   issue_fingerprint?: string | null;
   customer_note?: string | null;
 
-  question?: string | null;
   answer?: string | null;
   confidence_score?: number | null;
   should_suggest_ticket?: boolean | null;
