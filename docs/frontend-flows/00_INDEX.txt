@@ -1,0 +1,45 @@
+TÀI LIỆU FRONTEND FLOW - AI LEGAL DOCUMENT ANALYZER
+
+Phạm vi:
+- Chỉ dựa trên mã nguồn hiện có trong `frontend/src` và `backend/src`.
+- Không suy diễn như đã hoàn thiện nếu repo chưa thể hiện rõ.
+- Mỗi flow đều có các phần `HIỆN TRẠNG`, `SUY LUẬN`, `ĐỀ XUẤT`.
+
+Danh sách flow đã phân tích:
+1. `01_xac_thuc_va_phien_dang_nhap.txt`
+2. `02_workspace_va_upload_tai_lieu.txt`
+3. `03_chat_phap_ly_theo_workspace.txt`
+4. `04_ticket_khach_hang.txt`
+5. `05_admin_duyet_va_phan_cong_ticket.txt`
+6. `06_luat_su_xu_ly_ticket.txt`
+7. `07_billing_goi_dich_vu_va_thanh_toan.txt`
+8. `08_hop_dong_ai_va_quan_ly_phien_ban.txt`
+9. `09_knowledge_base_quan_tri.txt`
+
+Đánh giá nhanh mức độ sẵn sàng:
+- Đủ thông tin và có vẻ đi được end-to-end: flow 01, 02, 03, 04, 05, 06, 07.
+- Có API và UI nhưng còn điểm lệch/mơ hồ đáng kể: flow 08, 09.
+
+Những rủi ro chính cần frontend chú ý:
+- `workspaceId` của workspace đang là chuỗi kiểu `ws_*`, nhưng flow contracts tại `frontend/src/pages/contracts/MyContractsPage.tsx` lại ép `workspaceId` sang số.
+- Flow billing/subscription có nhiều endpoint gần nghĩa nhau ở backend (`/me`, `/my-plan`, `/usage`, `/my-usage`), FE hiện đang dùng một nhánh riêng; cần bám đúng endpoint đang map trong env.
+- Flow knowledge base đang có upload theo text payload, không phải upload file binary trực tiếp.
+- Chat yêu cầu document ở trạng thái `READY`; FE có lúc chọn document đầu tiên theo danh sách nếu query param không khớp.
+
+File tổng hợp câu hỏi chưa rõ:
+- `99_OPEN_QUESTIONS.txt`
+
+Tóm tắt cho đội FE:
+- Nếu cần triển khai ngay màn customer chính, nên ưu tiên theo thứ tự: Auth -> Workspace/Upload -> Chat -> Ticket -> Billing.
+- Nếu cần triển khai màn admin/expert, repo đã có route + service + controller thật cho admin ticket và lawyer ticket.
+- Nếu cần triển khai contracts hoặc knowledge base, nên đọc kỹ các mục `ĐIỂM CHƯA RÕ` và `CHECKLIST FE` trong từng file trước khi code.
+
+HIỆN TRẠNG:
+- Có 9 flow lớn đọc được từ route, page, service và controller hiện hữu.
+
+SUY LUẬN:
+- Repo đang ưu tiên sản phẩm theo hướng customer hỏi AI trước, sau đó escalated sang legal ticket khi cần.
+
+ĐỀ XUẤT:
+- FE team nên coi flow 01-07 là baseline sprint chính.
+- Flow 08-09 nên được chốt lại với backend/business trước khi làm pixel-perfect hoặc validation chi tiết.

@@ -5,7 +5,6 @@ import com.analyzer.api.dto.legalticket.*;
 import com.analyzer.api.entity.*;
 import com.analyzer.api.enums.LegalTicketMessageType;
 import com.analyzer.api.enums.LegalTicketStatus;
-import com.analyzer.api.enums.PlanStatus;
 import com.analyzer.api.enums.RiskLevel;
 import com.analyzer.api.enums.RoleName;
 import com.analyzer.api.exception.common.ConflictException;
@@ -14,6 +13,7 @@ import com.analyzer.api.exception.common.ResourceNotFoundException;
 import com.analyzer.api.mapper.LegalTicketMapper;
 import com.analyzer.api.repository.*;
 import com.analyzer.api.service.LegalTicketService;
+import com.analyzer.api.service.SubscriptionQuotaService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -38,14 +38,15 @@ public class LegalTicketServiceImpl implements LegalTicketService {
     private final UserRepository userRepository;
     private final WorkspaceRepository workspaceRepository;
     private final DocumentRepository documentRepository;
-    private final CustomerPlanRepository customerPlanRepository;
     private final LegalTicketMapper legalTicketMapper;
+    private final SubscriptionQuotaService subscriptionQuotaService;
 
     @Override
     @Transactional
     public LegalTicketResponse createTicket(Long customerId, CreateLegalTicketRequest request) {
         User customer = userRepository.findById(customerId)
                 .orElseThrow(() -> new ResourceNotFoundException("USER_NOT_FOUND"));
+        subscriptionQuotaService.checkCanCreateExpertTicket(customer);
 
         Workspace workspace = workspaceRepository.findById(request.getWorkspaceId())
                 .orElseThrow(() -> new ForbiddenException("WORKSPACE_ACCESS_DENIED"));
@@ -60,31 +61,6 @@ public class LegalTicketServiceImpl implements LegalTicketService {
             if (document.getWorkspace() == null || !document.getWorkspace().getId().equals(request.getWorkspaceId())) {
                 throw new ForbiddenException("DOCUMENT_NOT_IN_WORKSPACE");
             }
-        }
-
-        CustomerPlan activePlan = customerPlanRepository.findByCustomerIdAndStatus(customerId, PlanStatus.ACTIVE)
-                .orElse(null);
-
-        if (activePlan != null && activePlan.getEndDate() != null) {
-            if (LocalDateTime.now().isAfter(activePlan.getEndDate())) {
-                activePlan.setStatus(PlanStatus.EXPIRED);
-                customerPlanRepository.save(activePlan);
-                activePlan = null;
-            }
-        }
-
-        if (activePlan == null) {
-            throw new ForbiddenException("Ban khong co goi dich vu nao dang kich hoat");
-        }
-
-        SubscriptionPlan subPlan = activePlan.getSubscriptionPlan();
-        if (subPlan == null) {
-            throw new ForbiddenException("EXPERT_REVIEW_NOT_INCLUDED");
-        }
-
-        String planName = subPlan.getPlanName() != null ? subPlan.getPlanName().toUpperCase() : "";
-        if (planName.contains("FREE")) {
-            throw new ForbiddenException("EXPERT_REVIEW_NOT_INCLUDED");
         }
 
         String requestId = request.getRequestId();
@@ -149,6 +125,7 @@ public class LegalTicketServiceImpl implements LegalTicketService {
                 .internalOnly(false)
                 .build();
         legalTicketMessageRepository.save(systemMsg);
+        subscriptionQuotaService.recordExpertTicketUsage(customer);
 
         return legalTicketMapper.toResponse(ticket);
     }

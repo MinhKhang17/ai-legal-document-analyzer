@@ -1,0 +1,113 @@
+FLOW 06 - LUẬT SƯ XỬ LÝ TICKET
+
+Mục tiêu:
+- Cho expert/lawyer xem queue ticket được giao, mở chi tiết, trao đổi với khách hàng, upload/download file, yêu cầu bổ sung thông tin và gửi kết luận.
+
+Actor:
+- `EXPERT`
+
+Điểm bắt đầu:
+- Route `/lawyer/tickets`
+- Route `/lawyer/tickets/:ticketId`
+
+Điều kiện tiên quyết:
+- Ticket đã được assign cho expert hiện tại
+
+Luồng chính:
+1. `LawyerTicketsPage` tải ticket được assign cho luật sư hiện tại.
+2. FE gọi `getMyLawyerTickets()`.
+3. Luật sư mở chi tiết ticket.
+4. `LawyerTicketDetailPage` tải:
+5. ticket detail
+6. messages
+7. files
+8. Luật sư có thể:
+9. bắt đầu xử lý ticket (`start-review`)
+10. gửi tin nhắn cho user
+11. upload file customer-visible
+12. mở/download file
+13. yêu cầu khách hàng bổ sung thông tin
+14. gửi kết luận xử lý
+15. đóng ticket
+
+Sơ đồ text:
+- `assigned queue -> open detail -> start review -> chat/files -> request more info or resolve -> close`
+
+Màn hình / component:
+- `frontend/src/pages/lawyer/LawyerTicketsPage.tsx`
+- `frontend/src/pages/lawyer/LawyerTicketDetailPage.tsx`
+
+Dữ liệu / state:
+- list: `tickets`, `totalItems`
+- detail: `ticket`, `messages`, `files`
+- form action: `messageValue`, `requestInfoMessage`, `expertAnswer`, `expertInternalNote`
+
+Validation:
+- Gửi message phải có nội dung
+- Resolve phải có `expertAnswer`
+- Request more info phải có nội dung
+- Upload file yêu cầu `assigned_lawyer_id` có mặt ở ticket detail
+
+API / service tích hợp:
+- FE: `frontend/src/api/lawyerTicketApi.ts`
+- BE:
+- `GET /api/v1/lawyer/tickets/my`
+- `GET /api/v1/lawyer/tickets/{id}`
+- `GET /api/v1/lawyer/tickets/{id}/files`
+- `POST /api/v1/lawyer/tickets/{id}/files`
+- `GET /api/v1/lawyer/tickets/{id}/messages`
+- `POST /api/v1/lawyer/tickets/{id}/start-review`
+- `POST /api/v1/lawyer/tickets/{id}/request-more-info`
+- `POST /api/v1/lawyer/tickets/{id}/resolve`
+- `POST /api/v1/lawyer/tickets/{id}/messages`
+- `POST /api/v1/lawyer/tickets/{id}/close`
+- `GET /api/v1/lawyer/tickets/{id}/download/{documentId}`
+
+UI states:
+- Dashboard count total/open/high-risk
+- Detail page có nhiều block: AI analysis, recommendation, evidence, customer info, workspace info, document info, message thread, file panel
+- Modal cho request more info và resolve
+
+Edge cases:
+- Ticket ở terminal status thì khóa thao tác chính
+- `close` ở backend hiện map sang `resolveTicket()` với `feedback` -> `expertAnswer`
+- File upload hiện gửi `contentBase64`, không phải multipart
+
+Business rules:
+- `canStartReview`: chỉ cho status `ASSIGNED_TO_LAWYER`, `CUSTOMER_RESPONDED`, `REOPENED`
+- `canWorkOnTicket`: khóa khi terminal
+- File upload mặc định `visibilityScope = "CUSTOMER"`
+
+Quyền:
+- Tất cả endpoint flow này yêu cầu `hasRole('EXPERT')`
+
+File nguồn tham chiếu:
+- FE:
+- `frontend/src/pages/lawyer/LawyerTicketsPage.tsx`
+- `frontend/src/pages/lawyer/LawyerTicketDetailPage.tsx`
+- `frontend/src/api/lawyerTicketApi.ts`
+- BE:
+- `backend/src/main/java/com/analyzer/api/controller/lawyer/LawyerTicketController.java`
+
+Điểm chưa rõ:
+- `CHƯA XÁC ĐỊNH`: luật sư có được upload file internal-only hay không, vì FE đang fix `visibilityScope = CUSTOMER`.
+- `CHƯA XÁC ĐỊNH`: distinction chính thức giữa `resolve` và `close`, vì controller đang để close gọi resolve.
+
+Checklist FE:
+- Phải hiển thị rõ ticket terminal thì action nào bị khóa.
+- Cần note rõ upload file là base64 JSON request.
+- Nên cho preview file type nếu backend trả mime ổn định.
+
+Tiêu chí hoàn thành:
+- Expert xem queue và detail được.
+- Expert chat/file/action được.
+- Expert kết thúc hoặc yêu cầu bổ sung thông tin được.
+
+HIỆN TRẠNG:
+- Flow này dùng được ngay, dù có vài điểm naming chưa đẹp.
+
+SUY LUẬN:
+- Expert flow đang được ưu tiên cao vì backend controller và page detail rất chi tiết.
+
+ĐỀ XUẤT:
+- FE nên thống nhất thuật ngữ `resolve`, `close`, `complete review` để tránh hiểu nhầm nghiệp vụ.

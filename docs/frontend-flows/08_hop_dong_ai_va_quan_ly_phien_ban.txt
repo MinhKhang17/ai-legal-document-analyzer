@@ -1,0 +1,108 @@
+FLOW 08 - HỢP ĐỒNG AI VÀ QUẢN LÝ PHIÊN BẢN
+
+Mục tiêu:
+- Cho customer sinh draft hợp đồng từ template/input JSON, lưu hợp đồng, xem danh sách hợp đồng và revert version.
+
+Actor:
+- `CUSTOMER`
+- Một phần template management dành cho `ADMIN`
+
+Điểm bắt đầu:
+- Route `/contracts`
+- Route `/contracts/:id`
+
+Điều kiện tiên quyết:
+- Đăng nhập
+- Có workspace
+
+Luồng chính:
+1. `MyContractsPage` tải song song:
+2. danh sách hợp đồng của tôi
+3. danh sách template
+4. danh sách workspace
+5. Customer nhập `requestId`, `workspaceId`, `templateId`, `sourceDocumentId`, `inputJson` để generate draft.
+6. FE gọi `generateContract()`.
+7. Nếu thành công, FE lưu `latestJob` và prefill form save contract.
+8. Customer nhập `title`, `contractType`, `content` rồi gọi `saveContract()`.
+9. FE refresh lại list contract.
+10. Tại `ContractDetailPage`, FE tải detail và version history.
+11. User chọn version + reason để gọi `revertContractVersion()`.
+
+Sơ đồ text:
+- `contracts list -> generate draft -> save contract -> open detail -> revert version`
+
+Màn hình / component:
+- `frontend/src/pages/contracts/MyContractsPage.tsx`
+- `frontend/src/pages/contracts/ContractDetailPage.tsx`
+
+Dữ liệu / state:
+- `contracts`, `templates`, `workspaces`
+- `generationForm`, `saveForm`, `latestJob`
+- detail: `contract`, `versions`, `selectedVersionNo`, `reason`
+
+Validation:
+- Generate yêu cầu `requestId`, `workspaceId`, `inputJson`
+- Save yêu cầu `workspaceId`, `title`, `contractType`, `content`
+- Revert yêu cầu chọn version và nhập reason
+
+API / service tích hợp:
+- FE:
+- `frontend/src/services/contract.service.ts`
+- BE:
+- `GET /api/v1/contracts/templates`
+- `POST /api/v1/contracts/generate`
+- `POST /api/v1/contracts`
+- `GET /api/v1/contracts/my`
+- `GET /api/v1/contracts/{id}`
+- `GET /api/v1/contracts/{id}/versions`
+- `POST /api/v1/contracts/{id}/versions/{versionNo}/revert`
+
+UI states:
+- List saved contracts
+- Sidebar generate/save forms
+- Detail page hiển thị current content và version history
+
+Edge cases:
+- `workspaceId` của workspace đang là chuỗi, nhưng page contracts dùng `isNumericWorkspaceId()` và ép sang số
+- Nếu workspace ID thực tế là `ws_*`, flow generate/save hiện tại sẽ bị block phía FE trước khi gọi API
+- Template create/update có backend admin API, nhưng current customer page chỉ list template
+
+Business rules:
+- Backend `generate` dành cho customer
+- Backend `templates create/update` dành cho admin
+- Revert version cần reason
+
+Quyền:
+- Customer dùng generate/save/my/detail/revert
+- Admin dùng create/update template
+
+File nguồn tham chiếu:
+- FE:
+- `frontend/src/pages/contracts/MyContractsPage.tsx`
+- `frontend/src/pages/contracts/ContractDetailPage.tsx`
+- `frontend/src/services/contract.service.ts`
+- BE:
+- `backend/src/main/java/com/analyzer/api/controller/contract/ContractManagementController.java`
+
+Điểm chưa rõ:
+- `CHƯA XÁC ĐỊNH`: backend `workspaceId` của contract request thực sự mong đợi kiểu số hay chuỗi nếu route workspace ở nơi khác dùng `ws_*`.
+- `CHƯA XÁC ĐỊNH`: hợp đồng generate có phụ thuộc document đã ingest/ready hay không.
+
+Checklist FE:
+- Xác minh lại kiểu `workspaceId` trước khi code tiếp.
+- Tách rõ generate draft với save contract thật.
+- Nên có editor tốt hơn nếu content dài.
+
+Tiêu chí hoàn thành:
+- Generate được draft.
+- Save được contract.
+- Xem detail/version và revert được.
+
+HIỆN TRẠNG:
+- Có UI và backend thật, nhưng đang có dấu hiệu lệch contract dữ liệu ở `workspaceId`.
+
+SUY LUẬN:
+- Flow này chưa đủ an toàn để FE triển khai sâu nếu chưa chốt kiểu ID.
+
+ĐỀ XUẤT:
+- Cần xác nhận lại schema contract request trước khi coi flow này là production-ready.

@@ -30,7 +30,7 @@ import java.io.IOException;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/workspaces")
+@RequestMapping({"/api/v1/workspaces", "/api/workspaces"})
 @RequiredArgsConstructor
 @Tag(name = "Workspace Management", description = "APIs for managing user workspaces and workspace documents")
 public class WorkspaceController {

@@ -1,0 +1,109 @@
+FLOW 01 - XÁC THỰC VÀ PHIÊN ĐĂNG NHẬP
+
+Mục tiêu:
+- Cho người dùng đăng ký, đăng nhập, tự khôi phục access token và điều hướng theo vai trò.
+
+Actor:
+- Khách hàng `CUSTOMER`
+- Quản trị `ADMIN`
+- Luật sư/chuyên gia `EXPERT`
+
+Điểm bắt đầu:
+- Route `/login`, `/register`
+
+Điều kiện tiên quyết:
+- FE có env auth endpoint hợp lệ trong `frontend/src/config/api.ts`
+- Backend auth chạy tại `backend/src/main/java/com/analyzer/api/controller/AuthController.java`
+
+Luồng chính:
+1. Người dùng vào `LoginPage` hoặc `RegisterPage`.
+2. FE gọi `auth.service.ts` để `login()` hoặc `register()`.
+3. Khi đăng nhập thành công, `AppStore.signIn()` lưu `accessToken` vào `localStorage` và lưu user vào `lexiguard.authUser`.
+4. Các guard trong `frontend/src/components/auth/AuthGuards.tsx` kiểm tra `isAuthLoading`, `isAuthReady`, `isAuthenticated`, `user.role`.
+5. Khi reload app, `AppStoreProvider` chạy `refreshSession()`:
+6. Nếu `accessToken` còn dùng được, FE gọi `/auth/me`.
+7. Nếu `/auth/me` trả 401/403, FE gọi `/auth/refresh`, sau đó gọi lại `/auth/me`.
+8. Người dùng được điều hướng:
+9. `CUSTOMER` -> `/dashboard`
+10. `ADMIN` -> `/admin`
+11. `EXPERT` -> `/lawyer/tickets`
+
+Sơ đồ text:
+- `PublicRoute -> login/register -> signIn -> role-based redirect`
+- `App load -> refreshSession -> me or refresh -> hydrate auth state -> guards unlock route`
+
+Màn hình / component liên quan:
+- `frontend/src/pages/auth/LoginPage.tsx`
+- `frontend/src/pages/auth/RegisterPage.tsx`
+- `frontend/src/components/auth/AuthGuards.tsx`
+- `frontend/src/store/AppStore.tsx`
+
+Dữ liệu / state chính:
+- `accessToken` trong `localStorage`
+- `lexiguard.authUser` trong `localStorage`
+- `isAuthLoading`, `isAuthReady`, `isAuthenticated`, `user`
+
+Validation và rule:
+- `AuthController.login()` dùng `LoginRequestDTO`
+- `PublicRoute` chặn người đã đăng nhập quay lại login/register
+- `CustomerRoute`, `AdminRoute`, `ExpertRoute` chặn sai vai trò
+
+API / service tích hợp:
+- FE: `frontend/src/services/auth.service.ts`
+- BE:
+- `POST /api/v1/auth/register`
+- `POST /api/v1/auth/login`
+- `POST /api/v1/auth/refresh`
+- `POST /api/v1/auth/logout`
+- `GET /api/v1/auth/me`
+
+UI states:
+- Đang kiểm tra phiên: loading spinner trong `AuthLoadingView`
+- Chưa đăng nhập: redirect về `/login`
+- Đăng nhập nhưng sai role: redirect sang home phù hợp hoặc access denied
+
+Edge cases:
+- User `active = false` bị coi như chưa đăng nhập
+- Refresh token hỏng: FE xóa local session
+- `/logout` fail vẫn clear local state
+
+Business rules:
+- Refresh token nằm trong cookie HttpOnly, access token nằm ở body rồi lưu local
+- Guard hiện bám role trực tiếp từ `user.role`
+
+Quyền:
+- Không đăng nhập chỉ được dùng public route
+- Admin và expert không dùng route customer
+
+File nguồn tham chiếu:
+- FE:
+- `frontend/src/store/AppStore.tsx` - `refreshSession`, `signIn`, `signOut`
+- `frontend/src/services/auth.service.ts` - `login`, `refreshAccessToken`, `getCurrentUser`
+- `frontend/src/components/auth/AuthGuards.tsx` - `PublicRoute`, `AuthenticatedRoute`, `CustomerRoute`, `AdminRoute`, `ExpertRoute`
+- `frontend/src/routes/router.tsx`
+- BE:
+- `backend/src/main/java/com/analyzer/api/controller/AuthController.java`
+
+Điểm chưa rõ:
+- `CHƯA XÁC ĐỊNH`: form field cụ thể của `RegisterPage` nếu cần tài liệu UX chi tiết hơn.
+- `CHƯA XÁC ĐỊNH`: backend có email verification hay không, repo hiện chưa thể hiện.
+
+Checklist FE:
+- Đồng bộ redirect sau login theo role.
+- Luôn xử lý `isAuthLoading` trước khi render app shell.
+- Không tự lưu refresh token ở FE.
+- Chuẩn hóa thông báo session expired khi `/refresh` thất bại.
+
+Tiêu chí hoàn thành:
+- Người dùng đăng nhập xong vào đúng route.
+- Reload trang không bị mất phiên nếu refresh token còn hợp lệ.
+- Sai role không truy cập được màn không thuộc quyền.
+
+HIỆN TRẠNG:
+- Flow này có đủ route, store, service và controller thật.
+
+SUY LUẬN:
+- Đây là flow ổn định nhất của repo hiện tại.
+
+ĐỀ XUẤT:
+- FE có thể dùng flow này làm chuẩn cho các module còn lại.
