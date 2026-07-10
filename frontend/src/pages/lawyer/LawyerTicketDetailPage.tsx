@@ -323,19 +323,18 @@ export function LawyerTicketDetailPage() {
     async (file: LawyerTicketFile) => {
       if (!ticketId) return;
 
+      let objectUrl = "";
+
       try {
         setOpeningDocumentId(file.documentId);
-        const fileInfo = await downloadLawyerTicketFile(ticketId, file.documentId);
-
-        if (fileInfo.filePath) {
-          window.open(fileInfo.filePath, "_blank", "noopener,noreferrer");
-          return;
-        }
-
-        toast.error(t("lawyerTickets.files.openError"));
+        objectUrl = await downloadLawyerTicketFile(ticketId, file.documentId);
+        window.open(objectUrl, "_blank", "noopener,noreferrer");
       } catch {
         toast.error(t("lawyerTickets.files.openError"));
       } finally {
+        if (objectUrl) {
+          window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+        }
         setOpeningDocumentId("");
       }
     },

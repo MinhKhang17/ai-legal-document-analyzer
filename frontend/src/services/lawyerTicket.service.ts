@@ -1,4 +1,4 @@
-import { API_ENDPOINTS } from "../config/api";
+import { API_ENDPOINTS, buildApiUrl } from "../config/api";
 import type {
   CloseLawyerTicketRequest,
   CreateLawyerTicketMessageRequest,
@@ -46,7 +46,7 @@ export const getMyLawyerTickets = async (): Promise<LawyerTicketPageResponse> =>
       headers: buildAuthHeaders({ Accept: "application/json" }),
       credentials: "include",
     },
-    "Không thể tải danh sách ticket của lawyer",
+    "Khong the tai danh sach ticket cua lawyer",
   );
 
 export const getLawyerTicketDetail = async (
@@ -59,7 +59,7 @@ export const getLawyerTicketDetail = async (
       headers: buildAuthHeaders({ Accept: "application/json" }),
       credentials: "include",
     },
-    "Không thể tải chi tiết ticket",
+    "Khong the tai chi tiet ticket",
   );
 
 export const getLawyerTicketMessages = async (
@@ -72,7 +72,7 @@ export const getLawyerTicketMessages = async (
       headers: buildAuthHeaders({ Accept: "application/json" }),
       credentials: "include",
     },
-    "Không thể tải tin nhắn ticket",
+    "Khong the tai tin nhan ticket",
   );
 
 export const sendLawyerTicketMessage = async (
@@ -90,7 +90,7 @@ export const sendLawyerTicketMessage = async (
       credentials: "include",
       body: JSON.stringify(payload),
     },
-    "Không thể gửi tin nhắn",
+    "Khong the gui tin nhan",
   );
 
 export const getLawyerTicketFiles = async (
@@ -103,22 +103,29 @@ export const getLawyerTicketFiles = async (
       headers: buildAuthHeaders({ Accept: "application/json" }),
       credentials: "include",
     },
-    "Không thể tải tệp đính kèm",
+    "Khong the tai tep dinh kem",
   );
 
 export const downloadLawyerTicketFile = async (
   ticketId: string,
   documentId: string,
-): Promise<LawyerTicketFile> =>
-  requestApiData<LawyerTicketFile>(
-    API_ENDPOINTS.lawyerTickets.download(ticketId, documentId),
+): Promise<string> => {
+  const response = await fetch(
+    buildApiUrl(API_ENDPOINTS.lawyerTickets.download(ticketId, documentId)),
     {
       method: "GET",
-      headers: buildAuthHeaders({ Accept: "application/json" }),
+      headers: buildAuthHeaders({ Accept: "application/octet-stream" }),
       credentials: "include",
     },
-    "Không thể tải thông tin tệp đính kèm",
   );
+
+  if (!response.ok) {
+    throw new Error("Khong the tai thong tin tep dinh kem");
+  }
+
+  const blob = await response.blob();
+  return URL.createObjectURL(blob);
+};
 
 export const uploadLawyerTicketFile = async (
   ticketId: string,
@@ -135,7 +142,7 @@ export const uploadLawyerTicketFile = async (
       credentials: "include",
       body: JSON.stringify(payload),
     },
-    "Không thể tải tệp lên",
+    "Khong the tai tep len",
   );
 
 export const closeLawyerTicket = async (
@@ -145,7 +152,7 @@ export const closeLawyerTicket = async (
   postLawyerTicketAction<LegalTicket>(
     API_ENDPOINTS.lawyerTickets.close(ticketId),
     payload,
-    "Không thể đóng ticket",
+    "Khong the dong ticket",
   );
 
 export const startReviewLawyerTicket = async (
@@ -154,7 +161,7 @@ export const startReviewLawyerTicket = async (
   postLawyerTicketAction<LegalTicket>(
     lawyerTicketActionEndpoint(ticketId, "start-review"),
     undefined,
-    "Không thể bắt đầu xử lý ticket",
+    "Khong the bat dau xu ly ticket",
   );
 
 export const requestMoreInfoLawyerTicket = async (
@@ -164,7 +171,7 @@ export const requestMoreInfoLawyerTicket = async (
   postLawyerTicketAction<LegalTicket>(
     lawyerTicketActionEndpoint(ticketId, "request-more-info"),
     payload,
-    "Không thể gửi yêu cầu bổ sung thông tin",
+    "Khong the gui yeu cau bo sung thong tin",
   );
 
 export const resolveLawyerTicket = async (
@@ -174,5 +181,5 @@ export const resolveLawyerTicket = async (
   postLawyerTicketAction<LegalTicket>(
     lawyerTicketActionEndpoint(ticketId, "resolve"),
     payload,
-    "Không thể gửi kết luận xử lý ticket",
+    "Khong the gui ket luan xu ly ticket",
   );

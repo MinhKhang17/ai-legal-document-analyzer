@@ -18,6 +18,7 @@ import com.analyzer.api.security.UserDetailsImpl;
 import com.analyzer.api.service.AiClient;
 import com.analyzer.api.service.contract.ContractGenerationService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Primary;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -27,6 +28,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Service
+@Primary
 @RequiredArgsConstructor
 public class ContractGenerationServiceImpl implements ContractGenerationService {
 

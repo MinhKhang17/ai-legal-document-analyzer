@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -72,12 +73,12 @@ public class WorkspaceController {
         return ResponseEntity.ok(ApiResponseDTO.success("Lấy danh sách document thành công", response));
     }
 
-    @PostMapping(value = "/{workspaceId}/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping("/{workspaceId}/documents")
     @PreAuthorize("hasRole('CUSTOMER')")
     @Operation(summary = "Upload workspace document", description = "Upload a user document, save it, and request Python AI Service processing.")
     public ResponseEntity<ApiResponseDTO<DocumentResponseDTO>> uploadDocument(
             @PathVariable String workspaceId,
-            @RequestParam("file") MultipartFile file) throws IOException {
+            @RequestPart("file") MultipartFile file) throws IOException {
         DocumentResponseDTO response = workspaceService.uploadDocument(getCurrentUserId(), workspaceId, file);
         return new ResponseEntity<>(
                 ApiResponseDTO.accepted("Upload document thành công, đang gửi yêu cầu xử lý", response),

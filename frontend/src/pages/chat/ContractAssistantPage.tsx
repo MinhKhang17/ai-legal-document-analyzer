@@ -364,15 +364,6 @@ export function ContractAssistantPage() {
         workspace_id: sandboxWorkspaceId,
         document_id: null,
         question,
-        answer: assistantMessage.content,
-        confidence_score: assistantMessage.confidenceScore,
-        should_suggest_ticket: assistantMessage.shouldSuggestTicket,
-        suggestion_type: assistantMessage.suggestionType,
-        suggestion_reason: assistantMessage.suggestionReason,
-        missing_information: assistantMessage.missingInformation,
-        risk_level: assistantMessage.riskLevel,
-        legal_domain: assistantMessage.legalDomain,
-        user_action_hint: assistantMessage.userActionHint,
       });
 
       setTicketNotices((previous) => ({
