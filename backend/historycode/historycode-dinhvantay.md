@@ -1,5 +1,397 @@
 # History Code - Dinh Van Tay
 
+# Update History - 2026-06-28
+
+## Tasks Completed
+
+- **Trien khai Phase 2 Backend - Developer 2 Modules**
+  - Doc `docs/phase2_task_allocation.md` va thuc hien phan Developer 2: Contracts, Knowledge Base, Subscriptions & Feedback.
+  - Giu nguyen entity dung chung `Document`, khong doi ten column/field de tranh conflict voi Developer 1.
+
+- **Module Contract Management**
+  - Tao cac service implementation:
+    - `ContractTemplateServiceImpl`
+    - `ContractGenerationServiceImpl`
+    - `UserContractServiceImpl`
+    - `ContractVersionServiceImpl`
+  - Hoan thien CRUD template hop dong.
+  - Trien khai luong tao job sinh hop dong `ContractGenerationJob` co idempotency theo `requestId`.
+  - Trien khai luu hop dong nguoi dung, tao version dau tien va hash noi dung.
+  - Trien khai danh sach hop dong cua user, xem chi tiet hop dong, xem lich su version va revert version.
+  - Cap nhat `ContractManagementController` bo `501 Phase 2 contract only`, chuyen sang goi service that.
+  - Bo sung endpoint luu hop dong:
+    - `POST /api/v1/contracts`
+
+- **Module Knowledge Base Management**
+  - Tao cac service implementation:
+    - `KnowledgeUploadServiceImpl`
+    - `KnowledgeIngestionServiceImpl`
+    - `KnowledgeReviewServiceImpl`
+    - `KnowledgePublicationServiceImpl`
+    - `KnowledgeArchiveServiceImpl`
+  - Trien khai upload knowledge theo `code`, tao entry moi hoac version moi.
+  - Trien khai ingest job `KnowledgeIngestionJob` theo `requestId`, cap nhat trang thai version/entry sang `INGESTED`.
+  - Trien khai review voi cac decision `APPROVE`, `REQUEST_CHANGES`, `REJECT`.
+  - Trien khai publish chi khi version da duoc `APPROVE`.
+  - Trien khai archive version hien tai va set entry `active = false`.
+  - Cap nhat `KnowledgeBaseManagementController` bo `501`, them list/get/detail/versions va cac endpoint upload/ingest/review/publish/archive.
+
+- **Module Subscription & Refund**
+  - Thay mock trong `SubscriptionUsageServiceImpl` bang truy van repository that.
+  - Bo sung query phan trang usage theo customer:
+    - `findByCustomerPlanCustomerIdOrderByCreatedAtDesc`
+  - Thay mock trong `RefundServiceImpl` bang luu `RefundRequest` that.
+  - Validate payment transaction thuoc dung customer truoc khi tao refund.
+  - Validate customer plan thuoc dung customer neu request co `customerPlanId`.
+  - Chan user xem refund cua nguoi khac; chi requester hoac ADMIN duoc xem.
+
+- **Module User Feedback & AI Reports**
+  - Tao cac service implementation:
+    - `FeedbackSurveyServiceImpl`
+    - `FeedbackSurveyResponseServiceImpl`
+    - `AiReportServiceImpl`
+  - Trien khai tao/cap nhat/list survey feedback.
+  - Trien khai submit survey response khi survey dang `ACTIVE`.
+  - Trien khai tao/list/get AI report voi trang thai mac dinh `OPEN`.
+  - Cap nhat `FeedbackController` bo `501`, them phan quyen `@PreAuthorize`.
+
+---
+
+## Files Added / Updated
+
+### Added
+- `src/main/java/com/analyzer/api/service/contract/impl/ContractTemplateServiceImpl.java`
+- `src/main/java/com/analyzer/api/service/contract/impl/ContractGenerationServiceImpl.java`
+- `src/main/java/com/analyzer/api/service/contract/impl/UserContractServiceImpl.java`
+- `src/main/java/com/analyzer/api/service/contract/impl/ContractVersionServiceImpl.java`
+- `src/main/java/com/analyzer/api/service/contract/impl/ContractMappingSupport.java`
+- `src/main/java/com/analyzer/api/service/contract/impl/CurrentUserSupport.java`
+- `src/main/java/com/analyzer/api/service/knowledge/impl/KnowledgeUploadServiceImpl.java`
+- `src/main/java/com/analyzer/api/service/knowledge/impl/KnowledgeIngestionServiceImpl.java`
+- `src/main/java/com/analyzer/api/service/knowledge/impl/KnowledgeReviewServiceImpl.java`
+- `src/main/java/com/analyzer/api/service/knowledge/impl/KnowledgePublicationServiceImpl.java`
+- `src/main/java/com/analyzer/api/service/knowledge/impl/KnowledgeArchiveServiceImpl.java`
+- `src/main/java/com/analyzer/api/service/knowledge/impl/KnowledgeMappingSupport.java`
+- `src/main/java/com/analyzer/api/service/feedback/impl/FeedbackSurveyServiceImpl.java`
+- `src/main/java/com/analyzer/api/service/feedback/impl/FeedbackSurveyResponseServiceImpl.java`
+- `src/main/java/com/analyzer/api/service/feedback/impl/AiReportServiceImpl.java`
+- `src/main/java/com/analyzer/api/service/feedback/impl/FeedbackMappingSupport.java`
+
+### Updated
+- `src/main/java/com/analyzer/api/controller/contract/ContractManagementController.java`
+- `src/main/java/com/analyzer/api/controller/knowledge/KnowledgeBaseManagementController.java`
+- `src/main/java/com/analyzer/api/controller/feedback/FeedbackController.java`
+- `src/main/java/com/analyzer/api/repository/contract/UserContractRepository.java`
+- `src/main/java/com/analyzer/api/repository/subscription/SubscriptionUsageRepository.java`
+- `src/main/java/com/analyzer/api/repository/subscription/RefundRequestRepository.java`
+- `src/main/java/com/analyzer/api/service/subscription/impl/SubscriptionUsageServiceImpl.java`
+- `src/main/java/com/analyzer/api/service/subscription/impl/RefundServiceImpl.java`
+
+---
+
+## API Summary
+
+### Contract
+
+```http
+POST /api/v1/contracts/templates
+PUT  /api/v1/contracts/templates/{id}
+GET  /api/v1/contracts/templates
+POST /api/v1/contracts/generate
+POST /api/v1/contracts
+GET  /api/v1/contracts/my
+GET  /api/v1/contracts/{id}
+GET  /api/v1/contracts/{id}/versions
+POST /api/v1/contracts/{id}/versions/{versionNo}/revert
+```
+
+### Knowledge Base
+
+```http
+POST /api/v1/admin/knowledge-base/upload
+POST /api/v1/admin/knowledge-base/{id}/ingest
+GET  /api/v1/admin/knowledge-base
+GET  /api/v1/admin/knowledge-base/{id}
+GET  /api/v1/admin/knowledge-base/{id}/versions
+POST /api/v1/admin/knowledge-base/{id}/review
+POST /api/v1/admin/knowledge-base/{id}/publish
+POST /api/v1/admin/knowledge-base/{id}/archive
+```
+
+### Subscription & Refund
+
+```http
+GET  /api/v1/subscriptions/my-usage
+POST /api/v1/subscriptions/refunds
+GET  /api/v1/subscriptions/refunds/{id}
+```
+
+### Feedback & AI Reports
+
+```http
+POST /api/v1/admin/feedback/surveys
+PUT  /api/v1/admin/feedback/surveys/{id}
+GET  /api/v1/admin/feedback/surveys
+POST /api/v1/feedback/surveys/{id}/responses
+POST /api/v1/feedback/ai-reports
+GET  /api/v1/admin/feedback/ai-reports
+GET  /api/v1/admin/feedback/ai-reports/{id}
+```
+
+---
+
+## Swagger Test JSON
+
+### Contract Template - Create
+
+```http
+POST /api/v1/contracts/templates
+```
+
+```json
+{
+  "templateCode": "LABOR_CONTRACT_001",
+  "name": "Mau hop dong lao dong",
+  "description": "Template hop dong lao dong co ban",
+  "category": "LABOR",
+  "jurisdiction": "VN",
+  "content": "HOP DONG LAO DONG\nBen A: {{companyName}}\nBen B: {{employeeName}}\nVi tri: {{position}}\nMuc luong: {{salary}}"
+}
+```
+
+### Contract Template - Update
+
+```http
+PUT /api/v1/contracts/templates/{id}
+```
+
+```json
+{
+  "name": "Mau hop dong lao dong cap nhat",
+  "description": "Template hop dong lao dong da cap nhat dieu khoan",
+  "category": "LABOR",
+  "jurisdiction": "VN",
+  "content": "HOP DONG LAO DONG CAP NHAT\nBen A: {{companyName}}\nBen B: {{employeeName}}\nDieu khoan bao mat: {{confidentialityClause}}"
+}
+```
+
+### Contract Generation - Create Job
+
+```http
+POST /api/v1/contracts/generate
+```
+
+```json
+{
+  "requestId": "req_contract_001",
+  "workspaceId": 1,
+  "templateId": 1,
+  "sourceDocumentId": "doc_example",
+  "inputJson": "{\"companyName\":\"Cong ty ABC\",\"employeeName\":\"Nguyen Van A\",\"position\":\"Developer\",\"salary\":\"20000000\"}"
+}
+```
+
+**Note:** `sourceDocumentId` co the bo qua neu chua co document. `workspaceId` DTO hien la `Long`; neu database dang dung id workspace dang `ws_...` thi can dong bo lai DTO/service sau.
+
+### User Contract - Save Contract
+
+```http
+POST /api/v1/contracts
+```
+
+```json
+{
+  "workspaceId": 1,
+  "templateId": 1,
+  "generationJobId": "cg_example",
+  "sourceDocumentId": "doc_example",
+  "title": "Hop dong lao dong Nguyen Van A",
+  "contractType": "LABOR",
+  "content": "Noi dung hop dong da sinh hoac da chinh sua tu nguoi dung"
+}
+```
+
+**Note:** `templateId`, `generationJobId`, `sourceDocumentId` co the bo qua neu luu hop dong thu cong.
+
+### Contract Version - Revert
+
+```http
+POST /api/v1/contracts/{id}/versions/{versionNo}/revert
+```
+
+```json
+{
+  "reason": "Khoi phuc ve phien ban on dinh truoc khi chinh sua"
+}
+```
+
+### Knowledge Base - Upload
+
+```http
+POST /api/v1/admin/knowledge-base/upload
+```
+
+```json
+{
+  "code": "LAW_LABOR_2019",
+  "title": "Bo luat Lao dong 2019",
+  "category": "LABOR",
+  "scope": "GLOBAL",
+  "createdById": 1,
+  "workspaceId": null,
+  "extractedContent": "Noi dung trich xuat tu van ban phap luat ve lao dong...",
+  "rawContent": "Raw text goc neu co"
+}
+```
+
+### Knowledge Base - Ingest
+
+```http
+POST /api/v1/admin/knowledge-base/{id}/ingest
+```
+
+```json
+{
+  "requestId": "req_kb_ingest_001",
+  "jobPayload": "{\"chunkSize\":1000,\"embeddingModel\":\"default\"}"
+}
+```
+
+### Knowledge Base - Review
+
+```http
+POST /api/v1/admin/knowledge-base/{id}/review
+```
+
+```json
+{
+  "decision": "APPROVE",
+  "note": "Noi dung da du dieu kien publish"
+}
+```
+
+Gia tri `decision` hop le:
+
+```text
+APPROVE
+REQUEST_CHANGES
+REJECT
+```
+
+### Knowledge Base - Publish
+
+```http
+POST /api/v1/admin/knowledge-base/{id}/publish
+```
+
+```json
+{
+  "note": "Publish version da duoc review approve"
+}
+```
+
+### Knowledge Base - Archive
+
+```http
+POST /api/v1/admin/knowledge-base/{id}/archive
+```
+
+```json
+{
+  "reason": "Van ban da het hieu luc hoac duoc thay the bang version moi"
+}
+```
+
+### Refund - Create Request
+
+```http
+POST /api/v1/subscriptions/refunds
+```
+
+```json
+{
+  "paymentTransactionId": 1,
+  "customerPlanId": 1,
+  "reason": "Khach hang yeu cau hoan tien do chua su dung dich vu",
+  "amount": 150000
+}
+```
+
+**Note:** `paymentTransactionId` phai thuoc customer dang dang nhap. `customerPlanId` co the bo qua neu refund chi gan voi payment transaction.
+
+### Feedback Survey - Create
+
+```http
+POST /api/v1/admin/feedback/surveys
+```
+
+```json
+{
+  "code": "SURVEY_CONTRACT_001",
+  "title": "Khao sat trai nghiem tao hop dong",
+  "description": "Danh gia chat luong tinh nang tao hop dong",
+  "surveyType": "SATISFACTION",
+  "targetType": "CONTRACT",
+  "createdById": 1,
+  "workspaceId": null
+}
+```
+
+### Feedback Survey - Update / Activate
+
+```http
+PUT /api/v1/admin/feedback/surveys/{id}
+```
+
+```json
+{
+  "title": "Khao sat trai nghiem tao hop dong",
+  "description": "Survey dang duoc kich hoat de nhan phan hoi",
+  "surveyType": "SATISFACTION",
+  "targetType": "CONTRACT",
+  "status": "ACTIVE"
+}
+```
+
+### Feedback Survey - Submit Response
+
+```http
+POST /api/v1/feedback/surveys/{id}/responses
+```
+
+```json
+{
+  "respondentId": 2,
+  "sourceReferenceId": "contract_example",
+  "rating": 5,
+  "answerJson": "{\"easeOfUse\":5,\"quality\":4}",
+  "comment": "Tinh nang tao hop dong de dung va noi dung kha day du"
+}
+```
+
+### AI Report - Create
+
+```http
+POST /api/v1/feedback/ai-reports
+```
+
+```json
+{
+  "reportType": "INCORRECT_ANSWER",
+  "sourceType": "CHAT_MESSAGE",
+  "sourceReferenceId": "msg_example",
+  "summary": "AI tra loi sai dieu khoan trong hop dong",
+  "detailsJson": "{\"expected\":\"Dieu khoan dung\",\"actual\":\"Noi dung AI da tra loi\"}",
+  "submittedById": 2,
+  "workspaceId": null
+}
+```
+
+---
+
+## Verification
+
+
 **Date:** 2026-06-20
 
 ## Tasks Completed

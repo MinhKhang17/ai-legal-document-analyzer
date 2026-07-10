@@ -78,7 +78,7 @@ export function LoginPage() {
             const accessToken = response.data.accessToken?.trim();
 
             if (!accessToken) {
-              throw new Error("Login response did not include an access token.");
+              throw new Error(t("auth.missingAccessToken"));
             }
 
             localStorage.setItem("accessToken", accessToken);
@@ -87,13 +87,13 @@ export function LoginPage() {
             const currentUser = currentUserResponse.data;
 
             if (!isCurrentUser(currentUser)) {
-              throw new Error("Unable to load current user session.");
+              throw new Error(t("auth.loadCurrentSessionError"));
             }
 
             if (!currentUser.active) {
               void signOut({ remote: false });
               localStorage.removeItem("accessToken");
-              setError("Your account is inactive.");
+              setError(t("auth.inactiveAccount"));
               return;
             }
 
@@ -101,13 +101,15 @@ export function LoginPage() {
 
             if (currentUser.role === "ADMIN") {
               navigate("/admin", { replace: true });
+            } else if (currentUser.role === "EXPERT") {
+              navigate("/lawyer/tickets", { replace: true });
             } else {
               navigate("/dashboard", { replace: true });
             }
           } catch (error) {
             localStorage.removeItem("accessToken");
             void signOut({ remote: false });
-            setError(error instanceof Error ? error.message : "Login failed");
+            setError(error instanceof Error ? error.message : t("auth.loginFailed"));
           } finally {
             setLoading(false);
           }
@@ -207,7 +209,7 @@ export function LoginPage() {
           size="md"
           disabled={loading}
         >
-          {loading ? "Signing in..." : t("auth.signIn")}
+          {loading ? t("auth.signingIn") : t("auth.signIn")}
         </Button>
       </form>
 

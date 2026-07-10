@@ -22,4 +22,7 @@ public interface DocumentRepository extends JpaRepository<Document, String> {
             String workspaceId,
             Long userId,
             List<String> statuses);
+
+    List<Document> findByLegalTicket_Id(String legalTicketId);
 }
+

@@ -2,7 +2,15 @@ package com.analyzer.api.controller.contract;
 
 import com.analyzer.api.dto.ApiResponseDTO;
 import com.analyzer.api.dto.PageResponse;
-import com.analyzer.api.dto.contract.*;
+import com.analyzer.api.dto.contract.ContractGenerationResponse;
+import com.analyzer.api.dto.contract.ContractResponse;
+import com.analyzer.api.dto.contract.ContractTemplateResponse;
+import com.analyzer.api.dto.contract.ContractVersionResponse;
+import com.analyzer.api.dto.contract.CreateContractTemplateRequest;
+import com.analyzer.api.dto.contract.GenerateContractRequest;
+import com.analyzer.api.dto.contract.RevertContractVersionRequest;
+import com.analyzer.api.dto.contract.SaveContractRequest;
+import com.analyzer.api.dto.contract.UpdateContractTemplateRequest;
 import com.analyzer.api.security.UserDetailsImpl;
 import com.analyzer.api.service.contract.ContractGenerationService;
 import com.analyzer.api.service.contract.ContractTemplateService;
@@ -17,7 +25,14 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
@@ -52,18 +67,12 @@ public class ContractManagementController {
     }
 
     @GetMapping("/templates")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponseDTO<PageResponse<ContractTemplateResponse>>> getTemplates(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         Page<ContractTemplateResponse> pageResult = contractTemplateService.getAll(PageRequest.of(page, size));
-        PageResponse<ContractTemplateResponse> response = PageResponse.<ContractTemplateResponse>builder()
-                .items(pageResult.getContent())
-                .page(pageResult.getNumber())
-                .size(pageResult.getSize())
-                .totalItems(pageResult.getTotalElements())
-                .totalPages(pageResult.getTotalPages())
-                .build();
-        return ResponseEntity.ok(ApiResponseDTO.success("Lấy danh sách template thành công", response));
+        return ResponseEntity.ok(ApiResponseDTO.success("Lấy danh sách template thành công", toPageResponse(pageResult)));
     }
 
     @PostMapping("/generate")
@@ -74,20 +83,27 @@ public class ContractManagementController {
         return ResponseEntity.ok(ApiResponseDTO.success("Tạo hợp đồng thành công", response));
     }
 
+    @PostMapping
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponseDTO<ContractResponse>> saveContract(
+            @Valid @RequestBody SaveContractRequest request) {
+        ContractResponse response = userContractService.save(request);
+        return new ResponseEntity<>(
+                ApiResponseDTO.created("Lưu hợp đồng thành công", response),
+                HttpStatus.CREATED
+        );
+    }
+
     @GetMapping("/my")
     @PreAuthorize("hasRole('CUSTOMER')")
     public ResponseEntity<ApiResponseDTO<PageResponse<ContractResponse>>> getMyContracts(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        Page<ContractResponse> pageResult = userContractService.getMyContracts(getCurrentUserId(), PageRequest.of(page, size));
-        PageResponse<ContractResponse> response = PageResponse.<ContractResponse>builder()
-                .items(pageResult.getContent())
-                .page(pageResult.getNumber())
-                .size(pageResult.getSize())
-                .totalItems(pageResult.getTotalElements())
-                .totalPages(pageResult.getTotalPages())
-                .build();
-        return ResponseEntity.ok(ApiResponseDTO.success("Lấy danh sách hợp đồng thành công", response));
+        Page<ContractResponse> pageResult = userContractService.getMyContracts(
+                getCurrentUserId(),
+                PageRequest.of(page, size)
+        );
+        return ResponseEntity.ok(ApiResponseDTO.success("Lấy danh sách hợp đồng thành công", toPageResponse(pageResult)));
     }
 
     @GetMapping("/{id}")
@@ -127,5 +143,15 @@ public class ContractManagementController {
         }
 
         throw new RuntimeException("Thông tin xác thực không hợp lệ");
+    }
+
+    private <T> PageResponse<T> toPageResponse(Page<T> page) {
+        return PageResponse.<T>builder()
+                .items(page.getContent())
+                .page(page.getNumber())
+                .size(page.getSize())
+                .totalItems(page.getTotalElements())
+                .totalPages(page.getTotalPages())
+                .build();
     }
 }

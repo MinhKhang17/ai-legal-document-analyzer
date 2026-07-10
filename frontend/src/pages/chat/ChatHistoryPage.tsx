@@ -12,6 +12,7 @@ import { useI18n } from "../../hooks/useI18n";
 import type { ChatMessage } from "../../types/chat";
 import type { Workspace } from "../../types/workspace";
 import type { WorkspaceChatMessage, WorkspaceChatSession } from "../../types/chat";
+import { formatDisplayDateTime } from "../../utils/format";
 
 const getAccessToken = () => localStorage.getItem("accessToken") ?? "";
 
@@ -20,10 +21,7 @@ const formatTimestamp = (value: string | null | undefined, language: "en" | "vi"
     return language === "vi" ? "Vừa xong" : "Just now";
   }
 
-  return new Intl.DateTimeFormat(language === "vi" ? "vi-VN" : "en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return formatDisplayDateTime(value, language === "vi" ? "Vừa xong" : "Just now", language === "vi" ? "vi-VN" : "en-US");
 };
 
 const toDisplayMessage = (

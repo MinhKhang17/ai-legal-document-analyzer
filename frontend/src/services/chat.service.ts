@@ -5,6 +5,9 @@ import {
 } from "./http";
 import type {
   DeleteChatSessionResponse,
+  AppendChatContextRequest,
+  ChatSessionMemory,
+  ChatSessionSummary,
   WorkspaceChatConversation,
   WorkspaceChatMessage,
   WorkspaceChatSession,
@@ -32,6 +35,30 @@ interface ApiErrorResponse {
 type SendMessageRequest = {
   message: string;
   documentId?: string;
+};
+
+const AUTH_USER_STORAGE_KEY = "lexiguard.authUser";
+
+const getStoredUserId = (): number => {
+  if (typeof window === "undefined") {
+    throw new Error("Không thể xác định người dùng hiện tại để bổ sung context.");
+  }
+
+  const rawUser = window.localStorage.getItem(AUTH_USER_STORAGE_KEY);
+  if (!rawUser) {
+    throw new Error("Không tìm thấy thông tin người dùng hiện tại để bổ sung context.");
+  }
+
+  try {
+    const parsed = JSON.parse(rawUser) as { id?: unknown };
+    if (typeof parsed.id === "number" && Number.isFinite(parsed.id)) {
+      return parsed.id;
+    }
+  } catch {
+    throw new Error("Thông tin người dùng hiện tại không hợp lệ.");
+  }
+
+  throw new Error("Thông tin người dùng hiện tại không có userId hợp lệ.");
 };
 
 const getAuthHeaders = (accessToken: string): HeadersInit => ({
@@ -245,6 +272,52 @@ export async function getChatMessageDetail(
   );
 
   return mapMessage(response.data);
+}
+
+export async function getChatSessionSummary(
+  accessToken: string,
+  chatSessionId: string,
+): Promise<ChatSessionSummary> {
+  const response = await getJson<ApiResponse<ChatSessionSummary>>(
+    API_ENDPOINTS.chat.summary(chatSessionId),
+    "Không thể tải tóm tắt chat session",
+    accessToken,
+  );
+
+  return response.data;
+}
+
+export async function getChatSessionMemory(
+  accessToken: string,
+  chatSessionId: string,
+): Promise<ChatSessionMemory> {
+  const response = await getJson<ApiResponse<ChatSessionMemory>>(
+    API_ENDPOINTS.chat.memory(chatSessionId),
+    "Không thể tải memory chat session",
+    accessToken,
+  );
+
+  return response.data;
+}
+
+export async function appendChatSessionContext(
+  accessToken: string,
+  chatSessionId: string,
+  payload: AppendChatContextRequest,
+): Promise<ChatSessionMemory> {
+  const requestPayload: Required<AppendChatContextRequest> = {
+    ...payload,
+    userId: payload.userId ?? getStoredUserId(),
+  };
+
+  const response = await postJson<ApiResponse<ChatSessionMemory>>(
+    API_ENDPOINTS.chat.context(chatSessionId),
+    requestPayload,
+    "Không thể bổ sung context chat session",
+    accessToken,
+  );
+
+  return response.data;
 }
 
 export async function createChatSession(

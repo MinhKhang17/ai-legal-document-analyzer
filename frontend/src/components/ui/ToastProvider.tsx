@@ -14,6 +14,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useI18n } from "../../hooks/useI18n";
 import { cn } from "../../utils/cn";
 
 export type ToastVariant = "success" | "error" | "info" | "warning";
@@ -86,6 +87,7 @@ const makeToastId = () => {
 };
 
 export function ToastProvider({ children }: { children: ReactNode }) {
+  const { t } = useI18n();
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const timersRef = useRef(new Map<string, number>());
   const recentToastRef = useRef<{ key: string; time: number } | null>(null);
@@ -193,7 +195,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               <button
                 type="button"
                 className="rounded-md p-1 opacity-70 transition hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/10"
-                aria-label="Dismiss notification"
+                aria-label={t("toast.dismissNotification")}
                 onClick={() => removeToast(toast.id)}
               >
                 <X className="h-4 w-4" />

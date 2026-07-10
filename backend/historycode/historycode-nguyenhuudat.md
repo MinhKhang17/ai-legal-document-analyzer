@@ -1,5 +1,36 @@
 # History Code - Nguyen Huu Dat
 
+**Date:** 2026-06-27 (Ngày 27 tháng 6 năm 2026)
+
+## Tasks Completed:
+- **Triển khai Business Logic & Tái cấu trúc Phase 2 Backend (Developer 1 Modules)**:
+  - **Phân tích Kiến trúc & Thiết lập Kế hoạch**:
+    - Nghiên cứu hợp đồng API Phase 2 từ commit của Leader và xây dựng tài liệu phân chia công việc `phase2_task_allocation.md` cho 2 lập trình viên backend, giúp cách ly độc lập theo domain package và triệt tiêu xung đột git.
+    - Lập bản Kế hoạch triển khai chi tiết `implementation_plan.md` cho 4 module nghiệp vụ chính.
+  - **Triển khai Module Lawyer Ticket Operations**:
+    - Tạo mới `TicketConversationServiceImpl` xử lý trao đổi tin nhắn giữa chuyên gia và khách hàng (`chatWithUser`), cập nhật thời gian phản hồi `lastLawyerMessageAt` và truy xuất lịch sử hội thoại (`getChatHistory`).
+    - Tạo mới `TicketFileServiceImpl` quản lý danh sách và tải lên tài liệu chuyên gia đính kèm ticket với `DocumentPurpose.LAWYER_ATTACHMENT`.
+    - Cập nhật `LawyerTicketController` gắn bảo mật `@PreAuthorize("hasRole('EXPERT')")` đồng bộ với vai trò `EXPERT` trong hệ thống.
+  - **Triển khai Module Admin Ticket Management**:
+    - Tạo mới `AdminTicketManagementServiceImpl` triển khai các chức năng cho Admin xem tóm tắt AI (`viewAiSummary`), xem file người dùng (`viewUserFiles`), xem lịch sử chat, phân công (`assignLawyer`) và tái phân công chuyên gia (`reassignLawyer`).
+    - Cập nhật `AdminTicketManagementController` và bổ sung thêm endpoint từ chối ticket (`POST /api/v1/admin/tickets/{id}/reject`).
+  - **Triển khai Module AI Features & Citations Integration**:
+    - Tạo mới `AiFeatureServiceImpl` trả về đánh giá rủi ro AI (`AiRiskAssessmentResponse`) và tóm tắt ticket.
+    - Tạo mới `AiCitationServiceImpl` cùng MapStruct mapper `AiFeatureMapper` để truy xuất danh sách trích dẫn nguồn pháp lý (`AiCitation`) đính kèm theo Ticket hoặc Chat Message.
+    - Cập nhật `AiFeatureController` hoàn thiện các REST endpoint phục vụ AI metadata.
+  - **Triển khai Module Chat Session Memory & Context**:
+    - Tạo mới `ChatMemoryServiceImpl` xử lý đọc tóm tắt (`summary`), bộ nhớ (`memoryJson`), và nạp ngữ cảnh (`contextJson`) tự động tăng `contextVersion`.
+    - Cập nhật `ChatSessionContextController` hoàn thiện các API quản lý bộ nhớ chat.
+  - **Tái cấu trúc (Refactoring) & Loại bỏ API trùng lặp**:
+    - Tái cấu trúc `LegalTicketController` cũ thành controller độc quyền dành cho Khách hàng (`Customer`), xóa bỏ hoàn toàn các endpoint Admin và Expert bị trùng lặp.
+    - Xóa bỏ các controller cũ trùng lặp `SubscriptionPlanController` và `CustomerPlanController`, hợp nhất toàn bộ luồng quản lý gói cước, đăng ký, sử dụng và hoàn tiền vào `SubscriptionManagementController` duy nhất tại đường dẫn `/api/v1/subscriptions/...`.
+    - Tạo mới các Service implementation `SubscriptionUsageServiceImpl` và `RefundServiceImpl` để cung cấp đủ Spring Beans giúp hệ thống khởi chạy mượt mà.
+  - **Kiểm thử và Biên dịch (Build Verification)**:
+    - Sửa đổi và chuẩn hóa toàn bộ các điểm khác biệt về Enum (`LegalTicketStatus`, `LegalTicketMessageType`, `SuggestionType`, `UserActionHint`) và phương thức getter trên Entity (`uploadedAt`, `question`, `customerNote`).
+    - Chạy đóng gói tự động qua Maven Wrapper (`.\mvnw.cmd clean package -DskipTests`) đạt kết quả **`BUILD SUCCESS`** 100%.
+
+---
+
 **Date:** 2026-06-24 (Ngày 24 tháng 6 năm 2026)
 
 ## Tasks Completed:

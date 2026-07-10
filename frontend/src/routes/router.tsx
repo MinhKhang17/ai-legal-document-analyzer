@@ -5,6 +5,7 @@ import {
   AuthenticatedRoute,
   CustomerRoute,
   PublicRoute,
+  ExpertRoute,
 } from "../components/auth/AuthGuards";
 import { AuthLayout } from "../layouts/AuthLayout";
 import { LoginPage } from "../pages/auth/LoginPage";
@@ -20,6 +21,8 @@ import { RiskReviewPage } from "../pages/editor/RiskReviewPage";
 import { ContractAssistantPage } from "../pages/chat/ContractAssistantPage";
 import { LegalChatPage } from "../pages/chat/LegalChatPage";
 import { ChatHistoryPage } from "../pages/chat/ChatHistoryPage";
+import { CustomerTicketDetailPage } from "../pages/tickets/CustomerTicketDetailPage";
+import { CustomerTicketsPage } from "../pages/tickets/CustomerTicketsPage";
 import { ReportsPage } from "../pages/reports/ReportsPage";
 import { ReportDetailPage } from "../pages/reports/ReportDetailPage";
 import { KnowledgeBasePage } from "../pages/knowledge-base/KnowledgeBasePage";
@@ -28,12 +31,20 @@ import { BillingPage } from "../pages/billing/BillingPage";
 import { PaymentResultPage } from "../pages/billing/PaymentResultPage";
 import { SubscribePlanPage } from "../pages/billing/SubscribePlanPage";
 import { AdminConsolePage } from "../pages/admin/AdminConsolePage";
+import { AdminFeedbackPage } from "../pages/admin/AdminFeedbackPage";
+import { AdminTicketsPage } from "../pages/admin/AdminTicketsPage";
+import { AdminTicketDetailPage } from "../pages/admin/AdminTicketDetailPage";
 import { AuditLogsPage } from "../pages/admin/AuditLogsPage";
 import { SystemHealthPage } from "../pages/admin/SystemHealthPage";
 import { JobsPage } from "../pages/jobs/JobsPage";
 import { TemplatesPage } from "../pages/templates/TemplatesPage";
+import { ContractDetailPage } from "../pages/contracts/ContractDetailPage";
+import { MyContractsPage } from "../pages/contracts/MyContractsPage";
 import { SettingsPage } from "../pages/settings/SettingsPage";
 import { PaymentResultRedirect } from "../pages/billing/PaymentResultRedirect";
+import { LawyerTicketsPage } from "../pages/lawyer/LawyerTicketsPage";
+import { LawyerTicketDetailPage } from "../pages/lawyer/LawyerTicketDetailPage";
+import { CreateCustomerTicketPage } from "../pages/tickets/CreateCustomerTicketPage";
 
 export const router = createBrowserRouter([
   {
@@ -146,6 +157,30 @@ export const router = createBrowserRouter([
           </CustomerRoute>
         ),
       },
+      {
+        path: "/tickets",
+        element: (
+          <CustomerRoute>
+            <CustomerTicketsPage />
+          </CustomerRoute>
+        ),
+      },
+      {
+        path: "/tickets/create",
+        element: (
+          <CustomerRoute>
+            <CreateCustomerTicketPage />
+          </CustomerRoute>
+        ),
+      },
+      {
+        path: "/tickets/:id",
+        element: (
+          <CustomerRoute>
+            <CustomerTicketDetailPage />
+          </CustomerRoute>
+        ),
+      },
       { path: "/reports", element: <ReportsPage /> },
       { path: "/reports/:id", element: <ReportDetailPage /> },
       {
@@ -205,12 +240,52 @@ export const router = createBrowserRouter([
         ),
       },
       { path: "/templates", element: <TemplatesPage /> },
+      {
+        path: "/contracts",
+        element: (
+          <CustomerRoute>
+            <MyContractsPage />
+          </CustomerRoute>
+        ),
+      },
+      {
+        path: "/contracts/:id",
+        element: (
+          <CustomerRoute>
+            <ContractDetailPage />
+          </CustomerRoute>
+        ),
+      },
       { path: "/settings", element: <SettingsPage /> },
       {
         path: "/admin",
         element: (
           <AdminRoute>
             <AdminConsolePage />
+          </AdminRoute>
+        ),
+      },
+      {
+        path: "/admin/tickets",
+        element: (
+          <AdminRoute>
+            <AdminTicketsPage />
+          </AdminRoute>
+        ),
+      },
+      {
+        path: "/admin/tickets/:ticketId",
+        element: (
+          <AdminRoute>
+            <AdminTicketDetailPage />
+          </AdminRoute>
+        ),
+      },
+      {
+        path: "/admin/feedback",
+        element: (
+          <AdminRoute>
+            <AdminFeedbackPage />
           </AdminRoute>
         ),
       },
@@ -228,6 +303,22 @@ export const router = createBrowserRouter([
           <AdminRoute>
             <SystemHealthPage />
           </AdminRoute>
+        ),
+      },
+      {
+        path: "/lawyer/tickets",
+        element: (
+          <ExpertRoute>
+            <LawyerTicketsPage />
+          </ExpertRoute>
+        ),
+      },
+      {
+        path: "/lawyer/tickets/:ticketId",
+        element: (
+          <ExpertRoute>
+            <LawyerTicketDetailPage />
+          </ExpertRoute>
         ),
       },
     ],
