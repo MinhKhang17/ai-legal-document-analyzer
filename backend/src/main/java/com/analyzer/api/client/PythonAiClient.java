@@ -4,6 +4,8 @@ import com.analyzer.api.dto.ai.AiLegalQueryRequest;
 import com.analyzer.api.dto.ai.AiLegalQueryResponse;
 import com.analyzer.api.dto.ai.RagQueryRequest;
 import com.analyzer.api.dto.ai.RagQueryResponse;
+import com.analyzer.api.dto.ai.GenerateContractApiRequest;
+import com.analyzer.api.dto.ai.GenerateContractApiResponse;
 import com.analyzer.api.service.AiClient;
 import com.analyzer.api.exception.ai.AiServiceTimeoutException;
 import com.analyzer.api.exception.ai.AiServiceUnavailableException;
@@ -78,10 +80,35 @@ public class PythonAiClient implements AiClient {
         }
     }
 
+    @Override
+    public GenerateContractApiResponse generateContract(GenerateContractApiRequest request) {
+        try {
+            return postForObject(aiServiceBaseUrl + "/v2/contracts/generate", request, request.getRequestId(), GenerateContractApiResponse.class);
+        } catch (AiServiceTimeoutException | AiServiceUnavailableException e) {
+            throw e;
+        } catch (org.springframework.web.client.HttpStatusCodeException e) {
+            if (e.getStatusCode().value() == 504) {
+                throw new AiServiceTimeoutException("AI service timeout. Please try again later", request.getRequestId());
+            }
+            throw new AiServiceUnavailableException(
+                    "AI service is currently unavailable. status=" + e.getStatusCode().value()
+                            + ", body=" + e.getResponseBodyAsString(),
+                    request.getRequestId());
+        } catch (RestClientException e) {
+            throw new AiServiceUnavailableException(
+                    "AI service is currently unavailable. " + e.getMessage(),
+                    request.getRequestId());
+        } catch (Exception e) {
+            throw new AiServiceTimeoutException(
+                    "AI service timeout. Please try again later. " + e.getMessage(),
+                    request.getRequestId());
+        }
+    }
+
     private <T> T postForObject(String url, Object request, String requestId, Class<T> responseType) throws Exception {
         String jsonBody = objectMapper.writeValueAsString(request);
         HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set(org.springframework.http.HttpHeaders.CONTENT_TYPE, "application/json; charset=UTF-8");
         headers.setAccept(java.util.List.of(MediaType.APPLICATION_JSON));
 
         ResponseEntity<String> response = restTemplate.exchange(

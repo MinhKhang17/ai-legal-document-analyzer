@@ -85,6 +85,42 @@ public class WorkspaceController {
         );
     }
 
+    @GetMapping("/{workspaceId}/documents/{documentId}/download")
+    @Operation(summary = "Download workspace document", description = "Download a user document file by ID.")
+    public ResponseEntity<org.springframework.core.io.Resource> downloadDocument(
+            @PathVariable String workspaceId,
+            @PathVariable String documentId) throws java.io.IOException {
+        org.springframework.core.io.Resource resource = workspaceService.downloadDocumentFilePublic(workspaceId, documentId);
+        return ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + resource.getFilename() + "\"")
+                .contentType(org.springframework.http.MediaType.APPLICATION_OCTET_STREAM)
+                .body(resource);
+    }
+
+    @GetMapping("/{workspaceId}/documents/system/download")
+    @Operation(summary = "Download system knowledge base document", description = "Download a system knowledge base document by filename.")
+    public ResponseEntity<org.springframework.core.io.Resource> downloadSystemDocument(
+            @PathVariable String workspaceId,
+            @RequestParam String filename) {
+        org.springframework.core.io.Resource resource = workspaceService.downloadSystemDocumentFile(filename);
+        
+        String contentType = "application/octet-stream";
+        if (filename.endsWith(".docx")) {
+            contentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        } else if (filename.endsWith(".doc")) {
+            contentType = "application/msword";
+        } else if (filename.endsWith(".pdf")) {
+            contentType = "application/pdf";
+        } else if (filename.endsWith(".txt")) {
+            contentType = "text/plain";
+        }
+
+        return ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + resource.getFilename() + "\"")
+                .contentType(org.springframework.http.MediaType.parseMediaType(contentType))
+                .body(resource);
+    }
+
     private Long getCurrentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()

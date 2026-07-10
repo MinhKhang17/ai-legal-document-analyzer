@@ -6,11 +6,12 @@ from app.services.retrieval_service import RagChunkHit
 def build_user_context(user_hits: list[RagChunkHit]) -> str:
     if not user_hits:
         return ""
-    return "\n\n".join(
-        f"[{hit.citationId}] {hit.chunkText}".strip()
-        for hit in user_hits
-        if hit.chunkText.strip()
-    ).strip()
+    parts = []
+    for hit in user_hits:
+        if hit.chunkText.strip():
+            source = f"File: {hit.fileName}" if hit.fileName else "User Document"
+            parts.append(f"[{hit.citationId}] (Source: {source})\n{hit.chunkText}".strip())
+    return "\n\n".join(parts).strip()
 
 
 def build_legal_search_query(question: str, user_hits: list[RagChunkHit]) -> str:
@@ -23,8 +24,17 @@ def build_legal_search_query(question: str, user_hits: list[RagChunkHit]) -> str
 def build_knowledge_context(knowledge_hits: list[RagChunkHit]) -> str:
     if not knowledge_hits:
         return ""
-    return "\n\n".join(
-        f"[{hit.citationId}] {hit.chunkText}".strip()
-        for hit in knowledge_hits
-        if hit.chunkText.strip()
-    ).strip()
+    parts = []
+    for hit in knowledge_hits:
+        if hit.chunkText.strip():
+            source_parts = []
+            if hit.lawName:
+                source_parts.append(hit.lawName)
+            if hit.lawCode:
+                source_parts.append(hit.lawCode)
+            if hit.fileName:
+                source_parts.append(hit.fileName)
+            
+            source = ", ".join(source_parts) if source_parts else "System Knowledge Base"
+            parts.append(f"[{hit.citationId}] (Source: {source})\n{hit.chunkText}".strip())
+    return "\n\n".join(parts).strip()

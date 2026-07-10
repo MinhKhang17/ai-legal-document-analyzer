@@ -53,7 +53,9 @@ export function UploadPage() {
     const loadWorkspaces = async () => {
       try {
         setLoadingWorkspaces(true);
-        const data = await getWorkspaces(getAccessToken());
+        const data = (await getWorkspaces(getAccessToken())).filter(
+          (ws) => ws.description !== "System workspace for general contract assistant chat"
+        );
         setWorkspaces(data);
 
         const workspaceIdFromQuery = searchParams.get("workspaceId") ?? "";

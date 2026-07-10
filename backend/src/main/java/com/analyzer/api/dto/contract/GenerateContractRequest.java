@@ -17,7 +17,7 @@ public class GenerateContractRequest {
     private String requestId;
 
     @NotNull
-    private Long workspaceId;
+    private String workspaceId;
 
     private Long templateId;
 

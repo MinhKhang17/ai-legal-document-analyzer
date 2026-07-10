@@ -11,5 +11,7 @@ public interface ContractTemplateRepository extends JpaRepository<ContractTempla
 
     Optional<ContractTemplate> findByTemplateCode(String templateCode);
 
+    boolean existsByTemplateCode(String templateCode);
+
     List<ContractTemplate> findByStatus(ContractTemplateStatus status);
 }

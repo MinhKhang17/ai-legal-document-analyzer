@@ -16,7 +16,7 @@ public class ContractResponse {
 
     private String id;
     private Long ownerId;
-    private Long workspaceId;
+    private String workspaceId;
     private Long templateId;
     private String generationJobId;
     private String sourceDocumentId;

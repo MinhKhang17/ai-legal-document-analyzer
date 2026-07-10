@@ -29,7 +29,9 @@ export function ProjectsPage() {
     const loadWorkspaces = async () => {
       try {
         setLoading(true);
-        const data = await getWorkspaces(getAccessToken());
+        const data = (await getWorkspaces(getAccessToken())).filter(
+          (ws) => ws.description !== "System workspace for general contract assistant chat"
+        );
         if (isMounted) {
           setWorkspaces(data);
         }

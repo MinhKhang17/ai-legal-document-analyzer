@@ -17,5 +17,7 @@ public interface UserContractRepository extends JpaRepository<UserContract, Stri
 
     Optional<UserContract> findByIdAndOwnerId(String id, Long ownerId);
 
+    Optional<UserContract> findByGenerationJobId(String generationJobId);
+
     List<UserContract> findByStatus(ContractStatus status);
 }

@@ -74,7 +74,10 @@ public class ChatMessageServiceImpl implements ChatMessageService {
 
         // Validate Documents
         Document selectedDocument = resolveSelectedDocument(userId, workspaceId, request.getDocumentId());
-        validateWorkspaceDocuments(userId, workspaceId, selectedDocument);
+        boolean isSandboxWorkspace = "System workspace for general contract assistant chat".equals(workspace.getDescription());
+        if (!isSandboxWorkspace) {
+            validateWorkspaceDocuments(userId, workspaceId, selectedDocument);
+        }
 
         // Find or create default ChatSession
         ChatSession chatSession = chatSessionRepository.findByWorkspaceIdAndUserIdAndIsDefaultTrueAndStatus(
@@ -116,7 +119,10 @@ public class ChatMessageServiceImpl implements ChatMessageService {
 
         // Validate Documents
         Document selectedDocument = resolveSelectedDocument(userId, workspace.getId(), request.getDocumentId());
-        validateWorkspaceDocuments(userId, workspace.getId(), selectedDocument);
+        boolean isSandboxWorkspace = "System workspace for general contract assistant chat".equals(workspace.getDescription());
+        if (!isSandboxWorkspace) {
+            validateWorkspaceDocuments(userId, workspace.getId(), selectedDocument);
+        }
 
         // Create User Message
         ChatMessage userMessage = createAndSaveUserMessage(chatSession, request.getMessage().trim());
