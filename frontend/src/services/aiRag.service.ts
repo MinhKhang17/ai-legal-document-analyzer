@@ -1,5 +1,9 @@
 import { API_ENDPOINTS } from "../config/api";
-import type { AiRagQueryRequest, AiRagQueryResponse } from "../types/ai";
+import type {
+  AiRagPreviewResponse,
+  AiRagQueryRequest,
+  AiRagQueryResponse,
+} from "../types/ai";
 import { requestAiJson } from "./http";
 
 export const queryAiRagInternal = async (
@@ -17,8 +21,8 @@ export const queryAiRagInternal = async (
 
 export const previewAiRagInternal = async (
   payload: AiRagQueryRequest,
-): Promise<AiRagQueryResponse> =>
-  requestAiJson<AiRagQueryResponse>(
+): Promise<AiRagPreviewResponse> =>
+  requestAiJson<AiRagPreviewResponse>(
     API_ENDPOINTS.aiRag.preview,
     {
       method: "POST",

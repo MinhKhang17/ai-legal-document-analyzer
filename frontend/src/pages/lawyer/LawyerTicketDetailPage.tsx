@@ -11,6 +11,7 @@ import {
   RefreshCw,
   Send,
   ShieldAlert,
+  PlayCircle,
   UserRound,
 } from "lucide-react";
 import {
@@ -27,7 +28,10 @@ import {
   getLawyerTicketDetail,
   getLawyerTicketFiles,
   getLawyerTicketMessages,
+  requestMoreInfoLawyerTicket,
+  resolveLawyerTicket,
   sendLawyerTicketMessage,
+  startReviewLawyerTicket,
   type LawyerTicketDetail,
   type LawyerTicketFile,
   type LawyerTicketMessage,
@@ -37,6 +41,7 @@ import { Badge } from "../../components/common/Badge";
 import { Button } from "../../components/common/Button";
 import { Card } from "../../components/common/Card";
 import { EmptyState } from "../../components/common/EmptyState";
+import { Modal } from "../../components/common/Modal";
 import { PageHeader } from "../../components/common/PageHeader";
 import { useI18n } from "../../hooks/useI18n";
 import { useToast } from "../../hooks/useToast";
@@ -51,6 +56,14 @@ const formatFileSize = (size?: number | null) => {
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 };
+
+const terminalStatuses = new Set(["REJECTED_BY_ADMIN", "RESOLVED", "CLOSED", "CANCELLED"]);
+
+const canStartReview = (status?: string | null) =>
+  status === "ASSIGNED_TO_LAWYER" || status === "CUSTOMER_RESPONDED" || status === "REOPENED";
+
+const canWorkOnTicket = (status?: string | null) =>
+  Boolean(status) && !terminalStatuses.has(String(status));
 
 const fileToBase64 = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -85,8 +98,18 @@ export function LawyerTicketDetailPage() {
   const [openingDocumentId, setOpeningDocumentId] = useState("");
 
   const [closingTicket, setClosingTicket] = useState(false);
+  const [startingReview, setStartingReview] = useState(false);
+  const [requestInfoOpen, setRequestInfoOpen] = useState(false);
+  const [requestInfoMessage, setRequestInfoMessage] = useState("");
+  const [requestInfoSubmitting, setRequestInfoSubmitting] = useState(false);
+  const [resolveOpen, setResolveOpen] = useState(false);
+  const [expertAnswer, setExpertAnswer] = useState("");
+  const [expertInternalNote, setExpertInternalNote] = useState("");
+  const [resolveSubmitting, setResolveSubmitting] = useState(false);
+  const [actionError, setActionError] = useState("");
 
   const isClosed = ticket?.status === "CLOSED";
+  const isTerminal = terminalStatuses.has(String(ticket?.status ?? ""));
 
   const loadTicket = useCallback(async () => {
     if (!ticketId) return false;
@@ -229,6 +252,73 @@ export function LawyerTicketDetailPage() {
     }
   }, [ticketId, isClosed, loadTicket, toast, t]);
 
+  const handleStartReview = useCallback(async () => {
+    if (!ticketId || !ticket || !canStartReview(ticket.status)) return;
+
+    try {
+      setStartingReview(true);
+      setActionError("");
+      const data = await startReviewLawyerTicket(ticketId);
+      setTicket(data);
+      toast.success("Đã bắt đầu xử lý ticket.");
+      await refreshAll();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Không thể bắt đầu xử lý ticket.";
+      setActionError(message);
+      toast.error(message);
+    } finally {
+      setStartingReview(false);
+    }
+  }, [ticketId, ticket, refreshAll, toast]);
+
+  const handleRequestMoreInfo = useCallback(async () => {
+    const message = requestInfoMessage.trim();
+    if (!ticketId || !message) return;
+
+    try {
+      setRequestInfoSubmitting(true);
+      setActionError("");
+      const data = await requestMoreInfoLawyerTicket(ticketId, { message });
+      setTicket(data);
+      setRequestInfoMessage("");
+      setRequestInfoOpen(false);
+      toast.success("Đã gửi yêu cầu bổ sung thông tin.");
+      await refreshAll();
+    } catch (error) {
+      const messageText = error instanceof Error ? error.message : "Không thể gửi yêu cầu bổ sung thông tin.";
+      setActionError(messageText);
+      toast.error(messageText);
+    } finally {
+      setRequestInfoSubmitting(false);
+    }
+  }, [ticketId, requestInfoMessage, refreshAll, toast]);
+
+  const handleResolveTicket = useCallback(async () => {
+    const answer = expertAnswer.trim();
+    if (!ticketId || !answer) return;
+
+    try {
+      setResolveSubmitting(true);
+      setActionError("");
+      const data = await resolveLawyerTicket(ticketId, {
+        expert_answer: answer,
+        expert_internal_note: expertInternalNote.trim() || null,
+      });
+      setTicket(data);
+      setExpertAnswer("");
+      setExpertInternalNote("");
+      setResolveOpen(false);
+      toast.success("Đã gửi kết luận xử lý ticket.");
+      await refreshAll();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Không thể gửi kết luận xử lý ticket.";
+      setActionError(message);
+      toast.error(message);
+    } finally {
+      setResolveSubmitting(false);
+    }
+  }, [ticketId, expertAnswer, expertInternalNote, refreshAll, toast]);
+
   const handleOpenFile = useCallback(
     async (file: LawyerTicketFile) => {
       if (!ticketId) return;
@@ -346,6 +436,54 @@ export function LawyerTicketDetailPage() {
                 value={formatDisplayDate(ticket.updated_at, "—")}
               />
             </div>
+          </Card>
+
+          <Card className="p-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <PlayCircle className="h-5 w-5" />
+                  <h3 className="font-semibold">Thao tác xử lý</h3>
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Trạng thái hiện tại: {getValue(ticket.status)}
+                </p>
+                {actionError && (
+                  <p className="mt-3 rounded-lg bg-error-container px-md py-sm text-sm font-semibold text-risk-high-text dark:bg-red-950/40 dark:text-red-200">
+                    {actionError}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="secondary"
+                  onClick={handleStartReview}
+                  disabled={startingReview || !canStartReview(ticket.status)}
+                >
+                  {startingReview ? t("common.loading") : "Bắt đầu xử lý"}
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => setRequestInfoOpen(true)}
+                  disabled={!canWorkOnTicket(ticket.status)}
+                >
+                  Yêu cầu bổ sung
+                </Button>
+                <Button
+                  onClick={() => setResolveOpen(true)}
+                  disabled={!canWorkOnTicket(ticket.status)}
+                >
+                  Gửi kết luận
+                </Button>
+              </div>
+            </div>
+
+            {isTerminal && (
+              <p className="mt-3 rounded-lg bg-surface-container-low p-sm text-sm text-muted-foreground dark:bg-slate-800">
+                Ticket đã ở trạng thái kết thúc nên các thao tác xử lý chính được khóa.
+              </p>
+            )}
           </Card>
 
           <div className="grid gap-6 lg:grid-cols-2">
@@ -621,6 +759,70 @@ export function LawyerTicketDetailPage() {
           </Card>
         </>
       )}
+
+      <Modal
+        open={requestInfoOpen}
+        title="Yêu cầu bổ sung thông tin"
+        onClose={() => {
+          if (!requestInfoSubmitting) setRequestInfoOpen(false);
+        }}
+        footer={
+          <div className="flex justify-end gap-sm">
+            <Button variant="secondary" onClick={() => setRequestInfoOpen(false)} disabled={requestInfoSubmitting}>
+              Hủy
+            </Button>
+            <Button onClick={() => void handleRequestMoreInfo()} disabled={requestInfoSubmitting || !requestInfoMessage.trim()}>
+              {requestInfoSubmitting ? t("common.loading") : "Gửi yêu cầu"}
+            </Button>
+          </div>
+        }
+      >
+        <label className="block text-sm font-semibold">
+          Nội dung cần khách hàng bổ sung
+          <textarea
+            className="form-field mt-xs min-h-32"
+            value={requestInfoMessage}
+            onChange={(event) => setRequestInfoMessage(event.target.value)}
+          />
+        </label>
+      </Modal>
+
+      <Modal
+        open={resolveOpen}
+        title="Gửi kết luận xử lý"
+        onClose={() => {
+          if (!resolveSubmitting) setResolveOpen(false);
+        }}
+        footer={
+          <div className="flex justify-end gap-sm">
+            <Button variant="secondary" onClick={() => setResolveOpen(false)} disabled={resolveSubmitting}>
+              Hủy
+            </Button>
+            <Button onClick={() => void handleResolveTicket()} disabled={resolveSubmitting || !expertAnswer.trim()}>
+              {resolveSubmitting ? t("common.loading") : "Gửi kết luận"}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-md">
+          <label className="block text-sm font-semibold">
+            Kết luận gửi khách hàng
+            <textarea
+              className="form-field mt-xs min-h-36"
+              value={expertAnswer}
+              onChange={(event) => setExpertAnswer(event.target.value)}
+            />
+          </label>
+          <label className="block text-sm font-semibold">
+            Ghi chú nội bộ
+            <textarea
+              className="form-field mt-xs min-h-24"
+              value={expertInternalNote}
+              onChange={(event) => setExpertInternalNote(event.target.value)}
+            />
+          </label>
+        </div>
+      </Modal>
     </div>
   );
 }
