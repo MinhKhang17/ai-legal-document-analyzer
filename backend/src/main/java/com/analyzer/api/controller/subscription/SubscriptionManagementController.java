@@ -8,9 +8,11 @@ import com.analyzer.api.dto.subscription.RefundRequestDTO;
 import com.analyzer.api.dto.subscription.RefundResponseDTO;
 import com.analyzer.api.dto.subscription.SubscriptionQuotaUsageSummaryResponse;
 import com.analyzer.api.dto.subscription.SubscriptionUsageResponse;
+import com.analyzer.api.dto.subscription.UpdateRefundStatusRequest;
 import com.analyzer.api.dto.subscriptionplan.SubscriptionPlanRequestDTO;
 import com.analyzer.api.dto.subscriptionplan.SubscriptionPlanResponseDTO;
 import com.analyzer.api.entity.User;
+import com.analyzer.api.enums.RefundStatus;
 import com.analyzer.api.security.UserDetailsImpl;
 import com.analyzer.api.service.CustomerPlanService;
 import com.analyzer.api.service.SubscriptionPlanService;
@@ -157,8 +159,25 @@ public class SubscriptionManagementController {
     public ResponseEntity<ApiResponseDTO<RefundResponseDTO>> requestRefund(
             @Valid @RequestBody RefundRequestDTO request) {
         Long customerId = getCurrentUserId();
-        return ResponseEntity.ok(ApiResponseDTO.success("Gui yeu cau hoan tien thanh cong",
-                refundService.requestRefund(customerId, request)));
+        return new ResponseEntity<>(ApiResponseDTO.created("Gui yeu cau hoan tien thanh cong",
+                refundService.requestRefund(customerId, request)), HttpStatus.CREATED);
+    }
+
+    @GetMapping("/refunds/me")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Get my refund requests")
+    public ResponseEntity<ApiResponseDTO<List<RefundResponseDTO>>> getMyRefunds() {
+        return ResponseEntity.ok(ApiResponseDTO.success("Lay danh sach hoan tien thanh cong",
+                refundService.getMyRefunds(getCurrentUserId())));
+    }
+
+    @GetMapping("/refunds")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Get refund requests for administration")
+    public ResponseEntity<ApiResponseDTO<List<RefundResponseDTO>>> getRefunds(
+            @RequestParam(required = false) RefundStatus status) {
+        return ResponseEntity.ok(ApiResponseDTO.success("Lay danh sach hoan tien thanh cong",
+                refundService.getRefunds(status)));
     }
 
     @GetMapping("/refunds/{id}")
@@ -166,6 +185,16 @@ public class SubscriptionManagementController {
     public ResponseEntity<ApiResponseDTO<RefundResponseDTO>> getRefund(@PathVariable("id") Long refundId) {
         return ResponseEntity.ok(ApiResponseDTO.success("Lay thong tin hoan tien thanh cong",
                 refundService.getRefund(refundId)));
+    }
+
+    @PatchMapping("/refunds/{id}/status")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Approve, reject, process, or complete a refund request")
+    public ResponseEntity<ApiResponseDTO<RefundResponseDTO>> updateRefundStatus(
+            @PathVariable("id") Long refundId,
+            @Valid @RequestBody UpdateRefundStatusRequest request) {
+        return ResponseEntity.ok(ApiResponseDTO.success("Cap nhat trang thai hoan tien thanh cong",
+                refundService.updateRefundStatus(refundId, request)));
     }
 
     private Long getCurrentUserId() {
