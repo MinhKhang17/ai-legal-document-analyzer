@@ -21,7 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
 
-@Service
+@Service("legacyContractGenerationServiceImpl")
 @RequiredArgsConstructor
 public class ContractGenerationServiceImpl implements ContractGenerationService {
 

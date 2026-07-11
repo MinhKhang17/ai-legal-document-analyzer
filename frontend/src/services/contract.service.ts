@@ -73,6 +73,13 @@ export const getContractTemplates = async (
     "Không thể tải danh sách contract template",
   );
 
+export const getAllContractTemplates = async (size = 50): Promise<ContractTemplate[]> => {
+  const first = await getContractTemplates(0, size);
+  if (first.totalPages <= 1) return first.items;
+  const remaining = await Promise.all(Array.from({ length: first.totalPages - 1 }, (_, index) => getContractTemplates(index + 1, size)));
+  return [first, ...remaining].flatMap((page) => page.items);
+};
+
 export const createContractTemplate = async (
   payload: CreateContractTemplateRequest,
 ): Promise<ContractTemplate> =>

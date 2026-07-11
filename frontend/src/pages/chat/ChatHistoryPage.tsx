@@ -13,8 +13,10 @@ import type { ChatMessage } from "../../types/chat";
 import type { Workspace } from "../../types/workspace";
 import type { WorkspaceChatMessage, WorkspaceChatSession } from "../../types/chat";
 import { formatDisplayDateTime } from "../../utils/format";
+import { mergeUniqueBy } from "../../utils/mergeUnique";
 
-const getAccessToken = () => localStorage.getItem("accessToken") ?? "";
+import { getAccessToken as getSessionAccessToken } from "../../services/authSession";
+const getAccessToken = () => getSessionAccessToken() ?? "";
 
 const formatTimestamp = (value: string | null | undefined, language: "en" | "vi") => {
   if (!value) {
@@ -48,6 +50,11 @@ export function ChatHistoryPage() {
   );
   const [loading, setLoading] = useState(true);
   const [loadingSessions, setLoadingSessions] = useState(false);
+  const [sessionPage, setSessionPage] = useState(0);
+  const [sessionTotalPages, setSessionTotalPages] = useState(0);
+  const [messagePage, setMessagePage] = useState(0);
+  const [messageTotalPages, setMessageTotalPages] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
 
   const selectedWorkspace = useMemo(
@@ -114,6 +121,8 @@ export function ChatHistoryPage() {
         );
         if (!active) return;
         setSessions(data.items);
+        setSessionPage(0);
+        setSessionTotalPages(data.totalPages);
 
         const sessionFromQuery = searchParams.get("sessionId") ?? "";
         const nextSessionId =
@@ -166,10 +175,12 @@ export function ChatHistoryPage() {
           getAccessToken(),
           selectedSessionId,
           0,
-          100,
+          50,
         );
         if (!active) return;
         setMessages(data.items.map((message) => toDisplayMessage(message, language)));
+        setMessagePage(0);
+        setMessageTotalPages(data.totalPages);
       } catch (err) {
         if (active) {
           setError(err instanceof Error ? err.message : "Không thể tải tin nhắn");
@@ -183,6 +194,31 @@ export function ChatHistoryPage() {
       active = false;
     };
   }, [language, selectedSessionId]);
+
+  const loadMoreSessions = async () => {
+    if (!selectedWorkspaceId || loadingMore || sessionPage + 1 >= sessionTotalPages) return;
+    setLoadingMore(true);
+    try {
+      const nextPage = sessionPage + 1;
+      const data = await getWorkspaceChatSessions(getAccessToken(), selectedWorkspaceId, nextPage, 20);
+      setSessions((current) => mergeUniqueBy(current, data.items, (item) => item.chatSessionId));
+      setSessionPage(nextPage);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : t('chatHistory.loadingSessions')); }
+    finally { setLoadingMore(false); }
+  };
+
+  const loadMoreMessages = async () => {
+    if (!selectedSessionId || loadingMore || messagePage + 1 >= messageTotalPages) return;
+    setLoadingMore(true);
+    try {
+      const nextPage = messagePage + 1;
+      const data = await getChatSessionMessages(getAccessToken(), selectedSessionId, nextPage, 50);
+      const mapped = data.items.map((message) => toDisplayMessage(message, language));
+      setMessages((current) => mergeUniqueBy(current, mapped, (item) => item.id));
+      setMessagePage(nextPage);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : t('chat.messageDetailError')); }
+    finally { setLoadingMore(false); }
+  };
 
   return (
     <div>
@@ -236,6 +272,7 @@ export function ChatHistoryPage() {
                 </p>
               </div>
             )}
+            {sessionPage + 1 < sessionTotalPages && <Button variant="secondary" disabled={loadingMore} onClick={() => void loadMoreSessions()}>{loadingMore ? t('common.loading') : t('actions.loadMore')}</Button>}
           </div>
 
           <div className="space-y-md">
@@ -316,6 +353,7 @@ export function ChatHistoryPage() {
                   <Button className="w-full">{t("chatHistory.resumeDiscussion")}</Button>
                 </Link>
               )}
+              {messagePage + 1 < messageTotalPages && <Button variant="secondary" disabled={loadingMore} onClick={() => void loadMoreMessages()}>{loadingMore ? t('common.loading') : t('chat.loadOlderMessages')}</Button>}
             </div>
           </Card>
         </aside>

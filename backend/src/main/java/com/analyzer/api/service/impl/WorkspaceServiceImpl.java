@@ -10,7 +10,9 @@ import com.analyzer.api.entity.User;
 import com.analyzer.api.entity.Workspace;
 import com.analyzer.api.exception.workspace.DocumentProcessingDispatchException;
 import com.analyzer.api.repository.DocumentRepository;
+import com.analyzer.api.repository.UserRepository;
 import com.analyzer.api.repository.WorkspaceRepository;
+import com.analyzer.api.service.SubscriptionQuotaService;
 import com.analyzer.api.service.WorkspaceService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -54,6 +56,8 @@ public class WorkspaceServiceImpl implements WorkspaceService {
 
     private final WorkspaceRepository workspaceRepository;
     private final DocumentRepository documentRepository;
+    private final UserRepository userRepository;
+    private final SubscriptionQuotaService subscriptionQuotaService;
 
     @Value("${app.storage.upload-root:uploads}")
     private String uploadRoot;
@@ -67,9 +71,13 @@ public class WorkspaceServiceImpl implements WorkspaceService {
     @Override
     @Transactional
     public WorkspaceResponseDTO createWorkspace(Long userId, WorkspaceRequestDTO request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Khong tim thay nguoi dung"));
+        subscriptionQuotaService.checkCanCreateWorkspace(user);
+
         Workspace workspace = Workspace.builder()
                 .id(generateWorkspaceId())
-                .user(User.builder().id(userId).build())
+                .user(user)
                 .name(request.name().trim())
                 .description(request.description())
                 .status(STATUS_ACTIVE)
@@ -116,6 +124,10 @@ public class WorkspaceServiceImpl implements WorkspaceService {
         if (file == null || file.isEmpty()) {
             throw new RuntimeException("File khong duoc de trong");
         }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Khong tim thay nguoi dung"));
+        subscriptionQuotaService.checkCanUploadOrAnalyzeContract(user, workspaceId);
 
         workspaceRepository.findByIdAndUserIdAndStatus(workspaceId, userId, STATUS_ACTIVE)
                 .orElseThrow(() -> new RuntimeException("Workspace khong ton tai hoac khong thuoc user hien tai"));
@@ -302,5 +314,128 @@ public class WorkspaceServiceImpl implements WorkspaceService {
                 document.getStatus(),
                 document.getUploadedAt()
         );
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public org.springframework.core.io.Resource downloadDocumentFile(Long userId, String workspaceId, String documentId) {
+        workspaceRepository.findByIdAndUserIdAndStatus(workspaceId, userId, STATUS_ACTIVE)
+                .orElseThrow(() -> new RuntimeException("Workspace khong ton tai hoac khong thuoc user hien tai"));
+
+        Document document = documentRepository.findById(documentId)
+                .orElseThrow(() -> new RuntimeException("Khong tim thay document voi id: " + documentId));
+
+        if (!document.getWorkspace().getId().equals(workspaceId)) {
+            throw new RuntimeException("Document khong thuoc workspace nay");
+        }
+
+        try {
+            java.nio.file.Path filePath = java.nio.file.Path.of(document.getFilePath()).toAbsolutePath().normalize();
+            org.springframework.core.io.Resource resource = new org.springframework.core.io.UrlResource(filePath.toUri());
+            if (resource.exists() || resource.isReadable()) {
+                return resource;
+            } else {
+                throw new RuntimeException("File khong ton tai hoac khong the doc");
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Loi khi doc file: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public org.springframework.core.io.Resource downloadDocumentFilePublic(String workspaceId, String documentId) {
+        Document document = documentRepository.findById(documentId)
+                .orElseThrow(() -> new RuntimeException("Khong tim thay document voi id: " + documentId));
+
+        if (!document.getWorkspace().getId().equals(workspaceId)) {
+            throw new RuntimeException("Document khong thuoc workspace nay");
+        }
+
+        try {
+            java.nio.file.Path filePath = java.nio.file.Path.of(document.getFilePath()).toAbsolutePath().normalize();
+            org.springframework.core.io.Resource resource = new org.springframework.core.io.UrlResource(filePath.toUri());
+            if (resource.exists() || resource.isReadable()) {
+                return resource;
+            } else {
+                throw new RuntimeException("File khong ton tai hoac khong the doc");
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Loi khi doc file: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional
+    public DocumentResponseDTO registerGeneratedDocument(com.analyzer.api.dto.document.RegisterDocumentRequestDTO request) {
+        String documentId = generateDocumentId();
+        Document document = Document.builder()
+                .id(documentId)
+                .workspace(Workspace.builder().id(request.getWorkspaceId()).build())
+                .user(User.builder().id(Long.valueOf(request.getUserId())).build())
+                .originalFileName(request.getOriginalFileName())
+                .storedFileName(request.getStoredFileName())
+                .filePath(request.getFilePath())
+                .fileType(request.getOriginalFileName().endsWith(".docx")
+                        ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                        : "application/pdf")
+                .fileSize(request.getFileSize())
+                .sourceType(SOURCE_TYPE_USER_DOCUMENT)
+                .status(STATUS_READY)
+                .chunkCount(0)
+                .processedAt(LocalDateTime.now())
+                .build();
+
+        Document saved = documentRepository.save(document);
+        return toDocumentResponse(saved);
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public org.springframework.core.io.Resource downloadSystemDocumentFile(String filename) {
+        if (filename == null || filename.contains("..") || filename.contains("/") || filename.contains("\\")) {
+            throw new RuntimeException("Filename hop le khong duoc chua ki tu dac biet hoac duong dan");
+        }
+        
+        try {
+            java.nio.file.Path baseDir = java.nio.file.Path.of("/app/uploads/knowledge_base").toAbsolutePath().normalize();
+            
+            // Search recursively for a file matching the name (with or without extension)
+            final String targetName = filename.toLowerCase();
+            final java.nio.file.Path[] foundFile = new java.nio.file.Path[1];
+            
+            java.nio.file.Files.walkFileTree(baseDir, new java.nio.file.SimpleFileVisitor<java.nio.file.Path>() {
+                @Override
+                public java.nio.file.FileVisitResult visitFile(java.nio.file.Path file, java.nio.file.attribute.BasicFileAttributes attrs) throws java.io.IOException {
+                    String name = file.getFileName().toString().toLowerCase();
+                    int lastDot = name.lastIndexOf('.');
+                    String stem = lastDot > 0 ? name.substring(0, lastDot) : name;
+                    
+                    if (name.equals(targetName) || stem.equals(targetName)) {
+                        foundFile[0] = file;
+                        return java.nio.file.FileVisitResult.TERMINATE;
+                    }
+                    return java.nio.file.FileVisitResult.CONTINUE;
+                }
+            });
+            
+            if (foundFile[0] == null) {
+                throw new RuntimeException("File khong ton tai hoac khong the doc: " + filename);
+            }
+            
+            java.nio.file.Path filePath = foundFile[0].toAbsolutePath().normalize();
+            if (!filePath.startsWith(baseDir)) {
+                throw new RuntimeException("Khong duoc truy cap ngoai thu muc cho phep");
+            }
+            
+            org.springframework.core.io.Resource resource = new org.springframework.core.io.UrlResource(filePath.toUri());
+            if (resource.exists() || resource.isReadable()) {
+                return resource;
+            } else {
+                throw new RuntimeException("File khong ton tai hoac khong the doc: " + filename);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Loi khi doc file tri thuc: " + e.getMessage(), e);
+        }
     }
 }

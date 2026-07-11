@@ -1,6 +1,8 @@
 import { RefreshCw, TicketCheck, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Pagination } from "../../components/common/Pagination";
+import { parsePageParam, toPageParam } from "../../utils/pagination";
 import { Badge } from "../../components/common/Badge";
 import { Button } from "../../components/common/Button";
 import { Card } from "../../components/common/Card";
@@ -34,7 +36,8 @@ const getRiskTone = (risk?: string | null) => {
   return "slate";
 };
 
-const getAccessToken = () => localStorage.getItem("accessToken") ?? "";
+import { getAccessToken as getSessionAccessToken } from "../../services/authSession";
+const getAccessToken = () => getSessionAccessToken() ?? "";
 
 const getStatusTone = (status?: string | null) => {
   switch (normalizeLegalTicketStatus(status)) {
@@ -59,10 +62,14 @@ export function CustomerTicketsPage() {
   const { t, language } = useI18n();
   const toast = useToast();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [tickets, setTickets] = useState<LegalTicket[]>([]);
   const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [page, setPage] = useState(() => parsePageParam(searchParams.get("page")));
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<LegalTicketFilter>("ALL");
+  const [statusFilter, setStatusFilter] = useState<LegalTicketFilter>(() => toLegalTicketFilter(searchParams.get("status") ?? "ALL"));
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
@@ -75,24 +82,25 @@ export function CustomerTicketsPage() {
 
   const loadTickets = useCallback(async () => {
     setLoading(true);
+    setError("");
 
     try {
       const response = await getMyLegalTickets(
-        0,
+        page,
         20,
         statusFilter === "ALL" ? undefined : statusFilter,
       );
       setTickets(response.items ?? []);
       setTotalItems(response.totalItems ?? 0);
+      setTotalPages(response.totalPages ?? 0);
     } catch (error) {
       console.error("Failed to load customer legal tickets", error);
       toast.error(t("legalTickets.errors.load"), t("toast.errorTitle"));
-      setTickets([]);
-      setTotalItems(0);
+      setError(t("legalTickets.errors.load"));
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, t, toast]);
+  }, [page, statusFilter, t, toast]);
 
   useEffect(() => {
     void loadTickets();
@@ -274,9 +282,13 @@ export function CustomerTicketsPage() {
             <select
               className="form-field max-w-48"
               value={statusFilter}
-              onChange={(event) =>
-                setStatusFilter(toLegalTicketFilter(event.target.value))
-              }
+              onChange={(event) => {
+                const nextStatus = toLegalTicketFilter(event.target.value);
+                setStatusFilter(nextStatus); setPage(0);
+                const next = new URLSearchParams(searchParams); next.set("page", "1");
+                nextStatus === "ALL" ? next.delete("status") : next.set("status", nextStatus);
+                setSearchParams(next);
+              }}
             >
               {filterOptions.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -370,7 +382,7 @@ export function CustomerTicketsPage() {
         <Card title={t("legalTickets.totalTickets")}>
           <p className="text-3xl font-bold">{totalItems}</p>
         </Card>
-        <Card title={t("legalTickets.openTickets")}>
+        <Card title={t("legalTickets.openTicketsCurrentPage")}>
           <p className="text-3xl font-bold">{openCount}</p>
         </Card>
         <Card title={t("legalTickets.currentFilter")}>
@@ -384,7 +396,9 @@ export function CustomerTicketsPage() {
         title={t("legalTickets.myLegalTickets")}
         actions={<Badge tone="blue">{tickets.length}</Badge>}
       >
-        {loading ? (
+        {error ? (
+          <div role="alert" className="text-sm text-error">{error} <Button variant="secondary" onClick={() => void loadTickets()}>{t("common.retry")}</Button></div>
+        ) : loading && tickets.length === 0 ? (
           <p className="text-sm text-on-surface-variant dark:text-slate-400">
             {t("legalTickets.loading")}
           </p>
@@ -401,6 +415,7 @@ export function CustomerTicketsPage() {
             getRowKey={(ticket) => ticket.id}
           />
         )}
+        <Pagination page={page} totalPages={totalPages} totalItems={totalItems} disabled={loading} onPageChange={(nextPage) => { setPage(nextPage); const next = new URLSearchParams(searchParams); next.set("page", toPageParam(nextPage)); setSearchParams(next); }} />
       </Card>
     </div>
   );

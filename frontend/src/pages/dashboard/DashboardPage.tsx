@@ -13,7 +13,8 @@ import { useI18n } from '../../hooks/useI18n';
 import type { Document, Workspace } from '../../types/workspace';
 import { formatDisplayDateTime } from '../../utils/format';
 
-const getAccessToken = () => localStorage.getItem('accessToken') ?? '';
+import { getAccessToken as getSessionAccessToken } from '../../services/authSession';
+const getAccessToken = () => getSessionAccessToken() ?? '';
 
 type WorkspaceWithDocs = Workspace & { documents: Document[] };
 
@@ -32,7 +33,9 @@ export function DashboardPage() {
         setLoading(true);
         setError('');
 
-        const workspaceList = await getWorkspaces(getAccessToken());
+        const workspaceList = (await getWorkspaces(getAccessToken())).filter(
+          (ws) => ws.description !== 'System workspace for general contract assistant chat',
+        );
         const workspaceDetails = await Promise.all(
           workspaceList.map(async (workspace) => ({
             ...workspace,

@@ -1,6 +1,8 @@
 import { FileText, PlayCircle, RefreshCw, Save } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
+import { Pagination } from "../../components/common/Pagination";
+import { parsePageParam, toPageParam } from "../../utils/pagination";
 import { Badge } from "../../components/common/Badge";
 import { Button } from "../../components/common/Button";
 import { Card } from "../../components/common/Card";
@@ -11,7 +13,7 @@ import { useI18n } from "../../hooks/useI18n";
 import { useToast } from "../../hooks/useToast";
 import {
   generateContract,
-  getContractTemplates,
+  getAllContractTemplates,
   getMyContracts,
   saveContract,
 } from "../../services/contract.service";
@@ -24,6 +26,7 @@ import type {
 } from "../../types/contract";
 import type { Workspace } from "../../types/workspace";
 import { formatDisplayDate } from "../../utils/format";
+import { normalizeWorkspaceId } from "../../utils/workspaceId";
 
 const getStatusTone = (status?: string) => {
   if (status === "ACTIVE" || status === "COMPLETED" || status === "GENERATED") return "green";
@@ -31,8 +34,6 @@ const getStatusTone = (status?: string) => {
   if (status === "PROCESSING" || status === "QUEUED") return "amber";
   return "slate";
 };
-
-const isNumericWorkspaceId = (value: string) => /^[1-9]\d*$/.test(value.trim());
 
 const initialGenerationForm = () => ({
   requestId: `contract-${Date.now()}`,
@@ -55,9 +56,12 @@ const initialSaveForm = {
 export function MyContractsPage() {
   const { t, language } = useI18n();
   const toast = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
   const locale = language === "vi" ? "vi-VN" : "en-US";
-  const contractWorkspaceMismatchMessage = t("contracts.workspaceMismatch");
   const [contracts, setContracts] = useState<UserContract[]>([]);
+  const [page, setPage] = useState(() => parsePageParam(searchParams.get("page")));
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   const [templates, setTemplates] = useState<ContractTemplate[]>([]);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [latestJob, setLatestJob] = useState<ContractGenerationJob | null>(null);
@@ -74,13 +78,15 @@ export function MyContractsPage() {
 
     const token = getStoredAccessToken();
     const [contractsResult, templatesResult, workspacesResult] = await Promise.allSettled([
-      getMyContracts(0, 50),
-      getContractTemplates(0, 50),
+      getMyContracts(page, 20),
+      getAllContractTemplates(),
       token ? getWorkspaces(token) : Promise.resolve([]),
     ]);
 
     if (contractsResult.status === "fulfilled") {
       setContracts(contractsResult.value.items ?? []);
+      setTotalItems(contractsResult.value.totalItems ?? 0);
+      setTotalPages(contractsResult.value.totalPages ?? 0);
     } else {
       const message =
         contractsResult.reason instanceof Error
@@ -88,33 +94,26 @@ export function MyContractsPage() {
           : t("contracts.loadError");
       setError(message);
       toast.error(message);
-      setContracts([]);
     }
 
-    setTemplates(templatesResult.status === "fulfilled" ? templatesResult.value.items ?? [] : []);
+    setTemplates(templatesResult.status === "fulfilled" ? templatesResult.value : []);
     setWorkspaces(workspacesResult.status === "fulfilled" ? workspacesResult.value : []);
     setLoading(false);
-  }, [toast, t]);
+  }, [page, toast, t]);
 
   useEffect(() => {
     void loadContracts();
   }, [loadContracts]);
 
   const parseWorkspaceId = (value: string) => {
-    const normalizedValue = value.trim();
+    const normalizedValue = normalizeWorkspaceId(value);
 
     if (!normalizedValue) {
       toast.warning(t("contracts.workspaceRequired"));
       return null;
     }
 
-    if (!isNumericWorkspaceId(normalizedValue)) {
-      toast.warning(contractWorkspaceMismatchMessage);
-      return null;
-    }
-
-    const workspaceId = Number(normalizedValue);
-    return workspaceId;
+    return normalizedValue;
   };
 
   const parseOptionalNumber = (value: string) => {
@@ -221,14 +220,6 @@ export function MyContractsPage() {
     },
   ];
 
-  const generationWorkspaceBlocked =
-    Boolean(generationForm.workspaceId) && !isNumericWorkspaceId(generationForm.workspaceId);
-  const saveWorkspaceBlocked =
-    Boolean(saveForm.workspaceId) && !isNumericWorkspaceId(saveForm.workspaceId);
-  const hasStringWorkspaceIds = workspaces.some(
-    (workspace) => !isNumericWorkspaceId(workspace.workspaceId),
-  );
-
   return (
     <div>
       <PageHeader
@@ -252,16 +243,12 @@ export function MyContractsPage() {
         </div>
       )}
 
-      {hasStringWorkspaceIds && (
-        <div className="mb-lg rounded-xl border border-amber-300 bg-amber-50 p-md text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-100">
-          {contractWorkspaceMismatchMessage}
-        </div>
-      )}
-
       <div className="grid gap-gutter xl:grid-cols-[minmax(0,1fr)_420px]">
         <main className="space-y-gutter">
           <Card title={t("contracts.savedContracts")} actions={<Badge tone="blue">{contracts.length}</Badge>}>
-            {loading ? (
+            {error ? (
+              <div role="alert" className="text-sm text-error">{error} <Button variant="secondary" onClick={() => void loadContracts()}>{t("common.retry")}</Button></div>
+            ) : loading && contracts.length === 0 ? (
               <p className="text-sm text-on-surface-variant dark:text-slate-400">
                 {t("contracts.loading")}
               </p>
@@ -278,6 +265,7 @@ export function MyContractsPage() {
                 getRowKey={(contract) => contract.id}
               />
             )}
+            <Pagination page={page} totalPages={totalPages} totalItems={totalItems} disabled={loading} onPageChange={(nextPage) => { setPage(nextPage); const next = new URLSearchParams(searchParams); next.set("page", toPageParam(nextPage)); setSearchParams(next); }} />
           </Card>
 
           {latestJob && (
@@ -348,11 +336,6 @@ export function MyContractsPage() {
                     </option>
                   ))}
                 </select>
-                {generationWorkspaceBlocked && (
-                  <p className="mt-xs rounded-lg bg-amber-50 p-sm text-xs leading-5 text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
-                    {contractWorkspaceMismatchMessage}
-                  </p>
-                )}
               </label>
 
               <label className="block text-sm font-semibold">
@@ -407,7 +390,7 @@ export function MyContractsPage() {
               <Button
                 leftIcon={<PlayCircle className="h-4 w-4" />}
                 onClick={() => void handleGenerate()}
-                disabled={generating || !generationForm.workspaceId || generationWorkspaceBlocked}
+                disabled={generating || !generationForm.workspaceId.trim()}
               >
                 {generating ? t("contracts.generating") : t("contracts.generate")}
               </Button>
@@ -432,11 +415,6 @@ export function MyContractsPage() {
                     </option>
                   ))}
                 </select>
-                {saveWorkspaceBlocked && (
-                  <p className="mt-xs rounded-lg bg-amber-50 p-sm text-xs leading-5 text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
-                    {contractWorkspaceMismatchMessage}
-                  </p>
-                )}
               </label>
 
               <label className="block text-sm font-semibold">
@@ -528,7 +506,7 @@ export function MyContractsPage() {
               <Button
                 leftIcon={<Save className="h-4 w-4" />}
                 onClick={() => void handleSaveContract()}
-                disabled={saving || !saveForm.workspaceId || saveWorkspaceBlocked}
+                disabled={saving || !saveForm.workspaceId.trim()}
               >
                 {saving ? t("contracts.saving") : t("contracts.saveContract")}
               </Button>

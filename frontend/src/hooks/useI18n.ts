@@ -4,6 +4,6 @@ import { translate } from '../utils/i18n';
 
 export const useI18n = () => {
   const { language, setLanguage } = useAppStore();
-  const t = useCallback((key: string) => translate(language, key), [language]);
+  const t = useCallback((key: string, params?: Record<string, string | number>) => translate(language, key, params), [language]);
   return { t, language, setLanguage };
 };

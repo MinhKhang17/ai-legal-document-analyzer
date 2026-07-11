@@ -11,6 +11,7 @@ import com.analyzer.api.dto.chatsession.ChatSessionResponse;
 import com.analyzer.api.entity.ChatMessage;
 import com.analyzer.api.entity.ChatSession;
 import com.analyzer.api.entity.Document;
+import com.analyzer.api.entity.User;
 import com.analyzer.api.entity.Workspace;
 import com.analyzer.api.enums.ChatMessageRole;
 import com.analyzer.api.enums.ChatMessageStatus;
@@ -24,8 +25,10 @@ import com.analyzer.api.exception.validation.*;
 import com.analyzer.api.repository.ChatMessageRepository;
 import com.analyzer.api.repository.ChatSessionRepository;
 import com.analyzer.api.repository.DocumentRepository;
+import com.analyzer.api.repository.UserRepository;
 import com.analyzer.api.repository.WorkspaceRepository;
 import com.analyzer.api.service.ChatMessageService;
+import com.analyzer.api.service.SubscriptionQuotaService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,12 +54,17 @@ public class ChatMessageServiceImpl implements ChatMessageService {
     private final ChatSessionRepository chatSessionRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final PythonAiClient pythonAiClient;
+    private final UserRepository userRepository;
+    private final SubscriptionQuotaService subscriptionQuotaService;
 
     @Override
     @Transactional(noRollbackFor = {AiServiceUnavailableException.class, AiServiceTimeoutException.class})
     public SendMessageResponse sendMessageInWorkspace(Long userId, String workspaceId, SendMessageRequest request) {
         // Validate request
         validateMessageRequest(request);
+        User currentUser = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        subscriptionQuotaService.checkCanUseAiChat(currentUser, estimateTokens(request.getMessage()));
 
         // Find Workspace
         Workspace workspace = workspaceRepository.findById(workspaceId)
@@ -74,7 +82,10 @@ public class ChatMessageServiceImpl implements ChatMessageService {
 
         // Validate Documents
         Document selectedDocument = resolveSelectedDocument(userId, workspaceId, request.getDocumentId());
-        validateWorkspaceDocuments(userId, workspaceId, selectedDocument);
+        boolean isSandboxWorkspace = "System workspace for general contract assistant chat".equals(workspace.getDescription());
+        if (!isSandboxWorkspace) {
+            validateWorkspaceDocuments(userId, workspaceId, selectedDocument);
+        }
 
         // Find or create default ChatSession
         ChatSession chatSession = chatSessionRepository.findByWorkspaceIdAndUserIdAndIsDefaultTrueAndStatus(
@@ -85,7 +96,7 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         ChatMessage userMessage = createAndSaveUserMessage(chatSession, request.getMessage().trim());
 
         // Process AI Query
-        return executeAiQuery(workspace, chatSession, userMessage, request.getMessage().trim(), selectedDocument);
+        return executeAiQuery(currentUser, workspace, chatSession, userMessage, request.getMessage().trim(), selectedDocument);
     }
 
     @Override
@@ -93,6 +104,9 @@ public class ChatMessageServiceImpl implements ChatMessageService {
     public SendMessageResponse sendMessageInChatSession(Long userId, String chatSessionId, SendMessageRequest request) {
         // Validate request
         validateMessageRequest(request);
+        User currentUser = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        subscriptionQuotaService.checkCanUseAiChat(currentUser, estimateTokens(request.getMessage()));
 
         // Find ChatSession
         ChatSession chatSession = chatSessionRepository.findById(chatSessionId)
@@ -116,13 +130,16 @@ public class ChatMessageServiceImpl implements ChatMessageService {
 
         // Validate Documents
         Document selectedDocument = resolveSelectedDocument(userId, workspace.getId(), request.getDocumentId());
-        validateWorkspaceDocuments(userId, workspace.getId(), selectedDocument);
+        boolean isSandboxWorkspace = "System workspace for general contract assistant chat".equals(workspace.getDescription());
+        if (!isSandboxWorkspace) {
+            validateWorkspaceDocuments(userId, workspace.getId(), selectedDocument);
+        }
 
         // Create User Message
         ChatMessage userMessage = createAndSaveUserMessage(chatSession, request.getMessage().trim());
 
         // Process AI Query
-        return executeAiQuery(workspace, chatSession, userMessage, request.getMessage().trim(), selectedDocument);
+        return executeAiQuery(currentUser, workspace, chatSession, userMessage, request.getMessage().trim(), selectedDocument);
     }
 
     @Override
@@ -281,6 +298,7 @@ public class ChatMessageServiceImpl implements ChatMessageService {
     }
 
     private SendMessageResponse executeAiQuery(
+            User currentUser,
             Workspace workspace,
             ChatSession chatSession,
             ChatMessage userMessage,
@@ -386,6 +404,10 @@ public class ChatMessageServiceImpl implements ChatMessageService {
 
         ChatMessage assistantMessage = assistantBuilder.build();
         chatMessageRepository.save(assistantMessage);
+        subscriptionQuotaService.recordAiChatUsage(
+                currentUser,
+                assistantMessage.getPromptTokens() == null ? estimateTokens(question) : assistantMessage.getPromptTokens(),
+                assistantMessage.getCompletionTokens() == null ? estimateTokens(aiResponse.getAnswer()) : assistantMessage.getCompletionTokens());
 
         // Update ChatSession timestamps
         chatSession.setLastMessageAt(LocalDateTime.now());
@@ -450,5 +472,12 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                 .createdAt(message.getCreatedAt())
                 .updatedAt(message.getUpdatedAt())
                 .build();
+    }
+
+    private int estimateTokens(String content) {
+        if (content == null || content.isBlank()) {
+            return 0;
+        }
+        return Math.max(1, (int) Math.ceil(content.length() / 4.0));
     }
 }

@@ -17,7 +17,7 @@ final class ContractMappingSupport {
                 .id(job.getId())
                 .requestId(job.getRequestId())
                 .requesterId(job.getRequester().getId())
-                .workspaceId(toLongOrNull(job.getWorkspace().getId()))
+                .workspaceId(job.getWorkspace().getId())
                 .templateId(job.getTemplate() == null ? null : job.getTemplate().getId())
                 .sourceDocumentId(job.getSourceDocument() == null ? null : job.getSourceDocument().getId())
                 .inputJson(job.getInputJson())
@@ -34,7 +34,7 @@ final class ContractMappingSupport {
         return ContractResponse.builder()
                 .id(contract.getId())
                 .ownerId(contract.getOwner().getId())
-                .workspaceId(toLongOrNull(contract.getWorkspace().getId()))
+                .workspaceId(contract.getWorkspace().getId())
                 .templateId(contract.getTemplate() == null ? null : contract.getTemplate().getId())
                 .generationJobId(contract.getGenerationJob() == null ? null : contract.getGenerationJob().getId())
                 .sourceDocumentId(contract.getSourceDocument() == null ? null : contract.getSourceDocument().getId())
@@ -61,13 +61,5 @@ final class ContractMappingSupport {
                 .generationJobId(version.getGenerationJob() == null ? null : version.getGenerationJob().getId())
                 .createdAt(version.getCreatedAt())
                 .build();
-    }
-
-    private static Long toLongOrNull(String value) {
-        try {
-            return value == null ? null : Long.valueOf(value);
-        } catch (NumberFormatException ex) {
-            return null;
-        }
     }
 }

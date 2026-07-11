@@ -11,4 +11,5 @@ import java.util.List;
 public interface WorkspaceRepository extends JpaRepository<Workspace, String> {
     Optional<Workspace> findByIdAndUserIdAndStatus(String id, Long userId, String status);
     List<Workspace> findAllByUserIdAndStatusOrderByCreatedAtDesc(Long userId, String status);
+    long countByUserIdAndStatus(Long userId, String status);
 }

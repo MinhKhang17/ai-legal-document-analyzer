@@ -1,0 +1,127 @@
+FLOW 03 - CHAT PHÁP LÝ THEO WORKSPACE
+
+Mục tiêu:
+- Cho customer hỏi đáp pháp lý trên workspace, gắn với document cụ thể hoặc toàn workspace, xem lịch sử session và có thể escalated sang legal ticket.
+
+Actor:
+- `CUSTOMER`
+
+Điểm bắt đầu:
+- Route `/chat`
+
+Điều kiện tiên quyết:
+- Đã có workspace
+- Với workspace thường: backend yêu cầu phải có ít nhất một document `READY` nếu không chọn document cụ thể
+
+Luồng chính:
+1. `LegalChatPage` load workspaces và loại workspace hệ thống khỏi list hiển thị.
+2. FE load song song documents và chat sessions của workspace đang chọn.
+3. FE chọn:
+4. `selectedDocumentId` = document từ query param hoặc document `READY` đầu tiên
+5. `selectedSessionId` = session từ query param hoặc default session hoặc session đầu tiên
+6. FE load lịch sử message theo `chatSessionId`.
+7. Người dùng nhập câu hỏi và submit.
+8. Nếu đã có `chatSessionId`, FE gọi `sendChatSessionMessage()`.
+9. Nếu chưa có session, FE có thể dùng `sendWorkspaceMessage()` để backend tự tạo default session.
+10. Backend lưu user message, gọi Python AI client, lưu assistant message.
+11. FE render câu trả lời, metadata, nút `Chi tiết`, citation và action tạo legal ticket nếu assistant đề xuất.
+12. Người dùng có thể:
+13. tạo session mới
+14. đổi tên session
+15. xóa session
+16. xem summary/memory của session
+17. mở chi tiết message
+18. tạo legal ticket từ assistant message
+
+Sơ đồ text:
+- `select workspace/document/session -> load messages -> ask question -> AI response -> optional create legal ticket`
+
+Màn hình / component:
+- `frontend/src/pages/chat/LegalChatPage.tsx`
+- `frontend/src/components/chat/ChatMessageContent.tsx`
+- modal chi tiết message trong cùng file
+
+Dữ liệu / state:
+- `workspaces`, `workspaceDocuments`, `chatSessions`
+- `selectedWorkspaceId`, `selectedSessionId`, `selectedDocumentId`
+- `messages`, `input`, `sending`
+- `sessionSummary`, `sessionMemory`
+- `messageDetail`, `messageCitations`
+
+Validation:
+- Message không được rỗng
+- Backend `ChatMessageServiceImpl.validateMessageRequest()` giới hạn message <= 5000 ký tự
+- `documentId` nếu có phải thuộc workspace và phải ở trạng thái `READY`
+
+API / service tích hợp:
+- FE chat: `frontend/src/services/chat.service.ts`
+- FE AI citations: `frontend/src/api/aiFeatureApi.ts`
+- FE legal ticket bridge: `frontend/src/services/legalTicket.service.ts`
+- BE:
+- `POST /api/v1/workspaces/{workspaceId}/chat-sessions`
+- `GET /api/v1/workspaces/{workspaceId}/chat-sessions`
+- `GET /api/v1/chat-sessions/{chatSessionId}`
+- `PUT /api/v1/chat-sessions/{chatSessionId}`
+- `DELETE /api/v1/chat-sessions/{chatSessionId}`
+- `POST /api/v1/workspaces/{workspaceId}/messages`
+- `POST /api/v1/chat-sessions/{chatSessionId}/messages`
+- `GET /api/v1/chat-sessions/{chatSessionId}/messages`
+- `GET /api/v1/chat-messages/{messageId}`
+- `GET /api/v1/chat-sessions/{id}/summary`
+- `GET /api/v1/chat-sessions/{id}/memory`
+- `POST /api/v1/chat-sessions/{id}/context`
+
+UI states:
+- Không có workspace: nhắc chọn workspace
+- Không có message: empty state
+- AI fail: render assistant bubble lỗi và có nút retry
+- Có suggestion: render badge risk/confidence/suggestion và nút tạo ticket
+
+Edge cases:
+- Workspace có document nhưng chưa `READY`: backend ném `NoReadyDocumentsException`
+- Session bị xóa: backend chặn truy cập tiếp
+- AI timeout/unavailable: backend vẫn lưu message fail và FE có thể retry
+
+Business rules:
+- Session default được backend tạo tự động nếu gửi tin nhắn đầu tiên ở workspace
+- Nếu title session đang là `Default Conversation`, backend đổi title theo câu hỏi đầu tiên
+- Backend có check quota AI chat qua `SubscriptionQuotaService`
+
+Quyền:
+- Customer-only cho các endpoint chat chính
+- Summary/memory cho phép nhiều role, nhưng màn FE hiện tại dùng ở customer flow
+
+File nguồn tham chiếu:
+- FE:
+- `frontend/src/pages/chat/LegalChatPage.tsx`
+- `frontend/src/services/chat.service.ts`
+- `frontend/src/services/workspace.service.ts`
+- BE:
+- `backend/src/main/java/com/analyzer/api/controller/ChatSessionController.java`
+- `backend/src/main/java/com/analyzer/api/controller/ChatMessageController.java`
+- `backend/src/main/java/com/analyzer/api/controller/chatsession/ChatSessionContextController.java`
+- `backend/src/main/java/com/analyzer/api/service/impl/ChatSessionServiceImpl.java`
+- `backend/src/main/java/com/analyzer/api/service/impl/ChatMessageServiceImpl.java`
+
+Điểm chưa rõ:
+- `CHƯA XÁC ĐỊNH`: contract của citation endpoint `getChatMessageAiCitations()` nếu FE cần schema chi tiết.
+- `CHƯA XÁC ĐỊNH`: có streaming token-by-token hay không; mã hiện tại là request/response hoàn chỉnh.
+
+Checklist FE:
+- Luôn sync query params `workspaceId/sessionId/documentId`.
+- Nếu document không `READY`, cần thông báo rõ thay vì để người dùng đoán.
+- Nên phân biệt `assistant failed` với `assistant trả lời nhưng risk cao`.
+
+Tiêu chí hoàn thành:
+- Tạo/quản lý session được.
+- Gửi câu hỏi và nhận câu trả lời được.
+- Xem lịch sử, metadata và mở ticket từ chat được.
+
+HIỆN TRẠNG:
+- Flow này có độ hoàn chỉnh cao và bám backend thật.
+
+SUY LUẬN:
+- Đây là flow nghiệp vụ trung tâm của sản phẩm.
+
+ĐỀ XUẤT:
+- FE nên xem flow này là hub, từ đây điều hướng sang ticket hoặc project detail.

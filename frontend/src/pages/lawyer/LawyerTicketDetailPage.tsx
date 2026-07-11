@@ -22,6 +22,7 @@ import {
   type ReactNode,
 } from "react";
 import { Link, useParams } from "react-router-dom";
+import { LAWYER_UPLOAD_ACCEPT, validateLawyerUpload } from "../../config/lawyerUpload";
 import {
   closeLawyerTicket,
   downloadLawyerTicketFile,
@@ -95,6 +96,8 @@ export function LawyerTicketDetailPage() {
   const [files, setFiles] = useState<LawyerTicketFile[]>([]);
   const [filesLoading, setFilesLoading] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [selectedUploadFile, setSelectedUploadFile] = useState<File | null>(null);
+  const [uploadValidationError, setUploadValidationError] = useState("");
   const [openingDocumentId, setOpeningDocumentId] = useState("");
 
   const [closingTicket, setClosingTicket] = useState(false);
@@ -196,6 +199,14 @@ export function LawyerTicketDetailPage() {
       event.target.value = "";
 
       if (!file) return;
+      const validation = validateLawyerUpload(file);
+      if (!validation.valid) {
+        setSelectedUploadFile(null);
+        setUploadValidationError(t(validation.messageKey));
+        return;
+      }
+      setSelectedUploadFile(file);
+      setUploadValidationError("");
 
       if (!ticket.assigned_lawyer_id) {
         toast.error(t("lawyerTickets.files.uploadError"));
@@ -216,6 +227,7 @@ export function LawyerTicketDetailPage() {
         });
 
         toast.success(t("lawyerTickets.files.uploadSuccess"));
+        setSelectedUploadFile(null);
         await loadFiles();
       } catch {
         toast.error(t("lawyerTickets.files.uploadError"));
@@ -323,19 +335,18 @@ export function LawyerTicketDetailPage() {
     async (file: LawyerTicketFile) => {
       if (!ticketId) return;
 
+      let objectUrl = "";
+
       try {
         setOpeningDocumentId(file.documentId);
-        const fileInfo = await downloadLawyerTicketFile(ticketId, file.documentId);
-
-        if (fileInfo.filePath) {
-          window.open(fileInfo.filePath, "_blank", "noopener,noreferrer");
-          return;
-        }
-
-        toast.error(t("lawyerTickets.files.openError"));
+        objectUrl = await downloadLawyerTicketFile(ticketId, file.documentId);
+        window.open(objectUrl, "_blank", "noopener,noreferrer");
       } catch {
         toast.error(t("lawyerTickets.files.openError"));
       } finally {
+        if (objectUrl) {
+          window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+        }
         setOpeningDocumentId("");
       }
     },
@@ -443,10 +454,10 @@ export function LawyerTicketDetailPage() {
               <div>
                 <div className="flex items-center gap-2">
                   <PlayCircle className="h-5 w-5" />
-                  <h3 className="font-semibold">Thao tác xử lý</h3>
+                  <h3 className="font-semibold">{t('lawyerTickets.actions.title')}</h3>
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Trạng thái hiện tại: {getValue(ticket.status)}
+                  {t('lawyerTickets.actions.currentStatus', { status: getValue(ticket.status) })}
                 </p>
                 {actionError && (
                   <p className="mt-3 rounded-lg bg-error-container px-md py-sm text-sm font-semibold text-risk-high-text dark:bg-red-950/40 dark:text-red-200">
@@ -687,6 +698,7 @@ export function LawyerTicketDetailPage() {
                 <label className="inline-flex cursor-pointer items-center rounded-lg border px-4 py-2 text-sm font-medium">
                   <input
                     type="file"
+                    accept={LAWYER_UPLOAD_ACCEPT}
                     className="hidden"
                     onChange={handleUploadFile}
                     disabled={uploadingFile}
@@ -702,6 +714,8 @@ export function LawyerTicketDetailPage() {
                 </Button>
               </div>
             </div>
+            {selectedUploadFile && <p className="mb-3 text-sm" aria-live="polite">{selectedUploadFile.name} · {formatFileSize(selectedUploadFile.size)} · {selectedUploadFile.type || t('files.mimeUnknown')}</p>}
+            {uploadValidationError && <p className="mb-3 text-sm text-error" role="alert">{uploadValidationError}</p>}
 
             {filesLoading ? (
               <p className="text-sm text-muted-foreground">
@@ -762,7 +776,7 @@ export function LawyerTicketDetailPage() {
 
       <Modal
         open={requestInfoOpen}
-        title="Yêu cầu bổ sung thông tin"
+        title={t("lawyerTickets.requestInformation")}
         onClose={() => {
           if (!requestInfoSubmitting) setRequestInfoOpen(false);
         }}
@@ -789,7 +803,7 @@ export function LawyerTicketDetailPage() {
 
       <Modal
         open={resolveOpen}
-        title="Gửi kết luận xử lý"
+        title={t("lawyerTickets.submitConclusion")}
         onClose={() => {
           if (!resolveSubmitting) setResolveOpen(false);
         }}

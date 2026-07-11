@@ -33,7 +33,8 @@ import type { AiCitation } from "../../types/aiFeature";
 import { useRef } from "react";
 import { formatDisplayDateTime } from "../../utils/format";
 
-const getAccessToken = () => localStorage.getItem("accessToken") ?? "";
+import { getAccessToken as getSessionAccessToken } from "../../services/authSession";
+const getAccessToken = () => getSessionAccessToken() ?? "";
 
 const formatTimestamp = (
   value: string | null | undefined,
@@ -148,7 +149,9 @@ export function LegalChatPage() {
     const loadWorkspaces = async () => {
       try {
         setLoading(true);
-        const data = await getWorkspaces(getAccessToken());
+        const data = (await getWorkspaces(getAccessToken())).filter(
+          (ws) => ws.description !== "System workspace for general contract assistant chat"
+        );
         if (!active) return;
         setWorkspaces(data);
 
@@ -543,12 +546,17 @@ export function LegalChatPage() {
     setError("");
 
     try {
-      const [detail, citations] = await Promise.all([
+      const [detailResult, citationsResult] = await Promise.allSettled([
         getChatMessageDetail(getAccessToken(), messageId),
-        getChatMessageAiCitations(messageId).catch(() => []),
+        getChatMessageAiCitations(messageId),
       ]);
-      setMessageDetail(detail);
-      setMessageCitations(citations);
+      if (detailResult.status === "rejected") throw detailResult.reason;
+      setMessageDetail(detailResult.value);
+      if (citationsResult.status === "fulfilled") {
+        setMessageCitations(citationsResult.value);
+      } else {
+        setError(t("common.partialDataError"));
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : t("chat.messageDetailError");
       setError(message);
@@ -725,7 +733,7 @@ export function LegalChatPage() {
             </div>
           </Card>
 
-          <Card title="Documents in workspace">
+          <Card title={t("chat.documentsInWorkspace")}>
             <div className="space-y-md">
               {workspaceDocuments.length > 0 && (
                 <div className="space-y-sm">

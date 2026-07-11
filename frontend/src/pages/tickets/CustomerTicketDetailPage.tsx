@@ -39,12 +39,14 @@ export function CustomerTicketDetailPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [auxiliaryError, setAuxiliaryError] = useState("");
   const locale = language === "vi" ? "vi-VN" : "en-US";
 
   const loadTicket = useCallback(async () => {
     if (!id) return;
     setLoading(true);
     setError("");
+    setAuxiliaryError("");
 
     try {
       const loadedTicket = await getLegalTicket(id);
@@ -62,6 +64,9 @@ export function CustomerTicketDetailPage() {
       setAssessment(assessmentResult.status === "fulfilled" ? assessmentResult.value : null);
       setSummary(summaryResult.status === "fulfilled" ? summaryResult.value : null);
       setCitations(citationsResult.status === "fulfilled" ? citationsResult.value : []);
+      if ([messagesResult, assessmentResult, summaryResult, citationsResult].some((result) => result.status === "rejected")) {
+        setAuxiliaryError(t("common.partialDataError"));
+      }
     } catch (ticketError) {
       setTicket(null);
       setMessages([]);
@@ -130,6 +135,11 @@ export function CustomerTicketDetailPage() {
       {error && (
         <div className="mb-lg rounded-xl border border-error/40 bg-error/10 p-md text-sm text-error">
           {error}
+        </div>
+      )}
+      {ticket && auxiliaryError && (
+        <div className="mb-lg rounded-xl border border-amber-300 bg-amber-50 p-md text-sm text-amber-900" role="alert">
+          {auxiliaryError} <Button variant="secondary" onClick={() => void loadTicket()}>{t("common.retry")}</Button>
         </div>
       )}
 

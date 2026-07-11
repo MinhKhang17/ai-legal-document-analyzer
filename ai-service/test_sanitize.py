@@ -39,5 +39,18 @@ class TestSanitizeAndExtract(unittest.TestCase):
         text4 = "Không nói gì về mức độ."
         self.assertEqual(extract_risk_level(text4), "UNKNOWN")
 
+    def test_citation_cleanup(self):
+        # Case with bracketed citations
+        raw = "các đoạn thông tin tôi đã trích dẫn (như [K1], [K2], [K3]) đều có nguồn gốc"
+        self.assertEqual(sanitize_response(raw), "các đoạn thông tin tôi đã trích dẫn đều có nguồn gốc")
+        
+        # Case with mixed bracketed and parenthesized citations
+        raw2 = "như sau: (như (K1), [U2]) và kết quả"
+        self.assertEqual(sanitize_response(raw2), "như sau: và kết quả")
+
+        # Case where citations are not inside parenthesis but are comma separated
+        raw3 = "thông tin này [K1], [K2] được đối chiếu"
+        self.assertEqual(sanitize_response(raw3), "thông tin này, được đối chiếu")
+
 if __name__ == "__main__":
     unittest.main()

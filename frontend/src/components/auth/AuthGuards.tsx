@@ -134,8 +134,8 @@ export function AdminRoute({ children }: RouteGuardProps) {
   }
 
   if (user.role !== "ADMIN") {
-  return <Navigate to={resolveRedirectToDashboardOrAdmin(user)} replace />;
-}
+    return <RoleAccessDeniedView />;
+  }
 
   return <>{children}</>;
 }
@@ -152,7 +152,7 @@ export function ExpertRoute({ children }: RouteGuardProps) {
   }
 
   if (user.role !== "EXPERT") {
-    return <Navigate to={resolveRedirectToDashboardOrAdmin(user)} replace />;
+    return <RoleAccessDeniedView />;
   }
 
   return <>{children}</>;

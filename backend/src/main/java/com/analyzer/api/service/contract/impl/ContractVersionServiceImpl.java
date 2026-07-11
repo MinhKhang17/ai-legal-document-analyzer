@@ -12,6 +12,7 @@ import com.analyzer.api.repository.contract.ContractVersionRepository;
 import com.analyzer.api.repository.contract.UserContractRepository;
 import com.analyzer.api.service.contract.ContractVersionService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +20,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Service
+@Primary
 @RequiredArgsConstructor
 public class ContractVersionServiceImpl implements ContractVersionService {
 

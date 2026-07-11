@@ -1,11 +1,14 @@
 import { Fragment, type ReactNode } from "react";
 import { cn } from "../../utils/cn";
 
-type InlineToken = { type: "text" | "bold"; value: string };
+type InlineToken =
+  | { type: "text"; value: string }
+  | { type: "bold"; value: string }
+  | { type: "link"; text: string; url: string };
 
 function parseInline(text: string): InlineToken[] {
   const tokens: InlineToken[] = [];
-  const regex = /\*\*(.+?)\*\*/g;
+  const regex = /(\*\*(.+?)\*\*)|(\[(.+?)\]\((.+?)\))/g;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
@@ -13,7 +16,11 @@ function parseInline(text: string): InlineToken[] {
     if (match.index > lastIndex) {
       tokens.push({ type: "text", value: text.slice(lastIndex, match.index) });
     }
-    tokens.push({ type: "bold", value: match[1] });
+    if (match[1]) {
+      tokens.push({ type: "bold", value: match[2] });
+    } else if (match[3]) {
+      tokens.push({ type: "link", text: match[4], url: match[5] });
+    }
     lastIndex = regex.lastIndex;
   }
 
@@ -25,15 +32,30 @@ function parseInline(text: string): InlineToken[] {
 }
 
 function renderInline(text: string): ReactNode[] {
-  return parseInline(text).map((token, index) =>
-    token.type === "bold" ? (
-      <strong key={`${token.type}-${index}`} className="font-semibold">
-        {token.value}
-      </strong>
-    ) : (
-      <Fragment key={`${token.type}-${index}`}>{token.value}</Fragment>
-    ),
-  );
+  return parseInline(text).map((token, index) => {
+    if (token.type === "bold") {
+      return (
+        <strong key={`${token.type}-${index}`} className="font-semibold text-on-surface dark:text-slate-100">
+          {token.value}
+        </strong>
+      );
+    } else if (token.type === "link") {
+      return (
+        <a
+          key={`${token.type}-${index}`}
+          href={token.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 font-semibold text-primary hover:underline dark:text-inverse-primary transition-colors cursor-pointer"
+          download
+        >
+          {token.text}
+        </a>
+      );
+    } else {
+      return <Fragment key={`${token.type}-${index}`}>{token.value}</Fragment>;
+    }
+  });
 }
 
 interface ChatMessageContentProps {

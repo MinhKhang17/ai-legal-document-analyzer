@@ -13,14 +13,15 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/lawyer/tickets")
@@ -58,7 +59,7 @@ public class LawyerTicketController {
     @GetMapping("/{id}/files")
     @PreAuthorize("hasRole('EXPERT')")
     @Operation(summary = "List files attached to ticket")
-    public ResponseEntity<ApiResponseDTO<List<TicketFileResponse>>> getFiles(@PathVariable("id") String ticketId) {
+    public ResponseEntity<ApiResponseDTO<java.util.List<TicketFileResponse>>> getFiles(@PathVariable("id") String ticketId) {
         Long lawyerId = getCurrentUserId();
         return ResponseEntity.ok(ApiResponseDTO.success("Retrieved ticket files successfully",
                 ticketFileService.listFiles(ticketId, lawyerId)));
@@ -78,7 +79,7 @@ public class LawyerTicketController {
     @GetMapping("/{id}/messages")
     @PreAuthorize("hasRole('EXPERT')")
     @Operation(summary = "Get message history for ticket")
-    public ResponseEntity<ApiResponseDTO<List<LegalTicketMessageResponse>>> getMessages(
+    public ResponseEntity<ApiResponseDTO<java.util.List<LegalTicketMessageResponse>>> getMessages(
             @PathVariable("id") String ticketId) {
         Long lawyerId = getCurrentUserId();
         String role = getCurrentUserRole();
@@ -146,35 +147,35 @@ public class LawyerTicketController {
     @GetMapping("/{id}/download/{documentId}")
     @PreAuthorize("hasRole('EXPERT')")
     @Operation(summary = "Download file attached to ticket")
-    public ResponseEntity<ApiResponseDTO<TicketFileResponse>> downloadUserFile(
+    public ResponseEntity<Resource> downloadUserFile(
             @PathVariable("id") String ticketId,
             @PathVariable("documentId") String documentId) {
         Long lawyerId = getCurrentUserId();
-        List<TicketFileResponse> files = ticketFileService.listFiles(ticketId, lawyerId);
-        TicketFileResponse file = files.stream()
-                .filter(f -> f.getDocumentId().equals(documentId))
-                .findFirst()
-                .orElseThrow(() -> new RuntimeException("Tài liệu không tồn tại hoặc không có quyền truy cập"));
-        return ResponseEntity.ok(ApiResponseDTO.success("File info retrieved successfully", file));
+        Resource resource = ticketFileService.downloadFile(ticketId, lawyerId, documentId);
+        String filename = resource.getFilename() == null ? documentId : resource.getFilename();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(resource);
     }
 
     private Long getCurrentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()
                 || "anonymousUser".equals(authentication.getPrincipal())) {
-            throw new RuntimeException("Bạn chưa đăng nhập");
+            throw new RuntimeException("Ban chua dang nhap");
         }
         if (authentication.getPrincipal() instanceof UserDetailsImpl userDetails) {
             return userDetails.getId();
         }
-        throw new RuntimeException("Thông tin xác thực không hợp lệ");
+        throw new RuntimeException("Thong tin xac thuc khong hop le");
     }
 
     private String getCurrentUserRole() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()
                 || "anonymousUser".equals(authentication.getPrincipal())) {
-            throw new RuntimeException("Bạn chưa đăng nhập");
+            throw new RuntimeException("Ban chua dang nhap");
         }
         if (authentication.getPrincipal() instanceof UserDetailsImpl userDetails) {
             if (userDetails.getAuthorities() != null && !userDetails.getAuthorities().isEmpty()) {
@@ -183,6 +184,6 @@ public class LawyerTicketController {
                 return roleWithPrefix.startsWith("ROLE_") ? roleWithPrefix.substring(5) : roleWithPrefix;
             }
         }
-        throw new RuntimeException("Thông tin xác thực không hợp lệ");
+        throw new RuntimeException("Thong tin xac thuc khong hop le");
     }
 }

@@ -1,0 +1,118 @@
+FLOW 04 - TICKET KHÁCH HÀNG
+
+Mục tiêu:
+- Cho customer tạo legal ticket trực tiếp hoặc từ AI suggestion, xem danh sách ticket, xem chi tiết và phản hồi tiếp với hệ thống/lawyer.
+
+Actor:
+- `CUSTOMER`
+
+Điểm bắt đầu:
+- Route `/tickets`
+- Route `/tickets/create`
+- Từ `LegalChatPage` qua action `createLegalTicket`
+
+Điều kiện tiên quyết:
+- Đã đăng nhập
+- Có workspace
+- Nếu tạo từ chat thì nên có `request_id` từ assistant message
+
+Luồng chính:
+1. Customer vào `/tickets` để xem danh sách ticket của mình.
+2. FE gọi `getMyLegalTickets(page, size, status?)`.
+3. Customer có thể tạo ticket bằng hai đường:
+4. form riêng ở `/tickets/create`
+5. quick-create trong `CustomerTicketsPage`
+6. hoặc tạo từ `LegalChatPage` khi AI đề xuất.
+7. FE gọi `createLegalTicket(payload)`.
+8. Khi mở chi tiết ticket `/tickets/:id`, FE tải:
+9. detail ticket
+10. message history
+11. AI assessment
+12. AI summary
+13. AI citations
+14. Customer có thể reply, cancel, close hoặc reopen ticket tùy trạng thái.
+
+Sơ đồ text:
+- `chat or form -> create ticket -> ticket list -> ticket detail -> reply/cancel/close/reopen`
+
+Màn hình / component:
+- `frontend/src/pages/tickets/CustomerTicketsPage.tsx`
+- `frontend/src/pages/tickets/CreateCustomerTicketPage.tsx`
+- `frontend/src/pages/tickets/CustomerTicketDetailPage.tsx`
+
+Dữ liệu / state:
+- `tickets`, `statusFilter`
+- form create: `workspace/document/question/issueFingerprint/customerNote`
+- detail: `ticket`, `messages`, `assessment`, `summary`, `citations`, `reply`
+
+Validation:
+- `CreateCustomerTicketPage` bắt buộc: workspace, document, question, issueFingerprint
+- `CustomerTicketsPage` quick-create chỉ bắt buộc workspace và question
+- Backend `CreateLegalTicketRequest` chỉ bắt buộc `workspace_id` và `question`; `issue_fingerprint` là optional
+
+API / service tích hợp:
+- FE:
+- `frontend/src/services/legalTicket.service.ts`
+- `frontend/src/services/aiFeature.service.ts`
+- BE:
+- `POST /api/v1/legal-tickets`
+- `GET /api/v1/legal-tickets/my`
+- `GET /api/v1/legal-tickets/{id}`
+- `GET /api/v1/legal-tickets/{id}/messages`
+- `POST /api/v1/legal-tickets/{id}/cancel`
+- `POST /api/v1/legal-tickets/{id}/customer-reply`
+- `POST /api/v1/legal-tickets/{id}/close`
+- `POST /api/v1/legal-tickets/{id}/reopen`
+
+UI states:
+- Empty list ticket
+- Filter theo status
+- Detail có AI summary và message thread
+- Action button cho cancel/close/reopen
+
+Edge cases:
+- Tạo ticket từ chat nhưng thiếu `request_id`: FE đã chặn và báo lỗi
+- Tạo ticket quick-create không truyền `issue_fingerprint`: backend vẫn nhận được theo DTO hiện tại
+- Một số action có thể fail do state machine của ticket, nhưng rule chi tiết chưa thể hiện ở FE
+
+Business rules:
+- Ticket có thể được tạo từ AI suggestion hoặc từ nhập tay
+- Reopen chỉ được trong 7 ngày theo description ở controller
+- Detail page đang tải cả AI metadata lẫn conversation
+
+Quyền:
+- Customer tạo và quản lý ticket của chính mình
+
+File nguồn tham chiếu:
+- FE:
+- `frontend/src/pages/tickets/CreateCustomerTicketPage.tsx`
+- `frontend/src/pages/tickets/CustomerTicketsPage.tsx`
+- `frontend/src/pages/tickets/CustomerTicketDetailPage.tsx`
+- `frontend/src/services/legalTicket.service.ts`
+- `frontend/src/types/legalTicket.ts`
+- BE:
+- `backend/src/main/java/com/analyzer/api/controller/LegalTicketController.java`
+- `backend/src/main/java/com/analyzer/api/dto/legalticket/CreateLegalTicketRequest.java`
+
+Điểm chưa rõ:
+- `CHƯA XÁC ĐỊNH`: state transition hợp lệ đầy đủ của ticket theo từng action.
+- `CHƯA XÁC ĐỊNH`: backend có yêu cầu document phải thuộc workspace và thuộc customer hiện tại trong create ticket hay không, cần đọc sâu service impl thêm nếu triển khai validation UI nghiêm ngặt.
+
+Checklist FE:
+- Đồng bộ logic required field giữa các màn tạo ticket.
+- Không hard-code action availability chỉ theo UI; nên bám response status.
+- Nên hiện timeline status rõ hơn cho customer.
+
+Tiêu chí hoàn thành:
+- Tạo ticket được từ nhiều entry point.
+- Xem list và detail được.
+- Reply/cancel/close/reopen hoạt động đúng.
+
+HIỆN TRẠNG:
+- Flow này có backend thật và UI khá đầy đủ.
+
+SUY LUẬN:
+- Quick-create ở `/tickets` đang là bản rút gọn của form `/tickets/create`.
+
+ĐỀ XUẤT:
+- FE team nên chuẩn hóa một contract payload dùng chung cho mọi điểm tạo ticket.

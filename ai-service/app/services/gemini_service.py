@@ -575,7 +575,7 @@ class GeminiService:
             "temperature": 0.2,
             "top_p": 0.9,
             "top_k": 40,
-            "max_output_tokens": 4096,
+            "max_output_tokens": 8192,
         }
 
     def _encode_stream_event(self, event_type: str, payload: Dict[str, Any]) -> str:
