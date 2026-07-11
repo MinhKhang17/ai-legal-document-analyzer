@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Badge } from "../common/Badge";
 import { Button } from "../common/Button";
 import { Card } from "../common/Card";
@@ -21,8 +21,6 @@ interface KnowledgeBaseIngestedDocumentsCardProps {
 
 const statusOptions = ["", "UPLOADED", "PROCESSING", "INGESTED", "REVIEWING", "PUBLIC", "ARCHIVED", "FAILED"];
 const visibilityOptions = ["", "CUSTOMER", "LAWYER", "ADMIN", "ALL_INTERNAL"];
-
-const labelFor = (language: "en" | "vi", en: string, vi: string) => (language === "vi" ? vi : en);
 
 const getTone = (status?: string | null) => {
   if (!status) return "slate";
@@ -59,7 +57,7 @@ export function KnowledgeBaseIngestedDocumentsCard({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const loadDocuments = async () => {
+  const loadDocuments = useCallback(async () => {
     if (!knowledgeBaseEntryId) {
       return;
     }
@@ -77,18 +75,17 @@ export function KnowledgeBaseIngestedDocumentsCard({
       });
       setData(response);
     } catch (loadError) {
-      const message = loadError instanceof Error ? loadError.message : (language === "vi" ? "Không thể tải danh sách tài liệu đã ingest." : "Unable to load ingested documents.");
+      const message = loadError instanceof Error ? loadError.message : t("knowledge.ingestedDocuments.loadError");
       setError(message);
       setData(null);
     } finally {
       setLoading(false);
     }
-  };
+  }, [ingestStatus, keyword, knowledgeBaseEntryId, page, size, t, visibility]);
 
   useEffect(() => {
     void loadDocuments();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [knowledgeBaseEntryId, keyword, ingestStatus, visibility, page, size]);
+  }, [loadDocuments]);
 
   const resolvedItem = data?.items?.[0] ?? null;
   const versions = resolvedItem?.versions ?? [];
@@ -97,21 +94,17 @@ export function KnowledgeBaseIngestedDocumentsCard({
   const hasVersions = versions.length > 0;
   const pageLabel = useMemo(() => {
     if (totalItems === 0) {
-      return language === "vi" ? "0 mục" : "0 items";
+      return t("knowledge.ingestedDocuments.zeroItems");
     }
     const start = page * size + 1;
     const end = Math.min((page + 1) * size, totalItems);
-    return language === "vi" ? `${start}-${end} / ${totalItems}` : `${start}-${end} of ${totalItems}`;
-  }, [language, page, size, totalItems]);
+    return t("knowledge.ingestedDocuments.range", { start, end, total: totalItems });
+  }, [page, size, t, totalItems]);
 
   return (
     <Card
-      title={labelFor(language, "Ingested documents", "Tài liệu đã ingest")}
-      subtitle={labelFor(
-        language,
-        "Grouped by knowledge base document and enriched with AI ingest metadata.",
-        "Nhóm theo tài liệu knowledge base và bổ sung metadata ingest từ AI.",
-      )}
+      title={t("knowledge.ingestedDocuments.title")}
+      subtitle={t("knowledge.ingestedDocuments.subtitle")}
       actions={
         <Button
           variant="secondary"
@@ -132,7 +125,7 @@ export function KnowledgeBaseIngestedDocumentsCard({
 
         <div className="grid gap-md md:grid-cols-2 xl:grid-cols-5">
           <label className="text-sm font-semibold xl:col-span-2">
-            {labelFor(language, "Keyword", "Từ khóa")}
+            {t("knowledge.ingestedDocuments.keyword")}
             <input
               className="form-field mt-xs"
               value={keyword}
@@ -140,11 +133,11 @@ export function KnowledgeBaseIngestedDocumentsCard({
                 setPage(0);
                 setKeyword(event.target.value);
               }}
-              placeholder={labelFor(language, "Search title, code, source file...", "Tìm theo tiêu đề, mã, file nguồn...")}
+              placeholder={t("knowledge.ingestedDocuments.searchPlaceholder")}
             />
           </label>
           <label className="text-sm font-semibold">
-            {labelFor(language, "Ingest status", "Trạng thái ingest")}
+            {t("knowledge.ingestedDocuments.ingestStatus")}
             <select
               className="form-field mt-xs"
               value={ingestStatus}
@@ -155,13 +148,13 @@ export function KnowledgeBaseIngestedDocumentsCard({
             >
               {statusOptions.map((option) => (
                 <option key={option || "ALL"} value={option}>
-                  {option || labelFor(language, "All", "Tất cả")}
+                  {option || t("common.all")}
                 </option>
               ))}
             </select>
           </label>
           <label className="text-sm font-semibold">
-            {labelFor(language, "Visibility", "Hiển thị")}
+            {t("knowledge.ingestedDocuments.visibility")}
             <select
               className="form-field mt-xs"
               value={visibility}
@@ -172,13 +165,13 @@ export function KnowledgeBaseIngestedDocumentsCard({
             >
               {visibilityOptions.map((option) => (
                 <option key={option || "ALL"} value={option}>
-                  {option || labelFor(language, "All", "Tất cả")}
+                  {option || t("common.all")}
                 </option>
               ))}
             </select>
           </label>
           <label className="text-sm font-semibold">
-            {labelFor(language, "Page size", "Kích thước trang")}
+            {t("knowledge.ingestedDocuments.pageSize")}
             <select
               className="form-field mt-xs"
               value={size}
@@ -198,28 +191,24 @@ export function KnowledgeBaseIngestedDocumentsCard({
 
         <div className="flex flex-wrap items-center justify-between gap-sm rounded-xl bg-surface-container-low px-md py-sm dark:bg-slate-800/70">
           <div className="text-sm text-on-surface-variant dark:text-slate-400">
-            {labelFor(language, "Knowledge base", "Knowledge base")}: <span className="font-semibold text-on-surface dark:text-slate-100">{title}</span>
+            {t("knowledge.ingestedDocuments.knowledgeBase")}: <span className="font-semibold text-on-surface dark:text-slate-100">{title}</span>
             <span className="mx-sm">·</span>
-            {labelFor(language, "Code", "Mã")}: <span className="font-semibold text-on-surface dark:text-slate-100">{documentCode}</span>
+            {t("knowledge.ingestedDocuments.code")}: <span className="font-semibold text-on-surface dark:text-slate-100">{documentCode}</span>
           </div>
           <div className="flex items-center gap-sm text-sm">
-            <Badge tone="blue">{labelFor(language, "Versions", "Phiên bản")} {totalItems}</Badge>
+            <Badge tone="blue">{t("knowledge.ingestedDocuments.versions")} {totalItems}</Badge>
             <span className="text-on-surface-variant dark:text-slate-400">{pageLabel}</span>
           </div>
         </div>
 
         {loading ? (
           <p className="text-sm text-on-surface-variant dark:text-slate-400">
-            {labelFor(language, "Loading ingested documents...", "Đang tải tài liệu đã ingest...")}
+            {t("knowledge.ingestedDocuments.loading")}
           </p>
         ) : !hasVersions ? (
           <EmptyState
-            title={labelFor(language, "No ingested documents found", "Chưa có tài liệu đã ingest")}
-            description={labelFor(
-              language,
-              "Try adjusting filters or ingest the current knowledge base version.",
-              "Hãy thử đổi bộ lọc hoặc ingest lại version hiện tại của knowledge base.",
-            )}
+            title={t("knowledge.ingestedDocuments.emptyTitle")}
+            description={t("knowledge.ingestedDocuments.emptyDescription")}
           />
         ) : (
           <div className="space-y-md">
@@ -255,35 +244,35 @@ export function KnowledgeBaseIngestedDocumentsCard({
 
                       <dl className="mt-md grid gap-sm sm:grid-cols-2 xl:grid-cols-4">
                         <div>
-                          <dt className="label-uppercase">{labelFor(language, "Effective from", "Hiệu lực từ")}</dt>
+                          <dt className="label-uppercase">{t("knowledge.ingestedDocuments.effectiveFrom")}</dt>
                           <dd className="mt-xs">{formatDisplayDate(version.effectiveFrom, "-", locale)}</dd>
                         </div>
                         <div>
-                          <dt className="label-uppercase">{labelFor(language, "Effective to", "Hiệu lực đến")}</dt>
+                          <dt className="label-uppercase">{t("knowledge.ingestedDocuments.effectiveTo")}</dt>
                           <dd className="mt-xs">{formatDisplayDate(version.effectiveTo, "-", locale)}</dd>
                         </div>
                         <div>
-                          <dt className="label-uppercase">{labelFor(language, "Chunk count", "Số chunk")}</dt>
+                          <dt className="label-uppercase">{t("knowledge.ingestedDocuments.chunkCount")}</dt>
                           <dd className="mt-xs font-semibold">{version.chunkCount ?? 0}</dd>
                         </div>
                         <div>
-                          <dt className="label-uppercase">{labelFor(language, "Embedded count", "Số embedding")}</dt>
+                          <dt className="label-uppercase">{t("knowledge.ingestedDocuments.embeddedCount")}</dt>
                           <dd className="mt-xs font-semibold">{version.embeddedCount ?? 0}</dd>
                         </div>
                         <div>
-                          <dt className="label-uppercase">{labelFor(language, "Source file", "File nguồn")}</dt>
+                          <dt className="label-uppercase">{t("knowledge.ingestedDocuments.sourceFile")}</dt>
                           <dd className="mt-xs break-all">{version.sourceFileId || "-"}</dd>
                         </div>
                         <div>
-                          <dt className="label-uppercase">{labelFor(language, "Content hash", "Hash nội dung")}</dt>
+                          <dt className="label-uppercase">{t("knowledge.ingestedDocuments.contentHash")}</dt>
                           <dd className="mt-xs break-all">{version.contentHash || "-"}</dd>
                         </div>
                         <div>
-                          <dt className="label-uppercase">{labelFor(language, "Ingested at", "Đã ingest lúc")}</dt>
+                          <dt className="label-uppercase">{t("knowledge.ingestedDocuments.ingestedAt")}</dt>
                           <dd className="mt-xs">{formatDisplayDate(version.ingestedAt, "-", locale)}</dd>
                         </div>
                         <div>
-                          <dt className="label-uppercase">{labelFor(language, "Version label", "Nhãn phiên bản")}</dt>
+                          <dt className="label-uppercase">{t("knowledge.ingestedDocuments.versionLabel")}</dt>
                           <dd className="mt-xs">{version.versionLabel || "-"}</dd>
                         </div>
                       </dl>
@@ -293,7 +282,7 @@ export function KnowledgeBaseIngestedDocumentsCard({
 
                 <div className="mt-md flex flex-wrap items-center justify-between gap-sm">
                   <p className="text-sm text-on-surface-variant dark:text-slate-400">
-                    {labelFor(language, "Page", "Trang")} {page + 1} / {Math.max(totalPages, 1)}
+                    {t("pagination.page")} {page + 1} / {Math.max(totalPages, 1)}
                   </p>
                   <div className="flex gap-sm">
                     <Button
@@ -302,7 +291,7 @@ export function KnowledgeBaseIngestedDocumentsCard({
                       disabled={page <= 0}
                       onClick={() => setPage((previous) => Math.max(previous - 1, 0))}
                     >
-                      {labelFor(language, "Previous", "Trước")}
+                      {t("pagination.previous")}
                     </Button>
                     <Button
                       variant="secondary"
@@ -310,7 +299,7 @@ export function KnowledgeBaseIngestedDocumentsCard({
                       disabled={(page + 1) >= totalPages}
                       onClick={() => setPage((previous) => previous + 1)}
                     >
-                      {labelFor(language, "Next", "Sau")}
+                      {t("pagination.next")}
                     </Button>
                   </div>
                 </div>

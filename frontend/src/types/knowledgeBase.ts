@@ -22,8 +22,12 @@ export interface IngestKnowledgeRequest {
   jobPayload?: string | null;
 }
 
+export type KnowledgeStatus = "UPLOADED" | "PROCESSING" | "INGESTED" | "REVIEWING" | "PUBLIC" | "ARCHIVED" | "FAILED";
+export type KnowledgeReviewDecision = "APPROVE" | "REQUEST_CHANGES" | "REJECT";
+export type KnowledgeAction = "INGEST" | "REVIEW" | "PUBLISH" | "ARCHIVE";
+
 export interface KnowledgeReviewRequest {
-  decision: "APPROVED" | "REJECTED" | "NEEDS_CHANGES" | string;
+  decision: KnowledgeReviewDecision;
   note?: string | null;
 }
 
@@ -42,7 +46,7 @@ export interface KnowledgeBaseEntry {
   category: string;
   scope: string;
   currentVersionNo: number | null;
-  currentStatus: string | null;
+  currentStatus: KnowledgeStatus | null;
   active: boolean;
   createdById: number;
   workspaceId: number | null;
@@ -57,8 +61,8 @@ export interface KnowledgeBaseVersion {
   sourceDocumentId: string | null;
   rawContent: string | null;
   extractedContent: string | null;
-  status: string | null;
-  reviewDecision: string | null;
+  status: KnowledgeStatus | null;
+  reviewDecision: KnowledgeReviewDecision | null;
   reviewedById: number | null;
   reviewedAt: string | null;
   publishedById: number | null;
@@ -95,7 +99,7 @@ export interface KnowledgeIngestionJob {
   id: string;
   knowledgeBaseVersionId: string;
   requestId: string;
-  status: string;
+  status: KnowledgeStatus;
   jobPayload: string | null;
   errorMessage: string | null;
   startedAt: string | null;

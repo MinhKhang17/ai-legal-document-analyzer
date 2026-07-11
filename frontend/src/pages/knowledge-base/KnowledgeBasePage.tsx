@@ -1,6 +1,8 @@
 import { RefreshCw, Upload } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
+import { Pagination } from "../../components/common/Pagination";
+import { parsePageParam, toPageParam } from "../../utils/pagination";
 import { Badge } from "../../components/common/Badge";
 import { Button } from "../../components/common/Button";
 import { Card } from "../../components/common/Card";
@@ -29,9 +31,12 @@ export function KnowledgeBasePage() {
   const { t, language } = useI18n();
   const toast = useToast();
   const { user } = useAppStore();
+  const [searchParams, setSearchParams] = useSearchParams();
   const locale = language === "vi" ? "vi-VN" : "en-US";
   const [entries, setEntries] = useState<KnowledgeBaseEntry[]>([]);
   const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [page, setPage] = useState(() => parsePageParam(searchParams.get("page")));
   const [form, setForm] = useState(emptyForm);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -42,18 +47,17 @@ export function KnowledgeBasePage() {
     setError("");
 
     try {
-      const response = await getKnowledgeBaseEntries(0, 20);
+      const response = await getKnowledgeBaseEntries(page, 20);
       setEntries(response.items ?? []);
       setTotalItems(response.totalItems ?? 0);
+      setTotalPages(response.totalPages ?? 0);
     } catch (loadError) {
       const message = loadError instanceof Error ? loadError.message : t("knowledge.loadError");
       setError(message);
-      setEntries([]);
-      setTotalItems(0);
     } finally {
       setLoading(false);
     }
-  }, [t]);
+  }, [page, t]);
 
   useEffect(() => {
     void loadEntries();
@@ -169,11 +173,14 @@ export function KnowledgeBasePage() {
         </Card>
 
         <Card title={t("knowledge.entries")} actions={<Badge tone="blue">{totalItems}</Badge>}>
-          {loading ? (
+          {error ? (
+            <div role="alert" className="text-sm text-error">{error} <Button variant="secondary" onClick={() => void loadEntries()}>{t("common.retry")}</Button></div>
+          ) : loading && entries.length === 0 ? (
             <p className="text-sm text-on-surface-variant dark:text-slate-400">{t("knowledge.loading")}</p>
           ) : (
             <DataTable columns={columns} data={entries} getRowKey={(entry) => entry.id} emptyMessage={t("knowledge.empty")} />
           )}
+          <Pagination page={page} totalPages={totalPages} totalItems={totalItems} disabled={loading} onPageChange={(nextPage) => { setPage(nextPage); const next = new URLSearchParams(searchParams); next.set("page", toPageParam(nextPage)); setSearchParams(next); }} />
         </Card>
       </section>
     </div>

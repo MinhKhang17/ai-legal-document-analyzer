@@ -52,7 +52,7 @@ export const getKnowledgeBaseEntries = async (
   const query = new URLSearchParams({ page: String(page), size: String(size) });
   return getJson<PageResponse<KnowledgeBaseEntry>>(
     `${API_ENDPOINTS.knowledgeBase.list}?${query.toString()}`,
-    "KhÃ´ng thá»ƒ táº£i danh sÃ¡ch knowledge base",
+    "Không thể tải danh sách knowledge base",
   );
 };
 
@@ -61,7 +61,7 @@ export const getKnowledgeBaseEntry = async (
 ): Promise<KnowledgeBaseEntry> =>
   getJson<KnowledgeBaseEntry>(
     API_ENDPOINTS.knowledgeBase.detail(entryId),
-    "KhÃ´ng thá»ƒ táº£i chi tiáº¿t knowledge base",
+    "Không thể tải chi tiết knowledge base",
   );
 
 export const getKnowledgeBaseIngestedDocuments = async (
@@ -91,7 +91,7 @@ export const getKnowledgeBaseIngestedDocuments = async (
 
   return getJson<PageResponse<KnowledgeBaseIngestedDocument>>(
     `${API_ENDPOINTS.knowledgeBase.ingestedDocuments(entryId)}?${query.toString()}`,
-    "KhÃ´ng thá»ƒ táº£i danh sÃ¡ch tÃ i liá»‡u Ä‘Ã£ ingest",
+    "Không thể tải danh sách tài liệu đã ingest",
   );
 };
 
@@ -101,7 +101,7 @@ export const uploadKnowledgeBaseEntry = async (
   postJson<KnowledgeBaseVersion>(
     API_ENDPOINTS.knowledgeBase.upload,
     payload,
-    "KhÃ´ng thá»ƒ upload knowledge base",
+    "Không thể upload knowledge base",
   );
 
 export const ingestKnowledgeBaseEntry = async (
@@ -111,7 +111,7 @@ export const ingestKnowledgeBaseEntry = async (
   postJson<KnowledgeIngestionJob>(
     API_ENDPOINTS.knowledgeBase.ingest(entryId),
     payload,
-    "KhÃ´ng thá»ƒ ingest knowledge base",
+    "Không thể ingest knowledge base",
   );
 
 export const getKnowledgeBaseVersions = async (
@@ -119,7 +119,7 @@ export const getKnowledgeBaseVersions = async (
 ): Promise<KnowledgeBaseVersion[]> =>
   getJson<KnowledgeBaseVersion[]>(
     API_ENDPOINTS.knowledgeBase.versions(entryId),
-    "KhÃ´ng thá»ƒ táº£i version knowledge base",
+    "Không thể tải version knowledge base",
   );
 
 export const reviewKnowledgeBaseEntry = async (
@@ -129,7 +129,7 @@ export const reviewKnowledgeBaseEntry = async (
   postJson<KnowledgeBaseVersion>(
     API_ENDPOINTS.knowledgeBase.review(entryId),
     payload,
-    "KhÃ´ng thá»ƒ review knowledge base",
+    "Không thể review knowledge base",
   );
 
 export const publishKnowledgeBaseEntry = async (
@@ -139,7 +139,7 @@ export const publishKnowledgeBaseEntry = async (
   postJson<KnowledgeBaseVersion>(
     API_ENDPOINTS.knowledgeBase.publish(entryId),
     payload,
-    "KhÃ´ng thá»ƒ publish knowledge base",
+    "Không thể publish knowledge base",
   );
 
 export const archiveKnowledgeBaseEntry = async (
@@ -149,5 +149,5 @@ export const archiveKnowledgeBaseEntry = async (
   postJson<KnowledgeBaseVersion>(
     API_ENDPOINTS.knowledgeBase.archive(entryId),
     payload,
-    "KhÃ´ng thá»ƒ archive knowledge base",
+    "Không thể archive knowledge base",
   );

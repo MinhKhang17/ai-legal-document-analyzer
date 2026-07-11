@@ -1,4 +1,5 @@
 import { buildAiServiceUrl, buildApiUrl } from "../config/api";
+import { getAccessToken } from "./authSession";
 
 export interface ApiResponse<T> {
   code: number;
@@ -60,7 +61,7 @@ export const getStoredAccessToken = (): string | undefined => {
     return undefined;
   }
 
-  const accessToken = window.localStorage.getItem("accessToken")?.trim();
+  const accessToken = getAccessToken();
   return accessToken && accessToken.length > 0 ? accessToken : undefined;
 };
 

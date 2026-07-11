@@ -38,16 +38,20 @@ const postLawyerTicketAction = <TResponse>(
     errorMessage,
   );
 
-export const getMyLawyerTickets = async (): Promise<LawyerTicketPageResponse> =>
+export const getMyLawyerTickets = async (page = 0, size = 10, status?: string): Promise<LawyerTicketPageResponse> => {
+  const query = new URLSearchParams({ page: String(page), size: String(size) });
+  if (status?.trim()) query.set('status', status.trim());
+  return (
   requestApiData<LawyerTicketPageResponse>(
-    API_ENDPOINTS.lawyerTickets.my,
+    `${API_ENDPOINTS.lawyerTickets.my}?${query.toString()}`,
     {
       method: "GET",
       headers: buildAuthHeaders({ Accept: "application/json" }),
       credentials: "include",
     },
     "Khong the tai danh sach ticket cua lawyer",
-  );
+  ));
+};
 
 export const getLawyerTicketDetail = async (
   ticketId: string,

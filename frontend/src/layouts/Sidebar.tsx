@@ -205,6 +205,13 @@ const navItems: NavItem[] = [
     section: 'admin',
     allowedRoles: ['ADMIN'],
   },
+  {
+    to: '/admin/refunds',
+    labelKey: 'nav.refunds',
+    icon: Receipt,
+    section: 'admin',
+    allowedRoles: ['ADMIN'],
+  },
 ];
 
 const sectionLabelKeys: Record<NavSection, string> = {

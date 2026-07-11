@@ -130,7 +130,7 @@ export function AdminConsolePage() {
     } else {
       setBackendUsers([]);
       setAdminUsers([]);
-      setAdminError(usersResult.reason instanceof Error ? usersResult.reason.message : 'Không thể tải danh sách người dùng');
+      setAdminError(usersResult.reason instanceof Error ? usersResult.reason.message : t('admin.errors.loadUsers'));
     }
 
     if (paymentsResult.status === 'fulfilled') {
@@ -141,7 +141,7 @@ export function AdminConsolePage() {
         const nextMessage =
           paymentsResult.reason instanceof Error
             ? paymentsResult.reason.message
-            : 'Không thể tải lịch sử thanh toán admin';
+            : t('admin.errors.loadPayments');
         return previous ? `${previous} ${nextMessage}` : nextMessage;
       });
     }
@@ -154,7 +154,7 @@ export function AdminConsolePage() {
         const nextMessage =
           plansResult.reason instanceof Error
             ? plansResult.reason.message
-            : 'Không thể tải subscription plans';
+            : t('admin.errors.loadPlans');
         return previous ? `${previous} ${nextMessage}` : nextMessage;
       });
     }
@@ -163,11 +163,11 @@ export function AdminConsolePage() {
       setLegalTickets(ticketsResult.value.items ?? []);
     } else {
       setLegalTickets([]);
-      setTicketError(ticketsResult.reason instanceof Error ? ticketsResult.reason.message : 'Không thể tải legal tickets');
+      setTicketError(ticketsResult.reason instanceof Error ? ticketsResult.reason.message : t('admin.errors.loadTickets'));
     }
 
     setIsLoadingAdminData(false);
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void loadAdminData();
@@ -624,7 +624,7 @@ export function AdminConsolePage() {
 
   const renderTicketsTab = () => (
     <div className="grid gap-gutter xl:grid-cols-[1.2fr_0.8fr]">
-      <Card title={t('admin.tabs.tickets')} subtitle="Backend currently returns persisted tickets when available.">
+      <Card title={t('admin.tabs.tickets')} subtitle={t('admin.tickets.persistedSubtitle')}>
         {ticketError && (
           <p className="mb-md rounded-lg bg-error-container px-md py-sm text-sm font-semibold text-risk-high-text dark:bg-red-950/40 dark:text-red-200">
             {ticketError}
