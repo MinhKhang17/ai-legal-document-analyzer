@@ -6,13 +6,15 @@ import {
   TicketCheck,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { getMyLawyerTickets } from "../../api/lawyerTicketApi";
 import { Badge } from "../../components/common/Badge";
 import { Button } from "../../components/common/Button";
 import { Card } from "../../components/common/Card";
 import { EmptyState } from "../../components/common/EmptyState";
 import { PageHeader } from "../../components/common/PageHeader";
+import { Pagination } from "../../components/common/Pagination";
+import { parsePageParam, toPageParam } from "../../utils/pagination";
 import { useI18n } from "../../hooks/useI18n";
 import { useToast } from "../../hooks/useToast";
 import type { LawyerTicket } from "../../types/lawyerTicket";
@@ -29,6 +31,9 @@ export function LawyerTicketsPage() {
   const { t, language } = useI18n();
   const toast = useToast();
   const locale = language === "vi" ? "vi-VN" : "en-US";
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [page, setPage] = useState(() => parsePageParam(searchParams.get('page')));
+  const [totalPages, setTotalPages] = useState(0);
 
   const [tickets, setTickets] = useState<LawyerTicket[]>([]);
   const [totalItems, setTotalItems] = useState(0);
@@ -38,9 +43,10 @@ export function LawyerTicketsPage() {
     setIsLoading(true);
 
     try {
-      const response = await getMyLawyerTickets();
+      const response = await getMyLawyerTickets(page, 10);
       setTickets(response.items ?? []);
       setTotalItems(response.totalItems ?? 0);
+      setTotalPages(response.totalPages ?? 0);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : t("lawyerTickets.loadError");
@@ -51,7 +57,7 @@ export function LawyerTicketsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [t, toast]);
+  }, [page, t, toast]);
 
   useEffect(() => {
     void loadTickets();
@@ -93,7 +99,7 @@ export function LawyerTicketsPage() {
         <Card className="p-lg">
           <Clock className="mb-3 h-8 w-8 text-primary" />
           <p className="text-xs font-semibold uppercase tracking-wide">
-            {t("lawyerTickets.openTickets")}
+            {t("lawyerTickets.openTicketsCurrentPage")}
           </p>
           <p className="mt-2 text-3xl font-bold">{openCount}</p>
         </Card>
@@ -101,7 +107,7 @@ export function LawyerTicketsPage() {
         <Card className="p-lg">
           <AlertTriangle className="mb-3 h-8 w-8 text-primary" />
           <p className="text-xs font-semibold uppercase tracking-wide">
-            {t("lawyerTickets.highRiskTickets")}
+            {t("lawyerTickets.highRiskTicketsCurrentPage")}
           </p>
           <p className="mt-2 text-3xl font-bold">{highRiskCount}</p>
         </Card>
@@ -181,6 +187,7 @@ export function LawyerTicketsPage() {
             ))}
           </div>
         )}
+        <Pagination page={page} totalPages={totalPages} totalItems={totalItems} disabled={isLoading} onPageChange={(nextPage) => { setPage(nextPage); const next = new URLSearchParams(searchParams); next.set('page', toPageParam(nextPage)); setSearchParams(next); }} />
       </Card>
     </div>
   );

@@ -1,7 +1,8 @@
 import { ArrowUpRight, Receipt, RefreshCw, ShieldCheck, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { SubscriptionStatusBadge } from '../../components/billing/SubscriptionStatusBadge';
+import { RefundRequestModal } from '../../components/billing/RefundRequestModal';
 import { Badge, type BadgeTone } from '../../components/common/Badge';
 import { Button } from '../../components/common/Button';
 import { Card } from '../../components/common/Card';
@@ -90,6 +91,7 @@ export function BillingPage() {
   const [transactionActionMessage, setTransactionActionMessage] = useState<string | null>(null);
   const [payingTransactionId, setPayingTransactionId] = useState<number | null>(null);
   const [refundingTransactionId, setRefundingTransactionId] = useState<number | null>(null);
+  const [refundTransaction, setRefundTransaction] = useState<PaymentTransaction | null>(null);
   const [isCancellingPlan, setIsCancellingPlan] = useState(false);
   const [usageRows, setUsageRows] = useState<SubscriptionUsage[]>([]);
   const [isLoadingUsage, setIsLoadingUsage] = useState(true);
@@ -219,13 +221,9 @@ export function BillingPage() {
     }
   };
 
-  const handleRequestRefund = async (transaction: PaymentTransaction) => {
-    const reason = window.prompt(t('billing.refundPrompt'));
-
-    if (!reason?.trim()) {
-      return;
-    }
-
+  const handleRequestRefund = async (amount: number, reason: string) => {
+    const transaction = refundTransaction;
+    if (!transaction) return;
     setRefundingTransactionId(transaction.id);
     setTransactionError(null);
     setTransactionActionMessage(null);
@@ -234,12 +232,21 @@ export function BillingPage() {
       await requestSubscriptionRefund({
         paymentTransactionId: transaction.id,
         customerPlanId: transaction.customerPlanId,
-        reason: reason.trim(),
-        amount: transaction.amount,
+        reason,
+        amount,
       });
       const message = t('billing.refundSuccess');
       setTransactionActionMessage(message);
       toast.success(message, t('toast.successTitle'));
+      setRefundTransaction(null);
+      const refreshResults = await Promise.allSettled([
+        loadPaymentTransactions(),
+        loadCustomerPlan(),
+        loadUsage(),
+      ]);
+      if (refreshResults.some((result) => result.status === 'rejected')) {
+        toast.warning(t('common.partialDataError'), t('toast.warningTitle'));
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : t('billing.refundError');
       setTransactionError(message);
@@ -301,7 +308,7 @@ export function BillingPage() {
               refundingTransactionId === transaction.id ||
               transaction.paymentStatus.toUpperCase() !== 'SUCCESS'
             }
-            onClick={() => void handleRequestRefund(transaction)}
+            onClick={() => setRefundTransaction(transaction)}
           >
             {refundingTransactionId === transaction.id ? t('common.loading') : t('billing.refund')}
           </Button>
@@ -530,6 +537,7 @@ export function BillingPage() {
         subtitle={t('billing.subtitle')}
         actions={
           <>
+            <Link to="/billing/refunds"><Button variant="secondary">{t('refund.history.title')}</Button></Link>
             <Button
               variant="secondary"
               leftIcon={<RefreshCw className="h-4 w-4" />}
@@ -553,6 +561,7 @@ export function BillingPage() {
       />
 
       {renderPlanContent()}
+      <RefundRequestModal transaction={refundTransaction} submitting={refundingTransactionId !== null} onClose={() => setRefundTransaction(null)} onSubmit={handleRequestRefund} />
     </div>
   );
 }

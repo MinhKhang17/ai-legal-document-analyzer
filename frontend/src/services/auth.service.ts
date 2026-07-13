@@ -3,7 +3,6 @@ import { buildAuthHeaders } from "./http";
 import type {
   ApiErrorResponse,
   AuthMeResponse,
-  CurrentUser,
   LoginRequest,
   LoginResponse,
   RefreshResponse,
@@ -165,13 +164,6 @@ export const getCurrentUser = async (accessToken: string): Promise<AuthMeRespons
     "Unable to load current user session.",
     accessToken,
   );
-};
-
-export const getCurrentUserData = async (
-  accessToken: string,
-): Promise<CurrentUser> => {
-  const response = await getCurrentUser(accessToken);
-  return response.data;
 };
 
 export async function register(

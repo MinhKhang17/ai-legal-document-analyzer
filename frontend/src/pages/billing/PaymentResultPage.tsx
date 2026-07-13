@@ -1,6 +1,6 @@
 import { CheckCircle2, RefreshCw, XCircle } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Badge } from "../../components/common/Badge";
 import { Button } from "../../components/common/Button";
 import { Card } from "../../components/common/Card";
@@ -10,35 +10,39 @@ import { useToast } from "../../hooks/useToast";
 import { getMyPaymentTransactions } from "../../services/paymentTransaction.service";
 import type { PaymentTransaction } from "../../types/paymentTransaction";
 import { formatDisplayDate, formatVndCurrency } from "../../utils/format";
+import { findVnPayTransaction, getPaymentResultState, parseVnPayResultReference } from "../../utils/paymentResult";
 
 const isSuccessfulPayment = (transaction: PaymentTransaction | null) =>
   transaction?.paymentStatus?.toUpperCase() === "SUCCESS";
 
-const getLatestTransaction = (transactions: PaymentTransaction[]) =>
-  [...transactions].sort(
-    (a, b) =>
-      new Date(b.updatedAt ?? b.createdAt).getTime() -
-      new Date(a.updatedAt ?? a.createdAt).getTime(),
-  )[0] ?? null;
-
 export function PaymentResultPage() {
   const { t } = useI18n();
   const toast = useToast();
+  const [searchParams] = useSearchParams();
   const [transaction, setTransaction] = useState<PaymentTransaction | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [notFound, setNotFound] = useState(false);
   const notifiedResultRef = useRef("");
 
   const loadPaymentResult = useCallback(async () => {
     setLoading(true);
     setError("");
+    setNotFound(false);
 
     try {
+      const reference = parseVnPayResultReference(searchParams);
+      if (!reference.transactionCode) {
+        setTransaction(null);
+        setError("Callback thanh toán không hợp lệ: thiếu mã giao dịch VNPAY.");
+        return;
+      }
       const transactions = await getMyPaymentTransactions();
-      const result = getLatestTransaction(transactions);
+      const result = findVnPayTransaction(transactions, reference);
 
       if (!result) {
         setTransaction(null);
+        setNotFound(true);
         setError(t("payment.result.noTransaction"));
         return;
       }
@@ -65,13 +69,16 @@ export function PaymentResultPage() {
     } finally {
       setLoading(false);
     }
-  }, [t, toast]);
+  }, [searchParams, t, toast]);
 
   useEffect(() => {
     void loadPaymentResult();
   }, [loadPaymentResult]);
 
   const success = isSuccessfulPayment(transaction);
+  const reference = parseVnPayResultReference(searchParams);
+  const resultState = getPaymentResultState(transaction, Boolean(reference.transactionCode), notFound);
+  const stateLabel = t(`payment.result.state.${resultState}`);
 
   return (
     <div>
@@ -95,9 +102,7 @@ export function PaymentResultPage() {
         title={
           loading
             ? t("payment.result.verifying")
-            : success
-              ? t("payment.result.success")
-              : t("payment.result.pending")
+            : stateLabel
         }
         actions={
           loading ? (
@@ -120,7 +125,7 @@ export function PaymentResultPage() {
         ) : transaction ? (
           <div className="space-y-md">
             <div className="flex flex-wrap gap-xs">
-              <Badge tone={success ? "green" : "amber"}>{transaction.paymentStatus}</Badge>
+              <Badge tone={success ? "green" : resultState === "PENDING" ? "amber" : "red"}>{stateLabel}</Badge>
               <Badge tone="blue">{transaction.paymentMethod}</Badge>
               {transaction.transactionCode && <Badge tone="purple">{transaction.transactionCode}</Badge>}
             </div>

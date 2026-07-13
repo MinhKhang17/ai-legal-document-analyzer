@@ -64,12 +64,14 @@ export function AdminTicketDetailPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [auxiliaryError, setAuxiliaryError] = useState("");
 
   const loadTicket = useCallback(async () => {
     if (!ticketId) return;
 
     setLoading(true);
     setError("");
+    setAuxiliaryError("");
 
     try {
       const loadedTicket = await getAdminLegalTicket(ticketId);
@@ -111,6 +113,9 @@ export function AdminTicketDetailPage() {
           ? usersResult.value.filter((user) => user.active && user.role === "EXPERT")
           : [],
       );
+      if ([summaryResult, chatHistoryResult, filesResult, assessmentResult, aiSummaryResult, citationsResult, usersResult].some((result) => result.status === "rejected")) {
+        setAuxiliaryError(t("common.partialDataError"));
+      }
     } catch (ticketError) {
       setTicket(null);
       setTicketSummary(null);
@@ -236,6 +241,11 @@ export function AdminTicketDetailPage() {
       {error && (
         <div className="mb-lg rounded-xl border border-error/40 bg-error/10 p-md text-sm text-error">
           {error}
+        </div>
+      )}
+      {ticket && auxiliaryError && (
+        <div className="mb-lg rounded-xl border border-amber-300 bg-amber-50 p-md text-sm text-amber-900" role="alert">
+          {auxiliaryError} <Button variant="secondary" onClick={() => void loadTicket()}>{t("common.retry")}</Button>
         </div>
       )}
 

@@ -1,11 +1,14 @@
 import { Edit3, FileText, Plus, RefreshCw, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Badge } from "../../components/common/Badge";
 import { Button } from "../../components/common/Button";
 import { Card } from "../../components/common/Card";
 import { DataTable, type DataTableColumn } from "../../components/common/DataTable";
 import { EmptyState } from "../../components/common/EmptyState";
 import { PageHeader } from "../../components/common/PageHeader";
+import { Pagination } from "../../components/common/Pagination";
+import { parsePageParam, toPageParam } from "../../utils/pagination";
 import { useI18n } from "../../hooks/useI18n";
 import { useToast } from "../../hooks/useToast";
 import {
@@ -36,6 +39,10 @@ export function TemplatesPage() {
   const { t, language } = useI18n();
   const toast = useToast();
   const { user } = useAppStore();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [page, setPage] = useState(() => parsePageParam(searchParams.get('page')));
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalItems, setTotalItems] = useState(0);
   const isAdmin = user?.role === "ADMIN";
   const locale = language === "vi" ? "vi-VN" : "en-US";
   const [templates, setTemplates] = useState<ContractTemplate[]>([]);
@@ -50,8 +57,10 @@ export function TemplatesPage() {
     setError("");
 
     try {
-      const response = await getContractTemplates(0, 50);
+      const response = await getContractTemplates(page, 20);
       setTemplates(response.items ?? []);
+      setTotalPages(response.totalPages ?? 0);
+      setTotalItems(response.totalItems ?? 0);
     } catch (loadError) {
       const message =
         loadError instanceof Error ? loadError.message : t("templates.loadError");
@@ -61,7 +70,7 @@ export function TemplatesPage() {
     } finally {
       setLoading(false);
     }
-  }, [toast, t]);
+  }, [page, toast, t]);
 
   useEffect(() => {
     void loadTemplates();
@@ -245,6 +254,7 @@ export function TemplatesPage() {
                 getRowKey={(template) => String(template.id)}
               />
             )}
+            <Pagination page={page} totalPages={totalPages} totalItems={totalItems} disabled={loading} onPageChange={(nextPage) => { setPage(nextPage); const next = new URLSearchParams(searchParams); next.set('page', toPageParam(nextPage)); setSearchParams(next); }} />
           </Card>
         </main>
 

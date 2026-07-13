@@ -14,6 +14,9 @@ const getRequiredEnvValue = (key: string): string => {
 
 const fromEnv = (key: string) => getRequiredEnvValue(key);
 
+export const fromEnvOrDefault = (key: string, fallback: string): string =>
+  (import.meta.env as EnvMap)[key]?.trim() || fallback;
+
 const fillPathParams = (template: string, params: EndpointParams): string =>
   Object.entries(params).reduce(
     (endpoint, [key, value]) =>
@@ -69,10 +72,6 @@ export const API_ENDPOINTS = {
       fillPathParams(fromEnv("VITE_CHAT_SESSION_MEMORY_API"), {
         chatSessionId,
       }),
-    context: (chatSessionId: string) =>
-      fillPathParams(fromEnv("VITE_CHAT_SESSION_CONTEXT_API"), {
-        chatSessionId,
-      }),
   },
 
   subscription: {
@@ -87,10 +86,13 @@ export const API_ENDPOINTS = {
       }),
     myUsage: fromEnv("VITE_SUBSCRIPTION_MY_USAGE_API"),
     refunds: fromEnv("VITE_SUBSCRIPTION_REFUNDS_API"),
+    myRefunds: fromEnvOrDefault("VITE_SUBSCRIPTION_MY_REFUNDS_API", "/api/v1/subscriptions/refunds/me"),
     refundDetail: (refundId: number | string) =>
       fillPathParams(fromEnv("VITE_SUBSCRIPTION_REFUND_DETAIL_API"), {
         refundId,
       }),
+    refundStatus: (refundId: number | string) =>
+      fillPathParams(fromEnvOrDefault("VITE_ADMIN_REFUND_STATUS_API", "/api/v1/subscriptions/refunds/:refundId/status"), { refundId }),
   },
 
   paymentTransactions: {
@@ -101,8 +103,6 @@ export const API_ENDPOINTS = {
       fillPathParams(fromEnv("VITE_PAYMENT_TRANSACTION_VNPAY_URL_API"), {
         transactionId,
       }),
-    vnPayReturn: fromEnv("VITE_PAYMENT_VNPAY_RETURN_API"),
-    vnPayIpn: fromEnv("VITE_PAYMENT_VNPAY_IPN_API"),
   },
 
   users: {
@@ -171,7 +171,6 @@ export const API_ENDPOINTS = {
   },
 
   aiLegal: {
-    query: fromEnv("VITE_AI_LEGAL_QUERY_API"),
     ticketAssessment: (ticketId: string) =>
       fillPathParams(fromEnv("VITE_AI_TICKET_ASSESSMENT_API"), { ticketId }),
     ticketSummary: (ticketId: string) =>
@@ -192,7 +191,7 @@ export const API_ENDPOINTS = {
         knowledgeBaseEntryId,
       }),
     ingestedDocuments: (knowledgeBaseEntryId: string) =>
-      fillPathParams(fromEnv("VITE_ADMIN_KNOWLEDGE_BASE_INGESTED_DOCUMENTS_API"), {
+      fillPathParams(fromEnvOrDefault("VITE_ADMIN_KNOWLEDGE_BASE_INGESTED_DOCUMENTS_API", "/api/v1/admin/knowledge-bases/:knowledgeBaseEntryId/ingested-documents"), {
         knowledgeBaseEntryId,
       }),
     versions: (knowledgeBaseEntryId: string) =>
@@ -259,16 +258,6 @@ export const API_ENDPOINTS = {
     root: fromEnv("VITE_AI_ROOT_API"),
     health: fromEnv("VITE_AI_HEALTH_API"),
     technologies: fromEnv("VITE_AI_TECHNOLOGIES_API"),
-  },
-
-  aiRag: {
-    internalQuery: fromEnv("VITE_AI_RAG_QUERY_API"),
-    preview: fromEnv("VITE_AI_RAG_PREVIEW_API"),
-  },
-
-  aiInternalDocuments: {
-    import: fromEnv("VITE_AI_DOCUMENT_IMPORT_API"),
-    process: fromEnv("VITE_AI_DOCUMENT_PROCESS_API"),
   },
 
   aiRiskKnowledge: {

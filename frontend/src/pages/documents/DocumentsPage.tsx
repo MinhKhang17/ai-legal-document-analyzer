@@ -13,7 +13,8 @@ import { useI18n } from '../../hooks/useI18n';
 import type { Document, Workspace } from '../../types/workspace';
 import { formatDisplayDateTime } from '../../utils/format';
 
-const getAccessToken = () => localStorage.getItem('accessToken') ?? '';
+import { getAccessToken as getSessionAccessToken } from '../../services/authSession';
+const getAccessToken = () => getSessionAccessToken() ?? '';
 
 type DocumentRow = Document & {
   workspaceName: string;

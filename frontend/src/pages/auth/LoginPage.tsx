@@ -6,6 +6,7 @@ import { useI18n } from "../../hooks/useI18n";
 import { useAppStore } from "../../store/AppStore";
 import { getCurrentUser, login } from "../../api/authApi";
 import type { CurrentUser } from "../../types/auth";
+import { clearAccessToken, setAccessToken } from "../../services/authSession";
 
 const getStringStateValue = (state: unknown, key: string): string => {
   if (typeof state === "object" && state !== null) {
@@ -81,7 +82,7 @@ export function LoginPage() {
               throw new Error(t("auth.missingAccessToken"));
             }
 
-            localStorage.setItem("accessToken", accessToken);
+            setAccessToken(accessToken);
 
             const currentUserResponse = await getCurrentUser(accessToken);
             const currentUser = currentUserResponse.data;
@@ -92,7 +93,7 @@ export function LoginPage() {
 
             if (!currentUser.active) {
               void signOut({ remote: false });
-              localStorage.removeItem("accessToken");
+              clearAccessToken();
               setError(t("auth.inactiveAccount"));
               return;
             }
@@ -107,7 +108,7 @@ export function LoginPage() {
               navigate("/dashboard", { replace: true });
             }
           } catch (error) {
-            localStorage.removeItem("accessToken");
+            clearAccessToken();
             void signOut({ remote: false });
             setError(error instanceof Error ? error.message : t("auth.loginFailed"));
           } finally {

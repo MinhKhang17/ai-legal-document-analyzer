@@ -94,8 +94,3 @@ export interface ChatSessionMemory {
   contextJson: string | null;
   updatedAt: string | null;
 }
-
-export interface AppendChatContextRequest {
-  userId?: number;
-  contextJson: string;
-}

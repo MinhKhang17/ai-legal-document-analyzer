@@ -20,6 +20,7 @@ import { useI18n } from "../../hooks/useI18n";
 import { useToast } from "../../hooks/useToast";
 import type { KnowledgeBaseEntry, KnowledgeBaseVersion } from "../../types/knowledgeBase";
 import { formatDisplayDate } from "../../utils/format";
+import { canKnowledgeAction } from "../../utils/knowledgeLifecycle";
 
 export function KnowledgeBaseDetailPage() {
   const { id = "" } = useParams();
@@ -148,7 +149,7 @@ export function KnowledgeBaseDetailPage() {
                 <input className="form-field" value={requestId} onChange={(event) => setRequestId(event.target.value)} placeholder={t("chat.requestId")} />
                 <Button
                   leftIcon={<Send className="h-4 w-4" />}
-                  disabled={saving || !requestId.trim()}
+                    disabled={saving || !requestId.trim() || !canKnowledgeAction(entry.currentStatus, 'INGEST')}
                   onClick={() => void runAction(
                     () => ingestKnowledgeBaseEntry(id, { requestId: requestId.trim(), jobPayload: null }).then((job) => ({
                       id: job.knowledgeBaseVersionId,
@@ -184,16 +185,16 @@ export function KnowledgeBaseDetailPage() {
                   <Button
                     variant="secondary"
                     leftIcon={<CheckCircle2 className="h-4 w-4" />}
-                    disabled={saving}
+                    disabled={saving || !canKnowledgeAction(entry.currentStatus, 'REVIEW')}
                     onClick={() => void runAction(
-                      () => reviewKnowledgeBaseEntry(id, { decision: "APPROVED", note: note.trim() || null }),
+                      () => reviewKnowledgeBaseEntry(id, { decision: "APPROVE", note: note.trim() || null }),
                       t("knowledge.reviewSuccess"),
                     )}
                   >
                     {t("knowledge.approve")}
                   </Button>
                   <Button
-                    disabled={saving || !note.trim()}
+                    disabled={saving || !note.trim() || !canKnowledgeAction(entry.currentStatus, 'PUBLISH')}
                     onClick={() => void runAction(
                       () => publishKnowledgeBaseEntry(id, { note: note.trim() }),
                       t("knowledge.publishSuccess"),
@@ -204,7 +205,7 @@ export function KnowledgeBaseDetailPage() {
                   <Button
                     variant="danger"
                     leftIcon={<Archive className="h-4 w-4" />}
-                    disabled={saving || !note.trim()}
+                    disabled={saving || !note.trim() || !canKnowledgeAction(entry.currentStatus, 'ARCHIVE')}
                     onClick={() => void runAction(
                       () => archiveKnowledgeBaseEntry(id, { reason: note.trim() }),
                       t("knowledge.archiveSuccess"),

@@ -165,38 +165,6 @@ export interface AiRagPreviewResponse {
   retrievedKnowledgeChunks: number;
 }
 
-export interface AiLegalQueryRequest {
-  request_id?: string | null;
-  user_id?: string | null;
-  workspace_id?: string | null;
-  document_id?: string | null;
-  question: string;
-  top_k_checklist?: number;
-  top_k_user_chunks_per_checklist?: number;
-  top_k_knowledge_chunks?: number;
-}
-
-export interface AiLegalQueryResponse {
-  request_id: string | null;
-  success: boolean | null;
-  answer: string | null;
-  confidence_score: number | null;
-  should_suggest_ticket: boolean | null;
-  suggestion_type: string | null;
-  suggestion_reason: string | null;
-  missing_information: string | null;
-  risk_level: string | null;
-  legal_domain: string | null;
-  user_action_hint: string | null;
-  usage?: {
-    prompt_tokens?: number | null;
-    completion_tokens?: number | null;
-    total_tokens?: number | null;
-  } | null;
-  model?: string | null;
-  error_message?: string | null;
-}
-
 export interface AiLegalBasis {
   source_id: string;
   title: string;
