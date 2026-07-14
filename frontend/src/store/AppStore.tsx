@@ -14,6 +14,7 @@ import {
   refreshAccessToken,
 } from "../services/auth.service";
 import type { CurrentUser } from "../types/auth";
+import { clearAccessToken, getAccessToken, migrateLegacyAccessToken, setAccessToken } from "../services/authSession";
 
 export type ThemeMode = "light" | "dark" | "system";
 export type Language = "en" | "vi";
@@ -44,7 +45,6 @@ const STORAGE_KEYS = {
   theme: "lexiguard.theme",
   language: "lexiguard.language",
   sidebar: "lexiguard.sidebarCollapsed",
-  accessToken: "accessToken",
   user: "lexiguard.authUser",
 } as const;
 
@@ -193,7 +193,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    window.localStorage.removeItem(STORAGE_KEYS.accessToken);
+    clearAccessToken();
     window.localStorage.removeItem(STORAGE_KEYS.user);
 
     setIsAuthenticated(false);
@@ -208,7 +208,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    window.localStorage.setItem(STORAGE_KEYS.accessToken, accessToken);
+    setAccessToken(accessToken);
     window.localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(nextUser));
     setUser(nextUser);
     setIsAuthenticated(true);
@@ -226,14 +226,9 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     setIsAuthLoading(true);
 
     try {
-      const storedToken = window.localStorage.getItem(STORAGE_KEYS.accessToken);
+      const storedToken = migrateLegacyAccessToken();
 
-      if (storedToken === null || storedToken.trim().length === 0) {
-        clearAuthState();
-        return;
-      }
-
-      try {
+      if (storedToken) try {
         const response = await getCurrentUser(storedToken);
         if (!isCurrentUser(response.data)) {
           clearAuthState();
@@ -292,7 +287,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     const shouldCallRemote =
       options.remote !== false &&
       typeof window !== "undefined" &&
-      (window.localStorage.getItem(STORAGE_KEYS.accessToken)?.trim().length ?? 0) > 0;
+      Boolean(getAccessToken());
 
     if (shouldCallRemote) {
       try {

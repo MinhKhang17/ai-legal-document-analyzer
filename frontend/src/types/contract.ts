@@ -43,11 +43,7 @@ export interface UpdateContractTemplateRequest {
 
 export interface GenerateContractRequest {
   requestId: string;
-  /**
-   * BLOCKED_BY_BACKEND: contract endpoints currently require numeric workspaceId
-   * while workspace APIs return ids such as "ws_...".
-   */
-  workspaceId: number;
+  workspaceId: string;
   templateId?: number | null;
   sourceDocumentId?: string | null;
   inputJson: string;
@@ -57,7 +53,7 @@ export interface ContractGenerationJob {
   id: string;
   requestId: string;
   requesterId: number;
-  workspaceId: number;
+  workspaceId: string;
   templateId?: number | null;
   sourceDocumentId?: string | null;
   inputJson: string;
@@ -70,11 +66,7 @@ export interface ContractGenerationJob {
 }
 
 export interface SaveContractRequest {
-  /**
-   * BLOCKED_BY_BACKEND: contract endpoints currently require numeric workspaceId
-   * while workspace APIs return ids such as "ws_...".
-   */
-  workspaceId: number;
+  workspaceId: string;
   templateId?: number | null;
   generationJobId?: string | null;
   sourceDocumentId?: string | null;
@@ -86,7 +78,7 @@ export interface SaveContractRequest {
 export interface UserContract {
   id: string;
   ownerId: number;
-  workspaceId: number;
+  workspaceId: string;
   templateId?: number | null;
   generationJobId?: string | null;
   sourceDocumentId?: string | null;

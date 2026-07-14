@@ -26,7 +26,8 @@ import type { ChatMessage } from "../../types/chat";
 import type { WorkspaceChatMessage, WorkspaceChatSession } from "../../types/chat";
 import { useRef } from "react";
 
-const getAccessToken = () => localStorage.getItem("accessToken") ?? "";
+import { getAccessToken as getSessionAccessToken } from "../../services/authSession";
+const getAccessToken = () => getSessionAccessToken() ?? "";
 
 const formatTimestamp = (value: string | null | undefined, language: "en" | "vi") => {
   if (!value) {
@@ -602,7 +603,7 @@ export function ContractAssistantPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          aria-label="Rename chat session"
+                          aria-label={t("chat.renameSession")}
                           onClick={() => {
                             setRenamingSessionId(session.chatSessionId);
                             setRenameTitle(session.title);
@@ -615,7 +616,7 @@ export function ContractAssistantPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          aria-label="Delete chat session"
+                          aria-label={t("chat.deleteSession")}
                           disabled={sessionActionBusyId === session.chatSessionId}
                           onClick={() => void handleDeleteSession(session.chatSessionId)}
                         >
@@ -807,7 +808,7 @@ export function ContractAssistantPage() {
                 <Button
                   type="submit"
                   size="icon"
-                  aria-label="Ask"
+                  aria-label={t("actions.ask")}
                   disabled={!input.trim() || !sandboxWorkspaceId || sending}
                 >
                   <Send className="h-5 w-5" />
@@ -833,22 +834,22 @@ export function ContractAssistantPage() {
         ) : messageDetail ? (
           <div className="space-y-md text-sm">
             <dl className="grid gap-md sm:grid-cols-2">
-              <div><dt className="label-uppercase">Message ID</dt><dd className="mt-xs break-all font-semibold">{messageDetail.messageId}</dd></div>
-              <div><dt className="label-uppercase">Session ID</dt><dd className="mt-xs break-all">{messageDetail.chatSessionId}</dd></div>
-              <div><dt className="label-uppercase">Role</dt><dd className="mt-xs">{messageDetail.role}</dd></div>
-              <div><dt className="label-uppercase">Status</dt><dd className="mt-xs"><Badge tone="slate">{messageDetail.status}</Badge></dd></div>
-              <div><dt className="label-uppercase">Model</dt><dd className="mt-xs">{messageDetail.aiModel ?? '-'}</dd></div>
-              <div><dt className="label-uppercase">Request ID</dt><dd className="mt-xs break-all">{messageDetail.requestId ?? '-'}</dd></div>
-              <div><dt className="label-uppercase">Prompt tokens</dt><dd className="mt-xs">{messageDetail.promptTokens ?? '-'}</dd></div>
-              <div><dt className="label-uppercase">Completion tokens</dt><dd className="mt-xs">{messageDetail.completionTokens ?? '-'}</dd></div>
-              <div><dt className="label-uppercase">Total tokens</dt><dd className="mt-xs">{messageDetail.totalTokens ?? '-'}</dd></div>
-              <div><dt className="label-uppercase">Confidence</dt><dd className="mt-xs">{typeof messageDetail.confidenceScore === 'number' ? `${Math.round(messageDetail.confidenceScore * 100)}%` : '-'}</dd></div>
-              <div><dt className="label-uppercase">Risk level</dt><dd className="mt-xs">{messageDetail.riskLevel ?? '-'}</dd></div>
-              <div><dt className="label-uppercase">Legal domain</dt><dd className="mt-xs">{messageDetail.legalDomain ?? '-'}</dd></div>
+              <div><dt className="label-uppercase">{t("chat.messageId")}</dt><dd className="mt-xs break-all font-semibold">{messageDetail.messageId}</dd></div>
+              <div><dt className="label-uppercase">{t("chat.sessionIdLabel")}</dt><dd className="mt-xs break-all">{messageDetail.chatSessionId}</dd></div>
+              <div><dt className="label-uppercase">{t("chat.role")}</dt><dd className="mt-xs">{messageDetail.role}</dd></div>
+              <div><dt className="label-uppercase">{t("chat.status")}</dt><dd className="mt-xs"><Badge tone="slate">{messageDetail.status}</Badge></dd></div>
+              <div><dt className="label-uppercase">{t("chat.model")}</dt><dd className="mt-xs">{messageDetail.aiModel ?? '-'}</dd></div>
+              <div><dt className="label-uppercase">{t("chat.requestId")}</dt><dd className="mt-xs break-all">{messageDetail.requestId ?? '-'}</dd></div>
+              <div><dt className="label-uppercase">{t("chat.promptTokens")}</dt><dd className="mt-xs">{messageDetail.promptTokens ?? '-'}</dd></div>
+              <div><dt className="label-uppercase">{t("chat.completionTokens")}</dt><dd className="mt-xs">{messageDetail.completionTokens ?? '-'}</dd></div>
+              <div><dt className="label-uppercase">{t("chat.totalTokens")}</dt><dd className="mt-xs">{messageDetail.totalTokens ?? '-'}</dd></div>
+              <div><dt className="label-uppercase">{t("chat.confidence")}</dt><dd className="mt-xs">{typeof messageDetail.confidenceScore === 'number' ? `${Math.round(messageDetail.confidenceScore * 100)}%` : '-'}</dd></div>
+              <div><dt className="label-uppercase">{t("chat.riskLevel")}</dt><dd className="mt-xs">{messageDetail.riskLevel ?? '-'}</dd></div>
+              <div><dt className="label-uppercase">{t("chat.legalDomain")}</dt><dd className="mt-xs">{messageDetail.legalDomain ?? '-'}</dd></div>
             </dl>
             {messageDetail.suggestionReason && (
               <div className="rounded-lg bg-surface-container-low p-md dark:bg-slate-800">
-                <p className="label-uppercase mb-xs">Suggestion reason</p>
+                <p className="label-uppercase mb-xs">{t("chat.suggestionReason")}</p>
                 {messageDetail.suggestionReason}
               </div>
             )}

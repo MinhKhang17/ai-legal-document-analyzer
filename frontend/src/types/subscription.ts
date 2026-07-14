@@ -93,9 +93,16 @@ export interface RefundRequestRecord {
   customerPlanId: number | null;
   requestedById: number;
   reason: string;
-  status: string;
+  status: RefundStatus;
   amount: number;
   adminNote: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export type RefundStatus = 'REQUESTED' | 'APPROVED' | 'REJECTED' | 'PROCESSING' | 'COMPLETED';
+
+export interface UpdateRefundStatusPayload {
+  status: RefundStatus;
+  adminNote?: string | null;
 }

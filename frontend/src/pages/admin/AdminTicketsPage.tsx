@@ -1,6 +1,8 @@
 import { RefreshCw, TicketCheck } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
+import { Pagination } from "../../components/common/Pagination";
+import { parsePageParam, toPageParam } from "../../utils/pagination";
 import { Badge } from "../../components/common/Badge";
 import { Button } from "../../components/common/Button";
 import { Card } from "../../components/common/Card";
@@ -51,10 +53,13 @@ const getStatusTone = (status?: string | null) => {
 export function AdminTicketsPage() {
   const { t, language } = useI18n();
   const toast = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [tickets, setTickets] = useState<LegalTicket[]>([]);
   const [totalItems, setTotalItems] = useState(0);
-  const [statusFilter, setStatusFilter] = useState<LegalTicketFilter>("ALL");
-  const [riskLevel, setRiskLevel] = useState("");
+  const [totalPages, setTotalPages] = useState(0);
+  const [page, setPage] = useState(() => parsePageParam(searchParams.get("page")));
+  const [statusFilter, setStatusFilter] = useState<LegalTicketFilter>(() => toLegalTicketFilter(searchParams.get("status") ?? "ALL"));
+  const [riskLevel, setRiskLevel] = useState(searchParams.get("risk") ?? "");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const filterOptions = useMemo(() => getLegalTicketFilterOptions(t), [t]);
@@ -66,23 +71,22 @@ export function AdminTicketsPage() {
 
     try {
       const response = await getAdminLegalTickets(
-        0,
-        50,
+        page,
+        20,
         statusFilter === "ALL" ? undefined : statusFilter,
         riskLevel || undefined,
       );
       setTickets(response.items ?? []);
       setTotalItems(response.totalItems ?? 0);
+      setTotalPages(response.totalPages ?? 0);
     } catch (loadError) {
       console.error("Failed to load admin legal tickets", loadError);
       setError(t("legalTickets.errors.load"));
-      setTickets([]);
-      setTotalItems(0);
       toast.error(t("legalTickets.errors.load"), t("toast.errorTitle"));
     } finally {
       setLoading(false);
     }
-  }, [riskLevel, statusFilter, t, toast]);
+  }, [page, riskLevel, statusFilter, t, toast]);
 
   useEffect(() => {
     void loadTickets();
@@ -148,7 +152,7 @@ export function AdminTicketsPage() {
             <select
               className="form-field max-w-48"
               value={statusFilter}
-              onChange={(event) => setStatusFilter(toLegalTicketFilter(event.target.value))}
+              onChange={(event) => { const value = toLegalTicketFilter(event.target.value); setStatusFilter(value); setPage(0); const next = new URLSearchParams(searchParams); next.set("page", "1"); value === "ALL" ? next.delete("status") : next.set("status", value); setSearchParams(next); }}
             >
               {filterOptions.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -159,7 +163,7 @@ export function AdminTicketsPage() {
             <select
               className="form-field max-w-44"
               value={riskLevel}
-              onChange={(event) => setRiskLevel(event.target.value)}
+              onChange={(event) => { const value = event.target.value; setRiskLevel(value); setPage(0); const next = new URLSearchParams(searchParams); next.set("page", "1"); value ? next.set("risk", value) : next.delete("risk"); setSearchParams(next); }}
             >
               <option value="">{t("legalTickets.filters.allRisks")}</option>
               <option value="HIGH">{t("risk.high")}</option>
@@ -188,7 +192,7 @@ export function AdminTicketsPage() {
         <Card title={t("legalTickets.totalTickets")}>
           <p className="text-3xl font-bold">{totalItems}</p>
         </Card>
-        <Card title={t("legalTickets.openTickets")}>
+        <Card title={t("legalTickets.openTicketsCurrentPage")}>
           <p className="text-3xl font-bold">{openCount}</p>
         </Card>
         <Card title={t("legalTickets.currentFilter")}>
@@ -199,7 +203,9 @@ export function AdminTicketsPage() {
       </section>
 
       <Card title={t("legalTickets.title")} actions={<Badge tone="blue">{tickets.length}</Badge>}>
-        {loading ? (
+        {error ? (
+          <div role="alert" className="text-sm text-error">{error} <Button variant="secondary" onClick={() => void loadTickets()}>{t("common.retry")}</Button></div>
+        ) : loading && tickets.length === 0 ? (
           <p className="text-sm text-on-surface-variant dark:text-slate-400">
             {t("legalTickets.loading")}
           </p>
@@ -212,6 +218,7 @@ export function AdminTicketsPage() {
         ) : (
           <DataTable columns={columns} data={tickets} getRowKey={(ticket) => ticket.id} />
         )}
+        <Pagination page={page} totalPages={totalPages} totalItems={totalItems} disabled={loading} onPageChange={(nextPage) => { setPage(nextPage); const next = new URLSearchParams(searchParams); next.set("page", toPageParam(nextPage)); setSearchParams(next); }} />
       </Card>
     </div>
   );

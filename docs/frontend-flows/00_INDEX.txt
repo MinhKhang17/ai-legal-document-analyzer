@@ -15,6 +15,7 @@ Danh sách flow đã phân tích:
 7. `07_billing_goi_dich_vu_va_thanh_toan.txt`
 8. `08_hop_dong_ai_va_quan_ly_phien_ban.txt`
 9. `09_knowledge_base_quan_tri.txt`
+10. `10_hoan_tien_customer_va_admin.txt`
 
 Đánh giá nhanh mức độ sẵn sàng:
 - Đủ thông tin và có vẻ đi được end-to-end: flow 01, 02, 03, 04, 05, 06, 07.

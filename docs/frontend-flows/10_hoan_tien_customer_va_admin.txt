@@ -1,0 +1,225 @@
+FLOW 10 - HOAN TIEN CUSTOMER VA ADMIN
+
+Muc tieu:
+- Cho customer gui va theo doi yeu cau hoan tien cua chinh minh.
+- Cho admin xem, loc va xu ly yeu cau hoan tien theo workflow thu cong.
+- Dam bao FE khong cho phep thao tac sai thu tu trang thai.
+
+Actor:
+- `CUSTOMER`
+- `ADMIN`
+
+Diem bat dau de xuat:
+- Customer: route `/billing/refunds`
+- Customer: modal tao refund tu giao dich `SUCCESS` tren `/billing`
+- Admin: route `/admin/refunds`
+- Admin: route `/admin/refunds/{id}` hoac drawer chi tiet
+
+Dieu kien tien quyet:
+- User da dang nhap.
+- Customer co giao dich thanh toan o trang thai `SUCCESS`.
+- Customer chi duoc thao tac voi giao dich cua chinh minh.
+- Admin can co role `ADMIN` de xem danh sach va cap nhat trang thai.
+
+Trang thai refund:
+- `REQUESTED`: customer da gui, cho admin xem xet.
+- `APPROVED`: admin da duyet yeu cau.
+- `REJECTED`: admin tu choi; day la trang thai ket thuc.
+- `PROCESSING`: admin dang thuc hien hoan tien thu cong.
+- `COMPLETED`: da xac nhan hoan tien; day la trang thai ket thuc.
+
+State machine:
+- `REQUESTED -> APPROVED -> PROCESSING -> COMPLETED`
+- `REQUESTED -> REJECTED`
+- Khong cho phep bo qua buoc, vi du `REQUESTED -> COMPLETED`.
+- `REJECTED` va `COMPLETED` khong duoc chuyen sang trang thai khac.
+
+LUONG CUSTOMER - TAO YEU CAU HOAN TIEN:
+1. Customer vao `/billing` va xem lich su giao dich.
+2. FE chi hien nut `Yeu cau hoan tien` cho giao dich co `paymentStatus = SUCCESS`.
+3. Customer bam nut, FE mo modal/form gom:
+4. `paymentTransactionId`: lay tu giao dich dang chon, khong cho sua.
+5. `customerPlanId`: lay tu giao dich/goi lien quan neu co.
+6. `reason`: bat buoc, toi da 2000 ky tu.
+7. `amount`: bat buoc, phai lon hon 0.
+8. Customer xac nhan, FE goi `POST /api/v1/subscriptions/refunds`.
+9. Thanh cong HTTP `201`: FE thong bao da gui va hien status `REQUESTED`.
+10. FE refresh danh sach bang `GET /api/v1/subscriptions/refunds/me`.
+
+Request tao refund:
+```json
+{
+  "paymentTransactionId": 12,
+  "customerPlanId": 5,
+  "reason": "Khong con nhu cau su dung",
+  "amount": 50000
+}
+```
+
+Response data chinh:
+```json
+{
+  "id": 3,
+  "paymentTransactionId": 12,
+  "customerPlanId": 5,
+  "requestedById": 7,
+  "reason": "Khong con nhu cau su dung",
+  "status": "REQUESTED",
+  "amount": 50000,
+  "adminNote": "Yeu cau hoan tien dang duoc xem xet",
+  "createdAt": "2026-07-11T09:30:00",
+  "updatedAt": "2026-07-11T09:30:00"
+}
+```
+
+LUONG CUSTOMER - THEO DOI REFUND:
+1. Customer vao `/billing/refunds`.
+2. FE goi `GET /api/v1/subscriptions/refunds/me`.
+3. Hien danh sach moi nhat truoc, gom amount, reason, status, adminNote, createdAt.
+4. Khi mo chi tiet, FE co the goi `GET /api/v1/subscriptions/refunds/{id}`.
+5. Customer chi xem, khong co quyen doi trang thai.
+
+LUONG ADMIN - DANH SACH REFUND:
+1. Admin vao `/admin/refunds`.
+2. FE goi `GET /api/v1/subscriptions/refunds` de lay tat ca.
+3. Khi loc status, goi vi du:
+4. `GET /api/v1/subscriptions/refunds?status=REQUESTED`
+5. Hien cac cot: refund ID, transaction ID, customer/requestedBy ID, amount, reason, status, adminNote, createdAt.
+6. Admin mo chi tiet bang `GET /api/v1/subscriptions/refunds/{id}`.
+
+LUONG ADMIN - DUYET:
+1. Chi hien nut `Duyet` khi status hien tai la `REQUESTED`.
+2. FE goi `PATCH /api/v1/subscriptions/refunds/{id}/status`.
+3. Payload:
+```json
+{
+  "status": "APPROVED",
+  "adminNote": "Yeu cau hop le"
+}
+```
+4. Thanh cong: cap nhat status thanh `APPROVED` va chi hien thao tac `Bat dau xu ly`.
+
+LUONG ADMIN - TU CHOI:
+1. Chi hien nut `Tu choi` khi status hien tai la `REQUESTED`.
+2. Bat buoc admin nhap ly do tu choi.
+3. Payload:
+```json
+{
+  "status": "REJECTED",
+  "adminNote": "Giao dich khong du dieu kien hoan tien"
+}
+```
+4. Thanh cong: status thanh `REJECTED`; khong hien them nut chuyen trang thai.
+
+LUONG ADMIN - XU LY THU CONG:
+1. Khi status la `APPROVED`, admin thuc hien nghiep vu hoan tien thu cong ben ngoai he thong.
+2. Admin bam `Bat dau xu ly`.
+3. Payload:
+```json
+{
+  "status": "PROCESSING",
+  "adminNote": "Dang thuc hien hoan tien thu cong"
+}
+```
+4. FE cap nhat status thanh `PROCESSING`.
+
+LUONG ADMIN - HOAN TAT:
+1. Chi hien nut `Xac nhan da hoan` khi status la `PROCESSING`.
+2. Admin chi bam sau khi da xac minh tien duoc hoan thanh cong.
+3. Payload:
+```json
+{
+  "status": "COMPLETED",
+  "adminNote": "Da hoan tien thanh cong"
+}
+```
+4. Thanh cong: status thanh `COMPLETED`, khong hien them nut chuyen trang thai.
+5. Neu tong tien da hoan bang tien giao dich:
+6. backend cap nhat payment thanh `REFUNDED`.
+7. backend cap nhat customer plan thanh `CANCELLED`.
+8. backend tat `autoRenew`.
+9. Neu chi hoan mot phan, payment van `SUCCESS` va plan van hoat dong.
+
+API / service tich hop:
+- `POST /api/v1/subscriptions/refunds` - customer tao yeu cau, HTTP `201`.
+- `GET /api/v1/subscriptions/refunds/me` - customer xem danh sach cua minh.
+- `GET /api/v1/subscriptions/refunds/{id}` - customer so huu hoac admin xem chi tiet.
+- `GET /api/v1/subscriptions/refunds` - admin xem tat ca.
+- `GET /api/v1/subscriptions/refunds?status={status}` - admin loc status.
+- `PATCH /api/v1/subscriptions/refunds/{id}/status` - admin chuyen trang thai.
+
+UI states:
+- Loading danh sach.
+- Empty: chua co yeu cau hoan tien.
+- Submit loading: khoa nut gui de tranh double submit.
+- Status badge: requested/approved/rejected/processing/completed.
+- Error banner/toast theo response backend.
+- Confirm dialog truoc khi admin chuyen sang `PROCESSING` hoac `COMPLETED`.
+
+Validation FE:
+- `reason` khong duoc rong, toi da 2000 ky tu.
+- `amount` la so duong.
+- Khong tu tinh rang amount hop le thay backend; backend la nguon xac thuc cuoi cung.
+- Khi reject, `adminNote` bat buoc.
+- `adminNote` toi da 2000 ky tu.
+- Chi render action phu hop voi status hien tai.
+
+Error handling:
+- HTTP `400`: payload/validation khong hop le.
+- HTTP `403`: khong so huu giao dich/refund hoac khong co role admin.
+- HTTP `404`: khong tim thay payment, customer plan hoac refund.
+- HTTP `409`: payment khong SUCCESS, amount vuot phan con lai, co refund dang xu ly, plan khong thuoc payment, hoac chuyen status sai.
+- Khi gap `409`, FE hien thi `message` backend tra ve va refresh refund/payment hien tai.
+
+Edge cases:
+- Customer double click gui refund: khoa nut trong khi request dang chay.
+- Hai request dong thoi: backend khoa payment va tu choi request khong hop le.
+- Da co refund `REQUESTED`, `APPROVED` hoac `PROCESSING`: khong cho tao refund moi tren cung payment.
+- Refund truoc bi `REJECTED`: khong tinh vao tong tien da dat cho hoan.
+- Refund truoc `COMPLETED` mot phan: request sau chi duoc toi da so tien con lai.
+- Customer nhap `customerPlanId` cua giao dich khac: backend tra `409`.
+- Customer khac xem refund: backend tra `403`.
+- Admin refresh trang giua workflow: action phai duoc suy ra lai tu status backend.
+
+Quyen:
+- Customer/authenticated: tao refund, xem danh sach cua minh, xem refund minh so huu.
+- Admin: xem tat ca, loc, xem chi tiet va cap nhat status.
+- Customer khong duoc goi API cap nhat status.
+
+File backend tham chieu:
+- `backend/src/main/java/com/analyzer/api/controller/subscription/SubscriptionManagementController.java`
+- `backend/src/main/java/com/analyzer/api/service/subscription/impl/RefundServiceImpl.java`
+- `backend/src/main/java/com/analyzer/api/dto/subscription/RefundRequestDTO.java`
+- `backend/src/main/java/com/analyzer/api/dto/subscription/RefundResponseDTO.java`
+- `backend/src/main/java/com/analyzer/api/dto/subscription/UpdateRefundStatusRequest.java`
+
+Checklist FE:
+- Them method service cho 5 API refund.
+- Them type `RefundStatus` va `RefundResponse`.
+- Customer form tu transaction `SUCCESS`.
+- Customer refund history/detail.
+- Admin list/filter/detail.
+- Admin action theo state machine.
+- Disable double submit va refresh data sau mutation.
+- Hien thi dung error `403`, `404`, `409`.
+- Sau full refund, refresh payment transaction va current plan.
+
+Tieu chi hoan thanh:
+- Customer tao va theo doi refund cua minh duoc.
+- Customer khong xem duoc refund cua nguoi khac.
+- Admin loc va xu ly refund dung thu tu.
+- FE khong cho gui action sai status.
+- Full refund hien payment `REFUNDED` va plan `CANCELLED` sau khi refresh.
+- Partial refund giu payment `SUCCESS` va plan dang hoat dong.
+
+HIEN TRANG:
+- Backend da co API tao, xem, liet ke, loc va cap nhat workflow refund thu cong.
+- Chua tich hop API refund truc tiep cua VNPAY.
+
+SUY LUAN:
+- UI admin can coi `COMPLETED` la xac nhan nghiep vu quan trong, khong phai thao tac thu nghiem.
+
+DE XUAT:
+- FE dung state machine de render nut thao tac, khong hard-code nhieu dieu kien roi rac.
+- O man admin nen uu tien tab `REQUESTED` de xu ly yeu cau moi.
+- Nen hien confirm dialog ro rang truoc khi danh dau `COMPLETED`.
