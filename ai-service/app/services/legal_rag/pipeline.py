@@ -271,13 +271,19 @@ class GeminiLLMProvider:
         max_retries: int = 4,
         retry_backoff_seconds: float = 2.0,
     ) -> None:
-        self.api_key = api_key
-        self.model = model
-        self.base_url = base_url.rstrip("/")
-        self.timeout_seconds = timeout_seconds
-        self.max_output_tokens = max_output_tokens
-        self.max_retries = max_retries
-        self.retry_backoff_seconds = retry_backoff_seconds
+        self.client = (
+            GeminiClient(
+                api_key=api_key,
+                model=model,
+                base_url=base_url,
+                timeout_seconds=timeout_seconds,
+                max_output_tokens=max_output_tokens,
+                max_retries=max_retries,
+                retry_backoff_seconds=retry_backoff_seconds,
+            )
+            if api_key and model
+            else None
+        )
 
     def analyze(
         self,
@@ -285,7 +291,7 @@ class GeminiLLMProvider:
         candidates: Sequence[RiskCandidate],
         taxonomy: TaxonomyMatch | None,
     ) -> LLMAnalysis | None:
-        if not self.api_key or not self.model:
+        if self.client is None:
             return None
 
         payload = json.dumps(
@@ -310,16 +316,7 @@ class GeminiLLMProvider:
             ensure_ascii=False,
             separators=(",", ":"),
         )
-        client = GeminiClient(
-            api_key=self.api_key,
-            model=self.model,
-            base_url=self.base_url,
-            timeout_seconds=self.timeout_seconds,
-            max_output_tokens=self.max_output_tokens,
-            max_retries=self.max_retries,
-            retry_backoff_seconds=self.retry_backoff_seconds,
-        )
-        result = client.generate_text(
+        result = self.client.generate_text(
             system_prompt="Return compact JSON only: concept_id, taxonomy_id, confidence, explanation.",
             user_prompt=payload,
         )

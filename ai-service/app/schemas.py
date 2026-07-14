@@ -117,6 +117,13 @@ class RagCitation(BaseModel):
     articleNumber: str | None = None
     clauseNumber: str | None = None
     sectionTitle: str | None = None
+    excerpt: str | None = None
+
+
+class RagUsage(BaseModel):
+    promptTokens: int = 0
+    completionTokens: int = 0
+    totalTokens: int = 0
 
 
 class KeyClause(BaseModel):
@@ -165,29 +172,57 @@ class RagQueryResponse(BaseModel):
     answer: str
     confidenceScore: float | None = Field(default=None, description="AI confidence used by the UI to decide ticket escalation.")
     shouldSuggestTicket: bool = Field(default=False, description="Whether the frontend should surface a ticket action.")
-    suggestionType: Literal["NONE", "ASK_MORE_INFO", "SUGGEST_LAWYER", "REQUIRE_LAWYER"] = Field(
+    suggestionType: Literal[
+        "NONE",
+        "ASK_MORE_INFO",
+        "SUGGEST_LAWYER",
+        "REQUIRE_LAWYER",
+        "DIRECT_ANSWER",
+        "ASK_UPLOAD_CONTRACT",
+        "ASK_CONTRACT_TYPE",
+        "ASK_USER_ROLE",
+        "ASK_TARGET_CLAUSE",
+        "ASK_MORE_FACTS",
+        "SUGGEST_REVISE_CLAUSE",
+        "SUGGEST_NEGOTIATION",
+        "REDIRECT_TO_SUPPORTED_SCOPE",
+        "REFUSE_AND_REDIRECT",
+    ] = Field(
         default="NONE",
         description="Type of legal follow-up the AI recommends.",
     )
     suggestionReason: str | None = Field(default=None, description="Short explanation for the follow-up suggestion.")
     missingInformation: str | None = Field(default=None, description="What information the AI still needs from the user.")
-    riskLevel: Literal["LOW", "MEDIUM", "HIGH", "NEED_EXPERT", "UNKNOWN"]
+    riskLevel: Literal["NONE", "LOW", "MEDIUM", "HIGH", "CRITICAL", "UNKNOWN"]
     legalDomain: str | None = Field(default=None, description="Detected legal domain for UI grouping.")
     userActionHint: Literal["CONTINUE_CHAT", "PROVIDE_MORE_INFO", "CREATE_TICKET", "UPLOAD_CONTRACT", "CONTACT_LAWYER"] = Field(
         default="CONTINUE_CHAT",
         description="Small UX hint that tells the app how to guide the user next.",
     )
     citations: list[RagCitation] = Field(default_factory=list)
+    usedKnowledgeCitationIds: list[str] = Field(
+        default_factory=list,
+        description="Validated SYSTEM_KB citations actually used by the answer.",
+    )
+    usedUserCitationIds: list[str] = Field(
+        default_factory=list,
+        description="Validated user-document citations actually used by the answer.",
+    )
     retrievedUserChunks: int
     retrievedKnowledgeChunks: int
 
     # ── NEW fields (all optional for backward compatibility) ──
     intent: str | None = Field(default=None, description="Detected LegalQueryIntent (e.g. FULL_CONTRACT_REVIEW).")
     contractType: str | None = Field(default=None, description="Detected ContractType (e.g. RENTAL, LABOR).")
+    userRole: str | None = Field(default=None, description="Detected role of the user in the contract.")
+    jurisdiction: str | None = Field(default=None, description="Detected jurisdiction for the query.")
+    responseStatus: str | None = Field(default=None, description="Classifier decision on answerability.")
     responseMode: str | None = Field(default=None, description="ResponseMode used (e.g. DOCUMENT_BASED_ANALYSIS).")
     inputComplete: bool | None = Field(default=None, description="Whether the user provided all required input.")
     missingInputs: list[str] | None = Field(default=None, description="List of missing input items.")
     analysis: AnalysisResult | None = Field(default=None, description="Structured analysis output.")
+    model: str | None = None
+    usage: RagUsage | None = None
 
 
 

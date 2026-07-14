@@ -43,7 +43,8 @@ class Settings(BaseSettings):
     gemini_fallback_model: str = ""
     gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
     gemini_timeout_seconds: float = 120.0
-    gemini_max_output_tokens: int = 2048
+    gemini_max_output_tokens: int = 4096
+    gemini_thinking_budget: int = 512
     gemini_max_retries: int = 4
     gemini_retry_backoff_seconds: float = 2.0
 

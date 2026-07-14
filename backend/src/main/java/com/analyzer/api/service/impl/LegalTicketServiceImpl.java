@@ -3,6 +3,7 @@ package com.analyzer.api.service.impl;
 import com.analyzer.api.dto.PageResponse;
 import com.analyzer.api.dto.legalticket.*;
 import com.analyzer.api.entity.*;
+import com.analyzer.api.enums.ChatMessageRole;
 import com.analyzer.api.enums.LegalTicketMessageType;
 import com.analyzer.api.enums.LegalTicketStatus;
 import com.analyzer.api.enums.RiskLevel;
@@ -66,7 +67,11 @@ public class LegalTicketServiceImpl implements LegalTicketService {
         String requestId = request.getRequestId();
         ChatMessage chatMsg = null;
         if (requestId != null && !requestId.isBlank()) {
-            chatMsg = chatMessageRepository.findByRequestId(requestId)
+            chatMsg = chatMessageRepository
+                    .findTopByRequestIdAndUserIdAndRoleOrderByCreatedAtDesc(
+                            requestId,
+                            customerId,
+                            ChatMessageRole.ASSISTANT)
                     .orElseThrow(() -> new ResourceNotFoundException("AI_ANALYSIS_NOT_FOUND"));
 
             Optional<LegalTicket> existingTicket = legalTicketRepository

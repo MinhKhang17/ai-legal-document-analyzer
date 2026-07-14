@@ -105,9 +105,16 @@ async def ingest_document(
 async def ingest_document_v2(
     file: UploadFile = File(...),
     title: str | None = Form(default=None),
+    ingested_by_user_id: str = Form(default="SYSTEM_ADMIN"),
 ) -> IngestionResult:
     try:
-        response = await get_service_v2().ingest_upload(file=file, title=title, ingestion_version=2)
+        service = KnowledgeServiceV2(
+            document_metadata={
+                "ingested_by_role": "ADMIN",
+                "ingested_by_user_id": ingested_by_user_id.strip() or "SYSTEM_ADMIN",
+            }
+        )
+        response = await service.ingest_upload(file=file, title=title, ingestion_version=2)
         _log_response("ingest_v2", response)
         return response
     except Exception:
@@ -217,6 +224,7 @@ def ask_legal_knowledge_v2(payload: AskRequest) -> AskResponse:
     return response
 
 
+@lru_cache(maxsize=8)
 def _build_gemini_client(*, model: str | None = None) -> GeminiClient:
     api_key = os.getenv("GEMINI_API_KEY", settings.gemini_api_key).strip()
     resolved_model = (model or os.getenv("GEMINI_MODEL", settings.gemini_model)).strip()

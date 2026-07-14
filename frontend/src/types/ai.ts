@@ -146,6 +146,8 @@ export interface AiRagQueryResponse {
   legalDomain: string | null;
   userActionHint: "CONTINUE_CHAT" | "PROVIDE_MORE_INFO" | "CREATE_TICKET" | string;
   citations: AiRagCitation[];
+  usedKnowledgeCitationIds: string[];
+  usedUserCitationIds: string[];
   retrievedUserChunks: number;
   retrievedKnowledgeChunks: number;
 }
