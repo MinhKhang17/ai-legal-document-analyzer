@@ -20,8 +20,6 @@ import { UploadPage } from "../pages/upload/UploadPage";
 import { EditorPage } from "../pages/editor/EditorPage";
 import { CustomerTicketDetailPage } from "../pages/tickets/CustomerTicketDetailPage";
 import { CustomerTicketsPage } from "../pages/tickets/CustomerTicketsPage";
-import { ReportsPage } from "../pages/reports/ReportsPage";
-import { ReportDetailPage } from "../pages/reports/ReportDetailPage";
 import { KnowledgeBasePage } from "../pages/knowledge-base/KnowledgeBasePage";
 import { KnowledgeBaseDetailPage } from "../pages/knowledge-base/KnowledgeBaseDetailPage";
 import { BillingPage } from "../pages/billing/BillingPage";
@@ -187,8 +185,6 @@ export const router = createBrowserRouter([
           </CustomerRoute>
         ),
       },
-      { path: "/reports", element: <ReportsPage /> },
-      { path: "/reports/:id", element: <ReportDetailPage /> },
       {
         path: "/knowledge-base",
         element: (
