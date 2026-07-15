@@ -6,6 +6,12 @@ import type {
   Workspace,
 } from "../types/workspace";
 
+// interface ApiResponse<T> {
+//   code: number;
+//   message: string;
+//   data: T;
+// }
+
 type WorkspaceResponse = Omit<Workspace, "status"> & {
   status: string;
 };

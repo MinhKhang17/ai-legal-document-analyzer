@@ -29,7 +29,8 @@ RUN apt-get update \
 COPY requirements.txt .
 
 RUN pip install --upgrade pip \
-    && pip install --no-cache-dir paddlepaddle==${PADDLEPADDLE_VERSION} -i https://www.paddlepaddle.org.cn/packages/stable/cpu/ \
+    && pip install --no-cache-dir paddlepaddle==${PADDLEPADDLE_VERSION} \
+    && pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu \
     && pip install --no-cache-dir -r requirements.txt
 
 COPY . .

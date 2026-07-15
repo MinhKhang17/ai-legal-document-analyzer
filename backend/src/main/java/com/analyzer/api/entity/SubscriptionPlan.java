@@ -5,6 +5,8 @@ import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import com.analyzer.api.enums.SubscriptionTier;
+
 @Entity
 @Table(name = "subscription_plans")
 @Getter
@@ -24,6 +26,10 @@ public class SubscriptionPlan {
     @Column(name = "plan_type", nullable = false)
     private String planType;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tier")
+    private SubscriptionTier tier;
+
     @Column(columnDefinition = "TEXT")
     private String description;
 
@@ -35,6 +41,24 @@ public class SubscriptionPlan {
 
     @Column(name = "max_quota", nullable = false)
     private Integer maxQuota;
+
+    @Column(name = "ai_quota")
+    private Integer aiQuota;
+
+    @Column(name = "ticket_quota")
+    private Integer ticketQuota;
+
+    @Column(name = "max_workspaces")
+    private Integer maxWorkspaces;
+
+    @Column(name = "max_contracts_per_workspace")
+    private Integer maxContractsPerWorkspace;
+
+    @Column(name = "max_draft_contracts")
+    private Integer maxDraftContracts;
+
+    @Column(name = "feature_limits_json", columnDefinition = "TEXT")
+    private String featureLimitsJson;
 
     @Column(nullable = false)
     @Builder.Default

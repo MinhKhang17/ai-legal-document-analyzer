@@ -1,0 +1,105 @@
+FLOW 09 - KNOWLEDGE BASE QUẢN TRỊ
+
+Mục tiêu:
+- Cho admin tạo knowledge entry, xem list/detail/version, kích hoạt ingest, review, publish và archive.
+
+Actor:
+- `ADMIN`
+
+Điểm bắt đầu:
+- Route `/knowledge-base`
+- Route `/knowledge-base/:id`
+
+Điều kiện tiên quyết:
+- User role admin
+
+Luồng chính:
+1. `KnowledgeBasePage` tải list knowledge entry.
+2. Admin nhập form text-based gồm `code`, `title`, `category`, `scope`, `extractedContent`, `rawContent`.
+3. FE gọi `uploadKnowledgeBaseEntry(payload)`.
+4. Admin mở detail entry.
+5. `KnowledgeBaseDetailPage` tải detail và version history.
+6. Admin có thể:
+7. ingest bằng `requestId`
+8. review approve
+9. publish
+10. archive
+11. Xem danh sách ingested documents qua `KnowledgeBaseIngestedDocumentsCard`
+
+Sơ đồ text:
+- `knowledge list -> upload text entry -> detail -> ingest -> review -> publish/archive`
+
+Màn hình / component:
+- `frontend/src/pages/knowledge-base/KnowledgeBasePage.tsx`
+- `frontend/src/pages/knowledge-base/KnowledgeBaseDetailPage.tsx`
+- `frontend/src/components/knowledge-base/KnowledgeBaseIngestedDocumentsCard.tsx`
+
+Dữ liệu / state:
+- list: `entries`, `totalItems`, `form`
+- detail: `entry`, `versions`, `requestId`, `note`
+
+Validation:
+- Upload yêu cầu `user.id`, `code`, `title`, `extractedContent`
+- Ingest yêu cầu `requestId`
+- Publish/archive hiện yêu cầu `note` ở FE
+
+API / service tích hợp:
+- FE:
+- `frontend/src/services/knowledgeBase.service.ts`
+- BE:
+- `GET /api/v1/admin/knowledge-base`
+- `POST /api/v1/admin/knowledge-base/upload`
+- `GET /api/v1/admin/knowledge-base/{id}`
+- `GET /api/v1/admin/knowledge-base/{id}/versions`
+- `POST /api/v1/admin/knowledge-base/{id}/ingest`
+- `POST /api/v1/admin/knowledge-base/{id}/review`
+- `POST /api/v1/admin/knowledge-base/{id}/publish`
+- `POST /api/v1/admin/knowledge-base/{id}/archive`
+- cùng endpoint ingested documents đã map trong env và service
+
+UI states:
+- List table
+- Detail card + versions
+- Latest extracted content
+- Action cards cho ingest/review/publish/archive
+
+Edge cases:
+- Upload knowledge hiện là text payload, không phải upload file binary
+- Trong detail page, action ingest map response job sang object giống version tạm thời rồi reload lại
+- Có component ingested documents, nhưng chi tiết nguồn backend controller nằm ở controller khác
+
+Business rules:
+- Flow này là admin-only
+- Có lifecycle version/status/reviewDecision/publish/archive
+
+Quyền:
+- `@PreAuthorize("hasRole('ADMIN')")`
+
+File nguồn tham chiếu:
+- FE:
+- `frontend/src/pages/knowledge-base/KnowledgeBasePage.tsx`
+- `frontend/src/pages/knowledge-base/KnowledgeBaseDetailPage.tsx`
+- `frontend/src/services/knowledgeBase.service.ts`
+- BE:
+- `backend/src/main/java/com/analyzer/api/controller/knowledge/KnowledgeBaseManagementController.java`
+
+Điểm chưa rõ:
+- `CHƯA XÁC ĐỊNH`: business muốn knowledge upload từ text nhập tay hay từ file import là chính.
+- `CHƯA XÁC ĐỊNH`: endpoint/controller chính xác cho `ingestedDocuments` nếu FE cần tài liệu API đầy đủ hơn.
+
+Checklist FE:
+- Đừng giả định đây là flow upload file.
+- Cần hiển thị rõ trạng thái version và ingestion job.
+- Nếu làm UX hoàn chỉnh, nên phân biệt `review approved` với `publish completed`.
+
+Tiêu chí hoàn thành:
+- Admin tạo entry, xem detail, ingest, review, publish, archive được.
+
+HIỆN TRẠNG:
+- Có flow quản trị knowledge thật, nhưng mô hình dữ liệu hiện thiên về text payload hơn là file upload.
+
+SUY LUẬN:
+- Đây có thể là bước trung gian trước khi nối với ingestion pipeline lớn hơn.
+
+ĐỀ XUẤT:
+- FE nên chốt lại với business xem upload knowledge sẽ là nhập text hay chọn file, vì UX của hai hướng rất khác nhau.

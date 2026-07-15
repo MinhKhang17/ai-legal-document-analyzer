@@ -1,0 +1,67 @@
+services:
+  frontend:
+    image: legal-rag-platform/frontend:dev
+    build:
+      context: ./frontend
+      args:
+        VITE_APP_NAME: ${VITE_APP_NAME:-LexiGuard AI Legal Suite}
+        VITE_DEFAULT_LANGUAGE: ${VITE_DEFAULT_LANGUAGE:-vi}
+        VITE_DEFAULT_THEME: ${VITE_DEFAULT_THEME:-system}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080}
+        VITE_AI_SERVICE_BASE_URL: ${VITE_AI_SERVICE_BASE_URL:-http://localhost:8000}
+    ports:
+      - "5173:80"
+    environment:
+      NODE_ENV: development
+    depends_on:
+      - backend
+
+  backend:
+    image: legal-rag-platform/backend:dev
+    build:
+      context: ./backend
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      DB_URL: jdbc:postgresql://postgres:5432/ai_legal_db
+      DB_USERNAME: postgres
+      DB_PASSWORD: 12345
+      APP_STORAGE_UPLOAD_ROOT: /app/uploads
+      APP_AI_SERVICE_BASE_URL: http://ai-service:8000
+      APP_API_CALLBACK_BASE_URL: http://backend:8080
+    depends_on:
+      - postgres
+      - ai-service
+    volumes:
+      - shared_uploads:/app/uploads
+
+  ai-service:
+    image: legal-rag-platform/ai-service:dev
+    build:
+      context: ./ai-service
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./ai-service/.env
+    environment:
+      PYTHONUNBUFFERED: 1
+      DOCUMENT_IMPORT_DIR: /app/uploads
+      GEMINI_MAX_OUTPUT_TOKENS: 2048
+    volumes:
+      - shared_uploads:/app/uploads
+
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ai_legal_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 12345
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
+  shared_uploads:

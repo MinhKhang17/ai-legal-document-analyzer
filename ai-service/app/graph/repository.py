@@ -29,6 +29,11 @@ class GraphRepository:
                 """
                 for label in sorted(SUPPORTED_LABELS)
             ],
+            """
+            CREATE CONSTRAINT knowledge_node_id IF NOT EXISTS
+            FOR (n:KnowledgeNode)
+            REQUIRE n.node_id IS UNIQUE
+            """,
             f"""
             CREATE VECTOR INDEX {self.vector_index_name} IF NOT EXISTS
             FOR (n:Chunk) ON (n.embedding)
@@ -381,8 +386,9 @@ class GraphRepository:
             raise ValueError(f"Unsupported label: {label}")
 
         query = f"""
-        MERGE (n:{label} {{node_id: $node_id}})
-        SET n.title = $title,
+        MERGE (n:KnowledgeNode {{node_id: $node_id}})
+        SET n:{label},
+            n.title = $title,
             n.text = $text,
             n.order = $order,
             n.token_count = $token_count,
@@ -414,8 +420,8 @@ class GraphRepository:
             }
             session.run(
                 """
-                MATCH (parent {node_id: $parent_id})
-                MATCH (child {node_id: $child_id})
+                MATCH (parent:KnowledgeNode {node_id: $parent_id})
+                MATCH (child:KnowledgeNode {node_id: $child_id})
                 MERGE (parent)-[:PARENT_OF]->(child)
                 """,
                 **relation_params,
@@ -423,8 +429,8 @@ class GraphRepository:
             if relation:
                 session.run(
                     f"""
-                    MATCH (parent {{node_id: $parent_id}})
-                    MATCH (child {{node_id: $child_id}})
+                    MATCH (parent:KnowledgeNode {{node_id: $parent_id}})
+                    MATCH (child:KnowledgeNode {{node_id: $child_id}})
                     MERGE (parent)-[:{relation}]->(child)
                     """,
                     **relation_params,

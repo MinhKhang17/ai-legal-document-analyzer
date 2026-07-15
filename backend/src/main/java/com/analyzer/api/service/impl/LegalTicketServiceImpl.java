@@ -5,7 +5,6 @@ import com.analyzer.api.dto.legalticket.*;
 import com.analyzer.api.entity.*;
 import com.analyzer.api.enums.LegalTicketMessageType;
 import com.analyzer.api.enums.LegalTicketStatus;
-import com.analyzer.api.enums.PlanStatus;
 import com.analyzer.api.enums.RiskLevel;
 import com.analyzer.api.enums.RoleName;
 import com.analyzer.api.exception.common.ConflictException;
@@ -14,6 +13,7 @@ import com.analyzer.api.exception.common.ResourceNotFoundException;
 import com.analyzer.api.mapper.LegalTicketMapper;
 import com.analyzer.api.repository.*;
 import com.analyzer.api.service.LegalTicketService;
+import com.analyzer.api.service.SubscriptionQuotaService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -25,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -37,106 +38,94 @@ public class LegalTicketServiceImpl implements LegalTicketService {
     private final UserRepository userRepository;
     private final WorkspaceRepository workspaceRepository;
     private final DocumentRepository documentRepository;
-    private final CustomerPlanRepository customerPlanRepository;
     private final LegalTicketMapper legalTicketMapper;
+    private final SubscriptionQuotaService subscriptionQuotaService;
 
     @Override
     @Transactional
     public LegalTicketResponse createTicket(Long customerId, CreateLegalTicketRequest request) {
-        // 1. Fetch original ChatMessage by requestId
-        ChatMessage chatMsg = chatMessageRepository.findByRequestId(request.getRequestId())
-                .orElseThrow(() -> new ResourceNotFoundException("AI_ANALYSIS_NOT_FOUND"));
-
-        // 2. Validate duplicate ticket
-        Optional<LegalTicket> existingTicket = legalTicketRepository
-                .findByRequestIdAndCreatedByIdAndDeletedFalse(request.getRequestId(), customerId);
-        if (existingTicket.isPresent()) {
-            throw new ConflictException("DUPLICATE_TICKET");
-        }
-
-        // 3. Validate user
         User customer = userRepository.findById(customerId)
                 .orElseThrow(() -> new ResourceNotFoundException("USER_NOT_FOUND"));
+        subscriptionQuotaService.checkCanCreateExpertTicket(customer);
 
-        // 4. Validate workspace ownership
         Workspace workspace = workspaceRepository.findById(request.getWorkspaceId())
                 .orElseThrow(() -> new ForbiddenException("WORKSPACE_ACCESS_DENIED"));
         if (workspace.getUser() == null || !workspace.getUser().getId().equals(customerId)) {
             throw new ForbiddenException("WORKSPACE_ACCESS_DENIED");
         }
 
-        // 5. Validate document in workspace (optional)
         Document document = null;
         if (request.getDocumentId() != null && !request.getDocumentId().isBlank()) {
             document = documentRepository.findById(request.getDocumentId())
-                    .orElseThrow(() -> new RuntimeException("DOCUMENT_NOT_IN_WORKSPACE"));
+                    .orElseThrow(() -> new ResourceNotFoundException("DOCUMENT_NOT_FOUND"));
             if (document.getWorkspace() == null || !document.getWorkspace().getId().equals(request.getWorkspaceId())) {
-                throw new RuntimeException("DOCUMENT_NOT_IN_WORKSPACE");
+                throw new ForbiddenException("DOCUMENT_NOT_IN_WORKSPACE");
             }
         }
 
-        // 6. Subscription & Quota checks
-        CustomerPlan activePlan = customerPlanRepository.findByCustomerIdAndStatus(customerId, PlanStatus.ACTIVE)
-                .orElse(null);
+        String requestId = request.getRequestId();
+        ChatMessage chatMsg = null;
+        if (requestId != null && !requestId.isBlank()) {
+            chatMsg = chatMessageRepository.findByRequestId(requestId)
+                    .orElseThrow(() -> new ResourceNotFoundException("AI_ANALYSIS_NOT_FOUND"));
 
-        if (activePlan != null && activePlan.getEndDate() != null) {
-            if (LocalDateTime.now().isAfter(activePlan.getEndDate())) {
-                activePlan.setStatus(PlanStatus.EXPIRED);
-                customerPlanRepository.save(activePlan);
-                activePlan = null;
+            Optional<LegalTicket> existingTicket = legalTicketRepository
+                    .findByRequestIdAndCreatedByIdAndDeletedFalse(requestId, customerId);
+            if (existingTicket.isPresent()) {
+                throw new ConflictException("DUPLICATE_TICKET");
             }
+        } else {
+            requestId = "req_" + UUID.randomUUID().toString().replace("-", "");
         }
 
-        if (activePlan == null) {
-            throw new ForbiddenException("Bạn không có gói dịch vụ nào đang kích hoạt");
+        String question = firstNonBlank(request.getQuestion(), request.getCustomerNote());
+        if (question == null || question.isBlank()) {
+            throw new ConflictException("QUESTION_REQUIRED");
         }
 
-        SubscriptionPlan subPlan = activePlan.getSubscriptionPlan();
-        if (subPlan == null) {
-            throw new ForbiddenException("EXPERT_REVIEW_NOT_INCLUDED");
-        }
+        String customerNote = firstNonBlank(request.getCustomerNote(), request.getQuestion());
 
-        String planName = subPlan.getPlanName() != null ? subPlan.getPlanName().toUpperCase() : "";
-        if (planName.contains("FREE")) {
-            throw new ForbiddenException("EXPERT_REVIEW_NOT_INCLUDED");
-        }
-
-        // TODO: SubscriptionPlan currently does not have dedicated expert review quota fields.
-        // Once the schema supports expertReviewLimit, check if (activePlan.getUsedExpertReviews() >= subPlan.getMaxExpertReviews()).
-
-        // 7. Create ticket using metadata from ChatMessage to avoid trusting client data
         LegalTicket ticket = LegalTicket.builder()
-                .requestId(request.getRequestId())
+                .requestId(requestId)
                 .issueFingerprint(request.getIssueFingerprint())
-                .customerNote(request.getCustomerNote())
+                .customerNote(customerNote)
                 .createdBy(customer)
                 .workspace(workspace)
                 .document(document)
-                .question(chatMsg.getContent()) // From AI Chat log
-                .answer(chatMsg.getContent()) // AI log answer snaps (or use chatMsg content as base)
-                .confidenceScore(chatMsg.getConfidenceScore())
-                .shouldSuggestTicket(chatMsg.getShouldSuggestTicket())
-                .suggestionType(chatMsg.getSuggestionType())
-                .suggestionReason(chatMsg.getSuggestionReason())
-                .missingInformation(chatMsg.getMissingInformation())
-                .riskLevel(chatMsg.getRiskLevel())
-                .legalDomain(chatMsg.getLegalDomain())
-                .userActionHint(chatMsg.getUserActionHint())
+                .question(question)
+                .answer(chatMsg != null ? chatMsg.getContent() : null)
+                .confidenceScore(chatMsg != null ? chatMsg.getConfidenceScore() : null)
+                .shouldSuggestTicket(chatMsg != null ? chatMsg.getShouldSuggestTicket() : null)
+                .suggestionType(chatMsg != null ? chatMsg.getSuggestionType() : null)
+                .suggestionReason(chatMsg != null ? chatMsg.getSuggestionReason() : null)
+                .missingInformation(chatMsg != null ? chatMsg.getMissingInformation() : null)
+                .riskLevel(chatMsg != null ? chatMsg.getRiskLevel() : null)
+                .legalDomain(chatMsg != null ? chatMsg.getLegalDomain() : null)
+                .userActionHint(chatMsg != null ? chatMsg.getUserActionHint() : null)
                 .status(LegalTicketStatus.PENDING_ADMIN_REVIEW)
+                .lastCustomerMessageAt(LocalDateTime.now())
                 .build();
 
-        // Save Ticket (Hibernate triggers PrePersist)
         ticket = legalTicketRepository.save(ticket);
 
-        // 8. Create SYSTEM message history
+        LegalTicketMessage customerMsg = LegalTicketMessage.builder()
+                .ticket(ticket)
+                .sender(customer)
+                .content(question)
+                .messageType(LegalTicketMessageType.CUSTOMER_REPLY)
+                .internalOnly(false)
+                .build();
+        legalTicketMessageRepository.save(customerMsg);
+
         LegalTicketMessage systemMsg = LegalTicketMessage.builder()
                 .ticket(ticket)
-                .sender(customer) // Sender as creator, or could represent system
-                .content("Ticket được khởi tạo thành công và đang chờ Admin duyệt.")
+                .sender(customer)
+                .content("Ticket da duoc khoi tao thanh cong va dang cho Admin duyet.")
                 .messageType(LegalTicketMessageType.SYSTEM)
                 .internalOnly(false)
                 .build();
         legalTicketMessageRepository.save(systemMsg);
+        subscriptionQuotaService.recordExpertTicketUsage(customer);
 
         return legalTicketMapper.toResponse(ticket);
     }
@@ -147,10 +136,9 @@ public class LegalTicketServiceImpl implements LegalTicketService {
         LegalTicket ticket = legalTicketRepository.findByIdAndDeletedFalse(ticketId)
                 .orElseThrow(() -> new ResourceNotFoundException("TICKET_NOT_FOUND"));
 
-        // Security check based on roles
         if (RoleName.CUSTOMER.name().equalsIgnoreCase(userRole)) {
             if (!ticket.getCreatedBy().getId().equals(userId)) {
-                throw new ForbiddenException("Bạn không có quyền truy cập ticket này");
+                throw new ForbiddenException("Ban khong co quyen truy cap ticket nay");
             }
         } else if (RoleName.EXPERT.name().equalsIgnoreCase(userRole)) {
             if (ticket.getAssignedLawyer() == null || !ticket.getAssignedLawyer().getId().equals(userId)) {
@@ -193,10 +181,9 @@ public class LegalTicketServiceImpl implements LegalTicketService {
                 .orElseThrow(() -> new ResourceNotFoundException("TICKET_NOT_FOUND"));
 
         if (!ticket.getCreatedBy().getId().equals(customerId)) {
-            throw new ForbiddenException("Bạn không có quyền hủy ticket này");
+            throw new ForbiddenException("Ban khong co quyen huy ticket nay");
         }
 
-        // Only allow cancel when status is PENDING_ADMIN_REVIEW or ASSIGNED_TO_LAWYER
         if (ticket.getStatus() != LegalTicketStatus.PENDING_ADMIN_REVIEW &&
             ticket.getStatus() != LegalTicketStatus.ASSIGNED_TO_LAWYER) {
             throw new ConflictException("INVALID_STATUS_TRANSITION");
@@ -205,13 +192,12 @@ public class LegalTicketServiceImpl implements LegalTicketService {
         ticket.setStatus(LegalTicketStatus.CANCELLED);
         ticket.setCancelledAt(LocalDateTime.now());
 
-        String reason = request != null && request.getReason() != null ? request.getReason() : "Không có lý do";
+        String reason = request != null && request.getReason() != null ? request.getReason() : "Khong co ly do";
 
-        // Create System Message
         LegalTicketMessage msg = LegalTicketMessage.builder()
                 .ticket(ticket)
                 .sender(ticket.getCreatedBy())
-                .content("Khách hàng đã hủy ticket. Lý do: " + reason)
+                .content("Khach hang da huy ticket. Ly do: " + reason)
                 .messageType(LegalTicketMessageType.SYSTEM)
                 .internalOnly(false)
                 .build();
@@ -227,7 +213,7 @@ public class LegalTicketServiceImpl implements LegalTicketService {
                 .orElseThrow(() -> new ResourceNotFoundException("TICKET_NOT_FOUND"));
 
         if (!ticket.getCreatedBy().getId().equals(customerId)) {
-            throw new ForbiddenException("Bạn không có quyền đóng ticket này");
+            throw new ForbiddenException("Ban khong co quyen dong ticket nay");
         }
 
         if (ticket.getStatus() != LegalTicketStatus.RESOLVED) {
@@ -239,11 +225,10 @@ public class LegalTicketServiceImpl implements LegalTicketService {
 
         String feedback = request != null && request.getFeedback() != null ? request.getFeedback() : "";
 
-        // Create System Message
         LegalTicketMessage msg = LegalTicketMessage.builder()
                 .ticket(ticket)
                 .sender(ticket.getCreatedBy())
-                .content("Khách hàng đã đóng ticket. Phản hồi: " + feedback)
+                .content("Khach hang da dong ticket. Phan hoi: " + feedback)
                 .messageType(LegalTicketMessageType.SYSTEM)
                 .internalOnly(false)
                 .build();
@@ -259,29 +244,27 @@ public class LegalTicketServiceImpl implements LegalTicketService {
                 .orElseThrow(() -> new ResourceNotFoundException("TICKET_NOT_FOUND"));
 
         if (!ticket.getCreatedBy().getId().equals(customerId)) {
-            throw new ForbiddenException("Bạn không có quyền mở lại ticket này");
+            throw new ForbiddenException("Ban khong co quyen mo lai ticket nay");
         }
 
         if (ticket.getStatus() != LegalTicketStatus.RESOLVED && ticket.getStatus() != LegalTicketStatus.CLOSED) {
             throw new ConflictException("INVALID_STATUS_TRANSITION");
         }
 
-        // Limit reopening to within 7 days
         LocalDateTime referenceTime = ticket.getResolvedAt() != null ? ticket.getResolvedAt() : ticket.getClosedAt();
         if (referenceTime == null || referenceTime.plusDays(7).isBefore(LocalDateTime.now())) {
-            throw new ConflictException("Chỉ cho phép mở lại ticket trong vòng 7 ngày kể từ khi được giải quyết hoặc đóng");
+            throw new ConflictException("Chi cho phep mo lai ticket trong vong 7 ngay ke tu khi duoc giai quyet hoac dong");
         }
 
         ticket.setStatus(LegalTicketStatus.REOPENED);
         ticket.setReopenedAt(LocalDateTime.now());
 
-        String reason = request != null ? request.getReason() : "Không có lý do";
+        String reason = request != null ? request.getReason() : "Khong co ly do";
 
-        // Create System Message
         LegalTicketMessage msg = LegalTicketMessage.builder()
                 .ticket(ticket)
                 .sender(ticket.getCreatedBy())
-                .content("Khách hàng đã mở lại ticket. Lý do: " + reason)
+                .content("Khach hang da mo lai ticket. Ly do: " + reason)
                 .messageType(LegalTicketMessageType.CUSTOMER_REPLY)
                 .internalOnly(false)
                 .build();
@@ -297,17 +280,21 @@ public class LegalTicketServiceImpl implements LegalTicketService {
                 .orElseThrow(() -> new ResourceNotFoundException("TICKET_NOT_FOUND"));
 
         if (!ticket.getCreatedBy().getId().equals(customerId)) {
-            throw new ForbiddenException("Bạn không có quyền phản hồi ticket này");
+            throw new ForbiddenException("Ban khong co quyen phan hoi ticket nay");
         }
 
-        if (ticket.getStatus() != LegalTicketStatus.NEED_MORE_INFO && ticket.getStatus() != LegalTicketStatus.REOPENED) {
+        if (ticket.getStatus() != LegalTicketStatus.PENDING_ADMIN_REVIEW &&
+            ticket.getStatus() != LegalTicketStatus.ASSIGNED_TO_LAWYER &&
+            ticket.getStatus() != LegalTicketStatus.IN_REVIEW &&
+            ticket.getStatus() != LegalTicketStatus.NEED_MORE_INFO &&
+            ticket.getStatus() != LegalTicketStatus.CUSTOMER_RESPONDED &&
+            ticket.getStatus() != LegalTicketStatus.REOPENED) {
             throw new ConflictException("INVALID_STATUS_TRANSITION");
         }
 
-        // Transition status to CUSTOMER_RESPONDED
         ticket.setStatus(LegalTicketStatus.CUSTOMER_RESPONDED);
+        ticket.setLastCustomerMessageAt(LocalDateTime.now());
 
-        // Add Customer Reply message
         LegalTicketMessage msg = LegalTicketMessage.builder()
                 .ticket(ticket)
                 .sender(ticket.getCreatedBy())
@@ -365,11 +352,10 @@ public class LegalTicketServiceImpl implements LegalTicketService {
         ticket.setStatus(LegalTicketStatus.REJECTED_BY_ADMIN);
         ticket.setRejectionReason(request.getReason());
 
-        // Create System Message
         LegalTicketMessage msg = LegalTicketMessage.builder()
                 .ticket(ticket)
                 .sender(admin)
-                .content("Admin từ chối yêu cầu. Lý do: " + request.getReason())
+                .content("Admin tu choi yeu cau. Ly do: " + request.getReason())
                 .messageType(LegalTicketMessageType.SYSTEM)
                 .internalOnly(false)
                 .build();
@@ -384,10 +370,9 @@ public class LegalTicketServiceImpl implements LegalTicketService {
         LegalTicket ticket = legalTicketRepository.findByIdAndDeletedFalse(ticketId)
                 .orElseThrow(() -> new ResourceNotFoundException("TICKET_NOT_FOUND"));
 
-        // Authorize access
         if (RoleName.CUSTOMER.name().equalsIgnoreCase(userRole)) {
             if (!ticket.getCreatedBy().getId().equals(userId)) {
-                throw new ForbiddenException("Bạn không có quyền xem tin nhắn của ticket này");
+                throw new ForbiddenException("Ban khong co quyen xem tin nhan cua ticket nay");
             }
         } else if (RoleName.EXPERT.name().equalsIgnoreCase(userRole)) {
             if (ticket.getAssignedLawyer() == null || !ticket.getAssignedLawyer().getId().equals(userId)) {
@@ -399,7 +384,6 @@ public class LegalTicketServiceImpl implements LegalTicketService {
 
         return msgs.stream()
                 .filter(m -> {
-                    // Customers cannot see internalOnly messages
                     if (RoleName.CUSTOMER.name().equalsIgnoreCase(userRole)) {
                         return !Boolean.TRUE.equals(m.getInternalOnly());
                     }
@@ -407,5 +391,14 @@ public class LegalTicketServiceImpl implements LegalTicketService {
                 })
                 .map(legalTicketMapper::toMessageResponse)
                 .collect(Collectors.toList());
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+        return null;
     }
 }

@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 @Repository
@@ -41,4 +42,6 @@ public interface LegalTicketRepository extends JpaRepository<LegalTicket, String
 
     @EntityGraph(attributePaths = {"workspace", "document", "createdBy", "assignedLawyer"})
     Page<LegalTicket> findByStatusAndRiskLevelAndDeletedFalse(LegalTicketStatus status, RiskLevel riskLevel, Pageable pageable);
+
+    long countByCreatedByIdAndDeletedFalseAndCreatedAtBetween(Long createdById, LocalDateTime start, LocalDateTime end);
 }

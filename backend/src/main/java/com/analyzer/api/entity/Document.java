@@ -47,6 +47,18 @@ public class Document {
     @Column(name = "source_type", nullable = false)
     private String sourceType;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "legal_ticket_id")
+    private LegalTicket legalTicket;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "document_purpose")
+    private com.analyzer.api.enums.DocumentPurpose documentPurpose;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "visibility_scope")
+    private com.analyzer.api.enums.DocumentVisibilityScope visibilityScope;
+
     @Column(nullable = false)
     private String status;
 

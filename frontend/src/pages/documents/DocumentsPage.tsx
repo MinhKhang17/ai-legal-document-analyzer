@@ -11,8 +11,10 @@ import { StatusBadge } from '../../components/common/StatusBadge';
 import { getWorkspaceDocuments, getWorkspaces } from '../../api/workspaceApi';
 import { useI18n } from '../../hooks/useI18n';
 import type { Document, Workspace } from '../../types/workspace';
+import { formatDisplayDateTime } from '../../utils/format';
 
-const getAccessToken = () => localStorage.getItem('accessToken') ?? '';
+import { getAccessToken as getSessionAccessToken } from '../../services/authSession';
+const getAccessToken = () => getSessionAccessToken() ?? '';
 
 type DocumentRow = Document & {
   workspaceName: string;
@@ -100,10 +102,7 @@ export function DocumentsPage() {
     {
       header: t('table.date'),
       cell: (document) =>
-        new Intl.DateTimeFormat(language === 'vi' ? 'vi-VN' : 'en-US', {
-          dateStyle: 'medium',
-          timeStyle: 'short',
-        }).format(new Date(document.uploadedAt)),
+        formatDisplayDateTime(document.uploadedAt, '-', language === 'vi' ? 'vi-VN' : 'en-US'),
     },
     {
       header: t('table.actions'),

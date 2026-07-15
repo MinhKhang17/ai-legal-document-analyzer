@@ -3,6 +3,7 @@ import { useCallback, useRef, useState, type DragEvent } from 'react';
 import { Button } from '../common/Button';
 import { cn } from '../../utils/cn';
 import { useI18n } from '../../hooks/useI18n';
+import { DOCUMENT_UPLOAD_ACCEPT, validateDocumentFiles } from '../../config/upload';
 
 interface FileUploadZoneProps {
   onUpload?: (file: File) => void | Promise<void>;
@@ -18,12 +19,21 @@ export function FileUploadZone({
   const { t } = useI18n();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
+  const [validationError, setValidationError] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const handleFiles = useCallback(
     (files: FileList | null) => {
       if (disabled || !files?.length) return;
 
+      const result = validateDocumentFiles(files);
+      if (!result.valid) {
+        setValidationError(t(result.messageKey));
+        return;
+      }
+      setValidationError('');
       const file = files[0];
+      setSelectedFile(file);
       onUpload?.(file);
     },
     [disabled, onUpload],
@@ -56,11 +66,15 @@ export function FileUploadZone({
       role="button"
       tabIndex={0}
       aria-label={t('documents.dropzoneTitle')}
+      aria-disabled={disabled}
+      onKeyDown={(event) => {
+        if (!disabled && (event.key === 'Enter' || event.key === ' ')) inputRef.current?.click();
+      }}
     >
       <input
         ref={inputRef}
         type="file"
-        accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        accept={DOCUMENT_UPLOAD_ACCEPT}
         className="hidden"
         disabled={disabled}
         onChange={(event) => {
@@ -80,6 +94,13 @@ export function FileUploadZone({
       <p className="mt-xs text-sm text-on-surface-variant dark:text-slate-400">
         {t('documents.dropzoneHint')}
       </p>
+      {validationError && <p className="mt-sm text-sm text-error" role="alert">{validationError}</p>}
+      {selectedFile && (
+        <div className="mt-sm flex flex-wrap items-center justify-center gap-sm text-sm" aria-live="polite">
+          <span>{selectedFile.name} · {(selectedFile.size / 1024).toFixed(1)} KB · {selectedFile.type || t('files.mimeUnknown')}</span>
+          <Button type="button" variant="ghost" size="sm" disabled={disabled} onClick={(event) => { event.stopPropagation(); setSelectedFile(null); setValidationError(''); }}>{t('actions.remove')}</Button>
+        </div>
+      )}
 
       <Button
         type="button"
@@ -88,7 +109,7 @@ export function FileUploadZone({
         disabled={disabled}
         onClick={() => inputRef.current?.click()}
       >
-        {disabled ? 'Đang tải lên...' : t('actions.selectFiles')}
+        {disabled ? t('common.uploading') : t('actions.selectFiles')}
       </Button>
     </div>
   );

@@ -1,11 +1,14 @@
 import { Fragment, type ReactNode } from "react";
 import { cn } from "../../utils/cn";
 
-type InlineToken = { type: "text" | "bold"; value: string };
+type InlineToken =
+  | { type: "text"; value: string }
+  | { type: "bold"; value: string }
+  | { type: "link"; text: string; url: string };
 
 function parseInline(text: string): InlineToken[] {
   const tokens: InlineToken[] = [];
-  const regex = /\*\*(.+?)\*\*/g;
+  const regex = /(\*\*(.+?)\*\*)|(\[(.+?)\]\((.+?)\))/g;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
@@ -13,7 +16,11 @@ function parseInline(text: string): InlineToken[] {
     if (match.index > lastIndex) {
       tokens.push({ type: "text", value: text.slice(lastIndex, match.index) });
     }
-    tokens.push({ type: "bold", value: match[1] });
+    if (match[1]) {
+      tokens.push({ type: "bold", value: match[2] });
+    } else if (match[3]) {
+      tokens.push({ type: "link", text: match[4], url: match[5] });
+    }
     lastIndex = regex.lastIndex;
   }
 
@@ -25,15 +32,30 @@ function parseInline(text: string): InlineToken[] {
 }
 
 function renderInline(text: string): ReactNode[] {
-  return parseInline(text).map((token, index) =>
-    token.type === "bold" ? (
-      <strong key={`${token.type}-${index}`} className="font-semibold">
-        {token.value}
-      </strong>
-    ) : (
-      <Fragment key={`${token.type}-${index}`}>{token.value}</Fragment>
-    ),
-  );
+  return parseInline(text).map((token, index) => {
+    if (token.type === "bold") {
+      return (
+        <strong key={`${token.type}-${index}`} className="font-semibold text-on-surface dark:text-slate-100">
+          {token.value}
+        </strong>
+      );
+    } else if (token.type === "link") {
+      return (
+        <a
+          key={`${token.type}-${index}`}
+          href={token.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 font-semibold text-primary hover:underline dark:text-inverse-primary transition-colors cursor-pointer"
+          download
+        >
+          {token.text}
+        </a>
+      );
+    } else {
+      return <Fragment key={`${token.type}-${index}`}>{token.value}</Fragment>;
+    }
+  });
 }
 
 interface ChatMessageContentProps {
@@ -41,8 +63,93 @@ interface ChatMessageContentProps {
   className?: string;
 }
 
+export function sanitizeAndExtractContent(text: string): string {
+  if (!text) return "";
+
+  let cleaned = text.trim();
+
+  // 1. Clean markdown fences:
+  // ```json or ``` at the start
+  if (cleaned.startsWith("```")) {
+    cleaned = cleaned.replace(/^```[a-zA-Z0-9]*\s*/, "");
+    // ``` at the end
+    if (cleaned.endsWith("```")) {
+      cleaned = cleaned.slice(0, -3).trim();
+    }
+  }
+
+  // 2. Try to parse as JSON if it looks like JSON
+  if (
+    (cleaned.startsWith("{") && cleaned.endsWith("}")) ||
+    (cleaned.startsWith("[") && cleaned.endsWith("]"))
+  ) {
+    try {
+      const parsed = JSON.parse(cleaned);
+      if (parsed && typeof parsed === "object") {
+        const candidate = parsed.answer || parsed.response || parsed.content || parsed.message;
+        if (candidate && typeof candidate === "string") {
+          return sanitizeAndExtractContent(candidate);
+        }
+        // If it's a valid JSON dict but has no specific string field, find the first string value
+        for (const value of Object.values(parsed)) {
+          if (typeof value === "string" && value.trim()) {
+            return sanitizeAndExtractContent(value);
+          }
+        }
+      }
+    } catch {
+      // If parsing fails, fall back to regex extraction for unclosed/malformed JSON
+    }
+  }
+
+  // If it's not valid JSON, but has something like "answer": "...", try extracting with regex
+  if (cleaned.includes('"answer"') || cleaned.includes('"response"') || cleaned.includes('"content"')) {
+    const regex = /"(?:answer|response|content)"\s*:\s*"((?:[^"\\]|\\.)*)"/;
+    const match = regex.exec(cleaned);
+    if (match) {
+      try {
+        const parsedStr = JSON.parse(`"${match[1]}"`);
+        return sanitizeAndExtractContent(parsedStr);
+      } catch {
+        return sanitizeAndExtractContent(match[1]);
+      }
+    }
+
+    // Try unclosed key regex: `"answer": "..."` but unclosed at the end
+    const unclosedRegex = /"(?:answer|response|content)"\s*:\s*"\s*([\s\S]*)/;
+    const unclosedMatch = unclosedRegex.exec(cleaned);
+    if (unclosedMatch) {
+      let val = unclosedMatch[1].trim();
+      val = val.replace(/"\s*,\s*"[^"]*"\s*:\s*[\s\S]*$/, ""); // remove subsequent fields
+      val = val.replace(/"\s*\}\s*$/, "");
+      val = val.replace(/"\s*$/, "");
+      try {
+        const parsedStr = JSON.parse(`"${val}"`);
+        return sanitizeAndExtractContent(parsedStr);
+      } catch {
+        return sanitizeAndExtractContent(val);
+      }
+    }
+  }
+
+  // Double quotes strip if surrounding
+  if (
+    cleaned.length >= 2 &&
+    ((cleaned.startsWith('"') && cleaned.endsWith('"')) ||
+      (cleaned.startsWith("'") && cleaned.endsWith("'")))
+  ) {
+    cleaned = cleaned.slice(1, -1).trim();
+  }
+
+  // Remove final trailing/leading code blocks or ticks if they surround the content
+  cleaned = cleaned.replace(/^```[a-zA-Z0-9]*\s*/, "").replace(/```$/, "");
+
+  return cleaned.trim();
+}
+
 export function ChatMessageContent({ content, className }: ChatMessageContentProps) {
-  const lines = content.replace(/\r\n/g, "\n").split("\n");
+  const sanitizedContent = sanitizeAndExtractContent(content);
+  const lines = sanitizedContent.replace(/\r\n/g, "\n").split("\n");
   const blocks: ReactNode[] = [];
 
   let bulletItems: string[] = [];

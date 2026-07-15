@@ -28,7 +28,7 @@ class _FakeRetrievalService:
             )
         ]
 
-    def search_knowledge_chunks(self, legal_search_query: str, top_k: int):
+    def search_knowledge_chunks(self, legal_search_query: str, top_k: int, query_text: str | None = None):
         return [
             RagChunkHit(
                 citationId="K1",

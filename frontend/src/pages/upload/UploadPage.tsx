@@ -18,7 +18,8 @@ import { ProcessingTimeline } from "../../components/upload/ProcessingTimeline";
 import { useI18n } from "../../hooks/useI18n";
 import { useToast } from "../../hooks/useToast";
 
-const getAccessToken = () => localStorage.getItem("accessToken") ?? "";
+import { getAccessToken as getSessionAccessToken } from "../../services/authSession";
+const getAccessToken = () => getSessionAccessToken() ?? "";
 
 export function UploadPage() {
   const { t } = useI18n();
@@ -53,7 +54,9 @@ export function UploadPage() {
     const loadWorkspaces = async () => {
       try {
         setLoadingWorkspaces(true);
-        const data = await getWorkspaces(getAccessToken());
+        const data = (await getWorkspaces(getAccessToken())).filter(
+          (ws) => ws.description !== "System workspace for general contract assistant chat"
+        );
         setWorkspaces(data);
 
         const workspaceIdFromQuery = searchParams.get("workspaceId") ?? "";

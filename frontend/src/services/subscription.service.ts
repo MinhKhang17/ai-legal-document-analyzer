@@ -1,11 +1,18 @@
 import { API_ENDPOINTS, buildApiUrl } from '../config/api';
 import { ACCESS_DENIED_MESSAGE, BACKEND_API_UNAVAILABLE_MESSAGE } from './http';
+import { getAccessToken } from './authSession';
 import type {
   ApiResponse,
   CustomerPlan,
+  PageResponse,
+  RefundRequestPayload,
+  RefundRequestRecord,
+  RefundStatus,
   SubscribeCustomerPlanRequest,
+  SubscriptionUsage,
   SubscriptionPlanRequest,
   SubscriptionPlan,
+  UpdateRefundStatusPayload,
 } from '../types/subscription';
 
 type ParsedResponse<T> = {
@@ -49,21 +56,17 @@ export const isCustomerPlanMissingError = (error: unknown): error is Subscriptio
 
   return (
     normalizedMessage.includes('chưa đăng ký') ||
+    normalizedMessage.includes('chưa sở hữu') ||
     normalizedMessage.includes('chua dang ky') ||
+    normalizedMessage.includes('chua so huu') ||
+    normalizedMessage.includes('không có gói') ||
+    normalizedMessage.includes('khong co goi') ||
     normalizedMessage.includes('no plan') ||
     normalizedMessage.includes('not found')
   );
 };
 
-const getStoredAccessToken = (): string | undefined => {
-  if (typeof window === 'undefined') {
-    return undefined;
-  }
-
-  const accessToken = window.localStorage.getItem('accessToken')?.trim();
-
-  return accessToken && accessToken.length > 0 ? accessToken : undefined;
-};
+const getStoredAccessToken = (): string | undefined => getAccessToken();
 
 const readResponseBody = async <T>(response: Response): Promise<ParsedResponse<T>> => {
   const rawText = await response.text();
@@ -272,7 +275,7 @@ export const deleteSubscriptionPlan = async (
 
 export const getMyCustomerPlan = async (): Promise<ApiResponse<CustomerPlan>> =>
   getJson<ApiResponse<CustomerPlan>>(
-    API_ENDPOINTS.subscription.customerPlanMe,
+    API_ENDPOINTS.subscription.myPlan,
     'Unable to load current customer plan.',
   );
 
@@ -280,7 +283,7 @@ export const subscribeCustomerPlan = async (
   payload: SubscribeCustomerPlanRequest,
 ): Promise<ApiResponse<CustomerPlan>> =>
   postJson<ApiResponse<CustomerPlan>>(
-    API_ENDPOINTS.subscription.customerPlanSubscribe,
+    API_ENDPOINTS.subscription.subscribe,
     payload,
     'Unable to subscribe to the selected plan.',
   );
@@ -289,6 +292,56 @@ export const cancelCustomerPlan = async (
   customerPlanId: number | string,
 ): Promise<ApiResponse<CustomerPlan>> =>
   putJson<ApiResponse<CustomerPlan>>(
-    API_ENDPOINTS.subscription.customerPlanCancel(customerPlanId),
+    API_ENDPOINTS.subscription.cancelMyPlan(customerPlanId),
     'Unable to cancel the current customer plan.',
+  );
+
+export const getMySubscriptionUsage = async (
+  page = 0,
+  size = 10,
+): Promise<ApiResponse<PageResponse<SubscriptionUsage>>> => {
+  const query = new URLSearchParams({
+    page: String(page),
+    size: String(size),
+  });
+
+  return getJson<ApiResponse<PageResponse<SubscriptionUsage>>>(
+    `${API_ENDPOINTS.subscription.myUsage}?${query.toString()}`,
+    'Unable to load subscription usage history.',
+  );
+};
+
+export const requestSubscriptionRefund = async (
+  payload: RefundRequestPayload,
+): Promise<ApiResponse<RefundRequestRecord>> =>
+  postJson<ApiResponse<RefundRequestRecord>>(
+    API_ENDPOINTS.subscription.refunds,
+    payload,
+    'Unable to submit refund request.',
+  );
+
+export const getSubscriptionRefund = async (
+  refundId: number | string,
+): Promise<ApiResponse<RefundRequestRecord>> =>
+  getJson<ApiResponse<RefundRequestRecord>>(
+    API_ENDPOINTS.subscription.refundDetail(refundId),
+    'Unable to load refund request detail.',
+  );
+
+export const getMySubscriptionRefunds = async (): Promise<ApiResponse<RefundRequestRecord[]>> =>
+  getJson<ApiResponse<RefundRequestRecord[]>>(API_ENDPOINTS.subscription.myRefunds, 'Unable to load refund history.');
+
+export const getAdminSubscriptionRefunds = async (status?: RefundStatus): Promise<ApiResponse<RefundRequestRecord[]>> => {
+  const query = status ? `?${new URLSearchParams({ status }).toString()}` : '';
+  return getJson<ApiResponse<RefundRequestRecord[]>>(`${API_ENDPOINTS.subscription.refunds}${query}`, 'Unable to load refund requests.');
+};
+
+export const updateSubscriptionRefundStatus = async (
+  refundId: number | string,
+  payload: UpdateRefundStatusPayload,
+): Promise<ApiResponse<RefundRequestRecord>> =>
+  requestJson<ApiResponse<RefundRequestRecord>>(
+    API_ENDPOINTS.subscription.refundStatus(refundId),
+    { method: 'PATCH', headers: buildAuthHeaders({ Accept: 'application/json', 'Content-Type': 'application/json' }), credentials: 'include', body: JSON.stringify(payload) },
+    'Unable to update refund status.',
   );

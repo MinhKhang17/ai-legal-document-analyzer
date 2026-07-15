@@ -1,0 +1,202 @@
+# CÂU HỎI THƯỜNG GẶP VỀ HỢP ĐỒNG THUÊ NHÀ (MỞ RỘNG V2)
+
+## PHẦN A: CÂU HỎI PHÂN TÍCH CHUYÊN SÂU
+
+### A1. PHÂN TÍCH ĐẶT CỌC TRONG HỢP ĐỒNG THUÊ NHÀ
+
+#### Tiền cọc thuê nhà thường là bao nhiêu?
+Thông thường từ 1-3 tháng tiền thuê, tùy thỏa thuận. Không có quy định bắt buộc về mức cụ thể.
+
+#### Nếu hợp đồng không ghi rõ điều kiện hoàn trả cọc thì sao?
+Nếu không có thỏa thuận cụ thể, áp dụng Điều 328 BLDS 2015: cọc được trả lại khi hợp đồng thực hiện xong. Tuy nhiên, thiếu điều khoản hoàn trả sẽ dễ phát sinh tranh chấp.
+
+#### Chủ nhà có quyền giữ cọc khi người thuê chấm dứt sớm không?
+Tùy thỏa thuận:
+- Nếu hợp đồng quy định mất cọc khi chấm dứt sớm → chủ nhà được giữ
+- Nếu không có quy định → áp dụng Điều 328 BLDS 2015 (mất cọc khi từ chối thực hiện)
+- Nếu người thuê báo trước đúng thời hạn → có thể được hoàn cọc
+
+#### Tiền cọc có được tính vào tiền thuê tháng cuối không?
+Chỉ được nếu có thỏa thuận rõ trong hợp đồng. Nếu không có thỏa thuận, cọc phải được hoàn trả riêng.
+
+### A2. PHÂN TÍCH THANH TOÁN
+
+#### Thanh toán trước hay sau?
+- Thanh toán trước: Phổ biến, bảo vệ bên cho thuê
+- Thanh toán sau: Ít phổ biến, có lợi cho bên thuê
+- Nên ghi rõ kỳ hạn cụ thể (VD: trước ngày 5 mỗi tháng)
+
+#### Nếu chậm thanh toán thì lãi suất tối đa là bao nhiêu?
+Theo Điều 468 BLDS 2015:
+- Lãi suất thỏa thuận nhưng KHÔNG VƯỢT QUÁ 20%/năm
+- Nếu không thỏa thuận lãi suất → áp dụng lãi suất theo quy định NHNN (khoảng 10%/năm)
+- Nếu vượt mức 20%/năm → phần vượt quá bị vô hiệu
+
+#### Giá thuê có được tăng trong thời hạn hợp đồng không?
+- KHÔNG được tăng nếu hợp đồng không có thỏa thuận về việc điều chỉnh giá
+- Chỉ được tăng nếu: có điều khoản cho phép + thông báo trước + trong phạm vi cho phép
+- Khi gia hạn hợp đồng: có thể đàm phán lại giá
+
+### A3. PHÂN TÍCH CHẤM DỨT HỢP ĐỒNG
+
+#### Muốn chấm dứt sớm mà không mất cọc, phải làm gì?
+1. Đọc kỹ điều khoản chấm dứt trong hợp đồng
+2. Thông báo bằng văn bản trước thời hạn quy định (thường 30-60 ngày)
+3. Thanh toán đầy đủ tiền thuê và các khoản phí
+4. Bàn giao nhà trong tình trạng tốt
+5. Lập biên bản bàn giao có hai bên ký
+
+#### Chủ nhà có quyền đuổi người thuê khi hợp đồng còn hạn không?
+KHÔNG, trừ các trường hợp theo Điều 132 Luật Nhà ở 2014:
+- Bên thuê không trả tiền thuê liên tục 3 tháng trở lên
+- Bên thuê sử dụng nhà không đúng mục đích
+- Bên thuê tự ý sửa chữa, cải tạo, phá dỡ nhà
+- Bên thuê cho thuê lại không được phép
+Nếu đuổi sai → chủ nhà phải bồi thường thiệt hại
+
+#### Khi hợp đồng hết hạn mà các bên chưa ký mới thì sao?
+Theo Điều 486 BLDS 2015:
+- Nếu bên thuê vẫn sử dụng và bên cho thuê không phản đối → hợp đồng được tiếp tục thực hiện theo điều kiện cũ
+- Thời hạn: không xác định (mỗi bên có thể chấm dứt bất cứ lúc nào với thông báo hợp lý)
+
+### A4. PHÂN TÍCH PHẠT VI PHẠM
+
+#### Mức phạt vi phạm tối đa là bao nhiêu?
+- Trong hợp đồng dân sự: Không có mức trần (theo BLDS 2015)
+- Trong hợp đồng thương mại: Không quá 8% giá trị phần vi phạm (Điều 301 Luật Thương mại 2005)
+- Lưu ý: Hợp đồng thuê nhà giữa cá nhân thuộc dân sự → không giới hạn mức phạt
+
+#### Phạt vi phạm có loại trừ bồi thường thiệt hại không?
+KHÔNG. Theo Điều 418 BLDS 2015:
+- Phạt vi phạm và bồi thường thiệt hại có thể áp dụng đồng thời
+- Trừ khi các bên thỏa thuận chỉ áp dụng phạt vi phạm mà không bồi thường
+
+### A5. PHÂN TÍCH BẤT KHẢ KHÁNG
+
+#### Dịch bệnh có phải là bất khả kháng không?
+Theo Điều 156 BLDS 2015, sự kiện bất khả kháng phải thỏa mãn 3 điều kiện:
+1. Xảy ra một cách khách quan
+2. Không thể lường trước được
+3. Không thể khắc phục được dù đã áp dụng mọi biện pháp cần thiết
+
+Dịch bệnh CÓ THỂ được xem là bất khả kháng NẾU thỏa mãn cả 3 điều kiện trên.
+
+#### Nếu không có điều khoản bất khả kháng trong hợp đồng thì sao?
+Vẫn áp dụng quy định tại Điều 156 BLDS 2015. Tuy nhiên:
+- Phải chứng minh đủ 3 điều kiện
+- Bên bị ảnh hưởng phải thông báo ngay cho bên kia
+- Quá trình xử lý có thể phức tạp hơn
+
+## PHẦN B: CÂU HỎI THỰC TẾ NGƯỜI DÙNG HAY GẶP
+
+### B1. CÂU HỎI TRƯỚC KHI KÝ
+
+#### Tôi nên kiểm tra gì trước khi ký hợp đồng thuê nhà?
+1. **Giấy tờ chủ sở hữu**: Sổ đỏ, Giấy chứng nhận quyền sở hữu
+2. **CMND/CCCD** của chủ nhà — đối chiếu với tên trên Sổ đỏ
+3. **Hiện trạng nhà**: Kiểm tra thực tế, chụp ảnh, quay video
+4. **Trang thiết bị**: Kiểm tra hoạt động, lập danh sách
+5. **Hàng xóm/khu vực**: An ninh, tiện ích, giao thông
+6. **Chi phí phát sinh**: Điện, nước, internet, phí quản lý
+7. **Giấy phép kinh doanh**: Nếu thuê để kinh doanh
+
+#### Hợp đồng thuê nhà có nên công chứng không?
+Không bắt buộc, nhưng NÊN công chứng vì:
+- Có giá trị chứng cứ cao tại tòa án
+- Khó bị từ chối hoặc phủ nhận
+- Bảo vệ quyền lợi cả hai bên
+- Chi phí công chứng không lớn
+
+### B2. CÂU HỎI KHI ĐANG THUÊ
+
+#### Chủ nhà tự ý vào nhà khi tôi vắng, làm sao?
+- Quyền riêng tư của bên thuê được bảo vệ theo pháp luật
+- Chủ nhà chỉ được vào khi: có lý do chính đáng + thông báo trước + được bên thuê đồng ý
+- Nếu vi phạm: bên thuê có quyền khiếu nại, yêu cầu bồi thường
+- Nên ghi rõ trong hợp đồng về quyền kiểm tra
+
+#### Nhà bị hư hỏng, ai chịu trách nhiệm sửa?
+- Hao mòn tự nhiên (mái dột, tường nứt, ống nước cũ): CHỦ NHÀ chịu
+- Hư hỏng do người thuê gây ra (đập tường, hỏng thiết bị): NGƯỜI THUÊ chịu
+- NÊN ghi rõ trong hợp đồng ai chịu loại nào
+
+#### Tôi muốn cho thuê lại phòng/tầng, có được không?
+Chỉ được nếu:
+1. Hợp đồng cho phép thuê lại
+2. Có sự đồng ý bằng văn bản của chủ nhà
+3. Thông báo cho chủ nhà về người thuê lại
+Nếu tự ý cho thuê lại → vi phạm hợp đồng, có thể bị chấm dứt
+
+### B3. CÂU HỎI KHI KẾT THÚC
+
+#### Trả nhà cần chuẩn bị gì?
+1. Thông báo trước theo thời hạn quy định
+2. Thanh toán hết tiền thuê, điện, nước, phí dịch vụ
+3. Sửa chữa hư hỏng (nếu do mình gây ra)
+4. Dọn dẹp nhà sạch sẽ
+5. Lập biên bản bàn giao (ghi rõ hiện trạng, chỉ số điện nước)
+6. Chụp ảnh hiện trạng khi trả nhà
+7. Hai bên ký biên bản → nhận lại tiền cọc
+
+#### Chủ nhà không trả cọc, tôi phải làm gì?
+1. Liên hệ chủ nhà yêu cầu giải thích lý do
+2. Gửi thông báo bằng văn bản (có lưu bằng chứng)
+3. Nếu không giải quyết → nhờ UBND phường/xã hòa giải
+4. Nếu vẫn không → khởi kiện ra Tòa án nhân dân quận/huyện
+5. Cần chuẩn bị: hợp đồng gốc, biên nhận cọc, biên bản bàn giao, ảnh chụp
+
+## PHẦN C: CÂU HỎI VỀ THUẾ VÀ ĐĂNG KÝ
+
+### Thuế cho thuê nhà ở là bao nhiêu?
+Theo quy định hiện hành:
+- Thuế TNCN: 5% doanh thu cho thuê
+- Thuế GTGT: 5% doanh thu cho thuê
+- Tổng: 10% doanh thu cho thuê (cho thu nhập trên 100 triệu/năm)
+- Dưới 100 triệu/năm: Miễn thuế GTGT, chỉ nộp thuế TNCN 5%
+
+### Ai có trách nhiệm nộp thuế?
+- Chủ nhà là người có nghĩa vụ nộp thuế
+- Tuy nhiên, thực tế có thể thỏa thuận:
+  - Bên cho thuê nộp (phổ biến nhất)
+  - Bên thuê chịu hoặc chia sẻ (nếu thỏa thuận rõ)
+- NÊN ghi rõ trong hợp đồng ai chịu thuế
+
+### Có cần đăng ký thuê nhà với chính quyền không?
+- Bên thuê: Phải đăng ký tạm trú tại Công an phường/xã
+- Bên cho thuê: Phải khai thuế nếu có thu nhập cho thuê
+- Nếu thuê để kinh doanh: Phải đăng ký kinh doanh tại địa chỉ thuê
+
+## PHẦN D: CÂU HỎI VỀ TÌNH HUỐNG ĐẶC BIỆT
+
+### Chủ nhà bán nhà khi đang cho thuê, tôi phải làm sao?
+Theo Điều 134 Luật Nhà ở 2014:
+- Người thuê được ở tiếp cho đến hết hạn hợp đồng
+- Chủ mới phải tôn trọng hợp đồng thuê hiện có
+- Chủ mới trở thành bên cho thuê mới
+- Người thuê có quyền ưu tiên mua (nếu muốn mua)
+
+### Nhà thuê bị thu hồi để xây dựng, quyền lợi người thuê thế nào?
+- Bên cho thuê phải thông báo trước ít nhất 6 tháng
+- Phải bồi thường cho bên thuê theo thỏa thuận
+- Nếu không thỏa thuận được → giải quyết tại tòa án
+
+### Hợp đồng thuê nhà bằng miệng có giá trị không?
+- Về mặt pháp lý: Có giá trị (BLDS 2015 công nhận giao dịch bằng lời nói)
+- Thực tế: Rất khó chứng minh khi tranh chấp
+- Khuyến nghị: LUÔN LUÔN lập hợp đồng bằng văn bản
+
+---
+
+## CĂN CỨ PHÁP LÝ
+
+### Văn bản pháp luật chính:
+- **Bộ luật Dân sự 2015** (Luật số 91/2015/QH13)
+  - Phần IV: Nghĩa vụ và hợp đồng
+  - Chương XVI: Hợp đồng thuê tài sản (Điều 472-492)
+  - Chương XVII: Biện pháp bảo đảm (Điều 292-350)
+- **Luật Nhà ở 2014** (Luật số 65/2014/QH13)
+  - Chương VIII: Quản lý, sử dụng nhà ở (Điều 117-140)
+- **Luật Thương mại 2005** (Luật số 36/2005/QH11)
+  - Điều 301: Phạt vi phạm
+- **Nghị định 99/2015/NĐ-CP** về quản lý nhà ở
+- **Thông tư 92/2015/TT-BTC** về thuế TNCN, thuế GTGT cho hoạt động cho thuê

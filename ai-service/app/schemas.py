@@ -84,13 +84,21 @@ class DocumentProcessResult(BaseModel):
 
 
 class RagQueryRequest(BaseModel):
-    requestId: str
-    userId: str
-    workspaceId: str
-    chatSessionId: str | None = None
+    requestId: str = Field(alias="request_id")
+    userId: str = Field(alias="user_id")
+    workspaceId: str = Field(alias="workspace_id")
+    documentId: str | None = Field(default=None, alias="document_id")
+    chatSessionId: str | None = Field(default=None, alias="chat_session_id")
+    chatHistory: str | None = Field(default=None, alias="chat_history")
     question: str = Field(..., min_length=1)
-    topKUserChunks: int = Field(default=5, ge=1, le=20)
-    topKKnowledgeChunks: int = Field(default=5, ge=1, le=20)
+    topKUserChunks: int = Field(default=5, ge=1, le=20, alias="top_k_user_chunks")
+    topKKnowledgeChunks: int = Field(default=5, ge=1, le=20, alias="top_k_knowledge_chunks")
+    topKChecklist: int = Field(default=10, ge=1, le=50, alias="top_k_checklist")
+    topKUserChunksPerChecklist: int = Field(default=3, ge=1, le=10, alias="top_k_user_chunks_per_checklist")
+    
+    model_config = {
+        "populate_by_name": True
+    }
 
 
 class RagCitation(BaseModel):
@@ -111,6 +119,46 @@ class RagCitation(BaseModel):
     sectionTitle: str | None = None
 
 
+class KeyClause(BaseModel):
+    """A key clause identified in the contract."""
+    name: str = Field(..., description="Name of the clause.")
+    content: str | None = Field(default=None, description="Brief content summary.")
+    assessment: str | None = Field(default=None, description="Assessment of the clause quality.")
+
+
+class MissingClauseItem(BaseModel):
+    """A clause that is missing from the contract."""
+    name: str = Field(..., description="Name of the missing clause.")
+    importance: Literal["LOW", "MEDIUM", "HIGH"] = Field(
+        default="MEDIUM",
+        description="How important this missing clause is.",
+    )
+    reason: str = Field(default="", description="Why this clause is important.")
+    suggestedContent: str | None = Field(default=None, description="Suggested content for the missing clause.")
+
+
+class RiskItem(BaseModel):
+    """A risk item identified in the contract."""
+    title: str = Field(..., description="Short title of the risk.")
+    riskLevel: Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"] = Field(
+        default="MEDIUM",
+        description="Severity of the risk.",
+    )
+    description: str = Field(default="", description="Detailed description of the risk.")
+    clause: str | None = Field(default=None, description="Which clause this risk relates to.")
+    recommendation: str | None = Field(default=None, description="How to mitigate this risk.")
+
+
+class AnalysisResult(BaseModel):
+    """Structured analysis output from the AI."""
+    summary: str | None = Field(default=None, description="Overall summary of the analysis.")
+    keyClauses: list[KeyClause] = Field(default_factory=list, description="Key clauses identified.")
+    missingClauses: list[MissingClauseItem] = Field(default_factory=list, description="Missing clauses.")
+    riskItems: list[RiskItem] = Field(default_factory=list, description="Risk items found.")
+    recommendations: list[str] = Field(default_factory=list, description="Action recommendations.")
+    questionsToUser: list[str] = Field(default_factory=list, description="Follow-up questions for the user.")
+
+
 class RagQueryResponse(BaseModel):
     requestId: str
     chatSessionId: str | None = None
@@ -125,13 +173,23 @@ class RagQueryResponse(BaseModel):
     missingInformation: str | None = Field(default=None, description="What information the AI still needs from the user.")
     riskLevel: Literal["LOW", "MEDIUM", "HIGH", "NEED_EXPERT", "UNKNOWN"]
     legalDomain: str | None = Field(default=None, description="Detected legal domain for UI grouping.")
-    userActionHint: Literal["CONTINUE_CHAT", "PROVIDE_MORE_INFO", "CREATE_TICKET"] = Field(
+    userActionHint: Literal["CONTINUE_CHAT", "PROVIDE_MORE_INFO", "CREATE_TICKET", "UPLOAD_CONTRACT", "CONTACT_LAWYER"] = Field(
         default="CONTINUE_CHAT",
         description="Small UX hint that tells the app how to guide the user next.",
     )
     citations: list[RagCitation] = Field(default_factory=list)
     retrievedUserChunks: int
     retrievedKnowledgeChunks: int
+
+    # ── NEW fields (all optional for backward compatibility) ──
+    intent: str | None = Field(default=None, description="Detected LegalQueryIntent (e.g. FULL_CONTRACT_REVIEW).")
+    contractType: str | None = Field(default=None, description="Detected ContractType (e.g. RENTAL, LABOR).")
+    responseMode: str | None = Field(default=None, description="ResponseMode used (e.g. DOCUMENT_BASED_ANALYSIS).")
+    inputComplete: bool | None = Field(default=None, description="Whether the user provided all required input.")
+    missingInputs: list[str] | None = Field(default=None, description="List of missing input items.")
+    analysis: AnalysisResult | None = Field(default=None, description="Structured analysis output.")
+
+
 
 
 class RagPreviewChunk(BaseModel):

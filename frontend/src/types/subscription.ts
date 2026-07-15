@@ -4,6 +4,14 @@ export interface ApiResponse<T> {
   data?: T;
 }
 
+export interface PageResponse<T> {
+  items: T[];
+  page: number;
+  size: number;
+  totalItems: number;
+  totalPages: number;
+}
+
 export interface SubscriptionPlan {
   id: number;
   planName: string;
@@ -60,4 +68,41 @@ export interface CustomerPlan {
   createdAt: string;
   updatedAt: string;
   subscriptionPlan: SubscriptionPlan;
+}
+
+export interface SubscriptionUsage {
+  id: number;
+  customerPlanId: number;
+  usageType: string;
+  referenceId: string | null;
+  consumedUnits: number;
+  metadataJson: string | null;
+  createdAt: string;
+}
+
+export interface RefundRequestPayload {
+  paymentTransactionId: number;
+  customerPlanId?: number | null;
+  reason: string;
+  amount: number;
+}
+
+export interface RefundRequestRecord {
+  id: number;
+  paymentTransactionId: number;
+  customerPlanId: number | null;
+  requestedById: number;
+  reason: string;
+  status: RefundStatus;
+  amount: number;
+  adminNote: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type RefundStatus = 'REQUESTED' | 'APPROVED' | 'REJECTED' | 'PROCESSING' | 'COMPLETED';
+
+export interface UpdateRefundStatusPayload {
+  status: RefundStatus;
+  adminNote?: string | null;
 }

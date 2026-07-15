@@ -23,11 +23,11 @@ export function ReportDetailPage() {
       />
 
       <Card>
-        <EmptyState
+        <div role="status" aria-live="polite"><EmptyState
           icon={<FileText className="h-6 w-6" aria-hidden="true" />}
           title={t('reports.detailUnavailableTitle')}
           description={t('reports.detailUnavailableDescription')}
-        />
+        /></div>
       </Card>
     </div>
   );

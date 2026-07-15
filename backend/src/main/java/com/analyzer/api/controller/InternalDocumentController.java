@@ -29,4 +29,12 @@ public class InternalDocumentController {
         DocumentResponseDTO response = workspaceService.updateProcessingResult(documentId, request);
         return ResponseEntity.ok(ApiResponseDTO.success("Cập nhật kết quả xử lý document thành công", response));
     }
+
+    @PostMapping("/register-generated")
+    @Operation(summary = "Register generated document", description = "Endpoint used by Python AI Service to register generated contracts in PostgreSQL.")
+    public ResponseEntity<ApiResponseDTO<DocumentResponseDTO>> registerGeneratedDocument(
+            @RequestBody com.analyzer.api.dto.document.RegisterDocumentRequestDTO request) {
+        DocumentResponseDTO response = workspaceService.registerGeneratedDocument(request);
+        return ResponseEntity.ok(ApiResponseDTO.success("Đăng ký document tạo tự động thành công", response));
+    }
 }

@@ -44,6 +44,21 @@ public class CustomerPlan {
     @Builder.Default
     private Boolean autoRenew = false;
 
+    @Column(name = "usage_start_at")
+    private LocalDateTime usageStartAt;
+
+    @Column(name = "usage_end_at")
+    private LocalDateTime usageEndAt;
+
+    @Column(name = "billing_cycle_start_at")
+    private LocalDateTime billingCycleStartAt;
+
+    @Column(name = "billing_cycle_end_at")
+    private LocalDateTime billingCycleEndAt;
+
+    @Column(name = "cancel_reason", columnDefinition = "TEXT")
+    private String cancelReason;
+
     @Transient
     private Integer remainingQuota;
 

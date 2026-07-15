@@ -86,6 +86,7 @@ public class ExpertLegalTicketServiceImpl implements ExpertLegalTicketService {
         }
 
         ticket.setStatus(LegalTicketStatus.IN_REVIEW);
+        ticket.setLastLawyerMessageAt(LocalDateTime.now());
 
         // System message
         LegalTicketMessage systemMsg = LegalTicketMessage.builder()
@@ -115,6 +116,7 @@ public class ExpertLegalTicketServiceImpl implements ExpertLegalTicketService {
         }
 
         ticket.setStatus(LegalTicketStatus.NEED_MORE_INFO);
+        ticket.setLastLawyerMessageAt(LocalDateTime.now());
 
         // Save Request message
         LegalTicketMessage msg = LegalTicketMessage.builder()
@@ -148,6 +150,7 @@ public class ExpertLegalTicketServiceImpl implements ExpertLegalTicketService {
         ticket.setExpertAnswer(request.getExpertAnswer());
         ticket.setExpertInternalNote(request.getExpertInternalNote());
         ticket.setResolvedAt(LocalDateTime.now());
+        ticket.setLastLawyerMessageAt(LocalDateTime.now());
 
         // Save Response Message
         LegalTicketMessage msg = LegalTicketMessage.builder()

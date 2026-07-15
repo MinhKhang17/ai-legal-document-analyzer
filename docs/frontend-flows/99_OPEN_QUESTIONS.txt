@@ -1,0 +1,67 @@
+CÂU HỎI MỞ VÀ RỦI RO CẦN CHỐT TRƯỚC KHI FE CODE SÂU
+
+1. Nhóm Business
+- Contracts có thật sự dùng `workspaceId` kiểu số không, hay phải dùng cùng kiểu chuỗi như workspace flow (`ws_*`)?
+- Với ticket customer, business có muốn `issue_fingerprint` là bắt buộc ở mọi entry point hay chỉ khi escalated từ AI?
+- Lawyer `close` và `resolve` là hai hành động khác nhau hay thực chất là một?
+- Knowledge base được kỳ vọng nhập tay theo text hay upload file tài liệu để parse?
+
+2. Nhóm UI/UX
+- Customer ticket page nên chỉ cho hiện action hợp lệ theo status nào? Repo hiện chưa expose rõ state machine trên UI.
+- Chat khi không có document `READY` nên hiện thông báo, empty state hay disable composer hoàn toàn?
+- Billing payment result cần thông báo chi tiết mức nào cho `pending`, `failed`, `cancelled`?
+- Contracts page có cần editor rich text/markdown thay cho textarea thuần không?
+
+3. Nhóm API Contract
+- `workspaceId` trong flow contracts: FE đang parse số ở `frontend/src/pages/contracts/MyContractsPage.tsx`, trong khi workspace APIs dùng path variable chuỗi ở `backend/src/main/java/com/analyzer/api/controller/WorkspaceController.java`.
+- Knowledge ingested documents endpoint đã được FE map trong `frontend/src/services/knowledgeBase.service.ts`, nhưng tài liệu tổng backend cho endpoint này cần được chốt lại với controller tương ứng.
+- Billing có nhiều endpoint gần nghĩa nhau ở `SubscriptionManagementController`:
+- `/me`
+- `/my-plan`
+- `/usage`
+- `/my-usage`
+- FE cần thống nhất endpoint nào là canonical cho từng màn.
+
+4. Nhóm Dữ liệu / Mapping
+- `CustomerPlan` FE mong có `subscriptionPlan`, `usedQuota`, `remainingQuota`, `latestTransactionId`; cần xác nhận DTO backend hiện trả đủ và đúng shape ở mọi môi trường.
+- Chat citation schema cần xác nhận nếu FE muốn render nguồn/citation nâng cao.
+- Knowledge base version/status/reviewDecision enum đầy đủ cần được liệt kê chính thức cho FE.
+
+5. Nhóm Quyền / Phân quyền
+- Admin có được tạo legal ticket thay customer trong thực tế nghiệp vụ không? Backend `LegalTicketController.createTicket()` cho `CUSTOMER` và `ADMIN`.
+- Summary/memory endpoint của chat cho phép nhiều role; hiện chưa có màn admin/expert dùng chung session memory. Có cần không?
+
+6. Nhóm Validation / Error Handling
+- Giới hạn dung lượng, định dạng file upload workspace hiện chưa được tài liệu hóa rõ từ repo đã đọc.
+- Lawyer upload file hiện dùng base64 JSON; cần xác nhận giới hạn kích thước để tránh payload quá lớn.
+- Refund request có điều kiện thời gian/trạng thái nào ngoài `paymentStatus = SUCCESS` hay không?
+
+7. Nhóm Navigation / Flow
+- Sau upload document, FE đang điều hướng sang `/projects/:workspaceId`; cần xác nhận đây có phải landing page đúng hay nên về `/documents` hoặc `/chat`.
+- Sau subscribe plan nhưng tạo VNPAY URL lỗi, user nên ở lại trang subscribe hay tự về billing?
+
+8. Các điểm có thể làm FE triển khai sai ngay bây giờ
+- Nếu FE tin contracts dùng numeric workspace ID, flow contracts sẽ vướng ngay khi dùng workspace thật từ upload/chat.
+- Nếu FE coi knowledge base là upload file binary, UI sẽ lệch với service hiện tại vốn gửi text payload.
+- Nếu FE không xử lý `NoReadyDocumentsException`, chat sẽ cho cảm giác "hỏng" dù nguyên nhân là document chưa xử lý xong.
+- Nếu FE không thống nhất payload create ticket giữa chat / quick-create / full form, dữ liệu ticket sẽ không đồng nhất.
+
+9. Mức độ đủ thông tin theo flow
+- Đủ thông tin cao: auth, workspace/upload, chat, customer ticket, admin ticket, lawyer ticket, billing.
+- Cần chốt thêm trước khi code sâu: contracts, knowledge base.
+
+Tóm tắt hành động đề nghị cho team:
+1. Chốt kiểu `workspaceId` dùng chung toàn hệ thống.
+2. Chốt canonical API cho subscription/billing.
+3. Chốt state machine ticket và tên gọi `resolve/close/reopen/request more info`.
+4. Chốt UX knowledge base là text-first hay file-first.
+5. Viết bảng enum/status chính thức cho FE dùng chung.
+
+HIỆN TRẠNG:
+- Repo đã đủ để xác định phần lớn flow chính.
+
+SUY LUẬN:
+- Sai khác hiện nay chủ yếu nằm ở contract dữ liệu và naming nghiệp vụ, không hẳn do thiếu module.
+
+ĐỀ XUẤT:
+- Trước khi frontend build thêm màn mới, nên có một buổi chốt API/schema ngắn giữa FE-BE cho 4 điểm ưu tiên ở trên.

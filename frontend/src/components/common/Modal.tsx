@@ -1,5 +1,6 @@
 import { X } from 'lucide-react';
 import { type ReactNode, useEffect } from 'react';
+import { useI18n } from '../../hooks/useI18n';
 import { Button } from './Button';
 import { cn } from '../../utils/cn';
 
@@ -19,6 +20,8 @@ const sizeClasses = {
 };
 
 export function Modal({ open, title, children, onClose, footer, size = 'md' }: ModalProps) {
+  const { t } = useI18n();
+
   useEffect(() => {
     if (!open) return undefined;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -35,7 +38,7 @@ export function Modal({ open, title, children, onClose, footer, size = 'md' }: M
       <div className={cn('max-h-[90vh] w-full overflow-hidden rounded-xl border border-legal-border bg-white shadow-raised dark:border-slate-700 dark:bg-slate-900', sizeClasses[size])}>
         <div className="flex items-center justify-between border-b border-legal-border px-lg py-md dark:border-slate-700">
           <h2 className="text-title-lg font-semibold text-on-surface dark:text-slate-100">{title}</h2>
-          <Button variant="ghost" size="icon" aria-label="Close modal" onClick={onClose}>
+          <Button variant="ghost" size="icon" aria-label={t('modal.close')} onClick={onClose}>
             <X className="h-5 w-5" />
           </Button>
         </div>

@@ -78,3 +78,19 @@ export interface DeleteChatSessionResponse {
   status: string;
   deletedAt: string;
 }
+
+export interface ChatSessionSummary {
+  chatSessionId: string;
+  title: string | null;
+  summary: string | null;
+  generatedAt: string | null;
+  messageCount: number | null;
+}
+
+export interface ChatSessionMemory {
+  chatSessionId: string;
+  summary: string | null;
+  memoryJson: string | null;
+  contextJson: string | null;
+  updatedAt: string | null;
+}

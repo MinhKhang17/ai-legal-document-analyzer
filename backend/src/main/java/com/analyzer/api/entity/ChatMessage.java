@@ -91,6 +91,12 @@ public class ChatMessage {
     @Column(name = "error_message", columnDefinition = "TEXT")
     private String errorMessage;
 
+    @Column(name = "citation_metadata_json", columnDefinition = "TEXT")
+    private String citationMetadataJson;
+
+    @Column(name = "context_snapshot_json", columnDefinition = "TEXT")
+    private String contextSnapshotJson;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 

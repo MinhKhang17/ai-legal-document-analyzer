@@ -1,68 +1,29 @@
-"""Quick test to verify Gemini API key is working."""
-import google.generativeai as genai
-from app.config import settings
+import os
+from dotenv import load_dotenv
+load_dotenv()
+from app.core.config import settings
+from app.services.llm_client import build_default_llm_client
 
-def test_gemini_connection():
-    """Test Gemini API connection."""
-    print("=" * 60)
-    print("Testing Gemini API Connection")
-    print("=" * 60)
-    
-    # Load API key
-    api_key = settings.gemini_api_key
-    model_name = settings.gemini_model
-    
-    print(f"\n📋 Configuration:")
-    print(f"   API Key: {api_key[:20]}...{api_key[-10:]}")
-    print(f"   Model: {model_name}")
-    
-    # Test connection
-    print(f"\n🔄 Testing connection...")
-    try:
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel(model_name)
-        
-        # Simple test prompt
-        test_prompt = "Xin chào, bạn là ai?"
-        print(f"\n📤 Sending test prompt: '{test_prompt}'")
-        
-        response = model.generate_content(test_prompt)
-        
-        if response and response.text:
-            print(f"\n✅ SUCCESS! Gemini is working!")
-            print(f"\n📥 Response:")
-            print(f"   {response.text[:200]}...")
-            print(f"\n✅ Your Gemini API key is valid and working!")
-            return True
-        else:
-            print(f"\n❌ FAILED: Empty response from Gemini")
-            return False
-            
-    except Exception as e:
-        print(f"\n❌ FAILED: {e}")
-        print(f"\nPossible issues:")
-        print(f"   - API key is invalid")
-        print(f"   - Model name is incorrect")
-        print(f"   - Network connection issue")
-        print(f"   - Quota exceeded")
-        return False
+def run_test():
+    client = build_default_llm_client()
+    print("Using client:", type(client))
+    print("Configured Model:", settings.gemini_model)
+    print("Configured Max Output Tokens:", settings.gemini_max_output_tokens)
+
+    system_prompt = "You are a professional legal draft assistant."
+    user_prompt = "Draft a complete lease agreement in Vietnamese based on the reference document 08/LB-TT. Write at least 2500 words, including a lot of articles and sections to test the output length capacity. Do not truncate. Generate a very long and detailed agreement."
+
+    print("Calling Gemini...")
+    res = client.generate(system_prompt=system_prompt, user_prompt=user_prompt)
+    print("Error:", res.error)
+    print("Raw Response Length (chars):", len(res.raw_response) if res.raw_response else 0)
+    print("Sanitized Answer Length (chars):", len(res.answer) if res.answer else 0)
+    if res.answer:
+        print("--- LAST 200 CHARACTERS ---")
+        try:
+            print(res.answer[-200:])
+        except Exception:
+            print(res.answer[-200:].encode('ascii', 'backslashreplace').decode('ascii'))
 
 if __name__ == "__main__":
-    success = test_gemini_connection()
-    
-    if success:
-        print("\n" + "=" * 60)
-        print("🎉 Ready to use Gemini!")
-        print("=" * 60)
-        print("\nNext steps:")
-        print("   1. Start AI service: python run_dev.py")
-        print("   2. Run comprehensive test: python comprehensive_test.py")
-        print("   3. Check service logs for: '✅ Gemini LLM initialized successfully'")
-    else:
-        print("\n" + "=" * 60)
-        print("❌ Gemini setup failed")
-        print("=" * 60)
-        print("\nPlease check:")
-        print("   1. API key in .env file")
-        print("   2. Internet connection")
-        print("   3. Google AI Studio quota")
+    run_test()

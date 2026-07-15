@@ -2,6 +2,8 @@ export {
   createChatSession,
   deleteChatSession,
   getChatMessageDetail,
+  getChatSessionMemory,
+  getChatSessionSummary,
   getChatSessionDetail,
   getChatSessionMessages,
   getWorkspaceChatSessions,

@@ -5,10 +5,10 @@ COPY pom.xml ./
 COPY src ./src
 RUN mvn -B clean package -DskipTests
 
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:21-jre
 WORKDIR /app
 
-RUN addgroup -S app && adduser -S app -G app
+RUN groupadd -r app && useradd -r -g app app
 
 COPY --from=build /workspace/target/*.jar /app/app.jar
 
