@@ -12,6 +12,12 @@ from app.models.intent_enums import (
 )
 from app.schemas import RagCitation, RagPreviewChunk, RagPreviewResponse, RagQueryRequest, RagQueryResponse, RagUsage
 from app.services.completeness_checker import check_completeness
+from app.services.conversation_context import (
+    LegalConversationContextStore,
+    build_analysis_snapshot,
+    is_follow_up_query,
+    merge_snapshot_with_current_hits,
+)
 from app.services.intent_detector import detect_intent
 from app.services.llm_client import RagLlmClient, build_default_llm_client, sanitize_response
 from app.services.prompt_builder import build_intent_instruction, build_system_prompt, build_user_prompt
@@ -54,14 +60,19 @@ class RagQueryService:
         *,
         retrieval_service: RetrievalService | None = None,
         llm_client: RagLlmClient | None = None,
+        context_store: LegalConversationContextStore | None = None,
     ) -> None:
         self.retrieval_service = retrieval_service or RetrievalService()
         self.llm_client = llm_client or build_default_llm_client()
+        self.context_store = context_store or LegalConversationContextStore()
 
     def query(self, request: RagQueryRequest) -> RagQueryResponse:
         from app.services.contract_generation_service import ContractGenerationService, is_contract_generation_intent
 
-        if is_contract_generation_intent(request.question):
+        follow_up = is_follow_up_query(request.question)
+        previous_snapshot = self.context_store.latest(request.chatSessionId) if follow_up else None
+
+        if is_contract_generation_intent(request.question) and not follow_up:
             gen_service = ContractGenerationService(
                 retrieval_service=self.retrieval_service,
                 llm_client=self.llm_client,
@@ -69,6 +80,9 @@ class RagQueryService:
             return gen_service.generate_contract(request)
 
         user_hits, legal_search_query, knowledge_hits = self._retrieve(request)
+        if follow_up and previous_snapshot is None:
+            return self._build_missing_snapshot_response(request, user_hits, knowledge_hits)
+
         intent_result = detect_intent(
             request.question,
             has_user_chunks=bool(user_hits),
@@ -84,7 +98,9 @@ class RagQueryService:
             conversation_context=extract_recent_user_history(request.chatHistory),
         )
 
-        if self._should_short_circuit(intent_result.intent):
+        if self._should_short_circuit(intent_result.intent) and (
+            not follow_up or self._must_guard_follow_up(intent_result.intent)
+        ):
             return self._build_guard_response(
                 request=request,
                 intent_result=intent_result,
@@ -93,7 +109,7 @@ class RagQueryService:
                 knowledge_hits=knowledge_hits,
             )
 
-        if not completeness.is_complete:
+        if not completeness.is_complete and not follow_up:
             adjusted_intent_result = self._adjust_for_completeness(intent_result, completeness)
             return self._build_guard_response(
                 request=request,
@@ -103,7 +119,11 @@ class RagQueryService:
                 knowledge_hits=knowledge_hits,
             )
 
-        retrieval_issue = self._detect_retrieval_issue(request.question, intent_result.intent, knowledge_hits)
+        retrieval_issue = None if follow_up else self._detect_retrieval_issue(
+            request.question,
+            intent_result.intent,
+            knowledge_hits,
+        )
         if retrieval_issue is not None:
             return self._build_guard_response(
                 request=request,
@@ -114,15 +134,25 @@ class RagQueryService:
             )
 
         available_user_docs, available_system_docs = self._fetch_available_docs(request)
+        prompt_user_hits = user_hits
+        prompt_knowledge_hits = knowledge_hits
+        if follow_up and previous_snapshot is not None:
+            prompt_user_hits, prompt_knowledge_hits = merge_snapshot_with_current_hits(
+                previous_snapshot,
+                user_hits,
+                knowledge_hits,
+            )
         system_prompt = build_system_prompt()
         user_prompt = build_user_prompt(
             request.question,
-            user_hits,
-            knowledge_hits,
+            prompt_user_hits,
+            prompt_knowledge_hits,
             chat_history=request.chatHistory,
             available_user_docs=available_user_docs,
             available_system_docs=available_system_docs,
             workspace_id=request.workspaceId,
+            analysis_snapshot=previous_snapshot,
+            is_follow_up=follow_up,
         )
         user_prompt += build_intent_instruction(
             intent_result.intent,
@@ -146,11 +176,15 @@ class RagQueryService:
             answer=answer,
             declared_knowledge_ids=llm_result.used_knowledge_citation_ids,
             declared_user_ids=llm_result.used_user_citation_ids,
-            user_hits=user_hits,
-            knowledge_hits=knowledge_hits,
+            user_hits=prompt_user_hits,
+            knowledge_hits=prompt_knowledge_hits,
         )
         used_ids = {*used_knowledge_ids, *used_user_ids}
-        citations = [self._to_citation(hit) for hit in [*user_hits, *knowledge_hits] if hit.citationId in used_ids]
+        citations = [
+            self._to_citation(hit)
+            for hit in [*prompt_user_hits, *prompt_knowledge_hits]
+            if hit.citationId in used_ids
+        ]
         recommendations_grounded = self._recommendation_section_is_grounded(answer)
         grounding_failed = bool(invalid_citation_ids) or (
             intent_result.intent in _LEGAL_GROUNDED_INTENTS and not used_knowledge_ids
@@ -169,7 +203,9 @@ class RagQueryService:
             used_user_ids = []
 
         effective_confidence = llm_result.confidence_score
-        retrieved_citations = [self._to_citation(hit) for hit in [*user_hits, *knowledge_hits]]
+        retrieved_citations = [
+            self._to_citation(hit) for hit in [*prompt_user_hits, *prompt_knowledge_hits]
+        ]
         if effective_confidence is None and retrieved_citations:
             retrieval_confidence = sum(citation.score for citation in retrieved_citations) / len(retrieved_citations)
             effective_confidence = round(min(intent_result.confidence, retrieval_confidence), 4)
@@ -213,7 +249,7 @@ class RagQueryService:
         if should_suggest_ticket:
             user_action_hint = "CREATE_TICKET"
 
-        return RagQueryResponse(
+        response = RagQueryResponse(
             requestId=request.requestId,
             chatSessionId=request.chatSessionId,
             answer=answer,
@@ -246,6 +282,27 @@ class RagQueryService:
                 totalTokens=llm_result.total_tokens,
             ),
         )
+        if request.chatSessionId:
+            self.context_store.append(
+                build_analysis_snapshot(
+                    session_id=request.chatSessionId,
+                    analysis_id=request.requestId,
+                    contract_type=response.contractType or ContractType.UNKNOWN.value,
+                    user_role=response.userRole or "UNKNOWN",
+                    jurisdiction=response.jurisdiction or "UNKNOWN",
+                    risk_level=response.riskLevel,
+                    confidence=response.confidenceScore,
+                    response_status=response.responseStatus or ResponseStatus.NEED_MORE_INFORMATION.value,
+                    suggestion_type=response.suggestionType,
+                    answer=response.answer,
+                    analysis=llm_result.analysis,
+                    user_hits=prompt_user_hits,
+                    knowledge_hits=prompt_knowledge_hits,
+                    used_user_ids=response.usedUserCitationIds,
+                    used_knowledge_ids=response.usedKnowledgeCitationIds,
+                )
+            )
+        return response
 
     def preview(self, request: RagQueryRequest) -> RagPreviewResponse:
         user_hits, legal_search_query, knowledge_hits = self._retrieve(request)
@@ -296,6 +353,52 @@ class RagQueryService:
             LegalQueryIntent.OVERCONFIDENT_LEGAL_CONCLUSION_REQUEST,
             LegalQueryIntent.INSUFFICIENT_FACTS,
         }
+
+    def _must_guard_follow_up(self, intent: LegalQueryIntent) -> bool:
+        return intent in {
+            LegalQueryIntent.OUT_OF_DOMAIN_GENERAL_QUERY,
+            LegalQueryIntent.LEGAL_BUT_NOT_CONTRACT_SCOPE,
+            LegalQueryIntent.CONTRACT_TYPE_OUT_OF_STUDENT_SCOPE,
+            LegalQueryIntent.FOREIGN_LAW_QUERY,
+            LegalQueryIntent.PROMPT_INJECTION_OR_POLICY_BYPASS,
+            LegalQueryIntent.UNSAFE_LEGAL_REQUEST,
+        }
+
+    def _build_missing_snapshot_response(
+        self,
+        request: RagQueryRequest,
+        user_hits: list[RagChunkHit],
+        knowledge_hits: list[RagChunkHit],
+    ) -> RagQueryResponse:
+        return RagQueryResponse(
+            requestId=request.requestId,
+            chatSessionId=request.chatSessionId,
+            answer=(
+                "Mình chưa có bản phân tích trước trong session này để trả lời câu hỏi follow-up. "
+                "Bạn hãy gửi lại hợp đồng hoặc nội dung câu trả lời trước."
+            ),
+            confidenceScore=0.0,
+            shouldSuggestTicket=False,
+            suggestionType=SuggestionType.ASK_MORE_FACTS.value,
+            suggestionReason="Session hiện tại chưa có analysis snapshot.",
+            missingInformation="Hợp đồng hoặc nội dung phân tích trước trong cùng session.",
+            riskLevel=RiskLevel.UNKNOWN.value,
+            legalDomain=None,
+            userActionHint="PROVIDE_MORE_INFO",
+            citations=[],
+            usedKnowledgeCitationIds=[],
+            usedUserCitationIds=[],
+            retrievedUserChunks=len(user_hits),
+            retrievedKnowledgeChunks=len(knowledge_hits),
+            intent=LegalQueryIntent.INSUFFICIENT_FACTS.value,
+            contractType=ContractType.UNKNOWN.value,
+            userRole="UNKNOWN",
+            jurisdiction="UNKNOWN",
+            responseStatus=ResponseStatus.NEED_MORE_INFORMATION.value,
+            responseMode="ASK_FOR_INFORMATION",
+            inputComplete=False,
+            missingInputs=["analysisSnapshot"],
+        )
 
     def _adjust_for_completeness(self, intent_result, completeness):
         missing = set(completeness.missing_items)

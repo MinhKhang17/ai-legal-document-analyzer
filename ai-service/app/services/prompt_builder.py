@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
+
 from app.models.intent_enums import ContractType, LegalQueryIntent, ResponseMode
+from app.services.conversation_context import AnalysisSnapshot
 from app.services.query_builder import build_knowledge_context, build_user_context
 from app.services.retrieval_service import RagChunkHit
 
@@ -39,6 +42,8 @@ def build_user_prompt(
     available_user_docs: list[str] | None = None,
     available_system_docs: list[str] | None = None,
     workspace_id: str | None = None,
+    analysis_snapshot: AnalysisSnapshot | None = None,
+    is_follow_up: bool = False,
 ) -> str:
     user_context = build_user_context(user_hits) or "[none]"
     knowledge_context = build_knowledge_context(knowledge_hits) or "[none]"
@@ -50,9 +55,39 @@ def build_user_prompt(
     available_kb_ids = ", ".join(hit.citationId for hit in knowledge_hits) or "[none]"
     available_user_ids = ", ".join(hit.citationId for hit in user_hits) or "[none]"
 
+    history_context = chat_history or "[none]"
+    snapshot_context = ""
+    follow_up_rules = ""
+    if is_follow_up and analysis_snapshot is not None:
+        history_context = "[omitted: structured session snapshot is used for this follow-up]"
+        snapshot_context = (
+            "SESSION_ANALYSIS_SNAPSHOT:\n"
+            + json.dumps(
+                analysis_snapshot.to_prompt_payload(),
+                ensure_ascii=False,
+                separators=(",", ":"),
+            )
+            + "\n\n"
+        )
+        follow_up_rules = (
+            "FOLLOW_UP_RULES:\n"
+            "- Answer only from SESSION_ANALYSIS_SNAPSHOT and the current retrieved context.\n"
+            "- Clearly distinguish user contract evidence from legal KB evidence.\n"
+            "- If asked for legal basis, list only KB sources actually present in kbSources or SYSTEM_KB_CONTEXT.\n"
+            "- If no directly applicable legal basis exists, explicitly say: "
+            "\"KB hiện tại chưa có căn cứ pháp lý trực tiếp để kết luận.\"\n"
+            "- Do not invent law names, article numbers, decrees, precedents, citations, or legal conclusions.\n"
+            "- If a claim is based only on user contract text, identify it as a contract-text risk assessment, "
+            "not an absolute legal conclusion.\n"
+            "- For claimLedger entries with legalBasisStrength WEAK or NONE, do not state that a clause is "
+            "certainly illegal, void, or legal.\n"
+            "- Keep the answer concise and structured.\n\n"
+        )
+
     return (
         f"QUESTION:\n{question.strip()}\n\n"
-        f"CHAT_HISTORY:\n{chat_history or '[none]'}\n\n"
+        f"CHAT_HISTORY:\n{history_context}\n\n"
+        f"{snapshot_context}"
         f"AVAILABLE_DOCS:\n{chr(10).join(docs_summary) if docs_summary else '[none]'}\n\n"
         f"USER_DOCUMENT_CONTEXT:\n{user_context}\n\n"
         f"SYSTEM_KB_CONTEXT:\n{knowledge_context}\n\n"
@@ -63,7 +98,7 @@ def build_user_prompt(
         "- Trong phần Khuyến nghị, mỗi khuyến nghị pháp lý phải có citation [KB-x] ngay trong chính phần Khuyến nghị; không được chỉ citation ở phần kết luận.\n"
         "- Khi mô tả nội dung hợp đồng, đặt citation USER inline đúng dạng [USER-x] ngay sau nội dung đó.\n"
         "- Trước khi hoàn tất, tự kiểm tra rằng mọi citation đều thuộc danh sách ID ở trên; không được bỏ citation khỏi answer.\n"
-    )
+    ) + follow_up_rules
 
 
 def build_intent_instruction(

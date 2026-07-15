@@ -90,6 +90,29 @@ legal-rag-platform/
 docker compose up --build
 ```
 
+### VNPAY Sandbox Through ngrok
+
+1. Copy the root environment example and fill in the ngrok credentials assigned to your account:
+
+```bash
+cp .env.example .env
+```
+
+```dotenv
+NGROK_AUTHTOKEN=your_ngrok_authtoken
+NGROK_URL=https://your-assigned-domain.ngrok-free.app
+```
+
+2. Start the stack with the ngrok profile:
+
+```bash
+docker compose --profile ngrok up -d --build
+```
+
+The public VNPAY return endpoint will be `${NGROK_URL}/api/v1/payment-transactions/vnpay-return`.
+The IPN endpoint to register in the VNPAY sandbox portal is `${NGROK_URL}/api/v1/payment-transactions/vnpay-ipn`.
+ngrok's local traffic inspector is available at `http://localhost:4040`.
+
 4. Start services independently during development:
    - Frontend only:
 

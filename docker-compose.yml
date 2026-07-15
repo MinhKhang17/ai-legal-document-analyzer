@@ -31,11 +31,29 @@ services:
       APP_STORAGE_UPLOAD_ROOT: /app/uploads
       APP_AI_SERVICE_BASE_URL: http://ai-service:8000
       APP_API_CALLBACK_BASE_URL: http://backend:8080
+      VNPAY_RETURN_URL: ${NGROK_URL:-http://localhost:8080}/api/v1/payment-transactions/vnpay-return
     depends_on:
       - ai-service
       - postgres
     volumes:
       - shared_uploads:/app/uploads
+
+  ngrok:
+    image: ngrok/ngrok:latest
+    restart: unless-stopped
+    profiles:
+      - ngrok
+    command:
+      - http
+      - http://backend:8080
+      - --url
+      - ${NGROK_URL:-}
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN:-}
+    ports:
+      - "4040:4040"
+    depends_on:
+      - backend
 
   ai-service:
     image: legal-rag-platform/ai-service:dev

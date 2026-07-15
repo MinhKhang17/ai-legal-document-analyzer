@@ -11,6 +11,7 @@ from app.models.intent_enums import LegalQueryIntent
 from app.models.knowledge_models import RetrievedChunk
 from app.schemas import RagQueryRequest, RagQueryResponse
 from app.services.llm_client import LlmResponse
+from app.services.conversation_context import LegalConversationContextStore, is_follow_up_query
 from app.services.query_builder import build_legal_search_query, build_legal_text_query, extract_recent_user_history
 from app.services.rag_query_service import LlmGenerationError, RagQueryService
 from app.services.retrieval_service import RagChunkHit, RetrievalService
@@ -61,6 +62,15 @@ class _FakeLlmClient:
             completion_tokens=8,
             total_tokens=20,
         )
+
+
+class _CapturingLlmClient(_FakeLlmClient):
+    def __init__(self):
+        self.user_prompts: list[str] = []
+
+    def generate(self, *, system_prompt: str, user_prompt: str):
+        self.user_prompts.append(user_prompt)
+        return super().generate(system_prompt=system_prompt, user_prompt=user_prompt)
 
 
 class _TwoKbRetrievalService(_FakeRetrievalService):
@@ -118,6 +128,78 @@ class RagQueryTests(unittest.TestCase):
         self.assertEqual(retrieval_service.document_id, "doc-1")
         self.assertEqual(response.model, "gemini-test")
         self.assertEqual(response.usage.totalTokens, 20)
+
+    def test_follow_up_uses_latest_structured_snapshot_without_full_history(self) -> None:
+        context_store = LegalConversationContextStore()
+        llm_client = _CapturingLlmClient()
+        service = RagQueryService(
+            retrieval_service=_FakeRetrievalService(),
+            llm_client=llm_client,
+            context_store=context_store,
+        )
+        service.query(
+            RagQueryRequest(
+                requestId="req-initial",
+                userId="user-1",
+                workspaceId="ws-1",
+                chatSessionId="chat-follow-up",
+                question="Phân tích rủi ro hợp đồng thuê nhà của tôi",
+            )
+        )
+
+        response = service.query(
+            RagQueryRequest(
+                requestId="req-follow-up",
+                userId="user-1",
+                workspaceId="ws-1",
+                chatSessionId="chat-follow-up",
+                chatHistory="ASSISTANT: FULL_OLD_ANSWER_SHOULD_NOT_BE_IN_PROMPT",
+                question="Ở phần trên bạn dựa vào bộ luật nào?",
+            )
+        )
+
+        self.assertEqual(response.requestId, "req-follow-up")
+        self.assertEqual(len(llm_client.user_prompts), 2)
+        follow_up_prompt = llm_client.user_prompts[-1]
+        self.assertIn("SESSION_ANALYSIS_SNAPSHOT", follow_up_prompt)
+        self.assertIn('"analysisId":"req-initial"', follow_up_prompt)
+        self.assertIn('"claimLedger"', follow_up_prompt)
+        self.assertIn("FOLLOW_UP_RULES", follow_up_prompt)
+        self.assertNotIn("FULL_OLD_ANSWER_SHOULD_NOT_BE_IN_PROMPT", follow_up_prompt)
+        snapshots = context_store.all_for_session("chat-follow-up")
+        self.assertEqual([item.analysisId for item in snapshots], ["req-initial", "req-follow-up"])
+        initial_snapshot = snapshots[0]
+        self.assertEqual(initial_snapshot.sessionId, "chat-follow-up")
+        self.assertEqual(initial_snapshot.userSources[0].id, "USER-1")
+        self.assertEqual(initial_snapshot.kbSources[0].id, "KB-1")
+        self.assertFalse(initial_snapshot.kbSources[0].isDirectlyApplicable)
+        self.assertEqual(initial_snapshot.claimLedger[0].basedOnUserSources, ("USER-1",))
+        self.assertEqual(initial_snapshot.claimLedger[0].basedOnKbSources, ("KB-1",))
+        self.assertEqual(initial_snapshot.claimLedger[0].legalBasisStrength, "INDIRECT")
+        self.assertEqual(initial_snapshot.lastAnswerSummary.citationsUsed, ("USER-1", "KB-1"))
+
+    def test_follow_up_without_snapshot_returns_need_more_information(self) -> None:
+        llm_client = _CapturingLlmClient()
+        service = RagQueryService(
+            retrieval_service=_FakeRetrievalService(),
+            llm_client=llm_client,
+            context_store=LegalConversationContextStore(),
+        )
+
+        response = service.query(
+            RagQueryRequest(
+                requestId="req-no-snapshot",
+                userId="user-1",
+                workspaceId="ws-1",
+                chatSessionId="empty-session",
+                question="Vì sao điều khoản đó có rủi ro cao?",
+            )
+        )
+
+        self.assertTrue(is_follow_up_query("Vì sao điều khoản đó có rủi ro cao?"))
+        self.assertEqual(response.responseStatus, "NEED_MORE_INFORMATION")
+        self.assertEqual(response.missingInputs, ["analysisSnapshot"])
+        self.assertEqual(llm_client.user_prompts, [])
 
     def test_out_of_domain_query_short_circuits(self) -> None:
         service = RagQueryService(

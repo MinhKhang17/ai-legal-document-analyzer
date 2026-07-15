@@ -23,6 +23,7 @@ import java.math.RoundingMode;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +35,7 @@ import java.util.stream.Collectors;
 public class PaymentTransactionServiceImpl implements PaymentTransactionService {
 
     private static final DateTimeFormatter VNPAY_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+    private static final ZoneId VNPAY_ZONE_ID = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final BigDecimal VNPAY_MIN_AMOUNT = BigDecimal.valueOf(5000);
     private static final BigDecimal VNPAY_MAX_AMOUNT = BigDecimal.valueOf(1_000_000_000);
 
@@ -181,8 +183,9 @@ public class PaymentTransactionServiceImpl implements PaymentTransactionService 
         params.put("vnp_Locale", vnPayProperties.getLocale());
         params.put("vnp_ReturnUrl", vnPayProperties.getReturnUrl());
         params.put("vnp_IpAddr", clientIp);
-        params.put("vnp_CreateDate", LocalDateTime.now().format(VNPAY_DATE_FORMAT));
-        params.put("vnp_ExpireDate", LocalDateTime.now().plusMinutes(15).format(VNPAY_DATE_FORMAT));
+        LocalDateTime vnPayTime = LocalDateTime.now(VNPAY_ZONE_ID);
+        params.put("vnp_CreateDate", vnPayTime.format(VNPAY_DATE_FORMAT));
+        params.put("vnp_ExpireDate", vnPayTime.plusMinutes(15).format(VNPAY_DATE_FORMAT));
 
         String query = buildHashData(params);
         String secureHash = hmacSha512(vnPayProperties.getHashSecret(), query);
