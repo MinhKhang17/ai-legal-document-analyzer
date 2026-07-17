@@ -278,8 +278,18 @@ class ContractGenerationService:
                 logger.warning("No chunks found for document %s", doc_id)
                 return None
 
-            full_text = "\n\n".join(r["text"] for r in records if r.get("text"))
-            if not full_text.strip():
+            clean_paragraphs = []
+            for r in records:
+                text = r.get("text") or ""
+                if not text.strip():
+                    continue
+                # Split by ' > ' to clean breadcrumb prefixes and deduplicate
+                parts = text.split(" > ")
+                clean_text = parts[-1].strip()
+                if clean_text:
+                    clean_paragraphs.append(clean_text)
+
+            if not clean_paragraphs:
                 return None
 
             # Build a simple DOCX
@@ -303,19 +313,20 @@ class ContractGenerationService:
             style.paragraph_format.line_spacing = 1.5
             style.paragraph_format.space_after = Pt(6)
 
-            for line in full_text.split("\n"):
-                stripped = line.strip()
-                if not stripped:
-                    document.add_paragraph("")
-                    continue
-                para = document.add_paragraph()
-                # Bold for lines that look like headings/titles
-                if stripped.isupper() and len(stripped) < 100:
-                    run = para.add_run(stripped)
-                    run.bold = True
-                    para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                else:
-                    para.add_run(stripped)
+            for text_line in clean_paragraphs:
+                for line in text_line.split("\n"):
+                    stripped = line.strip()
+                    if not stripped:
+                        document.add_paragraph("")
+                        continue
+                    para = document.add_paragraph()
+                    # Center align and bold for signature blocks or headers
+                    if (stripped.isupper() and len(stripped) < 100) or stripped.startswith("CỘNG HÒA") or stripped.startswith("Độc lập"):
+                        run = para.add_run(stripped)
+                        run.bold = True
+                        para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    else:
+                        para.add_run(stripped)
 
             safe_title = "".join(c if c.isalnum() or c in "._- " else "_" for c in doc_title)[:80]
             new_filename = f"template_{uuid.uuid4().hex}_{safe_title}.docx"
@@ -437,8 +448,8 @@ class ContractGenerationService:
                     continue
                 name, ext = os.path.splitext(f)
                 cleaned_name = clean(name)
-                # Matches if equal or target is substring of filename
-                if cleaned_name == target or target in cleaned_name or cleaned_name in target:
+                # STRICT MATCH ONLY!
+                if cleaned_name == target:
                     resolved_path = os.path.join(root, f)
                     logger.info("Resolved original template file for '%s' -> %s", title, resolved_path)
                     return resolved_path
