@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from app.core.knowledge_access import is_published_system_kb
 from app.graph.repository import GraphRepository
 from app.models.knowledge_models import RetrievedChunk
 from app.services.embedding_service import EmbeddingService
@@ -108,13 +109,9 @@ class RetrievalService:
     @staticmethod
     def _is_authoritative_system_kb_chunk(chunk: RetrievedChunk) -> bool:
         metadata = dict(chunk.metadata or {})
-        source_type = str(metadata.get("source_type") or chunk.source_type or "").upper()
-        effective_status = str(metadata.get("effective_status") or "").upper()
-        ingested_by_role = str(metadata.get("ingested_by_role") or "").upper()
-        return (
-            source_type == "SYSTEM_KB"
-            and effective_status == "ACTIVE"
-            and ingested_by_role == "ADMIN"
+        return is_published_system_kb(
+            metadata,
+            source_type=chunk.source_type,
         )
 
     def _to_hit(self, chunk: RetrievedChunk, *, citation_id: str, source_type: Literal["USER_DOCUMENT", "SYSTEM_KB"]) -> RagChunkHit:

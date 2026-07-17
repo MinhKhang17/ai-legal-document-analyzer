@@ -210,6 +210,18 @@ export const API_ENDPOINTS = {
       fillPathParams(fromEnv("VITE_ADMIN_KNOWLEDGE_BASE_PUBLISH_API"), {
         knowledgeBaseEntryId,
       }),
+    ingestionJob: (jobId: string) =>
+      fillPathParams(fromEnvOrDefault("VITE_ADMIN_KNOWLEDGE_BASE_INGESTION_JOB_API", "/api/v1/admin/knowledge-base/ingestion-jobs/:jobId"), {
+        jobId,
+      }),
+    failIngestionJob: (jobId: string) =>
+      fillPathParams(fromEnvOrDefault("VITE_ADMIN_KNOWLEDGE_BASE_FAIL_JOB_API", "/api/v1/admin/knowledge-base/ingestion-jobs/:jobId/failed"), {
+        jobId,
+      }),
+    unpublish: (knowledgeBaseEntryId: string) =>
+      fillPathParams(fromEnvOrDefault("VITE_ADMIN_KNOWLEDGE_BASE_UNPUBLISH_API", "/api/v1/admin/knowledge-base/:knowledgeBaseEntryId/unpublish"), {
+        knowledgeBaseEntryId,
+      }),
     archive: (knowledgeBaseEntryId: string) =>
       fillPathParams(fromEnv("VITE_ADMIN_KNOWLEDGE_BASE_ARCHIVE_API"), {
         knowledgeBaseEntryId,
@@ -266,6 +278,10 @@ export const API_ENDPOINTS = {
     importV2: fromEnv("VITE_AI_RISK_KNOWLEDGE_IMPORT_V2_API"),
     query: fromEnv("VITE_AI_RISK_KNOWLEDGE_QUERY_API"),
     queryV2: fromEnv("VITE_AI_RISK_KNOWLEDGE_QUERY_V2_API"),
+  },
+
+  aiKnowledge: {
+    ingestV2: fromEnvOrDefault("VITE_AI_KNOWLEDGE_INGEST_V2_API", "/api/knowledge/ingest-v2/async"),
   },
 
   aiContracts: {

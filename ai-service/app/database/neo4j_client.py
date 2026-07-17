@@ -1,7 +1,11 @@
 """Neo4j client for database operations."""
+import json
 import logging
 from typing import List, Dict, Any, Optional
+
 from neo4j import GraphDatabase, Driver
+
+from app.core.knowledge_access import is_published_system_kb
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -193,15 +197,29 @@ class Neo4jClient:
         RETURN chunk.text as text,
                chunk.title as title,
                chunk.node_id as chunk_id,
+               coalesce(chunk.metadata_json, '{}') as metadata_json,
                score
         ORDER BY score DESC
-        LIMIT $top_k
+        LIMIT $candidate_limit
         """
-        
-        return self.execute_query(query, {
+
+        candidates = self.execute_query(query, {
             "embedding": embedding,
-            "top_k": top_k
+            "candidate_limit": max(top_k * 5, top_k + 10),
         })
+        filtered: List[Dict[str, Any]] = []
+        for candidate in candidates:
+            try:
+                metadata = json.loads(candidate.get("metadata_json") or "{}")
+            except (TypeError, ValueError):
+                metadata = {}
+            if not is_published_system_kb(metadata):
+                continue
+            candidate.pop("metadata_json", None)
+            filtered.append(candidate)
+            if len(filtered) >= top_k:
+                break
+        return filtered
     
     def check_checklist_exists(self) -> int:
         """Check if any checklist items exist in the database."""

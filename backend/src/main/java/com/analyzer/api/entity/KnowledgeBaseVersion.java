@@ -2,6 +2,7 @@ package com.analyzer.api.entity;
 
 import com.analyzer.api.enums.KnowledgeReviewDecision;
 import com.analyzer.api.enums.KnowledgeStatus;
+import com.analyzer.api.enums.KnowledgeVisibility;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -41,6 +42,29 @@ public class KnowledgeBaseVersion {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private KnowledgeStatus status;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "ingest_status")
+    private KnowledgeStatus ingestStatus;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "visibility")
+    @Builder.Default
+    private KnowledgeVisibility visibility = KnowledgeVisibility.PRIVATE;
+
+    @Column(name = "active")
+    @Builder.Default
+    private Boolean active = false;
+
+    @Column(name = "ingested_at")
+    private LocalDateTime ingestedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ingested_by_id")
+    private User ingestedBy;
+
+    @Column(name = "ingest_error_message", columnDefinition = "TEXT")
+    private String errorMessage;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "review_decision")

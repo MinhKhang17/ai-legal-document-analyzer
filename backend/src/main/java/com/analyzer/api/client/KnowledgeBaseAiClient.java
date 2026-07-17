@@ -18,6 +18,7 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
+import java.util.Map;
 
 @Slf4j
 @Component
@@ -63,6 +64,27 @@ public class KnowledgeBaseAiClient {
         } catch (Exception ex) {
             log.warn("AI service returned invalid ingested documents payload for kbId={}: {}", kbId, ex.getMessage());
             return emptyPage(page, size);
+        }
+    }
+
+    public boolean updateLifecycle(String kbId, String documentId, boolean makePublic) {
+        try {
+            URI uri = UriComponentsBuilder.fromUriString(aiServiceBaseUrl)
+                    .path("/ai/admin/knowledge-bases/{kbId}/ingested-documents/{documentId}/lifecycle")
+                    .buildAndExpand(kbId, documentId)
+                    .toUri();
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            ResponseEntity<String> response = restTemplate.exchange(
+                    uri,
+                    org.springframework.http.HttpMethod.PUT,
+                    new HttpEntity<>(Map.of("public", makePublic), headers),
+                    String.class
+            );
+            return response.getStatusCode().is2xxSuccessful();
+        } catch (RestClientException ex) {
+            log.warn("Unable to update AI KB lifecycle kbId={} documentId={}: {}", kbId, documentId, ex.getMessage());
+            return false;
         }
     }
 

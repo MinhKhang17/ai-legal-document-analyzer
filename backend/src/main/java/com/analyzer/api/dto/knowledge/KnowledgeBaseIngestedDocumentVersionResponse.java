@@ -18,10 +18,14 @@ public class KnowledgeBaseIngestedDocumentVersionResponse {
     private LocalDateTime effectiveFrom;
     private LocalDateTime effectiveTo;
     private String visibility;
+    private Boolean active;
     private String ingestStatus;
     private Integer chunkCount;
     private Integer embeddedCount;
     private String sourceFileId;
     private String contentHash;
     private LocalDateTime ingestedAt;
+    private LocalDateTime publishedAt;
+    private Long ingestedById;
+    private String errorMessage;
 }

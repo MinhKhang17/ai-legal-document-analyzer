@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import re
 
+from app.core.knowledge_access import is_published_system_kb
 from app.models.intent_enums import (
     ContractType,
     LegalQueryIntent,
@@ -698,11 +699,7 @@ class RagQueryService:
                     except Exception:
                         metadata = {}
                 ws_id = metadata.get("workspace_id") or metadata.get("workspaceId")
-                if (
-                    metadata.get("source_type") == "SYSTEM_KB"
-                    and metadata.get("effective_status") == "ACTIVE"
-                    and metadata.get("ingested_by_role") == "ADMIN"
-                ):
+                if is_published_system_kb(metadata):
                     available_system_docs.append(title)
                 elif ws_id == request.workspaceId:
                     available_user_docs.append(title)

@@ -1,4 +1,4 @@
-import { ArrowLeft, Archive, CheckCircle2, RefreshCw, Send } from "lucide-react";
+import { ArrowLeft, Archive, CheckCircle2, EyeOff, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Badge } from "../../components/common/Badge";
@@ -12,9 +12,9 @@ import {
   archiveKnowledgeBaseEntry,
   getKnowledgeBaseEntry,
   getKnowledgeBaseVersions,
-  ingestKnowledgeBaseEntry,
   publishKnowledgeBaseEntry,
   reviewKnowledgeBaseEntry,
+  unpublishKnowledgeBaseEntry,
 } from "../../services/knowledgeBase.service";
 import { useI18n } from "../../hooks/useI18n";
 import { useToast } from "../../hooks/useToast";
@@ -29,7 +29,6 @@ export function KnowledgeBaseDetailPage() {
   const locale = language === "vi" ? "vi-VN" : "en-US";
   const [entry, setEntry] = useState<KnowledgeBaseEntry | null>(null);
   const [versions, setVersions] = useState<KnowledgeBaseVersion[]>([]);
-  const [requestId, setRequestId] = useState("");
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -81,6 +80,9 @@ export function KnowledgeBaseDetailPage() {
   const versionColumns: DataTableColumn<KnowledgeBaseVersion>[] = [
     { header: t("contracts.version"), cell: (version) => <span className="font-semibold">v{version.versionNo}</span> },
     { header: t("table.status"), cell: (version) => <Badge>{version.status || t("common.unknown")}</Badge> },
+    { header: t("knowledge.ingestedDocuments.ingestStatus"), cell: (version) => <Badge>{version.ingestStatus || "-"}</Badge> },
+    { header: t("knowledge.ingestedDocuments.visibility"), cell: (version) => <Badge>{version.visibility || "-"}</Badge> },
+    { header: t("knowledge.ingestedDocuments.active"), cell: (version) => version.active ? t("admin.active") : t("admin.inactive") },
     { header: t("knowledge.review"), cell: (version) => version.reviewDecision || "-" },
     { header: t("contracts.created"), cell: (version) => formatDisplayDate(version.createdAt, "-", locale) },
   ];
@@ -120,6 +122,7 @@ export function KnowledgeBaseDetailPage() {
                 <div><dt className="label-uppercase">{t("knowledge.category")}</dt><dd>{entry.category}</dd></div>
                 <div><dt className="label-uppercase">{t("knowledge.scope")}</dt><dd>{entry.scope}</dd></div>
                 <div><dt className="label-uppercase">{t("contracts.version")}</dt><dd>{entry.currentVersionNo ?? "-"}</dd></div>
+                <div><dt className="label-uppercase">{t("knowledge.ingestedDocuments.active")}</dt><dd>{entry.active ? t("admin.active") : t("admin.inactive")}</dd></div>
                 <div><dt className="label-uppercase">{t("table.updated")}</dt><dd>{formatDisplayDate(entry.updatedAt, "-", locale)}</dd></div>
               </dl>
             </Card>
@@ -144,40 +147,6 @@ export function KnowledgeBaseDetailPage() {
           </main>
 
           <aside className="space-y-gutter">
-            <Card title={t("knowledge.ingest")}>
-              <div className="space-y-md">
-                <input className="form-field" value={requestId} onChange={(event) => setRequestId(event.target.value)} placeholder={t("chat.requestId")} />
-                <Button
-                  leftIcon={<Send className="h-4 w-4" />}
-                    disabled={saving || !requestId.trim() || !canKnowledgeAction(entry.currentStatus, 'INGEST')}
-                  onClick={() => void runAction(
-                    () => ingestKnowledgeBaseEntry(id, { requestId: requestId.trim(), jobPayload: null }).then((job) => ({
-                      id: job.knowledgeBaseVersionId,
-                      knowledgeBaseEntryId: id,
-                      versionNo: entry.currentVersionNo ?? 0,
-                      sourceDocumentId: null,
-                      rawContent: null,
-                      extractedContent: null,
-                      status: job.status,
-                      reviewDecision: null,
-                      reviewedById: null,
-                      reviewedAt: null,
-                      publishedById: null,
-                      publishedAt: null,
-                      archivedById: null,
-                      archivedAt: null,
-                      failedReason: job.errorMessage,
-                      createdAt: job.createdAt,
-                      updatedAt: job.createdAt,
-                    })),
-                    t("knowledge.ingestSuccess"),
-                  )}
-                >
-                  {t("knowledge.ingest")}
-                </Button>
-              </div>
-            </Card>
-
             <Card title={t("knowledge.reviewPublishArchive")}>
               <div className="space-y-md">
                 <textarea className="form-field min-h-24" value={note} onChange={(event) => setNote(event.target.value)} placeholder={t("knowledge.noteReason")} />
@@ -201,6 +170,17 @@ export function KnowledgeBaseDetailPage() {
                     )}
                   >
                     {t("knowledge.publish")}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    leftIcon={<EyeOff className="h-4 w-4" />}
+                    disabled={saving || !canKnowledgeAction(entry.currentStatus, 'UNPUBLISH')}
+                    onClick={() => void runAction(
+                      () => unpublishKnowledgeBaseEntry(id),
+                      t("knowledge.unpublishSuccess"),
+                    )}
+                  >
+                    {t("knowledge.unpublish")}
                   </Button>
                   <Button
                     variant="danger"

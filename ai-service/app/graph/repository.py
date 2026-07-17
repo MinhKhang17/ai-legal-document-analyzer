@@ -115,6 +115,8 @@ class GraphRepository:
                 "source_type": "SYSTEM_KB",
                 "ingest_source": "INGEST_V2",
                 "effective_status": "ACTIVE",
+                "visibility": {"PUBLIC", None},
+                "active": {True, None},
                 "ingested_by_role": "ADMIN",
             },
         )
@@ -222,6 +224,45 @@ class GraphRepository:
                 }
                 for record in result
             ]
+
+    def update_document_lifecycle(
+        self,
+        document_id: str,
+        *,
+        visibility: str,
+        active: bool,
+        published_at: str | None,
+    ) -> int:
+        """Update existing JSON metadata only; vector nodes/index/schema stay unchanged."""
+        rows = self.list_chunks()
+        updates: list[tuple[str, str]] = []
+        for row in rows:
+            metadata = self._parse_metadata(row.get("metadata_json"))
+            candidate_ids = {
+                str(metadata.get("document_id") or ""),
+                str(metadata.get("knowledge_document_id") or ""),
+                str(metadata.get("knowledge_base_id") or ""),
+            }
+            if document_id not in candidate_ids:
+                continue
+            metadata.update({
+                "visibility": visibility,
+                "active": active,
+                "effective_status": "ACTIVE" if active and visibility == "PUBLIC" else "INACTIVE",
+                "published_at": published_at,
+            })
+            updates.append((str(row["chunk_id"]), json.dumps(metadata, ensure_ascii=False)))
+
+        if not updates:
+            return 0
+        with self.driver.session() as session:
+            for chunk_id, metadata_json in updates:
+                session.run(
+                    "MATCH (chunk:Chunk {node_id: $chunk_id}) SET chunk.metadata_json = $metadata_json",
+                    chunk_id=chunk_id,
+                    metadata_json=metadata_json,
+                ).consume()
+        return len(updates)
 
     def _search_chunks_by_text(
         self,

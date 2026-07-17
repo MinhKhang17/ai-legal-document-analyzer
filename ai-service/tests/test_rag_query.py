@@ -590,6 +590,8 @@ class RagQueryTests(unittest.TestCase):
                 metadata={
                     "source_type": "SYSTEM_KB",
                     "effective_status": "ACTIVE",
+                    "visibility": "PUBLIC",
+                    "active": True,
                     "ingested_by_role": "ADMIN",
                 },
             ),

@@ -74,6 +74,9 @@ class KnowledgeService:
                     metadata.setdefault("law_code", None)
                     metadata.setdefault("legal_domain", self.document_metadata.get("legal_domain") or None)
                     metadata.setdefault("effective_status", self.document_metadata.get("effective_status") or "UNKNOWN")
+                    metadata.setdefault("visibility", self.document_metadata.get("visibility") or "PRIVATE")
+                    metadata.setdefault("active", self.document_metadata.get("active") is True)
+                    metadata.setdefault("ingest_status", self.document_metadata.get("ingest_status") or "INGESTED")
                     metadata.setdefault("ingest_source", self.document_metadata.get("ingest_source") or "INGEST_V2")
                     metadata.setdefault("source_type", "SYSTEM_KB")
                     metadata.setdefault("ingested_by_role", self.document_metadata.get("ingested_by_role"))
@@ -226,7 +229,10 @@ class KnowledgeServiceV2(KnowledgeService):
             "chunking_strategy": "structural_semantic_subchunk_v2",
             "source_type": "SYSTEM_KB",
             "ingest_source": "INGEST_V2",
-            "effective_status": "ACTIVE",
+            "effective_status": "INACTIVE",
+            "visibility": "PRIVATE",
+            "active": False,
+            "ingest_status": "INGESTED",
             "ingested_by_role": "ADMIN",
             "ingested_by_user_id": "SYSTEM_ADMIN",
             "ingested_at": datetime.now(timezone.utc).isoformat(),
@@ -248,6 +254,8 @@ class KnowledgeServiceV2(KnowledgeService):
                 "source_type": "SYSTEM_KB",
                 "ingest_source": "INGEST_V2",
                 "effective_status": "ACTIVE",
+                "visibility": "PUBLIC",
+                "active": True,
                 "ingested_by_role": "ADMIN",
             },
         )
