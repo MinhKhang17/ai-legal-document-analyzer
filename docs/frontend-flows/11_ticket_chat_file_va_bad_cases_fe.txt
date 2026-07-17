@@ -1,0 +1,164 @@
+FLOW 11 - TICKET CHAT, FILE VA BAD CASES CHO FRONTEND
+
+Muc tieu:
+- Huong dan FE cap nhat chat customer/expert ma khong can bam refresh thu cong.
+- Cho customer xem va tai file expert chia se.
+- Chi hien thao tac ticket phu hop voi trang thai backend.
+- Backend da bo sung API va validation; file nay la checklist de FE tu trien khai.
+
+Pham vi:
+- Chi la yeu cau va huong dan cho frontend.
+- Backend khong su dung WebSocket o thoi diem hien tai.
+- FE nen polling ticket/messages/files moi 3-5 giay khi dang o trang chi tiet ticket.
+
+1. CHAT CUSTOMER VA EXPERT
+
+Customer API:
+- `GET /api/v1/legal-tickets/{id}`
+- `GET /api/v1/legal-tickets/{id}/messages`
+- `POST /api/v1/legal-tickets/{id}/customer-reply`
+
+Expert API:
+- `GET /api/v1/lawyer/tickets/{id}`
+- `GET /api/v1/lawyer/tickets/{id}/messages`
+- `POST /api/v1/lawyer/tickets/{id}/messages`
+
+FE can lam:
+1. Khi mount trang detail, tai ticket va message ngay.
+2. Tao interval 3-5 giay de tai lai ticket va message.
+3. Clear interval khi unmount hoac doi ticketId.
+4. Polling ngam khong bat loading toan trang va khong hien toast lap lai neu loi mang tam thoi.
+5. Sau khi gui tin thanh cong, clear input va tai message ngay, khong doi interval.
+6. Khoa nut gui khi request dang chay de tranh double submit.
+7. Cuon xuong tin nhan moi neu user dang o gan cuoi danh sach.
+
+Trang thai cho phep customer reply:
+- `ASSIGNED_TO_LAWYER`
+- `IN_REVIEW`
+- `NEED_MORE_INFO`
+- `CUSTOMER_RESPONDED`
+- `REOPENED`
+
+Trang thai cho phep expert chat:
+- `ASSIGNED_TO_LAWYER`
+- `IN_REVIEW`
+- `NEED_MORE_INFO`
+- `CUSTOMER_RESPONDED`
+- `REOPENED`
+
+Khong hien composer khi:
+- `PENDING_ADMIN_REVIEW`
+- `REJECTED_BY_ADMIN`
+- `RESOLVED`
+- `CLOSED`
+- `CANCELLED`
+
+2. FILE EXPERT CHIA SE CHO CUSTOMER
+
+Expert upload:
+- `POST /api/v1/lawyer/tickets/{id}/files`
+- Khi file can gui cho customer, payload dung `visibilityScope = CUSTOMER`.
+- Backend mac dinh `CUSTOMER` neu FE khong gui visibilityScope.
+
+Customer list file:
+- `GET /api/v1/legal-tickets/{id}/files`
+
+Customer download file:
+- `GET /api/v1/legal-tickets/{id}/files/{documentId}/download`
+
+FE can lam:
+1. Them `files` endpoint va `download` endpoint vao config/service customer ticket.
+2. Poll file cung luc voi message de file expert vua upload tu xuat hien.
+3. Hien `originalFileName`, `fileSize`, `uploadedAt` va nut tai file.
+4. Download bang authenticated fetch co JWT/cookie.
+5. Chuyen response thanh Blob, tao object URL va trigger download.
+6. Revoke object URL sau khi download.
+7. Customer chi nhan file co visibility `CUSTOMER`; khong render duong dan `filePath` noi bo.
+
+3. RENDER ACTION THEO TRANG THAI
+
+Customer:
+- `PENDING_ADMIN_REVIEW`: hien nut `Huy ticket`.
+- `RESOLVED`: hien nut `Dong ticket` va `Mo lai` neu con trong 7 ngay.
+- `CLOSED`: chi hien `Mo lai` neu con trong 7 ngay.
+- Trang thai khac: an cac nut tren neu action khong hop le.
+
+Expert:
+- `ASSIGNED_TO_LAWYER`, `CUSTOMER_RESPONDED`, `REOPENED`: co the bat dau review theo API/backend validation.
+- `ASSIGNED_TO_LAWYER`, `IN_REVIEW`, `CUSTOMER_RESPONDED`, `REOPENED`: co the resolve neu co cau tra loi chinh thuc.
+- `NEED_MORE_INFO`: cho customer reply; khong cho resolve cho den khi customer phan hoi.
+- `RESOLVED`, `CLOSED`, `CANCELLED`, `REJECTED_BY_ADMIN`: an composer, upload va action xu ly.
+- Khong ghi nut expert la `Dong ticket`; expert chi `Resolve/Giai quyet`. Customer moi la nguoi `Dong ticket`.
+
+4. BAD CASE VA ERROR HANDLING
+
+- Customer huy ticket sau khi da assign: backend tra `409`.
+- Customer reply khi ticket con cho admin: backend tra `409`.
+- Expert chat/upload tren ticket ket thuc: backend tra `409`.
+- Expert khong duoc assign: backend tra `403`.
+- Customer xem/tai file ticket nguoi khac: backend tra `403`.
+- Customer tai file visibility noi bo: backend tra `403`.
+- File khong thuoc ticket: backend tra `403`.
+- Ticket/file khong ton tai: backend tra `404`.
+- Khi gap `409`, FE tai lai ticket hien tai de dong bo status va hien message backend.
+
+5. QUOTA TICKET
+
+- Ticket `CANCELLED` va `REJECTED_BY_ADMIN` khong con duoc tinh vao quota ticket da su dung.
+- Sau khi cancel/reject, FE nen refresh endpoint usage de hien quota moi.
+- FE khong tu cong/tru quota; backend la nguon du lieu cuoi cung.
+
+6. PSEUDOCODE POLLING
+
+```ts
+useEffect(() => {
+  if (!ticketId) return;
+
+  const refreshLiveData = async () => {
+    const [ticket, messages, files] = await Promise.allSettled([
+      getTicket(ticketId),
+      getMessages(ticketId),
+      getFiles(ticketId),
+    ]);
+
+    if (ticket.status === "fulfilled") setTicket(ticket.value);
+    if (messages.status === "fulfilled") setMessages(messages.value);
+    if (files.status === "fulfilled") setFiles(files.value);
+  };
+
+  void refreshLiveData();
+  const timer = window.setInterval(refreshLiveData, 3000);
+  return () => window.clearInterval(timer);
+}, [ticketId]);
+```
+
+7. CHECKLIST FE
+
+- [ ] Customer detail polling ticket/messages/files.
+- [ ] Expert detail polling ticket/messages/files.
+- [ ] Polling khong lam UI nhap nhay loading.
+- [ ] Customer co danh sach va nut download file.
+- [ ] Expert upload file gui customer voi visibility `CUSTOMER`.
+- [ ] Action button render theo state machine.
+- [ ] An composer/upload tren terminal status.
+- [ ] Handle `403`, `404`, `409` va refresh status sau conflict.
+- [ ] Refresh subscription usage sau cancel/admin reject.
+- [ ] Test hai account customer/expert o hai browser khac nhau.
+
+8. TIEU CHI HOAN THANH
+
+- Tin nhan moi xuat hien o ben con lai trong toi da 3-5 giay ma khong refresh tay.
+- Customer tai duoc file expert chia se.
+- Customer khong tai duoc file noi bo.
+- FE khong hien action sai trang thai.
+- Direct API goi action sai van bi backend chan.
+- Cancel/reject ticket duoc hoan quota tren UI sau khi refresh usage.
+
+HIEN TRANG BACKEND:
+- Da co validation state cho chat/upload/cancel/reply.
+- Da co customer list/download shared files.
+- Da loai `CANCELLED` va `REJECTED_BY_ADMIN` khoi ticket quota used.
+- Refund payment workflow van doc lap voi quota ticket.
+
+DE XUAT SAU:
+- Neu can realtime tuc thoi thay vi tre 3-5 giay, nang cap sang WebSocket hoac SSE o sprint sau.

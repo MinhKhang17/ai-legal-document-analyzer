@@ -9,6 +9,7 @@ import com.analyzer.api.enums.ChatMessageRole;
 import com.analyzer.api.enums.ChatMessageStatus;
 import com.analyzer.api.enums.ContractGenerationStatus;
 import com.analyzer.api.enums.PlanStatus;
+import com.analyzer.api.enums.LegalTicketStatus;
 import com.analyzer.api.enums.UsageEventType;
 import com.analyzer.api.exception.common.ConflictException;
 import com.analyzer.api.exception.common.ResourceNotFoundException;
@@ -26,6 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -69,8 +71,12 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
                 user.getId(), ChatMessageRole.ASSISTANT, ChatMessageStatus.COMPLETED, periodStart, periodEnd);
         int draftContractsUsed = Math.toIntExact(contractGenerationJobRepository.countByRequesterIdAndStatusAndCreatedAtBetween(
                 user.getId(), ContractGenerationStatus.COMPLETED, periodStart, periodEnd));
-        int expertTicketsUsed = Math.toIntExact(legalTicketRepository.countByCreatedByIdAndDeletedFalseAndCreatedAtBetween(
-                user.getId(), periodStart, periodEnd));
+        int expertTicketsUsed = Math.toIntExact(
+                legalTicketRepository.countByCreatedByIdAndDeletedFalseAndStatusNotInAndCreatedAtBetween(
+                        user.getId(),
+                        List.of(LegalTicketStatus.CANCELLED, LegalTicketStatus.REJECTED_BY_ADMIN),
+                        periodStart,
+                        periodEnd));
         int workspacesUsed = Math.toIntExact(workspaceRepository.countByUserIdAndStatus(user.getId(), ACTIVE_WORKSPACE_STATUS));
 
         return SubscriptionQuotaUsageSummaryResponse.builder()
