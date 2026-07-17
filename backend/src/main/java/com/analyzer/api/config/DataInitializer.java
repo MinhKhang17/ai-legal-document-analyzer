@@ -73,7 +73,8 @@ public class DataInitializer implements CommandLineRunner {
         Role expertRole = roleRepository.findByName(RoleName.EXPERT)
                 .orElseThrow(() -> new RuntimeException("EXPERT role not found in database"));
 
-        seedUser("admin", "admin", "admin@123", "pass@123", adminRole);
+        seedUser("admin", "admin", "admin@123", "" +
+                "", adminRole);
         seedUser("user", "user", "user@123", "pass@123", customerRole);
         seedUser("expert", "expert", "expert@123", "pass@123", expertRole);
 
