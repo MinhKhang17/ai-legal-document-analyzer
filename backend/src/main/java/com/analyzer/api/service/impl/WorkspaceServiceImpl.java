@@ -8,10 +8,14 @@ import com.analyzer.api.dto.workspace.WorkspaceResponseDTO;
 import com.analyzer.api.entity.Document;
 import com.analyzer.api.entity.User;
 import com.analyzer.api.entity.Workspace;
+import com.analyzer.api.enums.RoleName;
+import com.analyzer.api.exception.common.ForbiddenException;
+import com.analyzer.api.exception.common.ResourceNotFoundException;
 import com.analyzer.api.exception.workspace.DocumentProcessingDispatchException;
 import com.analyzer.api.repository.DocumentRepository;
 import com.analyzer.api.repository.UserRepository;
 import com.analyzer.api.repository.WorkspaceRepository;
+import com.analyzer.api.service.EmailService;
 import com.analyzer.api.service.SubscriptionQuotaService;
 import com.analyzer.api.service.WorkspaceService;
 import lombok.RequiredArgsConstructor;
@@ -58,6 +62,7 @@ public class WorkspaceServiceImpl implements WorkspaceService {
     private final DocumentRepository documentRepository;
     private final UserRepository userRepository;
     private final SubscriptionQuotaService subscriptionQuotaService;
+    private final EmailService emailService;
 
     @Value("${app.storage.upload-root:uploads}")
     private String uploadRoot;
@@ -175,6 +180,10 @@ public class WorkspaceServiceImpl implements WorkspaceService {
             document.setChunkCount(request.getChunkCount() == null ? 0 : request.getChunkCount());
             document.setErrorMessage(null);
             document.setProcessedAt(LocalDateTime.now());
+            emailService.sendIngestionSuccessEmailAsync(
+                    document.getUser().getEmail(),
+                    document.getUser().getFirstName(),
+                    document.getOriginalFileName());
         } else if (STATUS_FAILED.equalsIgnoreCase(request.getStatus())) {
             document.setStatus(STATUS_FAILED);
             document.setChunkCount(request.getChunkCount() == null ? 0 : request.getChunkCount());
@@ -361,6 +370,36 @@ public class WorkspaceServiceImpl implements WorkspaceService {
                 throw new RuntimeException("File khong ton tai hoac khong the doc");
             }
         } catch (Exception e) {
+            throw new RuntimeException("Loi khi doc file: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public org.springframework.core.io.Resource downloadDocumentForStaff(Long currentUserId, String currentUserRole, String documentId) {
+        Document document = documentRepository.findById(documentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay tai lieu voi id: " + documentId));
+
+        if (RoleName.EXPERT.name().equalsIgnoreCase(currentUserRole)) {
+            boolean assignedToCurrentExpert = document.getLegalTicket() != null
+                    && document.getLegalTicket().getAssignedLawyer() != null
+                    && document.getLegalTicket().getAssignedLawyer().getId().equals(currentUserId);
+            if (!assignedToCurrentExpert) {
+                throw new ForbiddenException("Ban khong duoc phan cong xu ly yeu cau tu van chua tai lieu nay");
+            }
+        }
+
+        try {
+            Path filePath = Path.of(document.getFilePath()).toAbsolutePath().normalize();
+            if (!Files.exists(filePath)) {
+                throw new ResourceNotFoundException("File vat ly cua tai lieu khong con ton tai tren server");
+            }
+            org.springframework.core.io.Resource resource = new org.springframework.core.io.UrlResource(filePath.toUri());
+            if (!resource.isReadable()) {
+                throw new ResourceNotFoundException("Khong the doc file tai lieu");
+            }
+            return resource;
+        } catch (java.io.IOException e) {
             throw new RuntimeException("Loi khi doc file: " + e.getMessage(), e);
         }
     }

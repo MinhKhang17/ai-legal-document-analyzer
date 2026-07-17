@@ -29,4 +29,10 @@ public interface AuthService {
      * Get the current authenticated user's details.
      */
     UserResponseDTO getCurrentUser();
+
+    /**
+     * Verify a user's email using the token sent at registration.
+     * Idempotent: verifying an already-verified account succeeds silently.
+     */
+    void verifyEmail(String token);
 }

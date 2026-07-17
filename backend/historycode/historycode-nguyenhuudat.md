@@ -1,5 +1,23 @@
 # History Code - Nguyen Huu Dat
 
+**Date:** 2026-07-17 (Ngày 17 tháng 7 năm 2026)
+
+## Tasks Completed:
+- **Triển khai 10 tính năng bổ sung Backend theo đặc tả `backend/docs/new_features_implementation_plan.md`** (thiết kế qua Plan Mode, được duyệt trước khi code, tuân thủ kiến trúc layer sẵn có entity → repository → service/impl → mapper → controller):
+  - **Cập nhật Entity/Schema**: `User` bổ sung `emailVerified`, `emailVerificationToken`, `emailVerificationTokenExpiry`, `specialty`, `legalDomain`, `description`; `ChatSession` bổ sung `isShared`, `shareToken`, `sharedAt`; tạo mới `@Entity ChatMessageFeedback` (unique theo `chat_message_id`, upsert 1 feedback/tin nhắn).
+  - **Đổi mật khẩu**: `POST /api/v1/users/change-password` (`@PreAuthorize("isAuthenticated()")`), lấy user từ SecurityContext (chống IDOR), xử lý edge case mật khẩu rỗng (OAuth), trùng mật khẩu cũ.
+  - **Admin quản lý Expert**: `POST /api/v1/admin/users/expert` (tạo tài khoản Expert active + verified ngay, chuẩn hóa email `trim().toLowerCase()` chống trùng do hoa/thường) và `GET /api/v1/admin/experts` (danh sách Expert active kèm `specialty`/`legalDomain`/`description` phục vụ giao diện phân công).
+  - **Xác thực email bắt buộc trước khi đăng nhập**: Đăng ký (`/auth/register`) giờ set `active=false`, `emailVerified=false`, sinh token UUID hết hạn 24h và gửi email xác thực. `GET /api/v1/auth/verify-email?token=` (public, idempotent, xử lý token hết hạn qua `ExpiredVerificationTokenException`). Sửa `UserDetailsImpl.isEnabled()` để phản ánh đúng `user.active` (trước đó luôn `true`, không có tác dụng chặn), đăng ký thêm handler `DisabledException` → 403 trong `GlobalExceptionHandler`. 3 tài khoản demo seed sẵn trong `DataInitializer` được set `emailVerified=true` để không bị khóa.
+  - **Hạ tầng gửi Email**: Thêm dependency `spring-boot-starter-mail`, tạo `EmailService`/`EmailServiceImpl` (dùng `JavaMailSender`, chạy `@Async`, tự log cảnh báo và bỏ qua thay vì throw nếu chưa cấu hình SMTP hoặc gửi lỗi — không làm rollback giao dịch chính), bật `@EnableAsync` ở `LegalAnalyzerApplication`. Hook gửi email thông báo khi tài liệu ingest xong (`WorkspaceServiceImpl.updateProcessingResult`, trạng thái `READY`).
+  - **Tải tài liệu gốc cho Admin/Expert**: `GET /api/v1/admin/documents/{documentId}/download` (`AdminDocumentController` mới) — Admin tải mọi file, Expert chỉ tải được file thuộc ticket đang được phân công (`document.legalTicket.assignedLawyer.id == currentUserId`), kiểm tra `Files.exists()` trả 404 rõ ràng thay vì lỗi 500 khi mất file vật lý.
+  - **Đánh giá câu trả lời AI**: `POST /api/v1/chat-messages/{messageId}/feedback` (chỉ rate được tin nhắn `role=ASSISTANT`, thuộc sở hữu chính mình, upsert theo `chatMessageId`) và `GET /api/v1/admin/chat-messages/feedback` (Admin xem, filter theo `rating`, phân trang) qua service mới `AdminChatFeedbackService`.
+  - **Chia sẻ Chat Session Read-only**: `POST /api/v1/chat-sessions/{chatSessionId}/share` (Customer sở hữu, sinh/tái sử dụng `shareToken`) và `GET /api/v1/shared/chat/{shareToken}` (`SharedChatSessionController` mới, chỉ `ADMIN`/`EXPERT`, kiểm tra đồng thời `shareToken` khớp và `isShared=true`); endpoint gửi tin nhắn giữ nguyên `@PreAuthorize("hasRole('CUSTOMER')")` nên tự động chặn gửi tiếp qua link chia sẻ.
+  - Build Maven (`.\mvnw.cmd -q -DskipTests compile`) đạt `BUILD SUCCESS`, không phát sinh lỗi biên dịch/MapStruct.
+- **Phát hiện và sửa lỗi nghiêm trọng về cấu hình `.env`**: Thư viện `spring-dotenv 5.1.0` **không nạp được file `.env` vào Spring Environment** khi chạy cùng Spring Boot 4.0.6 (âm thầm, không log lỗi) — toàn bộ config trước giờ chạy bằng default cứng trong `application.yml`, chỉ "trùng hợp" đúng với các biến DB vì giá trị `.env` giống hệt default. Phát hiện qua việc `MAIL_FROM`/`SMTP_USERNAME` (không có default) bị rỗng khi gửi email xác thực dù `.env` đã điền đúng. Đã xác minh nguyên nhân bằng cách set thẳng biến môi trường OS (mail gửi được ngay) rồi so sánh với chạy chỉ dựa `.env` (mail bị skip). **Khắc phục**: thêm `spring.config.import: "optional:file:.env[.properties]"` vào `application.yml` — dùng cơ chế native của Spring Boot để nạp `.env` theo định dạng properties, không phụ thuộc thư viện thứ 3 nữa. Đã verify lại: restart chỉ dựa vào `.env`, đăng ký thử, log không còn cảnh báo "Mail is not configured".
+- Cấu hình SMTP Gmail thật trong `backend/.env` (không commit lên git vì đã khớp pattern `*.env` trong `backend/.gitignore`) và test gửi email thành công qua `smtp.gmail.com:587`.
+
+---
+
 **Date:** 2026-06-27 (Ngày 27 tháng 6 năm 2026)
 
 ## Tasks Completed:

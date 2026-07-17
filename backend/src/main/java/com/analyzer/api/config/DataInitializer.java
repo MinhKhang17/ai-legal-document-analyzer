@@ -101,6 +101,7 @@ public class DataInitializer implements CommandLineRunner {
         user.setAcceptedTerms(true);
         user.setRole(role);
         user.setActive(true);
+        user.setEmailVerified(true);
         userRepository.save(user);
         logger.info("Seeded default user: {} / {}", email, rawPassword);
     }

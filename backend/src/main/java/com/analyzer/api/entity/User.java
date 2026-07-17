@@ -38,4 +38,22 @@ public class User {
     @Column(nullable = false)
     @Builder.Default
     private boolean active = true;
+
+    @Column(name = "email_verified", nullable = false)
+    @Builder.Default
+    private boolean emailVerified = false;
+
+    @Column(name = "email_verification_token")
+    private String emailVerificationToken;
+
+    @Column(name = "email_verification_token_expiry")
+    private java.time.LocalDateTime emailVerificationTokenExpiry;
+
+    private String specialty;
+
+    @Column(name = "legal_domain")
+    private String legalDomain;
+
+    @Column(columnDefinition = "TEXT")
+    private String description;
 }

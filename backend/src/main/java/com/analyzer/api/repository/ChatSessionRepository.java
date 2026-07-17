@@ -35,4 +35,6 @@ public interface ChatSessionRepository extends JpaRepository<ChatSession, String
     );
 
     boolean existsByIdAndUserId(String id, Long userId);
+
+    Optional<ChatSession> findByShareTokenAndIsSharedTrue(String shareToken);
 }

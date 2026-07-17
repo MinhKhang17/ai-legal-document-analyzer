@@ -20,4 +20,5 @@ public interface WorkspaceService {
     org.springframework.core.io.Resource downloadDocumentFilePublic(String workspaceId, String documentId);
     DocumentResponseDTO registerGeneratedDocument(com.analyzer.api.dto.document.RegisterDocumentRequestDTO request);
     org.springframework.core.io.Resource downloadSystemDocumentFile(String filename);
+    org.springframework.core.io.Resource downloadDocumentForStaff(Long currentUserId, String currentUserRole, String documentId);
 }

@@ -30,4 +30,13 @@ public class AdminCreateLawyerRequestDTO {
 
     @Schema(description = "Whether the account is active", example = "true", defaultValue = "true")
     private Boolean active = true;
+
+    @Schema(description = "Expert's main specialty", example = "Tư vấn doanh nghiệp")
+    private String specialty;
+
+    @Schema(description = "Legal domain the expert practices in", example = "Luật Thương mại")
+    private String legalDomain;
+
+    @Schema(description = "Free-text description of the expert's experience", example = "5 năm kinh nghiệm giải quyết tranh chấp kinh doanh")
+    private String description;
 }

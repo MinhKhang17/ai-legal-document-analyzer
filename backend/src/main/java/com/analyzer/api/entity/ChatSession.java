@@ -56,6 +56,16 @@ public class ChatSession {
     @Builder.Default
     private Boolean isDefault = false;
 
+    @Column(name = "is_shared", nullable = false)
+    @Builder.Default
+    private Boolean isShared = false;
+
+    @Column(name = "share_token", unique = true)
+    private String shareToken;
+
+    @Column(name = "shared_at")
+    private LocalDateTime sharedAt;
+
     @Column(name = "last_message_at")
     private LocalDateTime lastMessageAt;
 

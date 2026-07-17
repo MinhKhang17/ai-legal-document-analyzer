@@ -11,27 +11,37 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1/admin/users")
 @RequiredArgsConstructor
-@Tag(name = "Admin User Management", description = "Endpoints for admin to create lawyer accounts")
+@Tag(name = "Admin User Management", description = "Endpoints for admin to create and browse expert accounts")
 public class AdminUserController {
-//
-//    private final UserService userService;
-//
-//    @PostMapping("/lawyers")
-//    @PreAuthorize("hasRole('ADMIN')")
-//    @Operation(summary = "Create lawyer account", description = "Creates an active EXPERT user account for a lawyer.")
-//    public ResponseEntity<ApiResponseDTO<UserResponseDTO>> createLawyer(
-//            @Valid @RequestBody AdminCreateLawyerRequestDTO request) {
-//        UserResponseDTO user = userService.createLawyerUser(request);
-//        return new ResponseEntity<>(
-//                ApiResponseDTO.created("Lawyer account created successfully", user),
-//                HttpStatus.CREATED);
-//    }
+
+    private final UserService userService;
+
+    @PostMapping("/expert")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Create expert account", description = "Creates an active, email-verified EXPERT user account for a lawyer.")
+    public ResponseEntity<ApiResponseDTO<UserResponseDTO>> createExpert(
+            @Valid @RequestBody AdminCreateLawyerRequestDTO request) {
+        UserResponseDTO user = userService.createExpertUser(request);
+        return new ResponseEntity<>(
+                ApiResponseDTO.created("Tạo tài khoản Expert thành công", user),
+                HttpStatus.CREATED);
+    }
+
+    @GetMapping("/experts")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "List active experts", description = "Retrieves all active EXPERT users for assignment purposes.")
+    public ResponseEntity<ApiResponseDTO<List<UserResponseDTO>>> getActiveExperts() {
+        return ResponseEntity.ok(ApiResponseDTO.success(userService.getActiveExperts()));
+    }
 }
