@@ -134,11 +134,23 @@ class ContractGenerationService:
         download_links: list[str] = []
         served_path: str | None = None
 
+        # Try to resolve path
+        resolved_path = None
         if source_path and os.path.exists(source_path):
-            # File still exists on disk — copy it to uploads
-            served_path = self._copy_source_file(source_path, doc_title)
+            resolved_path = source_path
         else:
-            # Original file is gone (e.g. /tmp cleaned) — reconstruct from chunks
+            resolved_path = self._find_original_file_by_title(doc_title)
+            if not resolved_path and source_path:
+                # Also try matching using the filename inside the source_path
+                filename = os.path.basename(source_path)
+                name_only = os.path.splitext(filename)[0]
+                resolved_path = self._find_original_file_by_title(name_only)
+
+        if resolved_path and os.path.exists(resolved_path):
+            # File resolved on disk — copy it to uploads
+            served_path = self._copy_source_file(resolved_path, doc_title)
+        else:
+            # Original file is gone — reconstruct from chunks as a fallback
             served_path = self._reconstruct_docx_from_chunks(best_doc_id, doc_title)
 
         if served_path and os.path.exists(served_path):
@@ -401,3 +413,34 @@ class ContractGenerationService:
             retrievedUserChunks=0,
             retrievedKnowledgeChunks=0,
         )
+
+    def _find_original_file_by_title(self, title: str, search_dir: str = "/app/uploads") -> str | None:
+        """Find the original file path on disk by searching for a matching title."""
+        if not title:
+            return None
+
+        import re
+        def clean(t):
+            # Keep alphanumeric characters and convert to lower case for comparison
+            return re.sub(r'[^a-zA-Z0-9]', '', t).lower()
+
+        target = clean(title)
+        if not target:
+            return None
+
+        for root, dirs, files in os.walk(search_dir):
+            # Skip generated templates to avoid self-reference loops
+            if "template_" in root:
+                continue
+            for f in files:
+                if f.startswith("template_"):
+                    continue
+                name, ext = os.path.splitext(f)
+                cleaned_name = clean(name)
+                # Matches if equal or target is substring of filename
+                if cleaned_name == target or target in cleaned_name or cleaned_name in target:
+                    resolved_path = os.path.join(root, f)
+                    logger.info("Resolved original template file for '%s' -> %s", title, resolved_path)
+                    return resolved_path
+        return None
+
