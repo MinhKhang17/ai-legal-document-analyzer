@@ -1,5 +1,6 @@
 package com.analyzer.api.entity;
 
+import com.analyzer.api.enums.FeedbackRating;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -27,8 +28,12 @@ public class ChatMessageFeedback {
     @JoinColumn(name = "chat_message_id", nullable = false, unique = true)
     private ChatMessage chatMessage;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private Integer rating;
+    private FeedbackRating rating;
+
+    @Column(columnDefinition = "TEXT")
+    private String reasons;
 
     @Column(columnDefinition = "TEXT")
     private String comment;

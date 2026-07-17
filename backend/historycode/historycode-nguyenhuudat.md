@@ -1,5 +1,31 @@
 # History Code - Nguyen Huu Dat
 
+**Date:** 2026-07-18 (Ngày 18 tháng 7 năm 2026)
+
+## Tasks Completed:
+- **Sửa lỗi đặt tên API tạo Expert**: Đổi `POST /api/v1/admin/users/expert` (số ít) thành `POST /api/v1/admin/users/experts` (số nhiều) trong `AdminUserController` để nhất quán với `GET /api/v1/admin/users/experts` cùng resource — tránh 2 method khác path cho cùng 1 collection.
+- **Chẩn đoán nguyên nhân "click link xác thực email vẫn không đăng nhập được"**: Xác nhận backend (`AuthController.verifyEmail`, `AuthServiceImpl.verifyEmail`) hoạt động đúng, nhưng **frontend hoàn toàn chưa có route/trang `/verify-email`** — khi click link, route guard redirect thẳng về `/login` do chưa đăng nhập, token trên query string bị bỏ qua hoàn toàn, tài khoản không bao giờ được verify thật (`active`/`emailVerified` vẫn `false`). Đây là phần việc còn thiếu bên FE, chưa code do phạm vi công việc tập trung backend + docs.
+- **Rà soát và sửa nhiều sai lệch giữa `backend/docs/new_features_implementation_plan.md` / `docs/frontend-flows/*` với code thật**:
+  - Sửa endpoint danh sách Expert bị ghi sai (`/admin/experts` → đúng là `/admin/users/experts`) ở cả 2 nhóm tài liệu.
+  - Phát hiện tài liệu tính năng 7 (đánh giá câu trả lời AI) mô tả một API rating 1-5 sao tại `/chat-messages/{messageId}/feedback` — lần khảo sát đầu tưởng API này không tồn tại và đã bị thay thế bởi hệ thống Survey/AI Report (`FeedbackController`), nhưng rà soát kỹ hơn xác nhận **API rating thật sự đã tồn tại sẵn** ở `ChatMessageController` + `AdminChatFeedbackController` + entity `ChatMessageFeedback`, chỉ do bỏ sót khi khảo sát lần đầu (chưa đọc hết `ChatMessageController.java`). Đã đính chính lại toàn bộ nội dung docs liên quan.
+- **Redesign tính năng đánh giá câu trả lời AI sang mô hình thumbs up/down (kiểu ChatGPT) kèm preset lý do**:
+  - Thêm enum `FeedbackRating` (`THUMBS_UP` / `THUMBS_DOWN`) và `FeedbackReason` (`INCORRECT`, `WRONG_CITATION`, `INCOMPLETE`, `NOT_HELPFUL`, `POOR_PHRASING`, `OTHER`).
+  - Đổi `ChatMessageFeedback.rating` từ `Integer(1-5)` sang enum `FeedbackRating` (`@Enumerated(STRING)`), thêm cột `reasons` (Text, các mã enum nối dấu phẩy, chỉ có giá trị khi `rating = THUMBS_DOWN`).
+  - Bổ sung `submittedById` / `submittedByName` vào `ChatMessageFeedbackResponse` (suy ra từ `chatMessage.getUser()`, không cần thêm cột riêng) để Admin biết chính xác khách hàng nào đã đánh giá.
+  - Cập nhật `ChatMessageServiceImpl.submitFeedback()` (tự ép `reasons = null` khi `rating = THUMBS_UP` bất kể client gửi gì), `AdminChatFeedbackServiceImpl`, `ChatMessageFeedbackRepository`, `AdminChatFeedbackController` tương ứng.
+- **Cải tiến luồng Admin tạo tài khoản Expert theo yêu cầu mật khẩu mặc định + tự khóa sau 7 ngày**:
+  - Bỏ hẳn field `password` khỏi `AdminCreateLawyerRequestDTO` — Admin không tự nhập mật khẩu.
+  - Mật khẩu mặc định gán cứng `12345678` (mã hóa bcrypt trước khi lưu), thêm `User.mustChangePassword` (boolean) và `User.passwordResetDeadline` (LocalDateTime), đặt hạn 7 ngày kể từ lúc tạo/reset tài khoản.
+  - Gửi email thông tin đăng nhập cho Expert qua `EmailService.sendExpertAccountCreatedEmailAsync` (mật khẩu tạm thời + cảnh báo hạn đổi mật khẩu 7 ngày, nếu không sẽ bị khóa).
+  - Thêm `ExpertPasswordDeadlineScheduler` (`@Scheduled(fixedRate = 3_600_000)`, bật kèm `@EnableScheduling` ở `LegalAnalyzerApplication`) tự động khóa (`active = false`) tài khoản Expert quá hạn chưa đổi mật khẩu.
+  - `UserServiceImpl.changePassword()` tự xóa cờ `mustChangePassword`/`passwordResetDeadline` khi đổi mật khẩu thành công, giúp tài khoản thoát diện bị khóa.
+  - Thêm API mới `POST /api/v1/admin/users/experts/resend-activation` (payload chỉ `email`) để Admin gửi lại mật khẩu tạm thời và/hoặc mở khóa tài khoản Expert mà không cần xóa/tạo lại (giữ nguyên lịch sử ticket đã gán).
+  - Cập nhật `UserMapper` thêm `@Mapping(target = "mustChangePassword", ignore = true)` và tương tự cho `passwordResetDeadline` để loại bỏ warning MapStruct "Unmapped target properties" khi map từ `UserRequestDTO` (đăng ký Customer) sang `User`.
+- **Kiểm tra toàn diện lại cả 10 tính năng theo yêu cầu ban đầu** (đối chiếu code backend thật ↔ `new_features_implementation_plan.md` ↔ toàn bộ `docs/frontend-flows/*`): xác nhận backend đã hoàn thiện 10/10 tính năng, tài liệu đã khớp 100% với code sau khi sửa thêm 1 chỗ mô tả schema DB của bảng feedback còn ghi kiểu cũ (`rating Integer` → sửa thành lưu enum dạng String + bổ sung cột `reasons`); xác nhận phía frontend hiện chưa build UI cho bất kỳ tính năng nào trong 10 tính năng trên (đúng như các mục đã được đánh dấu `[MỚI]` trong docs).
+- Build Maven (`.\mvnw.cmd clean compile` và `.\mvnw.cmd test-compile`) đạt `BUILD SUCCESS` sau mỗi vòng thay đổi, không phát sinh lỗi biên dịch.
+
+---
+
 **Date:** 2026-07-17 (Ngày 17 tháng 7 năm 2026)
 
 ## Tasks Completed:

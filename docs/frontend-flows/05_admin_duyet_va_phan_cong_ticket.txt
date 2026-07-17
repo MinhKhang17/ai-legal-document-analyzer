@@ -31,7 +31,7 @@ Luồng chính:
 
 Sơ đồ text:
 - `admin list -> filter -> open detail -> inspect evidence -> assign/reassign/reject`
-- `load assign panel -> Call GET /admin/experts -> Render experts list with specialties/legal domain -> Select expert -> Call Assign API`
+- `load assign panel -> Call GET /admin/users/experts -> Render experts list with specialties/legal domain -> Select expert -> Call Assign API`
 
 Màn hình / component:
 - `frontend/src/pages/admin/AdminTicketsPage.tsx`
@@ -46,7 +46,7 @@ Dữ liệu / state:
 Validation:
 - Assign/reassign phải có `selectedLawyerId`
 - Reject phải có `reason`
-- Danh sách expert lấy trực tiếp từ API chuyên biệt `GET /api/v1/admin/experts` đã lọc sẵn expert hoạt động trên backend.
+- Danh sách expert lấy trực tiếp từ API chuyên biệt `GET /api/v1/admin/users/experts` đã lọc sẵn expert hoạt động trên backend.
 
 API / service tích hợp:
 - FE:
@@ -58,7 +58,7 @@ API / service tích hợp:
   - `GET /api/v1/admin/tickets/{id}/summary`
   - `GET /api/v1/admin/tickets/{id}/chat-history`
   - `GET /api/v1/admin/tickets/{id}/files`
-  - `GET /api/v1/admin/experts` (Lấy danh sách expert kèm chuyên ngành) [MỚI]
+  - `GET /api/v1/admin/users/experts` (Lấy danh sách expert kèm chuyên ngành) [MỚI]
   - `POST /api/v1/admin/tickets/{id}/assign-lawyer`
   - `POST /api/v1/admin/tickets/{id}/reassign-lawyer`
   - `POST /api/v1/admin/tickets/{id}/reject`
@@ -89,7 +89,7 @@ File nguồn tham chiếu:
   - `backend/src/main/java/com/analyzer/api/controller/admin/AdminTicketManagementController.java`
 
 Điểm chưa rõ:
-- `ĐÃ RÕ`: Lấy thông tin expert từ API `GET /api/v1/admin/experts` để có thông tin chuyên ngành.
+- `ĐÃ RÕ`: Lấy thông tin expert từ API `GET /api/v1/admin/users/experts` để có thông tin chuyên ngành.
 
 Checklist FE:
 - Thay thế API `getUsers()` thông thường bằng API `/admin/experts` khi mở panel assign ticket.

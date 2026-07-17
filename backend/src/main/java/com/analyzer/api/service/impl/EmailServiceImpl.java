@@ -49,6 +49,19 @@ public class EmailServiceImpl implements EmailService {
         send(toEmail, "Tài liệu của bạn đã sẵn sàng", body);
     }
 
+    @Override
+    @Async
+    public void sendExpertAccountCreatedEmailAsync(String toEmail, String recipientName, String temporaryPassword, int passwordChangeDeadlineDays) {
+        String loginUrl = frontendBaseUrl + "/login";
+        String body = "Xin chào " + safeName(recipientName) + ",\n\n"
+                + "Tài khoản Expert của bạn trên LexiGuard đã được tạo/kích hoạt với thông tin đăng nhập sau:\n"
+                + "Email: " + toEmail + "\n"
+                + "Mật khẩu tạm thời: " + temporaryPassword + "\n\n"
+                + "Vui lòng đăng nhập tại " + loginUrl + " và đổi mật khẩu trong vòng " + passwordChangeDeadlineDays + " ngày kể từ khi nhận email này.\n"
+                + "Nếu quá thời hạn trên mà mật khẩu chưa được đổi, tài khoản sẽ bị tạm khóa. Khi đó, vui lòng liên hệ Admin để được cấp lại quyền truy cập.";
+        send(toEmail, "Thông tin tài khoản Expert của bạn", body);
+    }
+
     private void send(String toEmail, String subject, String body) {
         if (!mailEnabled || !StringUtils.hasText(mailFrom)) {
             logger.warn("Mail is not configured (app.mail.enabled/from/SMTP_USERNAME missing) - skipping email to {}", toEmail);

@@ -13,4 +13,11 @@ public interface EmailService {
      * same failure-handling contract as {@link #sendVerificationEmailAsync}.
      */
     void sendIngestionSuccessEmailAsync(String toEmail, String recipientName, String originalFileName);
+
+    /**
+     * Sends an EXPERT account's temporary login credentials (created or reactivated by admin),
+     * along with the password-change deadline. Fire-and-forget, same failure-handling contract
+     * as {@link #sendVerificationEmailAsync}.
+     */
+    void sendExpertAccountCreatedEmailAsync(String toEmail, String recipientName, String temporaryPassword, int passwordChangeDeadlineDays);
 }

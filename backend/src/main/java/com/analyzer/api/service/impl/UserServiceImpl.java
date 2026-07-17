@@ -31,6 +31,8 @@ import java.util.stream.Collectors;
 public class UserServiceImpl implements UserService {
 
     private static final int VERIFICATION_TOKEN_VALID_HOURS = 24;
+    private static final String DEFAULT_EXPERT_PASSWORD = "12345678";
+    private static final int EXPERT_PASSWORD_CHANGE_DEADLINE_DAYS = 7;
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
@@ -113,6 +115,8 @@ public class UserServiceImpl implements UserService {
         }
 
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        user.setMustChangePassword(false);
+        user.setPasswordResetDeadline(null);
         userRepository.save(user);
     }
 
@@ -131,18 +135,45 @@ public class UserServiceImpl implements UserService {
                 .firstName(request.getFirstName())
                 .lastName(request.getLastName())
                 .email(normalizedEmail)
-                .password(passwordEncoder.encode(request.getPassword()))
+                .password(passwordEncoder.encode(DEFAULT_EXPERT_PASSWORD))
                 .acceptedTerms(true)
                 .role(expertRole)
                 .active(request.getActive() == null || request.getActive())
                 .emailVerified(true)
+                .mustChangePassword(true)
+                .passwordResetDeadline(LocalDateTime.now().plusDays(EXPERT_PASSWORD_CHANGE_DEADLINE_DAYS))
                 .specialty(request.getSpecialty())
                 .legalDomain(request.getLegalDomain())
                 .description(request.getDescription())
                 .build();
 
         User savedExpert = userRepository.save(expert);
+
+        emailService.sendExpertAccountCreatedEmailAsync(
+                savedExpert.getEmail(), savedExpert.getFirstName(), DEFAULT_EXPERT_PASSWORD, EXPERT_PASSWORD_CHANGE_DEADLINE_DAYS);
+
         return userMapper.toResponseDTO(savedExpert);
+    }
+
+    @Override
+    @Transactional
+    public void resendExpertActivation(String email) {
+        String normalizedEmail = email.trim().toLowerCase();
+        User expert = userRepository.findByEmail(normalizedEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tài khoản Expert với email: " + normalizedEmail));
+
+        if (expert.getRole() == null || expert.getRole().getName() != RoleName.EXPERT) {
+            throw new ForbiddenException("Tài khoản không phải là Expert");
+        }
+
+        expert.setPassword(passwordEncoder.encode(DEFAULT_EXPERT_PASSWORD));
+        expert.setMustChangePassword(true);
+        expert.setPasswordResetDeadline(LocalDateTime.now().plusDays(EXPERT_PASSWORD_CHANGE_DEADLINE_DAYS));
+        expert.setActive(true);
+        userRepository.save(expert);
+
+        emailService.sendExpertAccountCreatedEmailAsync(
+                expert.getEmail(), expert.getFirstName(), DEFAULT_EXPERT_PASSWORD, EXPERT_PASSWORD_CHANGE_DEADLINE_DAYS);
     }
 
     @Override

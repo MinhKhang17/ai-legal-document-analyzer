@@ -3,6 +3,7 @@ package com.analyzer.api.controller.admin;
 import com.analyzer.api.dto.ApiResponseDTO;
 import com.analyzer.api.dto.PageResponse;
 import com.analyzer.api.dto.chatmessage.ChatMessageFeedbackResponse;
+import com.analyzer.api.enums.FeedbackRating;
 import com.analyzer.api.service.admin.AdminChatFeedbackService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -26,7 +27,7 @@ public class AdminChatFeedbackController {
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "List chat message feedback", description = "Paginated list of customer ratings/comments on AI assistant messages, optionally filtered by rating.")
     public ResponseEntity<ApiResponseDTO<PageResponse<ChatMessageFeedbackResponse>>> listFeedback(
-            @RequestParam(required = false) Integer rating,
+            @RequestParam(required = false) FeedbackRating rating,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         return ResponseEntity.ok(ApiResponseDTO.success(

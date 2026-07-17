@@ -22,6 +22,8 @@ import com.analyzer.api.enums.ChatMessageStatus;
 import com.analyzer.api.enums.ChatMessageType;
 import com.analyzer.api.enums.ChatSessionStatus;
 import com.analyzer.api.enums.CitationSourceType;
+import com.analyzer.api.enums.FeedbackReason;
+import com.analyzer.api.enums.FeedbackRating;
 import com.analyzer.api.exception.common.*;
 import com.analyzer.api.exception.workspace.*;
 import com.analyzer.api.exception.chat.*;
@@ -47,8 +49,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -237,20 +241,43 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         ChatMessageFeedback feedback = chatMessageFeedbackRepository.findByChatMessageId(messageId)
                 .orElseGet(() -> ChatMessageFeedback.builder().chatMessage(chatMessage).build());
         feedback.setRating(request.getRating());
+        feedback.setReasons(request.getRating() == FeedbackRating.THUMBS_DOWN
+                ? joinReasons(request.getReasons())
+                : null);
         feedback.setComment(request.getComment());
 
         ChatMessageFeedback saved = chatMessageFeedbackRepository.save(feedback);
         return toChatMessageFeedbackResponse(saved);
     }
 
+    private static String joinReasons(List<FeedbackReason> reasons) {
+        if (reasons == null || reasons.isEmpty()) {
+            return null;
+        }
+        return reasons.stream().map(Enum::name).collect(Collectors.joining(","));
+    }
+
+    private static List<FeedbackReason> splitReasons(String reasons) {
+        if (reasons == null || reasons.isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(reasons.split(","))
+                .map(FeedbackReason::valueOf)
+                .collect(Collectors.toList());
+    }
+
     private ChatMessageFeedbackResponse toChatMessageFeedbackResponse(ChatMessageFeedback feedback) {
         String content = feedback.getChatMessage().getContent();
+        User submittedBy = feedback.getChatMessage().getUser();
         return ChatMessageFeedbackResponse.builder()
                 .id(feedback.getId())
                 .chatMessageId(feedback.getChatMessage().getId())
                 .messageContent(content != null && content.length() > 200 ? content.substring(0, 200) + "..." : content)
                 .rating(feedback.getRating())
+                .reasons(splitReasons(feedback.getReasons()))
                 .comment(feedback.getComment())
+                .submittedById(submittedBy.getId())
+                .submittedByName(submittedBy.getFirstName() + " " + submittedBy.getLastName())
                 .createdAt(feedback.getCreatedAt())
                 .build();
     }

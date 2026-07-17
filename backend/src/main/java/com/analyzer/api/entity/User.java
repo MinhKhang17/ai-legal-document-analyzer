@@ -49,6 +49,13 @@ public class User {
     @Column(name = "email_verification_token_expiry")
     private java.time.LocalDateTime emailVerificationTokenExpiry;
 
+    @Column(name = "must_change_password", nullable = false)
+    @Builder.Default
+    private boolean mustChangePassword = false;
+
+    @Column(name = "password_reset_deadline")
+    private java.time.LocalDateTime passwordResetDeadline;
+
     private String specialty;
 
     @Column(name = "legal_domain")

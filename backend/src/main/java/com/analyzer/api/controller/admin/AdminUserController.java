@@ -2,6 +2,7 @@ package com.analyzer.api.controller.admin;
 
 import com.analyzer.api.dto.ApiResponseDTO;
 import com.analyzer.api.dto.user.AdminCreateLawyerRequestDTO;
+import com.analyzer.api.dto.user.ResendExpertActivationRequestDTO;
 import com.analyzer.api.dto.user.UserResponseDTO;
 import com.analyzer.api.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -27,7 +28,7 @@ public class AdminUserController {
 
     private final UserService userService;
 
-    @PostMapping("/expert")
+    @PostMapping("/experts")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Create expert account", description = "Creates an active, email-verified EXPERT user account for a lawyer.")
     public ResponseEntity<ApiResponseDTO<UserResponseDTO>> createExpert(
@@ -43,5 +44,15 @@ public class AdminUserController {
     @Operation(summary = "List active experts", description = "Retrieves all active EXPERT users for assignment purposes.")
     public ResponseEntity<ApiResponseDTO<List<UserResponseDTO>>> getActiveExperts() {
         return ResponseEntity.ok(ApiResponseDTO.success(userService.getActiveExperts()));
+    }
+
+    @PostMapping("/experts/resend-activation")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Resend expert account activation",
+            description = "Resets an expert account's password back to the default temporary password, unlocks it if it was locked for missing the password-change deadline, and resends the account-info email.")
+    public ResponseEntity<ApiResponseDTO<Void>> resendExpertActivation(
+            @Valid @RequestBody ResendExpertActivationRequestDTO request) {
+        userService.resendExpertActivation(request.getEmail());
+        return ResponseEntity.ok(ApiResponseDTO.success("Đã gửi lại thông tin đăng nhập cho Expert"));
     }
 }

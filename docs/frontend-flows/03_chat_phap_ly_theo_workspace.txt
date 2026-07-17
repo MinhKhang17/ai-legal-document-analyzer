@@ -32,7 +32,11 @@ Luồng chính:
     - xem summary/memory của session
     - mở chi tiết message
     - tạo legal ticket từ assistant message
-    - **Đánh giá câu trả lời LLM:** Dưới mỗi tin nhắn của AI Assistant, người dùng có thể bấm Thích/Không thích (hoặc chấm điểm từ 1-5) và gửi bình luận. FE gọi API gửi phản hồi.
+    - **Đánh giá câu trả lời AI (thumbs up/down):** Dưới mỗi tin nhắn của AI Assistant, hiển thị 2 icon thumbs up/thumbs down.
+      - Bấm thumbs up: FE gọi ngay `POST /api/v1/chat-messages/{messageId}/feedback` với `rating: "THUMBS_UP"`, không cần hỏi gì thêm.
+      - Bấm thumbs down: FE mở popover nhỏ hiện các checkbox lý do preset (giống ChatGPT) — "Không chính xác", "Trích dẫn sai điều luật", "Thiếu thông tin", "Không hữu ích", "Diễn đạt kém", "Khác" — cho chọn nhiều, kèm textarea optional khi chọn "Khác". Bấm Gửi → gọi API với `rating: "THUMBS_DOWN"`, `reasons: [...]`, `comment` optional.
+      - Bấm lại thumbs khác (đổi ý): gọi lại đúng API đó — backend tự ghi đè đánh giá cũ (upsert theo `chatMessageId`), không tạo bản ghi trùng.
+      - Đây khác với mục "Báo cáo vấn đề" (AiReport) — 2 tính năng độc lập, xem rõ trong mục API bên dưới.
     - **Chia sẻ cuộc hội thoại:** Tại góc màn hình chat, khách hàng có thể nhấn nút "Chia sẻ". FE gọi API share, lấy về đường dẫn `/shared/chat/{shareToken}` và hiển thị cho khách hàng copy.
 
 13. Xem cuộc hội thoại được chia sẻ (Dành cho Admin và Expert):
@@ -42,14 +46,15 @@ Luồng chính:
 
 Sơ đồ text:
 - `select workspace/document/session -> load messages -> ask question -> AI response -> optional create legal ticket`
-- `AI Response -> Click Rate Star/Thumb -> Send Feedback API -> Save Feedback`
+- `AI Response -> Click Thumbs Up -> Call POST /chat-messages/{id}/feedback (rating=THUMBS_UP) -> Save`
+- `AI Response -> Click Thumbs Down -> Open reason chips popover -> Chon ly do (+ comment optional) -> Call POST /chat-messages/{id}/feedback (rating=THUMBS_DOWN, reasons=[...]) -> Save`
 - `Chat Screen -> Click Share -> Call Share API -> Copy URL -> Send to Admin/Expert`
 - `Admin/Expert -> Go to Shared URL -> Verify auth -> Load Shared Chat History -> Render Read-Only UI (No Prompt)`
 
 Màn hình / component:
 - `frontend/src/pages/chat/LegalChatPage.tsx`
 - `frontend/src/components/chat/ChatMessageContent.tsx`
-- Component phản hồi/đánh giá tin nhắn LLM (ThumbsUp/Down hoặc Rating Stars dưới mỗi bubble chat) [MỚI]
+- Component rating thumbs up/down dưới mỗi bubble chat của AI + popover reason chips khi bấm thumbs down [MỚI]
 - `frontend/src/pages/chat/SharedChatPage.tsx` (Màn hình xem hội thoại chia sẻ ở chế độ Read-Only dành riêng cho Admin/Expert) [MỚI]
 
 Dữ liệu / state:
@@ -80,10 +85,16 @@ API / service tích hợp:
   - `POST /api/v1/chat-sessions/{chatSessionId}/messages`
   - `GET /api/v1/chat-sessions/{chatSessionId}/messages`
   - `GET /api/v1/chat-messages/{messageId}`
-  - `POST /api/v1/chat-messages/{messageId}/feedback` (Gửi phản hồi rating/comment) [MỚI]
-  - `GET /api/v1/admin/chat-messages/feedback` (Admin xem toàn bộ đánh giá) [MỚI]
+  - `POST /api/v1/chat-messages/{messageId}/feedback` (Rating thumbs up/down + reasons cho tin nhắn AI, upsert theo messageId) [MỚI — chỉ thiếu UI, backend đã xong]
+    - Payload: `{ "rating": "THUMBS_UP" | "THUMBS_DOWN", "reasons": ["INCORRECT", "INCOMPLETE", ...], "comment": "optional" }`
+    - `reasons` chỉ gửi kèm khi `rating = THUMBS_DOWN`; giá trị hợp lệ: `INCORRECT`, `WRONG_CITATION`, `INCOMPLETE`, `NOT_HELPFUL`, `POOR_PHRASING`, `OTHER`.
+  - `GET /api/v1/admin/chat-messages/feedback?rating=&page=&size=` (Admin xem danh sách rating, kèm `submittedById`/`submittedByName` để biết ai đánh giá) — cần FE build trang admin mới, chưa có UI.
+  - `POST /api/v1/feedback/ai-reports` (Tính năng KHÁC — "Báo cáo vấn đề", không phải rating — xem chi tiết ở phần dưới, không nhầm lẫn 2 API này)
+  - `GET /api/v1/admin/feedback/ai-reports`, `GET /api/v1/admin/feedback/ai-reports/{id}` (Admin xem toàn bộ báo cáo, đã có sẵn UI ở `AdminFeedbackPage.tsx`)
   - `POST /api/v1/chat-sessions/{chatSessionId}/share` (Tạo mã chia sẻ hội thoại) [MỚI]
   - `GET /api/v1/shared/chat/{shareToken}` (Lấy tin nhắn của hội thoại chia sẻ) [MỚI]
+
+  > Đính chính: bản trước của tài liệu này ghi nhầm là API `/chat-messages/{messageId}/feedback` không tồn tại — thực ra nó có sẵn ở `ChatMessageController.java`/`AdminChatFeedbackController.java`, chỉ là chưa có UI phía FE. Xem `backend/docs/new_features_implementation_plan.md` Flow 5 để biết chi tiết đầy đủ.
 
 UI states:
 - Không có workspace: nhắc chọn workspace
@@ -93,7 +104,10 @@ UI states:
 
 Edge cases:
 - Link chia sẻ bị truy cập bởi người không có quyền (Khách hàng khác hoặc người chưa đăng nhập): Trả về 403 Forbidden hoặc chuyển hướng về trang báo lỗi.
-- Đánh giá tin nhắn nhiều lần: Ghi đè đánh giá trước đó hoặc trả về lỗi.
+- Rate lại một tin nhắn đã rate: Backend tự upsert (ghi đè theo `chatMessageId`), FE không cần disable nút sau khi rate — cho phép đổi ý.
+- Bấm thumbs down nhưng không chọn reason nào và để trống comment: FE nên validate tối thiểu 1 lựa chọn (reason hoặc comment) trước khi cho gửi, dù backend không bắt buộc.
+- Rate tin nhắn không phải của AI (role USER) hoặc tin nhắn của cuộc hội thoại khác: backend trả `403`.
+- Báo cáo (AiReport) tin nhắn nhiều lần: Vì `sourceReferenceId` không có ràng buộc Unique ở DB, mặc định sẽ tạo nhiều `AiReport` riêng biệt (không tự ghi đè) trừ khi service bổ sung logic gộp.
 
 Business rules:
 - Chat session đã chia sẻ chỉ cho phép Admin/Expert truy cập.
@@ -101,8 +115,10 @@ Business rules:
 
 Quyền:
 - Gửi tin nhắn và chia sẻ: `@PreAuthorize("hasRole('CUSTOMER')")`
-- Gửi feedback: `@PreAuthorize("isAuthenticated()")`
-- Xem danh sách feedback của User: `@PreAuthorize("hasRole('ADMIN')")`
+- Gửi rating tin nhắn AI: `@PreAuthorize("hasRole('CUSTOMER')")`
+- Xem danh sách rating tin nhắn AI: `@PreAuthorize("hasRole('ADMIN')")`
+- Gửi AI report: `@PreAuthorize("isAuthenticated()")`
+- Xem danh sách AI report: `@PreAuthorize("hasRole('ADMIN')")`
 - Xem shared chat: `@PreAuthorize("hasAnyRole('ADMIN', 'EXPERT')")`
 
 File nguồn tham chiếu:
@@ -112,27 +128,34 @@ File nguồn tham chiếu:
   - `frontend/src/services/feedback.service.ts`
 - BE:
   - `backend/src/main/java/com/analyzer/api/controller/ChatSessionController.java`
-  - `backend/src/main/java/com/analyzer/api/controller/feedback/FeedbackController.java`
+  - `backend/src/main/java/com/analyzer/api/controller/ChatMessageController.java` (rating thumbs up/down)
+  - `backend/src/main/java/com/analyzer/api/controller/admin/AdminChatFeedbackController.java` (admin xem rating)
+  - `backend/src/main/java/com/analyzer/api/controller/feedback/FeedbackController.java` (Survey/AiReport — tính năng khác)
 
 Điểm chưa rõ:
 - `ĐÃ RÕ`: Sử dụng token UUID để sinh link chia sẻ bảo mật, chỉ Admin/Expert có quyền xem.
 - `ĐÃ RÕ`: Chỉ hỗ trợ xem, loại bỏ hoàn toàn ô chat box khi mở link share.
+- `ĐÃ RÕ`: Rating tin nhắn AI dùng model thumbs up/down + preset reasons (không phải 1-5 sao), độc lập với hệ thống Survey/AiReport.
 
 Checklist FE:
-- Tích hợp cụm nút rating dưới mỗi câu trả lời của AI.
+- Tích hợp nút thumbs up/down dưới mỗi câu trả lời của AI trong `LegalChatPage`/`ChatMessageContent.tsx`, gọi `POST /api/v1/chat-messages/{messageId}/feedback`.
+- Thumbs down mở popover chọn reason (checkbox nhiều lựa chọn) + textarea optional cho "Khác".
+- Cho phép user bấm lại để đổi rating (không disable nút sau khi đã rate).
+- Thêm trang/tab Admin xem danh sách rating (`GET /api/v1/admin/chat-messages/feedback`), hiển thị `submittedByName` để biết ai đánh giá — có thể gộp vào `AdminFeedbackPage.tsx` như 1 card riêng, tách biệt với Survey/AiReport.
 - Tạo màn hình `SharedChatPage` cho luồng xem hội thoại. Chặn render hộp thoại gửi tin nhắn tại trang này.
 - Thêm popup/modal hiển thị URL đã copy khi bấm nút Share.
 
 Tiêu chí hoàn thành:
-- User đánh giá được câu trả lời AI.
-- Admin xem được danh sách đánh giá tại trang Quản trị Feedback.
+- User đánh giá được câu trả lời AI bằng thumbs up/down, có preset reason khi thumbs down.
+- Admin xem được danh sách rating kèm danh tính người đánh giá.
+- Admin vẫn xem được danh sách AI report tại trang Quản trị Feedback (`AdminFeedbackPage.tsx` — đã có, không đổi).
 - Tạo link chia sẻ thành công và Admin/Expert truy cập xem được lịch sử chat mà không gửi được prompt.
 
 HIỆN TRẠNG:
-- Chat cơ bản hoạt động tốt. Cần bổ sung các thành phần feedback UI và trang hiển thị hội thoại chia sẻ.
+- Chat cơ bản hoạt động tốt. Backend rating thumbs up/down (`ChatMessageController.java`, `AdminChatFeedbackController.java`) đã hoàn thiện. Còn thiếu ở FE: UI rating phía Customer, trang admin xem rating, và trang hiển thị hội thoại chia sẻ (`SharedChatPage`).
 
 SUY LUẬN:
-- Đánh giá câu trả lời LLM giúp quản trị viên nâng cao chất lượng RAG; chia sẻ phiên chat giúp Admin/Expert hiểu rõ bối cảnh khách hàng gặp phải trước khi tư vấn.
+- Rating nhanh (thumbs up/down) giúp thu thập tín hiệu chất lượng AI với ma sát thấp nhất, khác với AiReport (báo cáo lỗi chi tiết, có workflow xử lý) vốn dùng cho các trường hợp cần Admin can thiệp cụ thể; chia sẻ phiên chat giúp Admin/Expert hiểu rõ bối cảnh khách hàng gặp phải trước khi tư vấn.
 
 ĐỀ XUẤT:
-- Hiển thị phản hồi sao (rating) trực quan dưới dạng ngôi sao hoặc ngón tay (like/dislike) để tăng tỷ lệ người dùng tham gia đánh giá.
+- Nút thumbs down nên mở popover nhỏ ngay tại chỗ (không phải modal full-screen) để giữ trải nghiệm nhanh, đúng tinh thần "rating ít ma sát" thay vì "biểu mẫu báo cáo".

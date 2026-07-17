@@ -3,6 +3,9 @@ package com.analyzer.api.service.admin.impl;
 import com.analyzer.api.dto.PageResponse;
 import com.analyzer.api.dto.chatmessage.ChatMessageFeedbackResponse;
 import com.analyzer.api.entity.ChatMessageFeedback;
+import com.analyzer.api.entity.User;
+import com.analyzer.api.enums.FeedbackReason;
+import com.analyzer.api.enums.FeedbackRating;
 import com.analyzer.api.exception.validation.InvalidPageException;
 import com.analyzer.api.exception.validation.InvalidSizeException;
 import com.analyzer.api.repository.ChatMessageFeedbackRepository;
@@ -15,7 +18,9 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -25,7 +30,7 @@ public class AdminChatFeedbackServiceImpl implements AdminChatFeedbackService {
 
     @Override
     @Transactional(readOnly = true)
-    public PageResponse<ChatMessageFeedbackResponse> listFeedback(Integer rating, int page, int size) {
+    public PageResponse<ChatMessageFeedbackResponse> listFeedback(FeedbackRating rating, int page, int size) {
         if (page < 0) {
             throw new InvalidPageException("Page index must not be negative", page);
         }
@@ -53,13 +58,26 @@ public class AdminChatFeedbackServiceImpl implements AdminChatFeedbackService {
 
     private ChatMessageFeedbackResponse toResponse(ChatMessageFeedback feedback) {
         String content = feedback.getChatMessage().getContent();
+        User submittedBy = feedback.getChatMessage().getUser();
         return ChatMessageFeedbackResponse.builder()
                 .id(feedback.getId())
                 .chatMessageId(feedback.getChatMessage().getId())
                 .messageContent(content != null && content.length() > 200 ? content.substring(0, 200) + "..." : content)
                 .rating(feedback.getRating())
+                .reasons(splitReasons(feedback.getReasons()))
                 .comment(feedback.getComment())
+                .submittedById(submittedBy.getId())
+                .submittedByName(submittedBy.getFirstName() + " " + submittedBy.getLastName())
                 .createdAt(feedback.getCreatedAt())
                 .build();
+    }
+
+    private static List<FeedbackReason> splitReasons(String reasons) {
+        if (reasons == null || reasons.isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(reasons.split(","))
+                .map(FeedbackReason::valueOf)
+                .collect(Collectors.toList());
     }
 }

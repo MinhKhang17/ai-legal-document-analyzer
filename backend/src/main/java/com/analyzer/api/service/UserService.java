@@ -13,4 +13,10 @@ public interface UserService {
     void changePassword(Long userId, ChangePasswordRequestDTO request);
     UserResponseDTO createExpertUser(AdminCreateLawyerRequestDTO request);
     List<UserResponseDTO> getActiveExperts();
+
+    /**
+     * Resets an EXPERT account back to the default temporary password, unlocks it if it was
+     * locked for missing the password-change deadline, and resends the account-info email.
+     */
+    void resendExpertActivation(String email);
 }

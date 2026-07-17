@@ -20,6 +20,8 @@ public interface UserMapper {
     @Mapping(target = "specialty", ignore = true)
     @Mapping(target = "legalDomain", ignore = true)
     @Mapping(target = "description", ignore = true)
+    @Mapping(target = "mustChangePassword", ignore = true)
+    @Mapping(target = "passwordResetDeadline", ignore = true)
     User toEntity(UserRequestDTO requestDTO);
 
     @Mapping(target = "role", source = "role.name")
