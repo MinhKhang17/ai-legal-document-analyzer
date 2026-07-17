@@ -16,6 +16,7 @@ Danh sách flow đã phân tích:
 8. `08_hop_dong_ai_va_quan_ly_phien_ban.txt`
 9. `09_knowledge_base_quan_tri.txt`
 10. `10_hoan_tien_customer_va_admin.txt`
+11. `11_ticket_chat_file_va_bad_cases_fe.txt`
 
 Đánh giá nhanh mức độ sẵn sàng:
 - Đủ thông tin và có vẻ đi được end-to-end: flow 01, 02, 03, 04, 05, 06, 07.

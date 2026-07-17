@@ -13,6 +13,8 @@ public interface SubscriptionPlanMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
+    @Mapping(target = "tier", ignore = true)
+    @Mapping(target = "featureLimitsJson", ignore = true)
     SubscriptionPlan toEntity(SubscriptionPlanRequestDTO requestDTO);
 
     SubscriptionPlanResponseDTO toResponseDTO(SubscriptionPlan plan);
