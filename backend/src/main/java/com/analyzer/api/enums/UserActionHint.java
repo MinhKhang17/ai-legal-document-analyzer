@@ -7,5 +7,7 @@ package com.analyzer.api.enums;
 public enum UserActionHint {
     CONTINUE_CHAT,
     PROVIDE_MORE_INFO,
-    CREATE_TICKET
+    CREATE_TICKET,
+    UPLOAD_CONTRACT,
+    CONTACT_LAWYER
 }

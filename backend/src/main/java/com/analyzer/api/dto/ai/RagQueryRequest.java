@@ -24,14 +24,14 @@ public class RagQueryRequest {
     @JsonProperty("document_id")
     private String documentId;
 
+    @JsonProperty("chat_session_id")
+    private String chatSessionId;
+
     @JsonProperty("question")
     private String question;
 
-    @JsonProperty("top_k_checklist")
-    private Integer topKChecklist;
-
-    @JsonProperty("top_k_user_chunks_per_checklist")
-    private Integer topKUserChunksPerChecklist;
+    @JsonProperty("top_k_user_chunks")
+    private Integer topKUserChunks;
 
     @JsonProperty("top_k_knowledge_chunks")
     private Integer topKKnowledgeChunks;

@@ -3,6 +3,7 @@ package com.analyzer.api.service.impl;
 import com.analyzer.api.dto.PageResponse;
 import com.analyzer.api.dto.legalticket.*;
 import com.analyzer.api.entity.*;
+import com.analyzer.api.enums.ChatMessageRole;
 import com.analyzer.api.enums.LegalTicketMessageType;
 import com.analyzer.api.enums.LegalTicketStatus;
 import com.analyzer.api.enums.RiskLevel;
@@ -66,7 +67,11 @@ public class LegalTicketServiceImpl implements LegalTicketService {
         String requestId = request.getRequestId();
         ChatMessage chatMsg = null;
         if (requestId != null && !requestId.isBlank()) {
-            chatMsg = chatMessageRepository.findByRequestId(requestId)
+            chatMsg = chatMessageRepository
+                    .findTopByRequestIdAndUserIdAndRoleOrderByCreatedAtDesc(
+                            requestId,
+                            customerId,
+                            ChatMessageRole.ASSISTANT)
                     .orElseThrow(() -> new ResourceNotFoundException("AI_ANALYSIS_NOT_FOUND"));
 
             Optional<LegalTicket> existingTicket = legalTicketRepository
@@ -184,8 +189,7 @@ public class LegalTicketServiceImpl implements LegalTicketService {
             throw new ForbiddenException("Ban khong co quyen huy ticket nay");
         }
 
-        if (ticket.getStatus() != LegalTicketStatus.PENDING_ADMIN_REVIEW &&
-            ticket.getStatus() != LegalTicketStatus.ASSIGNED_TO_LAWYER) {
+        if (ticket.getStatus() != LegalTicketStatus.PENDING_ADMIN_REVIEW) {
             throw new ConflictException("INVALID_STATUS_TRANSITION");
         }
 
@@ -283,8 +287,7 @@ public class LegalTicketServiceImpl implements LegalTicketService {
             throw new ForbiddenException("Ban khong co quyen phan hoi ticket nay");
         }
 
-        if (ticket.getStatus() != LegalTicketStatus.PENDING_ADMIN_REVIEW &&
-            ticket.getStatus() != LegalTicketStatus.ASSIGNED_TO_LAWYER &&
+        if (ticket.getStatus() != LegalTicketStatus.ASSIGNED_TO_LAWYER &&
             ticket.getStatus() != LegalTicketStatus.IN_REVIEW &&
             ticket.getStatus() != LegalTicketStatus.NEED_MORE_INFO &&
             ticket.getStatus() != LegalTicketStatus.CUSTOMER_RESPONDED &&

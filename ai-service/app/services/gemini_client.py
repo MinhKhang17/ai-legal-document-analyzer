@@ -1,24 +1,68 @@
 from __future__ import annotations
 
-import json
 import logging
-import random
-import time
 from dataclasses import dataclass
-from typing import Any
-from urllib import error, request
+
+from google import genai
+from google.genai import types
 
 
 logger = logging.getLogger(__name__)
+
+_GOOGLE_API_BASE_URLS = {
+    "https://generativelanguage.googleapis.com",
+    "https://generativelanguage.googleapis.com/v1beta",
+}
+
+
+def build_genai_client(
+    *,
+    api_key: str,
+    base_url: str = "https://generativelanguage.googleapis.com/v1beta",
+    timeout_seconds: float = 30.0,
+    max_retries: int = 4,
+    retry_backoff_seconds: float = 2.0,
+) -> genai.Client:
+    """Create a configured Google Gen AI client.
+
+    The SDK already targets the Gemini Developer API beta endpoint. A base URL is
+    only passed for an explicitly configured proxy/custom endpoint.
+    """
+    retry_options = types.HttpRetryOptions(
+        attempts=max(1, int(max_retries) + 1),
+        initial_delay=max(0.0, float(retry_backoff_seconds)),
+        exp_base=2.0,
+        http_status_codes=[429, 500, 503, 504],
+    )
+    http_options_kwargs: dict[str, object] = {
+        "timeout": max(1, int(float(timeout_seconds) * 1000)),
+        "retry_options": retry_options,
+    }
+    normalized_base_url = base_url.rstrip("/")
+    if normalized_base_url and normalized_base_url not in _GOOGLE_API_BASE_URLS:
+        http_options_kwargs["base_url"] = normalized_base_url
+
+    return genai.Client(
+        api_key=api_key,
+        http_options=types.HttpOptions(**http_options_kwargs),
+    )
 
 
 @dataclass(frozen=True)
 class GeminiResponse:
     text: str | None
     error: str | None
+    model: str | None = None
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
+    thoughts_tokens: int = 0
+    finish_reason: str | None = None
 
 
 class GeminiClient:
+    """Project-level Gemini wrapper backed exclusively by ``google.genai``."""
+
     def __init__(
         self,
         *,
@@ -27,154 +71,142 @@ class GeminiClient:
         base_url: str = "https://generativelanguage.googleapis.com/v1beta",
         timeout_seconds: float = 30.0,
         max_output_tokens: int = 8192,
+        thinking_budget: int = 512,
         max_retries: int = 4,
         retry_backoff_seconds: float = 2.0,
+        fallback_model: str = "",
     ) -> None:
-        self.api_keys = [k.strip() for k in api_key.replace(";", ",").split(",") if k.strip()]
-        self.current_key_index = 0
-        self.api_key = self.api_keys[0] if self.api_keys else ""
+        self.api_keys = [key.strip() for key in api_key.replace(";", ",").split(",") if key.strip()]
         self.model = model.strip()
-        self.base_url = base_url.rstrip("/")
-        self.timeout_seconds = timeout_seconds
+        self.fallback_model = fallback_model.strip()
         self.max_output_tokens = max_output_tokens
-        self.max_retries = max(0, int(max_retries))
-        self.retry_backoff_seconds = max(0.0, float(retry_backoff_seconds))
-
-    def _get_current_key(self) -> str:
-        if not self.api_keys:
-            return ""
-        return self.api_keys[self.current_key_index]
-
-    def _rotate_key(self) -> None:
-        if len(self.api_keys) > 1:
-            self.current_key_index = (self.current_key_index + 1) % len(self.api_keys)
-            logger.info("Rotated Gemini API key to index %d: %s...", self.current_key_index, self._get_current_key()[:10])
+        self.thinking_budget = thinking_budget
+        self._clients = [
+            build_genai_client(
+                api_key=key,
+                base_url=base_url,
+                timeout_seconds=timeout_seconds,
+                max_retries=max_retries,
+                retry_backoff_seconds=retry_backoff_seconds,
+            )
+            for key in self.api_keys
+        ]
 
     def generate_text(self, *, system_prompt: str, user_prompt: str) -> GeminiResponse:
-        if not self.api_keys or not self.model:
+        if not self._clients or not self.model:
             return GeminiResponse(text=None, error="Gemini is not configured")
 
-        payload: dict[str, Any] = {
-            "systemInstruction": {
-                "parts": [{"text": system_prompt}],
-            },
-            "contents": [
-                {
-                    "role": "user",
-                    "parts": [{"text": user_prompt}],
-                }
-            ],
-            "generationConfig": {
-                "temperature": 0.0,
-                "maxOutputTokens": self.max_output_tokens,
-            },
-        }
+        models = [self.model]
+        if self.fallback_model and self.fallback_model != self.model:
+            models.append(self.fallback_model)
 
         last_error: str | None = None
-        keys_tried = set()
 
-        while len(keys_tried) < len(self.api_keys):
-            active_key = self._get_current_key()
-            keys_tried.add(active_key)
-
-            req = request.Request(
-                f"{self.base_url}/models/{self.model}:generateContent",
-                data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-                headers={
-                    "x-goog-api-key": active_key,
-                    "Content-Type": "application/json",
-                },
-                method="POST",
-            )
-
-            success = False
-            for attempt in range(self.max_retries + 1):
+        for active_model in models:
+            for key_index, client in enumerate(self._clients):
                 try:
-                    with request.urlopen(req, timeout=self.timeout_seconds) as response:
-                        body = json.loads(response.read().decode("utf-8"))
-                    success = True
-                    break
-                except error.HTTPError as exc:
-                    last_error = self._format_http_error(exc)
-                    logger.warning("Gemini HTTP error %s with key %s...: %s", exc.code, active_key[:10], exc.reason)
-                    if exc.code == 429:
-                        if len(self.api_keys) > 1:
-                            logger.info("Key hit 429, rotating key...")
-                            self._rotate_key()
-                            break
-                    if not self._should_retry_http_status(exc.code, attempt):
-                        return GeminiResponse(text=None, error=last_error)
-                    self._sleep_backoff(attempt)
-                except error.URLError as exc:
-                    last_error = f"Gemini request failed: {exc.reason}"
-                    logger.warning("Gemini URL error: %s", exc.reason)
-                    if not self._should_retry_exception(attempt):
-                        return GeminiResponse(text=None, error=last_error)
-                    self._sleep_backoff(attempt)
-                except TimeoutError:
-                    last_error = "Gemini request timed out"
-                    logger.warning("Gemini request timed out after %s seconds", self.timeout_seconds)
-                    if not self._should_retry_exception(attempt):
-                        return GeminiResponse(text=None, error=last_error)
-                    self._sleep_backoff(attempt)
-                except json.JSONDecodeError:
-                    logger.warning("Gemini returned invalid JSON")
-                    return GeminiResponse(text=None, error="Gemini returned invalid JSON")
+                    token_limits = [self.max_output_tokens, max(8192, self.max_output_tokens * 2)]
+                    for generation_attempt, max_output_tokens in enumerate(token_limits):
+                        response = client.models.generate_content(
+                            model=active_model,
+                            contents=user_prompt,
+                            config=self._build_generation_config(
+                                active_model,
+                                system_prompt,
+                                max_output_tokens=max_output_tokens,
+                            ),
+                        )
+                        finish_reason = self._get_finish_reason(response)
+                        usage = response.usage_metadata
+                        if finish_reason == "MAX_TOKENS" and generation_attempt == 0:
+                            logger.warning(
+                                "Gemini reached MAX_TOKENS for model %s; retrying with %d output tokens",
+                                active_model,
+                                token_limits[1],
+                            )
+                            continue
 
-            if success:
-                break
-        else:
-            return GeminiResponse(text=None, error=last_error or "All Gemini API keys failed")
+                        text = (response.text or "").strip()
+                        usage_fields = {
+                            "prompt_tokens": int(getattr(usage, "prompt_token_count", 0) or 0),
+                            "completion_tokens": int(getattr(usage, "candidates_token_count", 0) or 0),
+                            "total_tokens": int(getattr(usage, "total_token_count", 0) or 0),
+                            "thoughts_tokens": int(getattr(usage, "thoughts_token_count", 0) or 0),
+                            "finish_reason": finish_reason,
+                        }
+                        if finish_reason == "MAX_TOKENS":
+                            return GeminiResponse(
+                                text=None,
+                                error="Gemini response was incomplete after retry (MAX_TOKENS)",
+                                model=active_model,
+                                **usage_fields,
+                            )
+                        if not text:
+                            return GeminiResponse(
+                                text=None,
+                                error="Gemini response missing text content",
+                                model=active_model,
+                                **usage_fields,
+                            )
 
-        text = self._extract_text(body)
-        if not text:
-            return GeminiResponse(text=None, error="Gemini response missing text content")
-        return GeminiResponse(text=text, error=None)
+                        return GeminiResponse(text=text, error=None, model=active_model, **usage_fields)
+                except Exception as exc:
+                    last_error = self._format_sdk_error(exc)
+                    logger.warning(
+                        "Gemini SDK request failed for model %s with key index %d: %s",
+                        active_model,
+                        key_index,
+                        exc,
+                    )
 
-    def _should_retry_http_status(self, status_code: int, attempt: int) -> bool:
-        if attempt >= self.max_retries:
-            return False
-        return status_code in {429, 500, 503, 504}
+            if active_model != models[-1]:
+                logger.warning("Gemini model %s failed; trying fallback model %s", active_model, models[-1])
 
-    def _should_retry_exception(self, attempt: int) -> bool:
-        return attempt < self.max_retries
+        return GeminiResponse(
+            text=None,
+            error=last_error or "All Gemini models and API keys failed",
+            model=models[-1],
+        )
 
-    def _sleep_backoff(self, attempt: int) -> None:
-        delay = self.retry_backoff_seconds * (2**attempt)
-        if delay <= 0:
-            return
-        jitter = random.uniform(0.0, min(1.0, delay * 0.1))
-        time.sleep(delay + jitter)
+    def _build_generation_config(
+        self,
+        model: str,
+        system_prompt: str,
+        *,
+        max_output_tokens: int,
+    ) -> types.GenerateContentConfig:
+        thinking_config = None
+        if "gemini-2.5" in model.lower():
+            thinking_config = types.ThinkingConfig(thinking_budget=max(0, self.thinking_budget))
+        return types.GenerateContentConfig(
+            system_instruction=system_prompt,
+            temperature=0.0,
+            max_output_tokens=max_output_tokens,
+            thinking_config=thinking_config,
+        )
 
-    def _format_http_error(self, exc: error.HTTPError) -> str:
-        try:
-            body = exc.read().decode("utf-8", errors="replace").strip()
-        except Exception:
-            body = ""
-        detail = f"HTTP {exc.code} {exc.reason}"
-        if body:
-            snippet = " ".join(body.split())
-            if len(snippet) > 300:
-                snippet = snippet[:300].rsplit(" ", 1)[0].strip() + "..."
-            detail = f"{detail}: {snippet}"
-        return f"Gemini request failed: {detail}"
-
-    def _extract_text(self, body: dict[str, Any]) -> str | None:
-        candidates = body.get("candidates") or []
-        if not isinstance(candidates, list) or not candidates:
+    @staticmethod
+    def _get_finish_reason(response: object) -> str | None:
+        candidates = getattr(response, "candidates", None) or []
+        if not candidates:
             return None
-
-        content = (candidates[0] or {}).get("content") if isinstance(candidates[0], dict) else None
-        if not isinstance(content, dict):
+        finish_reason = getattr(candidates[0], "finish_reason", None)
+        if finish_reason is None:
             return None
+        return str(getattr(finish_reason, "value", finish_reason)).upper().split(".")[-1]
 
-        parts = content.get("parts") or []
-        if not isinstance(parts, list):
-            return None
+    def close(self) -> None:
+        for client in self._clients:
+            try:
+                client.close()
+            except Exception as exc:
+                logger.debug("Failed to close Gemini client cleanly: %s", exc)
 
-        texts: list[str] = []
-        for part in parts:
-            if isinstance(part, dict) and part.get("text"):
-                texts.append(str(part["text"]))
-        joined = "".join(texts).strip()
-        return joined or None
+    @staticmethod
+    def _format_sdk_error(exc: Exception) -> str:
+        code = getattr(exc, "code", None)
+        status = f"HTTP {code} " if code else ""
+        detail = " ".join(str(exc).split())
+        if len(detail) > 300:
+            detail = detail[:300].rsplit(" ", 1)[0].strip() + "..."
+        return f"Gemini request failed: {status}{detail}".strip()

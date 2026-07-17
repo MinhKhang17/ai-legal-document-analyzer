@@ -37,11 +37,19 @@ public class KnowledgeIngestionJob {
     @Column(name = "error_message", columnDefinition = "TEXT")
     private String errorMessage;
 
+    @Column(name = "progress_percent")
+    @Builder.Default
+    private Integer progressPercent = 0;
+
     @Column(name = "started_at")
     private LocalDateTime startedAt;
 
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ingested_by_id")
+    private User ingestedBy;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

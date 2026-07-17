@@ -5,7 +5,10 @@ package com.analyzer.api.enums;
  * Keep this narrow so the BE and FE can make simple UI decisions.
  */
 public enum RiskLevel {
+    NONE,
     LOW,
     MEDIUM,
-    HIGH
+    HIGH,
+    CRITICAL,
+    UNKNOWN
 }

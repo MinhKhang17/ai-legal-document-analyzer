@@ -1,18 +1,58 @@
 from __future__ import annotations
 
 import logging
+import re
 
-from app.models.intent_enums import LegalQueryIntent, ResponseMode
-from app.schemas import RagCitation, RagPreviewChunk, RagPreviewResponse, RagQueryRequest, RagQueryResponse
+from app.core.knowledge_access import is_published_system_kb
+from app.models.intent_enums import (
+    ContractType,
+    LegalQueryIntent,
+    ResponseStatus,
+    RiskLevel,
+    SuggestionType,
+)
+from app.schemas import RagCitation, RagPreviewChunk, RagPreviewResponse, RagQueryRequest, RagQueryResponse, RagUsage
 from app.services.completeness_checker import check_completeness
+from app.services.conversation_context import (
+    LegalConversationContextStore,
+    build_analysis_snapshot,
+    is_follow_up_query,
+    merge_snapshot_with_current_hits,
+)
 from app.services.intent_detector import detect_intent
-from app.services.llm_client import RagLlmClient, build_default_llm_client
+from app.services.llm_client import RagLlmClient, build_default_llm_client, sanitize_response
 from app.services.prompt_builder import build_intent_instruction, build_system_prompt, build_user_prompt
-from app.services.query_builder import build_legal_search_query
+from app.services.query_builder import build_legal_search_query, build_legal_text_query, extract_recent_user_history
 from app.services.retrieval_service import RagChunkHit, RetrievalService
 
 
 logger = logging.getLogger(__name__)
+
+_CITATION_PATTERN = re.compile(r"\[((?:KB|USER)-\d+)\]", re.IGNORECASE)
+_TICKET_ELIGIBLE_INTENTS = frozenset(
+    {
+        LegalQueryIntent.STUDENT_RENTAL_CONTRACT_REVIEW,
+        LegalQueryIntent.PART_TIME_OR_INTERNSHIP_CONTRACT_REVIEW,
+        LegalQueryIntent.SMALL_SERVICE_CONTRACT_REVIEW,
+        LegalQueryIntent.SMALL_SALE_CONTRACT_REVIEW,
+        LegalQueryIntent.PERSONAL_LOAN_NOTE_REVIEW,
+        LegalQueryIntent.CONTRACT_RISK_ANALYSIS,
+        LegalQueryIntent.CLAUSE_ANALYSIS,
+        LegalQueryIntent.MISSING_CLAUSE_CHECK,
+        LegalQueryIntent.SIGNING_DECISION_SUPPORT,
+    }
+)
+_LEGAL_GROUNDED_INTENTS = _TICKET_ELIGIBLE_INTENTS | frozenset(
+    {
+        LegalQueryIntent.LEGAL_KB_QUESTION,
+        LegalQueryIntent.CLAUSE_REVISION,
+        LegalQueryIntent.CLAUSE_DRAFTING,
+    }
+)
+
+
+class LlmGenerationError(RuntimeError):
+    """Raised when retrieval succeeds but the configured LLM cannot produce an answer."""
 
 
 class RagQueryService:
@@ -21,146 +61,249 @@ class RagQueryService:
         *,
         retrieval_service: RetrievalService | None = None,
         llm_client: RagLlmClient | None = None,
+        context_store: LegalConversationContextStore | None = None,
     ) -> None:
         self.retrieval_service = retrieval_service or RetrievalService()
         self.llm_client = llm_client or build_default_llm_client()
+        self.context_store = context_store or LegalConversationContextStore()
 
     def query(self, request: RagQueryRequest) -> RagQueryResponse:
-        # ── Step 0: Contract generation shortcut (existing) ──
         from app.services.contract_generation_service import ContractGenerationService, is_contract_generation_intent
-        if is_contract_generation_intent(request.question):
+
+        follow_up = is_follow_up_query(request.question)
+        previous_snapshot = self.context_store.latest(request.chatSessionId) if follow_up else None
+
+        if is_contract_generation_intent(request.question) and not follow_up:
             gen_service = ContractGenerationService(
                 retrieval_service=self.retrieval_service,
-                llm_client=self.llm_client
+                llm_client=self.llm_client,
             )
             return gen_service.generate_contract(request)
 
-        # ── Step 1: Retrieve chunks ──
         user_hits, legal_search_query, knowledge_hits = self._retrieve(request)
+        if follow_up and previous_snapshot is None:
+            return self._build_missing_snapshot_response(request, user_hits, knowledge_hits)
 
-        # ── Step 2: Detect intent ──
         intent_result = detect_intent(
             request.question,
-            has_user_chunks=len(user_hits) > 0,
-            has_knowledge_chunks=len(knowledge_hits) > 0,
+            has_user_chunks=bool(user_hits),
+            has_knowledge_chunks=bool(knowledge_hits),
+            conversation_context=extract_recent_user_history(request.chatHistory),
         )
-        logger.info(
-            "Intent detected: %s (contract_type=%s, mode=%s, confidence=%.2f)",
-            intent_result.intent.value,
-            intent_result.contract_type.value,
-            intent_result.response_mode.value,
-            intent_result.confidence,
-        )
-
-        # ── Step 3: Check input completeness ──
         completeness = check_completeness(
             intent_result.intent,
-            has_user_chunks=len(user_hits) > 0,
-            has_knowledge_chunks=len(knowledge_hits) > 0,
+            contract_type=intent_result.contract_type,
+            user_role=intent_result.user_role,
+            has_user_chunks=bool(user_hits),
             question=request.question,
+            conversation_context=extract_recent_user_history(request.chatHistory),
         )
 
-        # ── Step 4: Handle UNSAFE requests ──
-        if intent_result.intent == LegalQueryIntent.UNSAFE_LEGAL_REQUEST:
-            return self._build_unsafe_response(request, intent_result, user_hits, knowledge_hits)
+        if self._should_short_circuit(intent_result.intent) and (
+            not follow_up or self._must_guard_follow_up(intent_result.intent)
+        ):
+            return self._build_guard_response(
+                request=request,
+                intent_result=intent_result,
+                completeness=completeness,
+                user_hits=user_hits,
+                knowledge_hits=knowledge_hits,
+            )
 
-        # ── Step 5: Retrieve available documents list ──
+        if not completeness.is_complete and not follow_up:
+            adjusted_intent_result = self._adjust_for_completeness(intent_result, completeness)
+            return self._build_guard_response(
+                request=request,
+                intent_result=adjusted_intent_result,
+                completeness=completeness,
+                user_hits=user_hits,
+                knowledge_hits=knowledge_hits,
+            )
+
+        retrieval_issue = None if follow_up else self._detect_retrieval_issue(
+            request.question,
+            intent_result.intent,
+            knowledge_hits,
+        )
+        if retrieval_issue is not None:
+            return self._build_guard_response(
+                request=request,
+                intent_result=retrieval_issue,
+                completeness=completeness,
+                user_hits=user_hits,
+                knowledge_hits=knowledge_hits,
+            )
+
         available_user_docs, available_system_docs = self._fetch_available_docs(request)
-
-        # ── Step 6: Build prompts (with intent context) ──
+        prompt_user_hits = user_hits
+        prompt_knowledge_hits = knowledge_hits
+        if follow_up and previous_snapshot is not None:
+            prompt_user_hits, prompt_knowledge_hits = merge_snapshot_with_current_hits(
+                previous_snapshot,
+                user_hits,
+                knowledge_hits,
+            )
         system_prompt = build_system_prompt()
-
         user_prompt = build_user_prompt(
             request.question,
-            user_hits,
-            knowledge_hits,
+            prompt_user_hits,
+            prompt_knowledge_hits,
             chat_history=request.chatHistory,
             available_user_docs=available_user_docs,
             available_system_docs=available_system_docs,
             workspace_id=request.workspaceId,
+            analysis_snapshot=previous_snapshot,
+            is_follow_up=follow_up,
         )
-
-        # Append intent-specific instructions
-        intent_instruction = build_intent_instruction(
+        user_prompt += build_intent_instruction(
             intent_result.intent,
             contract_type=intent_result.contract_type,
             response_mode=intent_result.response_mode,
-            completeness_questions=completeness.questions_to_ask if not completeness.is_complete else None,
+            completeness_questions=None,
         )
-        user_prompt = user_prompt + "\n\n" + intent_instruction
 
-        # ── Step 7: Call LLM ──
         llm_result = self.llm_client.generate(system_prompt=system_prompt, user_prompt=user_prompt)
+        if llm_result.error or not llm_result.answer:
+            raise LlmGenerationError(llm_result.error or "LLM returned an empty answer")
+        answer = sanitize_response(llm_result.answer or self._build_fallback_answer(user_hits, knowledge_hits))
+        answer, removed_recommendations = self._filter_ungrounded_recommendation_items(answer)
+        if removed_recommendations:
+            logger.warning(
+                "Removed %s ungrounded recommendation item(s) for request %s",
+                removed_recommendations,
+                request.requestId,
+            )
+        used_knowledge_ids, used_user_ids, invalid_citation_ids = self._validate_used_citations(
+            answer=answer,
+            declared_knowledge_ids=llm_result.used_knowledge_citation_ids,
+            declared_user_ids=llm_result.used_user_citation_ids,
+            user_hits=prompt_user_hits,
+            knowledge_hits=prompt_knowledge_hits,
+        )
+        used_ids = {*used_knowledge_ids, *used_user_ids}
+        citations = [
+            self._to_citation(hit)
+            for hit in [*prompt_user_hits, *prompt_knowledge_hits]
+            if hit.citationId in used_ids
+        ]
+        recommendations_grounded = self._recommendation_section_is_grounded(answer)
+        grounding_failed = bool(invalid_citation_ids) or (
+            intent_result.intent in _LEGAL_GROUNDED_INTENTS and not used_knowledge_ids
+        ) or (intent_result.intent in _LEGAL_GROUNDED_INTENTS and not recommendations_grounded)
+        if grounding_failed:
+            logger.warning(
+                "Grounding validation failed for request %s: used_kb=%s invalid=%s recommendations_grounded=%s",
+                request.requestId,
+                used_knowledge_ids,
+                invalid_citation_ids,
+                recommendations_grounded,
+            )
+            answer = self._grounding_failure_answer(bool(invalid_citation_ids))
+            citations = []
+            used_knowledge_ids = []
+            used_user_ids = []
 
-        raw_answer = llm_result.answer or self._build_fallback_answer(user_hits, knowledge_hits)
-        from app.services.llm_client import sanitize_response
-        answer = sanitize_response(raw_answer)
-
-        # ── Step 8: Logging ──
-        logger.info("=== RAG QUERY SERVICE LOGGING ===")
-        logger.info(f"Intent: {intent_result.intent.value}")
-        logger.info(f"Contract Type: {intent_result.contract_type.value}")
-        logger.info(f"Response Mode: {intent_result.response_mode.value}")
-        logger.info(f"Input Complete: {completeness.is_complete}")
-        logger.info(f"Available User Docs: {available_user_docs}")
-        logger.info(f"Available System Docs: {available_system_docs}")
-        logger.info(f"User Question: {request.question}")
-        logger.info(f"Retrieved User Chunks (Total: {len(user_hits)}):")
-        for idx, hit in enumerate(user_hits):
-            logger.info(f"  User Chunk {idx + 1}: Doc={hit.fileName}, TextSnippet='{hit.chunkText[:150]}...'")
-        logger.info(f"Retrieved Knowledge Chunks (Total: {len(knowledge_hits)}):")
-        for idx, hit in enumerate(knowledge_hits):
-            logger.info(f"  Knowledge Chunk {idx + 1}: LawCode={hit.lawCode}, TextSnippet='{hit.chunkText[:150]}...'")
-        logger.info(f"Final Prompt (System):\n{system_prompt}")
-        logger.info(f"Final Prompt (User):\n{user_prompt}")
-        logger.info(f"Raw Gemini Response:\n{llm_result.raw_response}")
-        logger.info(f"Sanitized Response:\n{answer}")
-        logger.info("=================================")
-
-        # ── Step 9: Determine risk/suggestion/action based on intent ──
-        risk_level = llm_result.risk_level if llm_result.risk_level else "UNKNOWN"
-        if risk_level not in {"LOW", "MEDIUM", "HIGH", "NEED_EXPERT", "UNKNOWN"}:
-            risk_level = "UNKNOWN"
-
-        suggestion_type = llm_result.suggestion_type
-        user_action_hint = llm_result.user_action_hint
-        should_suggest_ticket = llm_result.should_suggest_ticket
-
-        # Override based on intent if LLM didn't set meaningful values
-        suggestion_type, user_action_hint, should_suggest_ticket = self._enrich_from_intent(
-            intent_result,
-            completeness,
-            suggestion_type=suggestion_type,
-            user_action_hint=user_action_hint,
-            should_suggest_ticket=should_suggest_ticket,
-            risk_level=risk_level,
+        effective_confidence = llm_result.confidence_score
+        retrieved_citations = [
+            self._to_citation(hit) for hit in [*prompt_user_hits, *prompt_knowledge_hits]
+        ]
+        if effective_confidence is None and retrieved_citations:
+            retrieval_confidence = sum(citation.score for citation in retrieved_citations) / len(retrieved_citations)
+            effective_confidence = round(min(intent_result.confidence, retrieval_confidence), 4)
+        if grounding_failed:
+            effective_confidence = min(effective_confidence if effective_confidence is not None else 0.4, 0.4)
+        risk_level = (
+            llm_result.risk_level
+            if llm_result.risk_level in {"NONE", "LOW", "MEDIUM", "HIGH", "CRITICAL"}
+            else intent_result.risk_level.value
         )
 
-        # ── Step 10: Build enriched response ──
-        citations = [self._to_citation(hit) for hit in [*user_hits, *knowledge_hits]]
-        return RagQueryResponse(
+        if grounding_failed:
+            response_status = (
+                ResponseStatus.LOW_CONFIDENCE.value
+                if invalid_citation_ids
+                else ResponseStatus.OUT_OF_KNOWLEDGE_BASE.value
+            )
+            suggestion_type = SuggestionType.ASK_MORE_FACTS.value
+        else:
+            response_status = self._postprocess_response_status(
+                base_status=intent_result.response_status,
+                confidence_score=effective_confidence,
+                citations=citations,
+                risk_level=risk_level,
+            )
+            suggestion_type = llm_result.suggestion_type or intent_result.suggestion_type.value
+            if (
+                response_status == ResponseStatus.HIGH_RISK_REQUIRE_LAWYER.value
+                and suggestion_type in {"NONE", SuggestionType.DIRECT_ANSWER.value}
+            ):
+                suggestion_type = SuggestionType.SUGGEST_LAWYER.value
+        user_action_hint = self._map_user_action_hint(suggestion_type, response_status)
+        should_suggest_ticket = self._should_suggest_ticket(
+            intent=intent_result.intent,
+            input_complete=completeness.is_complete,
+            used_knowledge_ids=used_knowledge_ids,
+            invalid_citation_ids=invalid_citation_ids,
+            risk_level=risk_level,
+            response_status=response_status,
+        )
+        if should_suggest_ticket:
+            user_action_hint = "CREATE_TICKET"
+
+        response = RagQueryResponse(
             requestId=request.requestId,
             chatSessionId=request.chatSessionId,
             answer=answer,
-            confidenceScore=llm_result.confidence_score,
+            confidenceScore=effective_confidence,
             shouldSuggestTicket=should_suggest_ticket,
             suggestionType=suggestion_type,
-            suggestionReason=llm_result.suggestion_reason,
+            suggestionReason=llm_result.suggestion_reason or self._default_suggestion_reason(suggestion_type),
             missingInformation=llm_result.missing_information,
             riskLevel=risk_level,
-            legalDomain=llm_result.legal_domain,
+            legalDomain=llm_result.legal_domain or self._default_legal_domain(intent_result.contract_type),
             userActionHint=user_action_hint,
             citations=citations,
+            usedKnowledgeCitationIds=used_knowledge_ids,
+            usedUserCitationIds=used_user_ids,
             retrievedUserChunks=len(user_hits),
             retrievedKnowledgeChunks=len(knowledge_hits),
-            # NEW fields
             intent=intent_result.intent.value,
             contractType=intent_result.contract_type.value,
+            userRole=intent_result.user_role.value,
+            jurisdiction=intent_result.jurisdiction.value,
+            responseStatus=response_status,
             responseMode=intent_result.response_mode.value,
             inputComplete=completeness.is_complete,
-            missingInputs=completeness.missing_items if completeness.missing_items else None,
+            missingInputs=completeness.missing_items or None,
             analysis=llm_result.analysis,
+            model=llm_result.model,
+            usage=RagUsage(
+                promptTokens=llm_result.prompt_tokens,
+                completionTokens=llm_result.completion_tokens,
+                totalTokens=llm_result.total_tokens,
+            ),
         )
+        if request.chatSessionId:
+            self.context_store.append(
+                build_analysis_snapshot(
+                    session_id=request.chatSessionId,
+                    analysis_id=request.requestId,
+                    contract_type=response.contractType or ContractType.UNKNOWN.value,
+                    user_role=response.userRole or "UNKNOWN",
+                    jurisdiction=response.jurisdiction or "UNKNOWN",
+                    risk_level=response.riskLevel,
+                    confidence=response.confidenceScore,
+                    response_status=response.responseStatus or ResponseStatus.NEED_MORE_INFORMATION.value,
+                    suggestion_type=response.suggestionType,
+                    answer=response.answer,
+                    analysis=llm_result.analysis,
+                    user_hits=prompt_user_hits,
+                    knowledge_hits=prompt_knowledge_hits,
+                    used_user_ids=response.usedUserCitationIds,
+                    used_knowledge_ids=response.usedKnowledgeCitationIds,
+                )
+            )
+        return response
 
     def preview(self, request: RagQueryRequest) -> RagPreviewResponse:
         user_hits, legal_search_query, knowledge_hits = self._retrieve(request)
@@ -181,63 +324,364 @@ class RagQueryService:
             user_id=request.userId,
             workspace_id=request.workspaceId,
             top_k=request.topKUserChunks,
+            document_id=request.documentId,
         )
-        legal_search_query = build_legal_search_query(request.question, user_hits)
+        legal_search_query = build_legal_search_query(
+            request.question,
+            user_hits,
+            chat_history=request.chatHistory,
+        )
         knowledge_hits = self.retrieval_service.search_knowledge_chunks(
             legal_search_query,
             top_k=request.topKKnowledgeChunks,
-            query_text=request.question,
+            query_text=build_legal_text_query(request.question, chat_history=request.chatHistory),
         )
         return user_hits, legal_search_query, knowledge_hits
 
-    def _build_fallback_answer(self, user_hits: list[RagChunkHit], knowledge_hits: list[RagChunkHit]) -> str:
-        if not user_hits and not knowledge_hits:
-            return "Không tìm thấy thông tin liên quan trong tài liệu và cơ sở tri thức."
-        return "Hệ thống không thể kết nối tới mô hình AI để tự động phân tích điều khoản này. Vui lòng cấu hình API Key hợp lệ."
+    def _should_short_circuit(self, intent: LegalQueryIntent) -> bool:
+        return intent in {
+            LegalQueryIntent.OUT_OF_DOMAIN_GENERAL_QUERY,
+            LegalQueryIntent.INVALID_OR_MEANINGLESS_QUERY,
+            LegalQueryIntent.UNDER_SPECIFIED_LEGAL_QUERY,
+            LegalQueryIntent.UNKNOWN_USER_ROLE,
+            LegalQueryIntent.UNKNOWN_JURISDICTION,
+            LegalQueryIntent.INCOMPLETE_DOCUMENT,
+            LegalQueryIntent.LEGAL_BUT_NOT_CONTRACT_SCOPE,
+            LegalQueryIntent.CONTRACT_TYPE_OUT_OF_STUDENT_SCOPE,
+            LegalQueryIntent.FOREIGN_LAW_QUERY,
+            LegalQueryIntent.PROMPT_INJECTION_OR_POLICY_BYPASS,
+            LegalQueryIntent.UNSAFE_LEGAL_REQUEST,
+            LegalQueryIntent.OVERCONFIDENT_LEGAL_CONCLUSION_REQUEST,
+            LegalQueryIntent.INSUFFICIENT_FACTS,
+        }
 
-    def _build_unsafe_response(self, request, intent_result, user_hits, knowledge_hits):
-        """Handle Case 11: Unsafe/unethical legal requests."""
-        from app.services.completeness_checker import CompletenessResult
-        answer = (
-            "## ⛔ Yêu cầu không được hỗ trợ\n\n"
-            "Tôi không thể hỗ trợ yêu cầu này vì nó có dấu hiệu **không phù hợp với đạo đức nghề nghiệp** "
-            "và **pháp luật hiện hành**.\n\n"
-            "### Lý do\n"
-            "- Việc soạn thảo điều khoản nhằm che giấu thông tin hoặc gây bất lợi cho một bên "
-            "vi phạm nguyên tắc **trung thực và thiện chí** (Điều 3 Bộ luật Dân sự 2015).\n"
-            "- Hợp đồng có điều khoản lừa dối có thể bị **tuyên vô hiệu** theo Điều 127 BLDS 2015.\n\n"
-            "### Thay vào đó, tôi có thể giúp bạn\n"
-            "- ✅ Soạn điều khoản **minh bạch và cân bằng** quyền lợi các bên\n"
-            "- ✅ Phân tích **rủi ro pháp lý** của hợp đồng hiện có\n"
-            "- ✅ Đề xuất **biện pháp bảo vệ quyền lợi hợp pháp** cho bạn\n"
-            "- ✅ Kiểm tra hợp đồng có **phù hợp pháp luật** không\n\n"
-            "Bạn muốn tôi giúp gì trong các lựa chọn trên?"
+    def _must_guard_follow_up(self, intent: LegalQueryIntent) -> bool:
+        return intent in {
+            LegalQueryIntent.OUT_OF_DOMAIN_GENERAL_QUERY,
+            LegalQueryIntent.LEGAL_BUT_NOT_CONTRACT_SCOPE,
+            LegalQueryIntent.CONTRACT_TYPE_OUT_OF_STUDENT_SCOPE,
+            LegalQueryIntent.FOREIGN_LAW_QUERY,
+            LegalQueryIntent.PROMPT_INJECTION_OR_POLICY_BYPASS,
+            LegalQueryIntent.UNSAFE_LEGAL_REQUEST,
+        }
+
+    def _build_missing_snapshot_response(
+        self,
+        request: RagQueryRequest,
+        user_hits: list[RagChunkHit],
+        knowledge_hits: list[RagChunkHit],
+    ) -> RagQueryResponse:
+        return RagQueryResponse(
+            requestId=request.requestId,
+            chatSessionId=request.chatSessionId,
+            answer=(
+                "Mình chưa có bản phân tích trước trong session này để trả lời câu hỏi follow-up. "
+                "Bạn hãy gửi lại hợp đồng hoặc nội dung câu trả lời trước."
+            ),
+            confidenceScore=0.0,
+            shouldSuggestTicket=False,
+            suggestionType=SuggestionType.ASK_MORE_FACTS.value,
+            suggestionReason="Session hiện tại chưa có analysis snapshot.",
+            missingInformation="Hợp đồng hoặc nội dung phân tích trước trong cùng session.",
+            riskLevel=RiskLevel.UNKNOWN.value,
+            legalDomain=None,
+            userActionHint="PROVIDE_MORE_INFO",
+            citations=[],
+            usedKnowledgeCitationIds=[],
+            usedUserCitationIds=[],
+            retrievedUserChunks=len(user_hits),
+            retrievedKnowledgeChunks=len(knowledge_hits),
+            intent=LegalQueryIntent.INSUFFICIENT_FACTS.value,
+            contractType=ContractType.UNKNOWN.value,
+            userRole="UNKNOWN",
+            jurisdiction="UNKNOWN",
+            responseStatus=ResponseStatus.NEED_MORE_INFORMATION.value,
+            responseMode="ASK_FOR_INFORMATION",
+            inputComplete=False,
+            missingInputs=["analysisSnapshot"],
         )
-        citations = [self._to_citation(hit) for hit in [*user_hits, *knowledge_hits]]
+
+    def _adjust_for_completeness(self, intent_result, completeness):
+        missing = set(completeness.missing_items)
+        suggestion_type = SuggestionType.ASK_MORE_FACTS
+        if "contractDocument" in missing:
+            suggestion_type = SuggestionType.ASK_UPLOAD_CONTRACT
+        elif "contractType" in missing:
+            suggestion_type = SuggestionType.ASK_CONTRACT_TYPE
+        elif "userRole" in missing:
+            suggestion_type = SuggestionType.ASK_USER_ROLE
+        elif "targetClause" in missing:
+            suggestion_type = SuggestionType.ASK_TARGET_CLAUSE
+
+        return intent_result.__class__(
+            intent=intent_result.intent,
+            contract_type=intent_result.contract_type,
+            user_role=intent_result.user_role,
+            jurisdiction=intent_result.jurisdiction,
+            response_mode=intent_result.response_mode,
+            response_status=ResponseStatus.INCOMPLETE_INPUT,
+            suggestion_type=suggestion_type,
+            risk_level=intent_result.risk_level,
+            confidence=intent_result.confidence,
+            has_document_context=intent_result.has_document_context,
+        )
+
+    def _detect_retrieval_issue(self, question: str, intent: LegalQueryIntent, knowledge_hits: list[RagChunkHit]):
+        review_like = {
+            LegalQueryIntent.STUDENT_RENTAL_CONTRACT_REVIEW,
+            LegalQueryIntent.PART_TIME_OR_INTERNSHIP_CONTRACT_REVIEW,
+            LegalQueryIntent.SMALL_SERVICE_CONTRACT_REVIEW,
+            LegalQueryIntent.SMALL_SALE_CONTRACT_REVIEW,
+            LegalQueryIntent.PERSONAL_LOAN_NOTE_REVIEW,
+            LegalQueryIntent.CONTRACT_RISK_ANALYSIS,
+            LegalQueryIntent.CLAUSE_ANALYSIS,
+            LegalQueryIntent.MISSING_CLAUSE_CHECK,
+            LegalQueryIntent.SIGNING_DECISION_SUPPORT,
+        }
+        lowered = question.lower()
+        if not knowledge_hits:
+            issue_intent = LegalQueryIntent.OUTDATED_KNOWLEDGE_BASE if any(word in lowered for word in ["mới nhất", "hiện hành", "cập nhật"]) else LegalQueryIntent.NO_RELEVANT_DOCUMENT_FOUND
+            return self._make_retrieval_issue(issue_intent)
+
+        avg_score = sum(hit.score for hit in knowledge_hits) / len(knowledge_hits)
+        if avg_score < 0.45:
+            return self._make_retrieval_issue(LegalQueryIntent.LOW_RETRIEVAL_CONFIDENCE)
+
+        if intent in review_like and len(knowledge_hits) < 2 and avg_score < 0.6:
+            return self._make_retrieval_issue(LegalQueryIntent.PARTIAL_KB_COVERAGE)
+
+        return None
+
+    def _make_retrieval_issue(self, issue_intent: LegalQueryIntent):
+        mapping = {
+            LegalQueryIntent.NO_RELEVANT_DOCUMENT_FOUND: (ResponseStatus.OUT_OF_KNOWLEDGE_BASE, SuggestionType.ASK_MORE_FACTS, RiskLevel.UNKNOWN),
+            LegalQueryIntent.LOW_RETRIEVAL_CONFIDENCE: (ResponseStatus.LOW_CONFIDENCE, SuggestionType.ASK_MORE_FACTS, RiskLevel.UNKNOWN),
+            LegalQueryIntent.PARTIAL_KB_COVERAGE: (ResponseStatus.OUT_OF_KNOWLEDGE_BASE, SuggestionType.ASK_MORE_FACTS, RiskLevel.MEDIUM),
+            LegalQueryIntent.OUTDATED_KNOWLEDGE_BASE: (ResponseStatus.OUT_OF_KNOWLEDGE_BASE, SuggestionType.ASK_MORE_FACTS, RiskLevel.UNKNOWN),
+            LegalQueryIntent.CONFLICTING_REFERENCES: (ResponseStatus.LOW_CONFIDENCE, SuggestionType.ASK_MORE_FACTS, RiskLevel.UNKNOWN),
+        }
+        response_status, suggestion_type, risk_level = mapping[issue_intent]
+        from app.models.intent_enums import Jurisdiction, ResponseMode, UserRole
+        from app.services.intent_detector import IntentResult
+
+        return IntentResult(
+            intent=issue_intent,
+            contract_type=ContractType.UNKNOWN,
+            user_role=UserRole.UNKNOWN,
+            jurisdiction=Jurisdiction.VIETNAM,
+            response_mode=ResponseMode.SAFE_REDIRECT,
+            response_status=response_status,
+            suggestion_type=suggestion_type,
+            risk_level=risk_level,
+            confidence=0.8,
+            has_document_context=False,
+        )
+
+    def _build_guard_response(self, *, request, intent_result, completeness, user_hits, knowledge_hits):
+        answer = self._guard_answer(intent_result.intent, completeness.questions_to_ask)
         return RagQueryResponse(
             requestId=request.requestId,
             chatSessionId=request.chatSessionId,
             answer=answer,
-            confidenceScore=0.95,
+            confidenceScore=intent_result.confidence,
             shouldSuggestTicket=False,
-            suggestionType="NONE",
-            suggestionReason="Yêu cầu không an toàn đã bị từ chối.",
-            missingInformation=None,
-            riskLevel="HIGH",
-            legalDomain=None,
-            userActionHint="CONTINUE_CHAT",
-            citations=citations,
+            suggestionType=intent_result.suggestion_type.value,
+            suggestionReason=self._default_suggestion_reason(intent_result.suggestion_type.value),
+            missingInformation=self._missing_information_text(completeness.questions_to_ask),
+            riskLevel=intent_result.risk_level.value,
+            legalDomain=self._default_legal_domain(intent_result.contract_type),
+            userActionHint=self._map_user_action_hint(intent_result.suggestion_type.value, intent_result.response_status.value),
+            citations=[],
+            usedKnowledgeCitationIds=[],
+            usedUserCitationIds=[],
             retrievedUserChunks=len(user_hits),
             retrievedKnowledgeChunks=len(knowledge_hits),
             intent=intent_result.intent.value,
             contractType=intent_result.contract_type.value,
+            userRole=intent_result.user_role.value,
+            jurisdiction=intent_result.jurisdiction.value,
+            responseStatus=intent_result.response_status.value,
             responseMode=intent_result.response_mode.value,
-            inputComplete=True,
-            missingInputs=None,
+            inputComplete=completeness.is_complete,
+            missingInputs=completeness.missing_items or None,
+        )
+
+    def _guard_answer(self, intent: LegalQueryIntent, questions: list[str]) -> str:
+        mapping = {
+            LegalQueryIntent.OUT_OF_DOMAIN_GENERAL_QUERY: "Mình chỉ hỗ trợ phân tích hợp đồng đơn giản trong phạm vi sinh viên. Bạn có thể hỏi về hợp đồng thuê trọ, làm thêm/thực tập, dịch vụ nhỏ, mua bán tài sản nhỏ hoặc giấy vay tiền.",
+            LegalQueryIntent.INVALID_OR_MEANINGLESS_QUERY: "Mình chưa hiểu yêu cầu hiện tại. Bạn hãy mô tả rõ câu hỏi về hợp đồng hoặc tải tài liệu cần kiểm tra.",
+            LegalQueryIntent.UNDER_SPECIFIED_LEGAL_QUERY: "Câu hỏi hiện còn quá thiếu ngữ cảnh để kết luận. Bạn cho mình biết loại hợp đồng, vai trò của bạn và điều khoản hoặc vấn đề cần kiểm tra.",
+            LegalQueryIntent.LEGAL_BUT_NOT_CONTRACT_SCOPE: "Nội dung này là vấn đề pháp lý nhưng không thuộc scope chatbot hợp đồng sinh viên. Mình chỉ hỗ trợ các hợp đồng đơn giản trong phạm vi sinh viên.",
+            LegalQueryIntent.CONTRACT_TYPE_OUT_OF_STUDENT_SCOPE: "Loại hợp đồng này vượt ngoài phạm vi hợp đồng đơn giản dành cho sinh viên. Bạn nên trao đổi với luật sư để được đánh giá chính xác hơn.",
+            LegalQueryIntent.FOREIGN_LAW_QUERY: "Hiện hệ thống không đủ căn cứ để tư vấn theo pháp luật nước ngoài. Nếu đây là hợp đồng chịu luật nước ngoài, bạn nên dùng nguồn chuyên biệt hoặc hỏi luật sư tại nước đó.",
+            LegalQueryIntent.PROMPT_INJECTION_OR_POLICY_BYPASS: "Mình không thể bỏ qua quy tắc an toàn hoặc tạo kết luận pháp lý sai lệch. Nếu bạn muốn, mình có thể hỗ trợ phân tích hợp đồng theo hướng hợp pháp và minh bạch.",
+            LegalQueryIntent.UNSAFE_LEGAL_REQUEST: "Mình không thể hỗ trợ yêu cầu có tính gian dối hoặc lách luật. Nếu muốn, mình có thể giúp bạn soạn điều khoản minh bạch và đúng hướng hợp pháp.",
+            LegalQueryIntent.OVERCONFIDENT_LEGAL_CONCLUSION_REQUEST: "Mình không thể kết luận tuyệt đối khi chưa đủ dữ kiện và căn cứ. Mình có thể giúp bạn rà rủi ro và chỉ ra thông tin còn thiếu để đánh giá an toàn hơn.",
+            LegalQueryIntent.INSUFFICIENT_FACTS: "Mình chưa có đủ dữ kiện để phân tích đáng tin cậy. Bạn hãy cung cấp thêm hợp đồng, vai trò của bạn và điều khoản cần kiểm tra.",
+            LegalQueryIntent.NO_RELEVANT_DOCUMENT_FOUND: "Hiện mình không tìm thấy tài liệu pháp lý liên quan trong knowledge base để trả lời đáng tin cậy.",
+            LegalQueryIntent.LOW_RETRIEVAL_CONFIDENCE: "Các tài liệu truy xuất được hiện có độ liên quan thấp nên mình không nên trả lời quá tự tin.",
+            LegalQueryIntent.PARTIAL_KB_COVERAGE: "Knowledge base hiện chỉ bao phủ một phần vấn đề bạn hỏi, nên kết quả lúc này chỉ có thể mang tính tham khảo hạn chế.",
+            LegalQueryIntent.OUTDATED_KNOWLEDGE_BASE: "Nguồn pháp lý truy xuất được có dấu hiệu chưa đủ mới hoặc chưa đủ chắc để trả lời vấn đề này.",
+            LegalQueryIntent.CONFLICTING_REFERENCES: "Các căn cứ truy xuất hiện đang mâu thuẫn hoặc chưa thống nhất, nên mình không thể kết luận tự tin ở thời điểm này.",
+        }
+        answer = mapping.get(intent, "Mình cần thêm thông tin để tiếp tục phân tích.")
+        if questions:
+            answer = f"{answer}\n\nThông tin mình cần thêm:\n- " + "\n- ".join(questions[:3])
+        return answer
+
+    def _default_suggestion_reason(self, suggestion_type: str) -> str | None:
+        reasons = {
+            "ASK_UPLOAD_CONTRACT": "Cần hợp đồng cụ thể để phân tích chính xác.",
+            "ASK_CONTRACT_TYPE": "Cần xác định đúng loại hợp đồng trong scope hỗ trợ.",
+            "ASK_USER_ROLE": "Vai trò của bạn ảnh hưởng trực tiếp đến đánh giá rủi ro và khuyến nghị.",
+            "ASK_TARGET_CLAUSE": "Cần biết điều khoản mục tiêu để phân tích đúng trọng tâm.",
+            "ASK_MORE_FACTS": "Hiện còn thiếu dữ kiện để đưa ra nhận định đáng tin cậy.",
+            "SUGGEST_REVISE_CLAUSE": "Có điểm cần sửa hoặc làm rõ trong điều khoản.",
+            "SUGGEST_NEGOTIATION": "Có nội dung nên đàm phán lại trước khi ký.",
+            "SUGGEST_LAWYER": "Mức rủi ro hoặc độ không chắc chắn đủ cao để nên tham khảo luật sư.",
+            "REDIRECT_TO_SUPPORTED_SCOPE": "Nội dung hiện không thuộc phạm vi hỗ trợ của chatbot.",
+            "REFUSE_AND_REDIRECT": "Yêu cầu hiện không an toàn hoặc không phù hợp để hỗ trợ.",
+            "DIRECT_ANSWER": "Có thể trả lời trong phạm vi hiện có.",
+        }
+        return reasons.get(suggestion_type)
+
+    def _missing_information_text(self, questions: list[str]) -> str | None:
+        if not questions:
+            return None
+        return " | ".join(questions[:3])
+
+    def _default_legal_domain(self, contract_type: ContractType) -> str | None:
+        mapping = {
+            ContractType.STUDENT_RENTAL: "student_rental",
+            ContractType.PART_TIME_OR_INTERNSHIP: "employment",
+            ContractType.SMALL_SERVICE_OR_FREELANCE: "service",
+            ContractType.SMALL_ASSET_SALE: "sale",
+            ContractType.PERSONAL_LOAN_SIMPLE: "loan",
+        }
+        return mapping.get(contract_type)
+
+    def _map_user_action_hint(self, suggestion_type: str, response_status: str) -> str:
+        if suggestion_type == SuggestionType.ASK_UPLOAD_CONTRACT.value:
+            return "UPLOAD_CONTRACT"
+        if suggestion_type in {
+            SuggestionType.ASK_CONTRACT_TYPE.value,
+            SuggestionType.ASK_USER_ROLE.value,
+            SuggestionType.ASK_TARGET_CLAUSE.value,
+            SuggestionType.ASK_MORE_FACTS.value,
+        } or response_status in {
+            ResponseStatus.NEED_MORE_INFORMATION.value,
+            ResponseStatus.INCOMPLETE_INPUT.value,
+        }:
+            return "PROVIDE_MORE_INFO"
+        if suggestion_type == SuggestionType.SUGGEST_LAWYER.value or response_status == ResponseStatus.HIGH_RISK_REQUIRE_LAWYER.value:
+            return "CONTACT_LAWYER"
+        return "CONTINUE_CHAT"
+
+    def _postprocess_response_status(self, *, base_status: ResponseStatus, confidence_score: float | None, citations: list[RagCitation], risk_level: str) -> str:
+        if risk_level in {"HIGH", "CRITICAL"}:
+            return ResponseStatus.HIGH_RISK_REQUIRE_LAWYER.value
+        if confidence_score is not None and confidence_score < 0.45:
+            return ResponseStatus.LOW_CONFIDENCE.value
+        if not citations:
+            return ResponseStatus.OUT_OF_KNOWLEDGE_BASE.value
+        return base_status.value
+
+    def _validate_used_citations(
+        self,
+        *,
+        answer: str,
+        declared_knowledge_ids: tuple[str, ...],
+        declared_user_ids: tuple[str, ...],
+        user_hits: list[RagChunkHit],
+        knowledge_hits: list[RagChunkHit],
+    ) -> tuple[list[str], list[str], list[str]]:
+        inline_ids = {match.upper() for match in _CITATION_PATTERN.findall(answer)}
+        inline_knowledge_ids = {citation_id for citation_id in inline_ids if citation_id.startswith("KB-")}
+        inline_user_ids = {citation_id for citation_id in inline_ids if citation_id.startswith("USER-")}
+        declared_knowledge_set = {citation_id.upper() for citation_id in declared_knowledge_ids}
+        declared_user_set = {citation_id.upper() for citation_id in declared_user_ids}
+        available_knowledge_ids = {hit.citationId for hit in knowledge_hits}
+        available_user_ids = {hit.citationId for hit in user_hits}
+        invalid_ids = sorted(
+            ((inline_knowledge_ids | declared_knowledge_set) - available_knowledge_ids)
+            | ((inline_user_ids | declared_user_set) - available_user_ids)
+        )
+        used_knowledge_ids = [
+            hit.citationId for hit in knowledge_hits if hit.citationId in inline_knowledge_ids
+        ]
+        used_user_ids = [hit.citationId for hit in user_hits if hit.citationId in inline_user_ids]
+        return used_knowledge_ids, used_user_ids, invalid_ids
+
+    def _should_suggest_ticket(
+        self,
+        *,
+        intent: LegalQueryIntent,
+        input_complete: bool,
+        used_knowledge_ids: list[str],
+        invalid_citation_ids: list[str],
+        risk_level: str,
+        response_status: str,
+    ) -> bool:
+        return (
+            intent in _TICKET_ELIGIBLE_INTENTS
+            and input_complete
+            and bool(used_knowledge_ids)
+            and not invalid_citation_ids
+            and risk_level in {"HIGH", "CRITICAL"}
+            and response_status == ResponseStatus.HIGH_RISK_REQUIRE_LAWYER.value
+        )
+
+    def _recommendation_section_is_grounded(self, answer: str) -> bool:
+        recommendation_match = re.search(
+            r"(?:khuyến nghị|recommendations?)\s*:?\**\s*(.*)$",
+            answer,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        if recommendation_match is None:
+            return True
+        section = recommendation_match.group(1)
+        bullet_blocks = re.split(r"(?m)(?=^\s*(?:[-*•]|\d+[.)])\s+)", section)
+        actual_bullets = [
+            block for block in bullet_blocks if re.match(r"^\s*(?:[-*•]|\d+[.)])\s+", block)
+        ]
+        if actual_bullets:
+            return all(re.search(r"\[KB-\d+\]", block, flags=re.IGNORECASE) for block in actual_bullets)
+        return bool(re.search(r"\[KB-\d+\]", section, flags=re.IGNORECASE))
+
+    def _filter_ungrounded_recommendation_items(self, answer: str) -> tuple[str, int]:
+        heading = re.search(
+            r"(?:khuyến nghị|recommendations?)\s*:?\**",
+            answer,
+            flags=re.IGNORECASE,
+        )
+        if heading is None:
+            return answer, 0
+
+        prefix = answer[: heading.end()]
+        section = answer[heading.end() :]
+        blocks = re.split(r"(?m)(?=^\s*(?:[-*•]|\d+[.)])\s+)", section)
+        kept: list[str] = []
+        removed = 0
+        for block in blocks:
+            is_bullet = bool(re.match(r"^\s*(?:[-*•]|\d+[.)])\s+", block))
+            if is_bullet and not re.search(r"\[KB-\d+\]", block, flags=re.IGNORECASE):
+                removed += 1
+                continue
+            kept.append(block)
+        return (prefix + "".join(kept)).rstrip(), removed
+
+    def _grounding_failure_answer(self, has_invalid_citation: bool) -> str:
+        if has_invalid_citation:
+            return (
+                "Câu trả lời vừa tạo có căn cứ không khớp với tài liệu đã truy xuất, "
+                "nên mình chưa thể cung cấp kết luận pháp lý đáng tin cậy."
+            )
+        return (
+            "Knowledge base hiện chưa cung cấp đủ căn cứ pháp lý được trích dẫn "
+            "để mình trả lời đáng tin cậy."
         )
 
     def _fetch_available_docs(self, request: RagQueryRequest) -> tuple[list[str], list[str]]:
-        """Fetch available document titles from Neo4j for context."""
         available_user_docs: list[str] = []
         available_system_docs: list[str] = []
         try:
@@ -245,83 +689,28 @@ class RagQueryService:
             import json
             if not neo4j_client.driver:
                 neo4j_client.connect()
-            docs = neo4j_client.execute_query(
-                "MATCH (d:Document) RETURN d.title as title, d.metadata_json as metadata_json"
-            )
-            user_docs: list[str] = []
-            system_docs: list[str] = []
-            for d in docs:
-                title = d.get("title") or "Untitled"
-                metadata: dict = {}
-                if d.get("metadata_json"):
+            docs = neo4j_client.execute_query("MATCH (d:Document) RETURN d.title as title, d.metadata_json as metadata_json")
+            for doc in docs:
+                title = doc.get("title") or "Untitled"
+                metadata = {}
+                if doc.get("metadata_json"):
                     try:
-                        metadata = json.loads(d["metadata_json"])
+                        metadata = json.loads(doc["metadata_json"])
                     except Exception:
-                        pass
-
+                        metadata = {}
                 ws_id = metadata.get("workspace_id") or metadata.get("workspaceId")
-                u_id = metadata.get("user_id") or metadata.get("userId")
+                if is_published_system_kb(metadata):
+                    available_system_docs.append(title)
+                elif ws_id == request.workspaceId:
+                    available_user_docs.append(title)
+        except Exception as exc:
+            logger.error("Failed to fetch documents list: %s", exc)
+        return sorted(set(available_user_docs)), sorted(set(available_system_docs))
 
-                if ws_id == request.workspaceId:
-                    user_docs.append(title)
-                elif metadata.get("source_type") == "SYSTEM_KB" or not u_id:
-                    system_docs.append(title)
-
-            available_user_docs = sorted(set(user_docs))
-            available_system_docs = sorted(set(system_docs))
-        except Exception as e:
-            logger.error("Failed to fetch documents list: %s", e)
-        return available_user_docs, available_system_docs
-
-    def _enrich_from_intent(
-        self,
-        intent_result,
-        completeness,
-        *,
-        suggestion_type: str,
-        user_action_hint: str,
-        should_suggest_ticket: bool,
-        risk_level: str,
-    ) -> tuple[str, str, bool]:
-        """Override suggestion/action fields based on detected intent when LLM defaults are generic."""
-        intent = intent_result.intent
-
-        # ── If input is incomplete, ask for more info ──
-        if not completeness.is_complete:
-            if "document" in completeness.missing_items:
-                return "ASK_MORE_INFO", "UPLOAD_CONTRACT", False
-            return "ASK_MORE_INFO", "PROVIDE_MORE_INFO", False
-
-        # ── Intent-specific overrides ──
-        if intent == LegalQueryIntent.LEGAL_VALIDITY_CHECK:
-            if risk_level in ("HIGH", "NEED_EXPERT"):
-                return "SUGGEST_LAWYER", "CONTACT_LAWYER", True
-            if suggestion_type == "NONE":
-                return "SUGGEST_LAWYER", "CONTINUE_CHAT", True
-
-        if intent == LegalQueryIntent.SIGNING_DECISION_SUPPORT:
-            if risk_level in ("HIGH", "NEED_EXPERT"):
-                return "REQUIRE_LAWYER", "CONTACT_LAWYER", True
-            if suggestion_type == "NONE":
-                return "SUGGEST_LAWYER", "CONTINUE_CHAT", True
-
-        if intent == LegalQueryIntent.NEED_MORE_INFO:
-            return "ASK_MORE_INFO", "PROVIDE_MORE_INFO", False
-
-        if intent == LegalQueryIntent.OUT_OF_KNOWLEDGE_BASE:
-            return "ASK_MORE_INFO", "CONTINUE_CHAT", False
-
-        if intent == LegalQueryIntent.FULL_CONTRACT_REVIEW:
-            if risk_level in ("HIGH", "NEED_EXPERT") and suggestion_type == "NONE":
-                return "SUGGEST_LAWYER", "CREATE_TICKET", True
-
-        if intent == LegalQueryIntent.MISSING_CLAUSE_CHECK:
-            if risk_level in ("HIGH", "NEED_EXPERT") and suggestion_type == "NONE":
-                return "SUGGEST_LAWYER", "CONTINUE_CHAT", True
-
-        # Default: keep LLM values
-        return suggestion_type, user_action_hint, should_suggest_ticket
-
+    def _build_fallback_answer(self, user_hits: list[RagChunkHit], knowledge_hits: list[RagChunkHit]) -> str:
+        if not user_hits and not knowledge_hits:
+            return "Hiện mình chưa tìm thấy thông tin liên quan trong tài liệu và knowledge base."
+        return "Hiện chưa thể sinh phân tích hoàn chỉnh từ mô hình AI. Bạn có thể thử hỏi ngắn gọn hơn hoặc kiểm tra lại dữ liệu đầu vào."
 
     def _to_citation(self, hit: RagChunkHit) -> RagCitation:
         return RagCitation(
@@ -340,6 +729,7 @@ class RagQueryService:
             articleNumber=hit.articleNumber,
             clauseNumber=hit.clauseNumber,
             sectionTitle=hit.sectionTitle,
+            excerpt=hit.chunkText,
         )
 
     def _to_preview_chunk(self, hit: RagChunkHit) -> RagPreviewChunk:

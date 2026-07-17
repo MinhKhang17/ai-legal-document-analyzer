@@ -38,6 +38,12 @@ final class KnowledgeMappingSupport {
                 .rawContent(version.getRawContent())
                 .extractedContent(version.getExtractedContent())
                 .status(version.getStatus())
+                .ingestStatus(version.getIngestStatus())
+                .visibility(version.getVisibility())
+                .active(version.getActive())
+                .ingestedAt(version.getIngestedAt())
+                .ingestedById(version.getIngestedBy() == null ? null : version.getIngestedBy().getId())
+                .errorMessage(version.getErrorMessage())
                 .reviewDecision(version.getReviewDecision())
                 .reviewedById(version.getReviewedBy() == null ? null : version.getReviewedBy().getId())
                 .reviewedAt(version.getReviewedAt())
@@ -59,8 +65,10 @@ final class KnowledgeMappingSupport {
                 .status(job.getStatus())
                 .jobPayload(job.getJobPayload())
                 .errorMessage(job.getErrorMessage())
+                .progressPercent(job.getProgressPercent())
                 .startedAt(job.getStartedAt())
                 .completedAt(job.getCompletedAt())
+                .ingestedById(job.getIngestedBy() == null ? null : job.getIngestedBy().getId())
                 .createdAt(job.getCreatedAt())
                 .build();
     }

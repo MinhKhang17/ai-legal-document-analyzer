@@ -8,15 +8,17 @@ import threading
 import time
 from functools import lru_cache
 from hashlib import md5
+from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, File, Form, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Form, UploadFile
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.config import settings
 from app.models.knowledge_models import IngestionResult, RetrievedChunk
 from app.services.gemini_client import GeminiClient
 from app.services.knowledge_service import KnowledgeService, KnowledgeServiceV2
+from app.services.callback_client import CallbackClient
 
 
 class SearchChunksRequest(BaseModel):
@@ -55,6 +57,12 @@ class AskResponse(BaseModel):
     llm_status: str
     llm_error: str | None = None
     chunks: list[QueryChunkResponse]
+
+
+class AsyncIngestAcceptedResponse(BaseModel):
+    jobId: str
+    status: str = "PROCESSING"
+    progressPercent: int = 10
 
 
 router = APIRouter(prefix="/api/knowledge", tags=["knowledge"])
@@ -105,14 +113,111 @@ async def ingest_document(
 async def ingest_document_v2(
     file: UploadFile = File(...),
     title: str | None = Form(default=None),
+    ingested_by_user_id: str = Form(default="SYSTEM_ADMIN"),
+    knowledge_base_id: str | None = Form(default=None),
 ) -> IngestionResult:
     try:
-        response = await get_service_v2().ingest_upload(file=file, title=title, ingestion_version=2)
+        service = KnowledgeServiceV2(
+            document_metadata={
+                "ingested_by_role": "ADMIN",
+                "ingested_by_user_id": ingested_by_user_id.strip() or "SYSTEM_ADMIN",
+                "knowledge_base_id": knowledge_base_id.strip() if knowledge_base_id and knowledge_base_id.strip() else None,
+            }
+        )
+        response = await service.ingest_upload(file=file, title=title, ingestion_version=2)
         _log_response("ingest_v2", response)
         return response
     except Exception:
         logger.exception("Failed to ingest knowledge document v2")
         raise
+
+
+def _run_admin_ingest_job(
+    *,
+    file_path: str,
+    filename: str,
+    title: str,
+    job_id: str,
+    callback_url: str,
+    knowledge_base_id: str,
+    ingested_by_user_id: str,
+) -> None:
+    callback = CallbackClient()
+    callback.post_json(callback_url, {
+        "status": "PROCESSING",
+        "progressPercent": 30,
+        "errorMessage": None,
+    })
+    try:
+        service = KnowledgeServiceV2(document_metadata={
+            "ingested_by_role": "ADMIN",
+            "ingested_by_user_id": ingested_by_user_id,
+            "knowledge_base_id": knowledge_base_id,
+        })
+        result = service.ingest_file(
+            file_path,
+            title=title,
+            filename=filename,
+            ingestion_version=2,
+        )
+        callback.post_json(callback_url, {
+            "status": "INGESTED",
+            "progressPercent": 100,
+            "chunkCount": result.total_chunks,
+            "errorMessage": None,
+        })
+    except Exception as exc:
+        logger.exception("Async admin knowledge ingest failed job_id=%s", job_id)
+        callback.post_json(callback_url, {
+            "status": "FAILED",
+            "progressPercent": 100,
+            "chunkCount": 0,
+            "errorMessage": str(exc),
+        })
+    finally:
+        try:
+            os.remove(file_path)
+        except OSError:
+            pass
+
+
+@router.post("/ingest-v2/async", response_model=AsyncIngestAcceptedResponse, status_code=202)
+async def ingest_document_v2_async(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    title: str | None = Form(default=None),
+    job_id: str = Form(...),
+    callback_url: str = Form(...),
+    knowledge_base_id: str = Form(...),
+    ingested_by_user_id: str = Form(default="SYSTEM_ADMIN"),
+) -> AsyncIngestAcceptedResponse:
+    suffix = Path(file.filename or "").suffix.lower()
+    if suffix not in get_service_v2().supported_formats():
+        raise ValueError(f"Unsupported file type: {suffix or '[unknown]'}")
+    import_dir = settings.document_import_dir
+    import_dir.mkdir(parents=True, exist_ok=True)
+    target_path = import_dir / f"{job_id}{suffix}"
+    try:
+        with target_path.open("wb") as handle:
+            while True:
+                chunk = await file.read(1024 * 1024)
+                if not chunk:
+                    break
+                handle.write(chunk)
+    finally:
+        await file.close()
+
+    background_tasks.add_task(
+        _run_admin_ingest_job,
+        file_path=str(target_path),
+        filename=file.filename or target_path.name,
+        title=(title or Path(file.filename or "").stem).strip(),
+        job_id=job_id,
+        callback_url=callback_url,
+        knowledge_base_id=knowledge_base_id,
+        ingested_by_user_id=ingested_by_user_id.strip() or "SYSTEM_ADMIN",
+    )
+    return AsyncIngestAcceptedResponse(jobId=job_id)
 
 
 @router.post("/search")
@@ -217,6 +322,7 @@ def ask_legal_knowledge_v2(payload: AskRequest) -> AskResponse:
     return response
 
 
+@lru_cache(maxsize=8)
 def _build_gemini_client(*, model: str | None = None) -> GeminiClient:
     api_key = os.getenv("GEMINI_API_KEY", settings.gemini_api_key).strip()
     resolved_model = (model or os.getenv("GEMINI_MODEL", settings.gemini_model)).strip()

@@ -135,11 +135,15 @@ public class KnowledgeIngestedDocumentsServiceImpl implements KnowledgeIngestedD
                 ? aiSnapshot.version().getEmbeddedCount()
                 : chunkCount;
 
-        LocalDateTime ingestedAt = sourceDocument != null && sourceDocument.getProcessedAt() != null
+        LocalDateTime ingestedAt = version.getIngestedAt() != null
+                ? version.getIngestedAt()
+                : sourceDocument != null && sourceDocument.getProcessedAt() != null
                 ? sourceDocument.getProcessedAt()
                 : version.getCreatedAt();
 
-        String visibility = sourceDocument != null && sourceDocument.getVisibilityScope() != null
+        String visibility = version.getVisibility() != null
+                ? version.getVisibility().name()
+                : sourceDocument != null && sourceDocument.getVisibilityScope() != null
                 ? sourceDocument.getVisibilityScope().name()
                 : null;
 
@@ -149,18 +153,22 @@ public class KnowledgeIngestedDocumentsServiceImpl implements KnowledgeIngestedD
                 .effectiveFrom(version.getCreatedAt())
                 .effectiveTo(null)
                 .visibility(visibility)
+                .active(version.getActive())
                 .ingestStatus(resolveIngestStatus(version, aiSnapshot))
                 .chunkCount(chunkCount)
                 .embeddedCount(embeddedCount)
                 .sourceFileId(sourceFileId)
                 .contentHash(aiSnapshot != null ? aiSnapshot.version().getContentHash() : null)
                 .ingestedAt(ingestedAt)
+                .publishedAt(version.getPublishedAt())
+                .ingestedById(version.getIngestedBy() == null ? null : version.getIngestedBy().getId())
+                .errorMessage(version.getErrorMessage() != null ? version.getErrorMessage() : version.getFailedReason())
                 .build();
     }
 
     private String resolveIngestStatus(KnowledgeBaseVersion version, AiDocumentSnapshot aiSnapshot) {
-        if (version.getStatus() != null) {
-            return version.getStatus().name();
+        if (version.getIngestStatus() != null) {
+            return version.getIngestStatus().name();
         }
         return aiSnapshot != null ? aiSnapshot.version().getIngestStatus() : "UNKNOWN";
     }

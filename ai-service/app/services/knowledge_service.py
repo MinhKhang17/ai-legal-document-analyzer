@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -73,8 +74,14 @@ class KnowledgeService:
                     metadata.setdefault("law_code", None)
                     metadata.setdefault("legal_domain", self.document_metadata.get("legal_domain") or None)
                     metadata.setdefault("effective_status", self.document_metadata.get("effective_status") or "UNKNOWN")
+                    metadata.setdefault("visibility", self.document_metadata.get("visibility") or "PRIVATE")
+                    metadata.setdefault("active", self.document_metadata.get("active") is True)
+                    metadata.setdefault("ingest_status", self.document_metadata.get("ingest_status") or "INGESTED")
                     metadata.setdefault("ingest_source", self.document_metadata.get("ingest_source") or "INGEST_V2")
                     metadata.setdefault("source_type", "SYSTEM_KB")
+                    metadata.setdefault("ingested_by_role", self.document_metadata.get("ingested_by_role"))
+                    metadata.setdefault("ingested_by_user_id", self.document_metadata.get("ingested_by_user_id"))
+                    metadata.setdefault("ingested_at", self.document_metadata.get("ingested_at"))
                 enriched_nodes.append(
                     node.__class__(
                         node_id=node.node_id,
@@ -222,7 +229,13 @@ class KnowledgeServiceV2(KnowledgeService):
             "chunking_strategy": "structural_semantic_subchunk_v2",
             "source_type": "SYSTEM_KB",
             "ingest_source": "INGEST_V2",
-            "effective_status": "UNKNOWN",
+            "effective_status": "INACTIVE",
+            "visibility": "PRIVATE",
+            "active": False,
+            "ingest_status": "INGESTED",
+            "ingested_by_role": "ADMIN",
+            "ingested_by_user_id": "SYSTEM_ADMIN",
+            "ingested_at": datetime.now(timezone.utc).isoformat(),
         }
         if document_metadata:
             merged_metadata.update(document_metadata)
@@ -233,4 +246,16 @@ class KnowledgeServiceV2(KnowledgeService):
         )
 
     def search(self, query: str, top_k: int = 5) -> list[RetrievedChunk]:
-        return super().search(query, top_k=top_k, metadata_filter={"chunking_version": 2})
+        return super().search(
+            query,
+            top_k=top_k,
+            metadata_filter={
+                "chunking_version": 2,
+                "source_type": "SYSTEM_KB",
+                "ingest_source": "INGEST_V2",
+                "effective_status": "ACTIVE",
+                "visibility": "PUBLIC",
+                "active": True,
+                "ingested_by_role": "ADMIN",
+            },
+        )

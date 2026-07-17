@@ -57,7 +57,8 @@ class Settings:
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
     gemini_fallback_model: str = os.getenv("GEMINI_FALLBACK_MODEL", "")
     gemini_timeout_seconds: float = float(os.getenv("GEMINI_TIMEOUT_SECONDS", "120"))
-    gemini_max_output_tokens: int = int(os.getenv("GEMINI_MAX_OUTPUT_TOKENS", "8192"))
+    gemini_max_output_tokens: int = int(os.getenv("GEMINI_MAX_OUTPUT_TOKENS", "4096"))
+    gemini_thinking_budget: int = int(os.getenv("GEMINI_THINKING_BUDGET", "512"))
     gemini_max_retries: int = int(os.getenv("GEMINI_MAX_RETRIES", "4"))
     gemini_retry_backoff_seconds: float = float(os.getenv("GEMINI_RETRY_BACKOFF_SECONDS", "2"))
 

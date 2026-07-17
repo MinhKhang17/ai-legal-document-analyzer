@@ -1,6 +1,7 @@
-import { API_ENDPOINTS } from "../config/api";
+import { API_ENDPOINTS, buildApiUrl } from "../config/api";
 import type {
   ArchiveKnowledgeRequest,
+  AsyncKnowledgeIngestAccepted,
   IngestKnowledgeRequest,
   KnowledgeBaseEntry,
   KnowledgeBaseIngestedDocument,
@@ -11,7 +12,7 @@ import type {
   PublishKnowledgeRequest,
   UploadKnowledgeRequest,
 } from "../types/knowledgeBase";
-import { buildAuthHeaders, requestApiData } from "./http";
+import { buildAuthHeaders, requestAiJson, requestApiData } from "./http";
 
 const jsonHeaders = {
   Accept: "application/json",
@@ -140,6 +141,55 @@ export const publishKnowledgeBaseEntry = async (
     API_ENDPOINTS.knowledgeBase.publish(entryId),
     payload,
     "Không thể publish knowledge base",
+  );
+
+export const ingestKnowledgeBaseFile = async (
+  file: File,
+  knowledgeBaseEntryId: string,
+  title: string,
+  adminId: number,
+  jobId: string,
+): Promise<AsyncKnowledgeIngestAccepted> => {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("title", title);
+  formData.append("ingested_by_user_id", String(adminId));
+  formData.append("knowledge_base_id", knowledgeBaseEntryId);
+  formData.append("job_id", jobId);
+  formData.append("callback_url", buildApiUrl(`/api/internal/knowledge-ingestion/${encodeURIComponent(jobId)}/progress`));
+
+  return requestAiJson<AsyncKnowledgeIngestAccepted>(
+    API_ENDPOINTS.aiKnowledge.ingestV2,
+    { method: "POST", body: formData },
+    "Không thể upload và ingest file tài liệu pháp lý",
+  );
+};
+
+export const getKnowledgeIngestionJob = async (
+  jobId: string,
+): Promise<KnowledgeIngestionJob> =>
+  getJson<KnowledgeIngestionJob>(
+    API_ENDPOINTS.knowledgeBase.ingestionJob(jobId),
+    "Không thể tải tiến độ ingest",
+  );
+
+export const failKnowledgeIngestionJob = async (
+  jobId: string,
+  errorMessage: string,
+): Promise<KnowledgeIngestionJob> =>
+  postJson<KnowledgeIngestionJob>(
+    API_ENDPOINTS.knowledgeBase.failIngestionJob(jobId),
+    { errorMessage },
+    "Không thể cập nhật trạng thái ingest thất bại",
+  );
+
+export const unpublishKnowledgeBaseEntry = async (
+  entryId: string,
+): Promise<KnowledgeBaseVersion> =>
+  postJson<KnowledgeBaseVersion>(
+    API_ENDPOINTS.knowledgeBase.unpublish(entryId),
+    {},
+    "Không thể unpublish knowledge base",
   );
 
 export const archiveKnowledgeBaseEntry = async (

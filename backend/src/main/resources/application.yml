@@ -42,6 +42,8 @@ app:
 
   ai-service:
     base-url: http://localhost:8000
+    connect-timeout: ${AI_SERVICE_CONNECT_TIMEOUT:5s}
+    read-timeout: ${AI_SERVICE_READ_TIMEOUT:130s}
 
   storage:
     upload-root: uploads
@@ -55,7 +57,7 @@ app:
   payment:
     vnpay:
       pay-url: https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
-      return-url: http://localhost:8080/api/v1/payment-transactions/vnpay-return
+      return-url: ${VNPAY_RETURN_URL:http://localhost:8080/api/v1/payment-transactions/vnpay-return}
 
       tmn-code: JSLOYW6T
       hash-secret: QPZPU6FGA8L3WXRHEWV1UQHFBHLMWUPP

@@ -7,6 +7,8 @@ import com.analyzer.api.entity.LegalTicket;
 import com.analyzer.api.entity.User;
 import com.analyzer.api.enums.DocumentPurpose;
 import com.analyzer.api.enums.DocumentVisibilityScope;
+import com.analyzer.api.enums.LegalTicketStatus;
+import com.analyzer.api.exception.common.ConflictException;
 import com.analyzer.api.exception.common.ForbiddenException;
 import com.analyzer.api.exception.common.ResourceNotFoundException;
 import com.analyzer.api.repository.DocumentRepository;
@@ -31,6 +33,13 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class TicketFileServiceImpl implements TicketFileService {
+
+    private static final List<LegalTicketStatus> FILE_UPLOAD_STATUSES = List.of(
+            LegalTicketStatus.ASSIGNED_TO_LAWYER,
+            LegalTicketStatus.IN_REVIEW,
+            LegalTicketStatus.NEED_MORE_INFO,
+            LegalTicketStatus.CUSTOMER_RESPONDED,
+            LegalTicketStatus.REOPENED);
 
     private final LegalTicketRepository legalTicketRepository;
     private final DocumentRepository documentRepository;
@@ -75,6 +84,9 @@ public class TicketFileServiceImpl implements TicketFileService {
         if (ticket.getAssignedLawyer() == null || !ticket.getAssignedLawyer().getId().equals(lawyerId)) {
             throw new ForbiddenException("Ban khong phai la Luat su duoc phan cong xu ly yeu cau nay");
         }
+        if (!FILE_UPLOAD_STATUSES.contains(ticket.getStatus())) {
+            throw new ConflictException("INVALID_STATUS_TRANSITION");
+        }
 
         User lawyer = userRepository.findById(lawyerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay thong tin Luat su ID: " + lawyerId));
@@ -82,7 +94,7 @@ public class TicketFileServiceImpl implements TicketFileService {
         String docId = "doc_" + UUID.randomUUID().toString().replace("-", "");
         DocumentVisibilityScope visibility = request.getVisibilityScope() != null
                 ? request.getVisibilityScope()
-                : DocumentVisibilityScope.ALL_INTERNAL;
+                : DocumentVisibilityScope.CUSTOMER;
 
         String originalFileName = request.getOriginalFileName().trim();
         String storedFileName = docId + "_" + originalFileName.replaceAll("[^a-zA-Z0-9._-]", "_");
@@ -153,6 +165,71 @@ public class TicketFileServiceImpl implements TicketFileService {
                 return resource;
             }
             throw new ResourceNotFoundException("Khong the doc file tai lieu: " + documentId);
+        } catch (IOException ex) {
+            throw new RuntimeException("Loi khi doc file tai lieu: " + ex.getMessage(), ex);
+        }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<TicketFileResponse> listCustomerVisibleFiles(String ticketId, Long customerId) {
+        LegalTicket ticket = getOwnedTicket(ticketId, customerId);
+        return documentRepository.findByLegalTicket_Id(ticket.getId()).stream()
+                .filter(this::isCustomerVisible)
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Resource downloadCustomerVisibleFile(String ticketId, Long customerId, String documentId) {
+        getOwnedTicket(ticketId, customerId);
+        Document document = documentRepository.findById(documentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay tai lieu ID: " + documentId));
+        if (document.getLegalTicket() == null || !ticketId.equals(document.getLegalTicket().getId())) {
+            throw new ForbiddenException("Tai lieu khong thuoc yeu cau tu van nay");
+        }
+        if (!isCustomerVisible(document)) {
+            throw new ForbiddenException("Tai lieu nay khong duoc chia se voi khach hang");
+        }
+        return loadResource(document);
+    }
+
+    private LegalTicket getOwnedTicket(String ticketId, Long customerId) {
+        LegalTicket ticket = legalTicketRepository.findById(ticketId)
+                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay yeu cau tu van ID: " + ticketId));
+        if (!ticket.getCreatedBy().getId().equals(customerId)) {
+            throw new ForbiddenException("Ban khong co quyen truy cap file cua ticket nay");
+        }
+        return ticket;
+    }
+
+    private boolean isCustomerVisible(Document document) {
+        return document.getVisibilityScope() == DocumentVisibilityScope.CUSTOMER;
+    }
+
+    private TicketFileResponse toResponse(Document doc) {
+        return TicketFileResponse.builder()
+                .documentId(doc.getId())
+                .originalFileName(doc.getOriginalFileName())
+                .storedFileName(doc.getStoredFileName())
+                .filePath(null)
+                .fileType(doc.getFileType())
+                .fileSize(doc.getFileSize())
+                .documentPurpose(doc.getDocumentPurpose())
+                .visibilityScope(doc.getVisibilityScope())
+                .uploadedAt(doc.getUploadedAt() != null ? doc.getUploadedAt() : doc.getUpdatedAt())
+                .build();
+    }
+
+    private Resource loadResource(Document document) {
+        try {
+            Path filePath = Path.of(document.getFilePath()).toAbsolutePath().normalize();
+            Resource resource = new UrlResource(filePath.toUri());
+            if (resource.exists() && resource.isReadable()) {
+                return resource;
+            }
+            throw new ResourceNotFoundException("Khong the doc file tai lieu: " + document.getId());
         } catch (IOException ex) {
             throw new RuntimeException("Loi khi doc file tai lieu: " + ex.getMessage(), ex);
         }

@@ -10,6 +10,7 @@ import com.analyzer.api.dto.chatmessage.SendMessageResponse;
 import com.analyzer.api.dto.chatsession.ChatSessionResponse;
 import com.analyzer.api.entity.ChatMessage;
 import com.analyzer.api.entity.ChatSession;
+import com.analyzer.api.entity.AiCitation;
 import com.analyzer.api.entity.Document;
 import com.analyzer.api.entity.User;
 import com.analyzer.api.entity.Workspace;
@@ -17,6 +18,7 @@ import com.analyzer.api.enums.ChatMessageRole;
 import com.analyzer.api.enums.ChatMessageStatus;
 import com.analyzer.api.enums.ChatMessageType;
 import com.analyzer.api.enums.ChatSessionStatus;
+import com.analyzer.api.enums.CitationSourceType;
 import com.analyzer.api.exception.common.*;
 import com.analyzer.api.exception.workspace.*;
 import com.analyzer.api.exception.chat.*;
@@ -27,6 +29,7 @@ import com.analyzer.api.repository.ChatSessionRepository;
 import com.analyzer.api.repository.DocumentRepository;
 import com.analyzer.api.repository.UserRepository;
 import com.analyzer.api.repository.WorkspaceRepository;
+import com.analyzer.api.repository.ai.AiCitationRepository;
 import com.analyzer.api.service.ChatMessageService;
 import com.analyzer.api.service.SubscriptionQuotaService;
 import lombok.RequiredArgsConstructor;
@@ -56,6 +59,7 @@ public class ChatMessageServiceImpl implements ChatMessageService {
     private final PythonAiClient pythonAiClient;
     private final UserRepository userRepository;
     private final SubscriptionQuotaService subscriptionQuotaService;
+    private final AiCitationRepository aiCitationRepository;
 
     @Override
     @Transactional(noRollbackFor = {AiServiceUnavailableException.class, AiServiceTimeoutException.class})
@@ -334,10 +338,10 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                     .userId(String.valueOf(workspace.getUser().getId()))
                     .workspaceId(workspace.getId())
                     .documentId(selectedDocument != null ? selectedDocument.getId() : null)
+                    .chatSessionId(chatSession.getId())
                     .question(question)
                     .chatHistory(chatHistoryStr.isEmpty() ? null : chatHistoryStr)
-                    .topKChecklist(10)
-                    .topKUserChunksPerChecklist(3)
+                    .topKUserChunks(5)
                     .topKKnowledgeChunks(5)
                     .build();
             aiResponse = pythonAiClient.query(aiRequest);
@@ -404,6 +408,7 @@ public class ChatMessageServiceImpl implements ChatMessageService {
 
         ChatMessage assistantMessage = assistantBuilder.build();
         chatMessageRepository.save(assistantMessage);
+        saveCitations(aiResponse.getCitations(), assistantMessage);
         subscriptionQuotaService.recordAiChatUsage(
                 currentUser,
                 assistantMessage.getPromptTokens() == null ? estimateTokens(question) : assistantMessage.getPromptTokens(),
@@ -472,6 +477,47 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                 .createdAt(message.getCreatedAt())
                 .updatedAt(message.getUpdatedAt())
                 .build();
+    }
+
+    private void saveCitations(List<RagQueryResponse.Citation> citations, ChatMessage assistantMessage) {
+        if (citations == null || citations.isEmpty()) {
+            return;
+        }
+
+        List<AiCitation> entities = citations.stream()
+                .map(citation -> {
+                    boolean knowledgeBase = "SYSTEM_KB".equalsIgnoreCase(citation.getSourceType());
+                    String sourceReferenceId = firstNonBlank(
+                            knowledgeBase ? citation.getKnowledgeDocumentId() : citation.getDocumentId(),
+                            citation.getDocumentId(),
+                            citation.getCitationId());
+                    String label = firstNonBlank(
+                            citation.getLawName(),
+                            citation.getFileName(),
+                            citation.getSectionTitle(),
+                            citation.getCitationId());
+                    return AiCitation.builder()
+                            .id("cite_" + UUID.randomUUID().toString().replace("-", ""))
+                            .sourceType(knowledgeBase ? CitationSourceType.KNOWLEDGE_BASE : CitationSourceType.DOCUMENT)
+                            .sourceReferenceId(sourceReferenceId)
+                            .label(label)
+                            .excerpt(citation.getExcerpt())
+                            .pageNumber(citation.getPageNumber())
+                            .score(citation.getScore())
+                            .chatMessage(assistantMessage)
+                            .build();
+                })
+                .toList();
+        aiCitationRepository.saveAll(entities);
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return "unknown";
     }
 
     private int estimateTokens(String content) {

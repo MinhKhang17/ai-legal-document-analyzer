@@ -7,6 +7,7 @@ import com.analyzer.api.entity.KnowledgeBaseVersion;
 import com.analyzer.api.entity.User;
 import com.analyzer.api.entity.Workspace;
 import com.analyzer.api.enums.KnowledgeStatus;
+import com.analyzer.api.enums.KnowledgeVisibility;
 import com.analyzer.api.exception.common.ResourceNotFoundException;
 import com.analyzer.api.repository.UserRepository;
 import com.analyzer.api.repository.WorkspaceRepository;
@@ -41,7 +42,7 @@ public class KnowledgeUploadServiceImpl implements KnowledgeUploadService {
                         .id("kb_" + UUID.randomUUID().toString().replace("-", ""))
                         .code(request.getCode().trim())
                         .createdBy(createdBy)
-                        .active(true)
+                        .active(false)
                         .build());
 
         int nextVersionNo = entry.getCurrentVersionNo() == null ? 1 : entry.getCurrentVersionNo() + 1;
@@ -54,17 +55,24 @@ public class KnowledgeUploadServiceImpl implements KnowledgeUploadService {
         entry.setWorkspace(workspace);
         entry.setCurrentVersionNo(nextVersionNo);
         entry.setCurrentStatus(KnowledgeStatus.UPLOADED);
-        entry.setActive(true);
+        entry.setActive(false);
         KnowledgeBaseEntry savedEntry = entryRepository.save(entry);
 
         KnowledgeBaseVersion version = KnowledgeBaseVersion.builder()
                 .id("kbv_" + UUID.randomUUID().toString().replace("-", ""))
                 .knowledgeBaseEntry(savedEntry)
                 .versionNo(nextVersionNo)
-                .rawContent(request.getRawContent())
-                .extractedContent(request.getExtractedContent())
+                .rawContent(sanitizeText(request.getRawContent()))
+                .extractedContent(sanitizeText(request.getExtractedContent()))
                 .status(KnowledgeStatus.UPLOADED)
+                .ingestStatus(KnowledgeStatus.PENDING)
+                .visibility(KnowledgeVisibility.PRIVATE)
+                .active(false)
                 .build();
         return KnowledgeMappingSupport.toVersionResponse(versionRepository.save(version));
+    }
+
+    private String sanitizeText(String value) {
+        return value == null ? null : value.replace("\u0000", "");
     }
 }

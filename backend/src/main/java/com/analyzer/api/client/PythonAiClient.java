@@ -18,14 +18,27 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 
 import java.net.URI;
+import java.net.SocketTimeoutException;
+import java.time.Duration;
 
 @Component
 public class PythonAiClient implements AiClient {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
+
+    public PythonAiClient(
+            @Value("${app.ai-service.connect-timeout:5s}") Duration connectTimeout,
+            @Value("${app.ai-service.read-timeout:130s}") Duration readTimeout) {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(connectTimeout);
+        requestFactory.setReadTimeout(readTimeout);
+        this.restTemplate = new RestTemplate(requestFactory);
+    }
 
     @Value("${app.ai-service.base-url:http://localhost:8000}")
     private String aiServiceBaseUrl;
@@ -43,6 +56,13 @@ public class PythonAiClient implements AiClient {
             throw new AiServiceUnavailableException(
                     "AI service is currently unavailable. status=" + e.getStatusCode().value()
                             + ", body=" + e.getResponseBodyAsString(),
+                    request.getRequestId());
+        } catch (ResourceAccessException e) {
+            if (hasTimeoutCause(e)) {
+                throw new AiServiceTimeoutException("AI service timeout. Please try again later", request.getRequestId());
+            }
+            throw new AiServiceUnavailableException(
+                    "AI service is currently unavailable. " + e.getMessage(),
                     request.getRequestId());
         } catch (RestClientException e) {
             throw new AiServiceUnavailableException(
@@ -69,6 +89,13 @@ public class PythonAiClient implements AiClient {
                     "AI service is currently unavailable. status=" + e.getStatusCode().value()
                             + ", body=" + e.getResponseBodyAsString(),
                     request.getRequestId());
+        } catch (ResourceAccessException e) {
+            if (hasTimeoutCause(e)) {
+                throw new AiServiceTimeoutException("AI service timeout. Please try again later", request.getRequestId());
+            }
+            throw new AiServiceUnavailableException(
+                    "AI service is currently unavailable. " + e.getMessage(),
+                    request.getRequestId());
         } catch (RestClientException e) {
             throw new AiServiceUnavailableException(
                     "AI service is currently unavailable. " + e.getMessage(),
@@ -93,6 +120,13 @@ public class PythonAiClient implements AiClient {
             throw new AiServiceUnavailableException(
                     "AI service is currently unavailable. status=" + e.getStatusCode().value()
                             + ", body=" + e.getResponseBodyAsString(),
+                    request.getRequestId());
+        } catch (ResourceAccessException e) {
+            if (hasTimeoutCause(e)) {
+                throw new AiServiceTimeoutException("AI service timeout. Please try again later", request.getRequestId());
+            }
+            throw new AiServiceUnavailableException(
+                    "AI service is currently unavailable. " + e.getMessage(),
                     request.getRequestId());
         } catch (RestClientException e) {
             throw new AiServiceUnavailableException(
@@ -130,5 +164,16 @@ public class PythonAiClient implements AiClient {
         }
 
         return objectMapper.readValue(response.getBody(), responseType);
+    }
+
+    private boolean hasTimeoutCause(Throwable error) {
+        Throwable current = error;
+        while (current != null) {
+            if (current instanceof SocketTimeoutException) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 }

@@ -1,11 +1,17 @@
 package com.analyzer.api.config;
 
 import com.analyzer.api.entity.Role;
+import com.analyzer.api.entity.CustomerPlan;
+import com.analyzer.api.entity.PaymentTransaction;
 import com.analyzer.api.entity.SubscriptionPlan;
 import com.analyzer.api.entity.User;
+import com.analyzer.api.enums.PaymentStatus;
+import com.analyzer.api.enums.PlanStatus;
 import com.analyzer.api.enums.RoleName;
 import com.analyzer.api.enums.SubscriptionTier;
 import com.analyzer.api.repository.RoleRepository;
+import com.analyzer.api.repository.CustomerPlanRepository;
+import com.analyzer.api.repository.PaymentTransactionRepository;
 import com.analyzer.api.repository.SubscriptionPlanRepository;
 import com.analyzer.api.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -17,7 +23,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -28,6 +36,8 @@ public class DataInitializer implements CommandLineRunner {
     private final RoleRepository roleRepository;
     private final UserRepository userRepository;
     private final SubscriptionPlanRepository subscriptionPlanRepository;
+    private final CustomerPlanRepository customerPlanRepository;
+    private final PaymentTransactionRepository paymentTransactionRepository;
     private final PasswordEncoder passwordEncoder;
     private final JdbcTemplate jdbcTemplate;
 
@@ -63,7 +73,8 @@ public class DataInitializer implements CommandLineRunner {
         Role expertRole = roleRepository.findByName(RoleName.EXPERT)
                 .orElseThrow(() -> new RuntimeException("EXPERT role not found in database"));
 
-        seedUser("admin", "admin", "admin@123", "pass@123", adminRole);
+        seedUser("admin", "admin", "admin@123", "" +
+                "", adminRole);
         seedUser("user", "user", "user@123", "pass@123", customerRole);
         seedUser("expert", "expert", "expert@123", "pass@123", expertRole);
 
@@ -77,6 +88,8 @@ public class DataInitializer implements CommandLineRunner {
         seedOrUpdatePlan("PREMIUM", "Premium Plan", SubscriptionTier.PREMIUM,
                 "Premium monthly plan with higher AI limits and one expert review ticket.",
                 new BigDecimal("299000"), 30, 200, 8_500_000, 1, 20, 50, 40);
+
+        grantPremiumPlanToDemoUser();
     }
 
     private void seedUser(String firstName, String lastName, String email, String rawPassword, Role role) {
@@ -125,5 +138,70 @@ public class DataInitializer implements CommandLineRunner {
 
         subscriptionPlanRepository.save(plan);
         logger.info("Seeded or updated subscription plan {}", planType);
+    }
+
+    private void grantPremiumPlanToDemoUser() {
+        User demoUser = userRepository.findByEmail("user@123")
+                .orElseThrow(() -> new IllegalStateException("Demo customer user@123 was not seeded"));
+        SubscriptionPlan premiumPlan = subscriptionPlanRepository.findByPlanTypeIgnoreCase("PREMIUM")
+                .orElseThrow(() -> new IllegalStateException("PREMIUM plan was not seeded"));
+
+        LocalDateTime now = LocalDateTime.now();
+        List<CustomerPlan> demoPlans = customerPlanRepository.findByCustomerId(demoUser.getId());
+        CustomerPlan demoPremiumPlan = demoPlans.stream()
+                .filter(plan -> plan.getSubscriptionPlan() != null
+                        && premiumPlan.getId().equals(plan.getSubscriptionPlan().getId()))
+                .filter(plan -> plan.getStatus() == PlanStatus.ACTIVE
+                        && (plan.getEndDate() == null || plan.getEndDate().isAfter(now)))
+                .findFirst()
+                .orElse(null);
+
+        for (CustomerPlan plan : demoPlans) {
+            if (plan.getStatus() == PlanStatus.ACTIVE
+                    && (demoPremiumPlan == null || !plan.getId().equals(demoPremiumPlan.getId()))) {
+                plan.setStatus(PlanStatus.EXPIRED);
+                customerPlanRepository.save(plan);
+            }
+        }
+
+        if (demoPremiumPlan == null) {
+            demoPremiumPlan = demoPlans.stream()
+                    .filter(plan -> plan.getSubscriptionPlan() != null
+                            && premiumPlan.getId().equals(plan.getSubscriptionPlan().getId()))
+                    .findFirst()
+                    .orElseGet(() -> CustomerPlan.builder()
+                            .customer(demoUser)
+                            .subscriptionPlan(premiumPlan)
+                            .build());
+
+            demoPremiumPlan.setStatus(PlanStatus.ACTIVE);
+            demoPremiumPlan.setStartDate(now);
+            demoPremiumPlan.setEndDate(now.plusDays(premiumPlan.getDurationDays()));
+            demoPremiumPlan.setUsageStartAt(now);
+            demoPremiumPlan.setUsageEndAt(now.plusDays(premiumPlan.getDurationDays()));
+            demoPremiumPlan.setBillingCycleStartAt(now);
+            demoPremiumPlan.setBillingCycleEndAt(now.plusDays(premiumPlan.getDurationDays()));
+            demoPremiumPlan.setUsedQuota(0);
+            demoPremiumPlan.setAutoRenew(false);
+            demoPremiumPlan.setCancelReason(null);
+            demoPremiumPlan = customerPlanRepository.save(demoPremiumPlan);
+        }
+
+        cancelPendingDemoPayments(demoPremiumPlan);
+        logger.info(
+                "Granted active {} plan to demo customer {} until {}",
+                premiumPlan.getPlanName(),
+                demoUser.getEmail(),
+                demoPremiumPlan.getEndDate());
+    }
+
+    private void cancelPendingDemoPayments(CustomerPlan demoPremiumPlan) {
+        for (PaymentTransaction transaction : paymentTransactionRepository.findByCustomerPlanId(demoPremiumPlan.getId())) {
+            if (transaction.getPaymentStatus() == PaymentStatus.PENDING) {
+                transaction.setPaymentStatus(PaymentStatus.CANCELLED);
+                transaction.setGatewayResponseCode("DEMO_PLAN_GRANTED");
+                paymentTransactionRepository.save(transaction);
+            }
+        }
     }
 }

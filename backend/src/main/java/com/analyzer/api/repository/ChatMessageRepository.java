@@ -22,7 +22,10 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, String
 
     Optional<ChatMessage> findByIdAndUserId(String id, Long userId);
 
-    Optional<ChatMessage> findByRequestId(String requestId);
+    Optional<ChatMessage> findTopByRequestIdAndUserIdAndRoleOrderByCreatedAtDesc(
+            String requestId,
+            Long userId,
+            ChatMessageRole role);
 
     List<ChatMessage> findByChatSessionIdAndStatusOrderByCreatedAtAsc(
             String chatSessionId,
