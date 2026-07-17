@@ -1,5 +1,170 @@
 # History Code - Dinh Van Tay
 
+# Full Git Ownership Audit - 2026-07-16
+
+## Git Identities Used For Audit
+
+- `dinhtay <dinhvantay060404@gmail.com>`
+- `dinhtay06 <dinhvantay060404@gmail.com>`
+- `dinhtay06 <DINHVANTAY060404@GMAIL.COM>`
+- `taydvse181660 <taydvse181660@fpt.edu.vn>`
+
+## Missing Work Found And Added
+
+- Auth va role: commit `9c6bbcb`, `45812ac`.
+- VNPAY/payment: commit `0ee2fea`, `50f7afd`, `fb912ab`, `5182672`, `10242cc`, `7288e2a`, `ff9ab2a`, `8e670d7`.
+- Workspace/document: commit `6fd02d6`, `ce25e69`; da co noi dung chi tiet trong history ben duoi.
+- Contract, knowledge, subscription/refund, feedback: commit `3044a38`, `d7ec3cb`; da co noi dung chi tiet trong history ben duoi.
+- History documentation: commit `038cd5a` cap nhat file `historycode-dinhvantay.md` cho cac module Phase 2.
+- Refund workflow va tai lieu FE: commit `60e5836`, `0a8ff36`.
+- Cac merge commit `55740f4`, `09f7d8f` khong duoc tinh thanh task doc lap vi khong co thay doi file rieng trong merge diff dang audit.
+
+## Task Ownership Boundary
+
+- Khong tim thay commit cua Dinh Van Tay tren module legal ticket, lawyer ticket conversation hoac ticket file.
+- Vi vay cac loi ticket realtime chat, expert/customer download file, dong/mo lai ticket va bad case ticket khong thuoc ownership Git cua Dinh Van Tay.
+
+---
+
+# Update History - 2026-06-03 to 2026-06-04
+
+## Authentication And Role Management
+
+- Chuyen luong dang nhap tu username sang email.
+- Cap nhat `AuthController`, login/JWT DTO va `UserDetails` de dung email trong qua trinh xac thuc.
+- Bo sung entity va repository cho role.
+- Gan role customer mac dinh khi tao user.
+- Chuan hoa `RoleName` vao package `enums`.
+- Cap nhat mapping va response user de tra thong tin role phu hop.
+
+## Commits
+
+- `9c6bbcb` - fix auth: replace username login with email and assign default customer role.
+- `45812ac` - tiep tuc chuan hoa role/entity/repository va user service.
+
+## Main Files Added / Updated
+
+- `src/main/java/com/analyzer/api/controller/AuthController.java`
+- `src/main/java/com/analyzer/api/entity/Role.java` (duoc restructure tu package cu trong cac commit sau)
+- `src/main/java/com/analyzer/api/enums/RoleName.java`
+- `src/main/java/com/analyzer/api/repository/RoleRepository.java`
+- `src/main/java/com/analyzer/api/repository/UserRepository.java`
+- `src/main/java/com/analyzer/api/security/UserDetailsImpl.java`
+- `src/main/java/com/analyzer/api/security/UserDetailsServiceImpl.java`
+- `src/main/java/com/analyzer/api/service/impl/UserServiceImpl.java`
+- Cac DTO auth/user va `UserMapper` lien quan.
+
+---
+
+# Update History - 2026-06-18 to 2026-06-24
+
+## VNPAY And Payment Transaction
+
+- Bo sung cau hinh VNPAY qua `VnPayProperties` va `application.yml`.
+- Mo rong payment transaction de luu payment method/status, transaction code, payment URL va thong tin gateway.
+- Tao payment transaction khi customer dang ky goi dich vu.
+- Tao URL thanh toan VNPAY tu transaction cua customer.
+- Bo sung return endpoint va IPN response DTO cho VNPAY.
+- Xac thuc callback/IPN va cap nhat giao dich thanh cong hoac that bai.
+- Hoan thien mapping response cho payment transaction va payment URL.
+- Refactor logic VNPAY vao `PaymentTransactionServiceImpl` va xoa `VnPayService` trung gian de tranh trung service.
+- Cap nhat security de cho phep VNPAY return/IPN goi endpoint can thiet.
+
+## Commits
+
+- `0ee2fea`, `50f7afd` - khoi tao payment transaction va VNPAY service/config.
+- `fb912ab`, `5182672`, `10242cc` - chuan hoa DTO/response va bo sung IPN response.
+- `7288e2a` - hoan thien VNPAY trong payment service/controller/config.
+- `ff9ab2a` - cap nhat `PaymentTransactionController`.
+- `8e670d7` - xoa `VnPayService` sau khi logic da duoc gop vao service chinh.
+
+## Main Files Added / Updated
+
+- `src/main/java/com/analyzer/api/config/VnPayProperties.java`
+- `src/main/java/com/analyzer/api/controller/PaymentTransactionController.java`
+- `src/main/java/com/analyzer/api/dto/paymenttransaction/PaymentTransactionResponseDTO.java`
+- `src/main/java/com/analyzer/api/dto/paymenttransaction/PaymentUrlResponseDTO.java`
+- `src/main/java/com/analyzer/api/dto/paymenttransaction/VnPayIpnResponseDTO.java`
+- `src/main/java/com/analyzer/api/entity/PaymentTransaction.java`
+- `src/main/java/com/analyzer/api/service/PaymentTransactionService.java`
+- `src/main/java/com/analyzer/api/service/impl/PaymentTransactionServiceImpl.java`
+- `src/main/java/com/analyzer/api/service/impl/CustomerPlanServiceImpl.java`
+- `src/main/java/com/analyzer/api/security/SecurityConfig.java`
+- `src/main/resources/application.yml`
+
+---
+
+# Update History - 2026-07-11
+
+## Task Ownership Check
+
+- Doi chieu Git commit `60e5836` (`refunds`) xac nhan phan hoan tien thuoc Dinh Van Tay.
+- Cac van de legal ticket nhu chat phai refresh, expert/customer tai file va bad case dong/mo lai ticket khong nam trong commit cua Dinh Van Tay.
+- Phan legal ticket chinh duoc trien khai trong cac commit cua thanh vien khac, vi vay khong ghi nhan vao task ownership cua Dinh Van Tay.
+
+## Module Refund - Manual Approval Workflow
+
+- Hoan thien workflow hoan tien thu cong co admin phe duyet:
+  - `REQUESTED -> APPROVED -> PROCESSING -> COMPLETED`
+  - `REQUESTED -> REJECTED`
+- Chi cho phep tao refund tu payment transaction co trang thai `SUCCESS`.
+- Kiem tra payment transaction thuoc dung customer dang dang nhap.
+- Kiem tra `customerPlanId` phai thuoc dung payment transaction.
+- Chan amount vuot qua so tien con lai co the hoan.
+- Chan tao yeu cau moi khi payment dang co refund o trang thai `REQUESTED`, `APPROVED` hoac `PROCESSING`.
+- Dung pessimistic lock tren payment transaction de han che hai request dong thoi lam vuot tong tien hoan.
+- Bat buoc admin nhap ly do khi chuyen refund sang `REJECTED`.
+- Khi tong refund `COMPLETED` bang toan bo gia tri payment:
+  - Cap nhat payment status thanh `REFUNDED`.
+  - Cap nhat customer plan status thanh `CANCELLED`.
+  - Tat `autoRenew` va luu ly do huy goi.
+- Neu chi hoan mot phan, payment van `SUCCESS` va customer plan van hoat dong.
+
+## Refund API Added / Updated
+
+```http
+POST  /api/v1/subscriptions/refunds
+GET   /api/v1/subscriptions/refunds/me
+GET   /api/v1/subscriptions/refunds/{id}
+GET   /api/v1/subscriptions/refunds
+GET   /api/v1/subscriptions/refunds?status={status}
+PATCH /api/v1/subscriptions/refunds/{id}/status
+```
+
+## Files Added / Updated
+
+### Added
+
+- `src/main/java/com/analyzer/api/dto/subscription/UpdateRefundStatusRequest.java`
+- `src/test/java/com/analyzer/api/service/subscription/impl/RefundServiceImplTest.java`
+
+### Updated
+
+- `pom.xml`
+- `src/main/java/com/analyzer/api/controller/subscription/SubscriptionManagementController.java`
+- `src/main/java/com/analyzer/api/dto/subscription/RefundRequestDTO.java`
+- `src/main/java/com/analyzer/api/repository/PaymentTransactionRepository.java`
+- `src/main/java/com/analyzer/api/repository/subscription/RefundRequestRepository.java`
+- `src/main/java/com/analyzer/api/service/subscription/RefundService.java`
+- `src/main/java/com/analyzer/api/service/subscription/impl/RefundServiceImpl.java`
+- `docs/frontend-flows/00_INDEX.txt`
+
+### Frontend Flow Documentation
+
+- Tao `docs/frontend-flows/10_hoan_tien_customer_va_admin.txt`.
+- Mo ta flow customer tao/theo doi refund va admin duyet/tu choi/xu ly/hoan tat.
+- Bo sung state machine, request/response mau, validation, error handling, edge cases va checklist FE.
+- Cap nhat `docs/frontend-flows/00_INDEX.txt` de them flow refund.
+
+## Refund Test Cases Added
+
+- Tu choi amount lon hon so tien con lai cua payment.
+- Hoan toan bo thi payment thanh `REFUNDED` va plan thanh `CANCELLED`.
+- Hoan mot phan thi payment van `SUCCESS` va plan van `ACTIVE`.
+- Tu choi chuyen trang thai tu `REJECTED` sang trang thai khac.
+
+---
+
 # Update History - 2026-06-28
 
 ## Tasks Completed

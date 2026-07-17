@@ -189,8 +189,7 @@ public class LegalTicketServiceImpl implements LegalTicketService {
             throw new ForbiddenException("Ban khong co quyen huy ticket nay");
         }
 
-        if (ticket.getStatus() != LegalTicketStatus.PENDING_ADMIN_REVIEW &&
-            ticket.getStatus() != LegalTicketStatus.ASSIGNED_TO_LAWYER) {
+        if (ticket.getStatus() != LegalTicketStatus.PENDING_ADMIN_REVIEW) {
             throw new ConflictException("INVALID_STATUS_TRANSITION");
         }
 
@@ -288,8 +287,7 @@ public class LegalTicketServiceImpl implements LegalTicketService {
             throw new ForbiddenException("Ban khong co quyen phan hoi ticket nay");
         }
 
-        if (ticket.getStatus() != LegalTicketStatus.PENDING_ADMIN_REVIEW &&
-            ticket.getStatus() != LegalTicketStatus.ASSIGNED_TO_LAWYER &&
+        if (ticket.getStatus() != LegalTicketStatus.ASSIGNED_TO_LAWYER &&
             ticket.getStatus() != LegalTicketStatus.IN_REVIEW &&
             ticket.getStatus() != LegalTicketStatus.NEED_MORE_INFO &&
             ticket.getStatus() != LegalTicketStatus.CUSTOMER_RESPONDED &&

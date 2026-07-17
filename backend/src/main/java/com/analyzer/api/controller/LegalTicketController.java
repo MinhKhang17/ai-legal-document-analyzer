@@ -6,12 +6,16 @@ import com.analyzer.api.dto.legalticket.*;
 import com.analyzer.api.enums.LegalTicketStatus;
 import com.analyzer.api.security.UserDetailsImpl;
 import com.analyzer.api.service.LegalTicketService;
+import com.analyzer.api.service.lawyer.TicketFileService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.core.io.Resource;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -26,6 +30,7 @@ import java.util.List;
 public class LegalTicketController {
 
     private final LegalTicketService legalTicketService;
+    private final TicketFileService ticketFileService;
 
     @PostMapping
     @PreAuthorize("hasAnyRole('CUSTOMER', 'ADMIN')")
@@ -67,6 +72,29 @@ public class LegalTicketController {
         String currentUserRole = getCurrentUserRole();
         return ResponseEntity.ok(ApiResponseDTO.success("Legal ticket messages retrieved successfully",
                 legalTicketService.getMessages(currentUserId, currentUserRole, ticketId)));
+    }
+
+    @GetMapping("/{id}/files")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    @Operation(summary = "Get files shared with customer")
+    public ResponseEntity<ApiResponseDTO<List<TicketFileResponse>>> getCustomerFiles(
+            @PathVariable("id") String ticketId) {
+        return ResponseEntity.ok(ApiResponseDTO.success("Ticket files retrieved successfully",
+                ticketFileService.listCustomerVisibleFiles(ticketId, getCurrentUserId())));
+    }
+
+    @GetMapping("/{id}/files/{documentId}/download")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    @Operation(summary = "Download a file shared with customer")
+    public ResponseEntity<Resource> downloadCustomerFile(
+            @PathVariable("id") String ticketId,
+            @PathVariable String documentId) {
+        Resource resource = ticketFileService.downloadCustomerVisibleFile(ticketId, getCurrentUserId(), documentId);
+        String filename = resource.getFilename() == null ? documentId : resource.getFilename();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename.replace("\"", "") + "\"")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(resource);
     }
 
     @PostMapping("/{id}/cancel")
