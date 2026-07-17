@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 import unicodedata
 from collections import defaultdict
@@ -11,7 +12,11 @@ from app.graph.connection import get_driver
 from app.models.knowledge_models import ChunkedDocument, HierarchyNode, RetrievedChunk
 
 
+logger = logging.getLogger(__name__)
+
 SUPPORTED_LABELS = {"Document", "Part", "Chapter", "Section", "Article", "Clause", "Point", "Chunk", "Subsection"}
+
+FULLTEXT_INDEX_NAME = "chunk_fulltext_index"
 
 
 class GraphRepository:
@@ -43,6 +48,10 @@ class GraphRepository:
                 `vector.similarity_function`: 'cosine'
               }}
             }}
+            """,
+            f"""
+            CREATE FULLTEXT INDEX {FULLTEXT_INDEX_NAME} IF NOT EXISTS
+            FOR (n:Chunk) ON EACH [n.text, n.title]
             """,
         ]
 
@@ -228,6 +237,68 @@ class GraphRepository:
         top_k: int = 5,
         metadata_filter: dict[str, Any] | None = None,
     ) -> list[RetrievedChunk]:
+        query_tokens = self._tokenize(query_text)
+        if not query_tokens:
+            return []
+
+        # Build a Lucene-compatible query string for Neo4j Full-Text Search
+        lucene_query = " OR ".join(query_tokens)
+
+        candidate_limit = max(top_k * 5, top_k + 10) if metadata_filter else top_k
+
+        cypher = f"""
+        CALL db.index.fulltext.queryNodes($index_name, $query_text, {{limit: $limit}})
+        YIELD node, score
+        RETURN node.node_id AS chunk_id,
+               coalesce(node.title, '') AS title,
+               coalesce(node.text, '') AS text,
+               coalesce(node.metadata_json, '{{}}') AS metadata_json,
+               score AS score
+        ORDER BY score DESC
+        """
+
+        try:
+            with self.driver.session() as session:
+                result = session.run(
+                    cypher,
+                    index_name=FULLTEXT_INDEX_NAME,
+                    query_text=lucene_query,
+                    limit=candidate_limit,
+                )
+                filtered: list[RetrievedChunk] = []
+                for record in result:
+                    if not self._record_matches_metadata(record, metadata_filter):
+                        continue
+                    metadata = self._parse_metadata(record["metadata_json"])
+                    text = record["text"] or ""
+                    retrieval_text = str(metadata.get("retrieval_text") or "").strip()
+                    if retrieval_text:
+                        text = retrieval_text
+                    filtered.append(
+                        RetrievedChunk(
+                            chunk_id=record["chunk_id"],
+                            text=text,
+                            score=float(record["score"]),
+                            title=record["title"] or "",
+                            context=self.get_context(record["chunk_id"], metadata_filter=metadata_filter),
+                            source_type=str(metadata.get("source_type") or ""),
+                            metadata=metadata,
+                        )
+                    )
+                    if len(filtered) >= top_k:
+                        break
+                return filtered
+        except Exception as exc:
+            logger.warning("Full-text search failed, falling back to in-memory search: %s", exc)
+            return self._search_chunks_by_text_fallback(query_text, top_k=top_k, metadata_filter=metadata_filter)
+
+    def _search_chunks_by_text_fallback(
+        self,
+        query_text: str,
+        top_k: int = 5,
+        metadata_filter: dict[str, Any] | None = None,
+    ) -> list[RetrievedChunk]:
+        """Legacy in-memory keyword search. Used as fallback when full-text index is unavailable."""
         query_tokens = set(self._tokenize(query_text))
         if not query_tokens:
             return []

@@ -5,7 +5,7 @@ import logging
 from app.models.intent_enums import LegalQueryIntent, ResponseMode
 from app.schemas import RagCitation, RagPreviewChunk, RagPreviewResponse, RagQueryRequest, RagQueryResponse
 from app.services.completeness_checker import check_completeness
-from app.services.intent_detector import detect_intent
+from app.services.llm_intent_detector import detect_intent_smart
 from app.services.llm_client import RagLlmClient, build_default_llm_client
 from app.services.prompt_builder import build_intent_instruction, build_system_prompt, build_user_prompt
 from app.services.query_builder import build_legal_search_query
@@ -39,7 +39,7 @@ class RagQueryService:
         user_hits, legal_search_query, knowledge_hits = self._retrieve(request)
 
         # ── Step 2: Detect intent ──
-        intent_result = detect_intent(
+        intent_result = detect_intent_smart(
             request.question,
             has_user_chunks=len(user_hits) > 0,
             has_knowledge_chunks=len(knowledge_hits) > 0,

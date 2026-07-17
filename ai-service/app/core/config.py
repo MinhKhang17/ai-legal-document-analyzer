@@ -60,6 +60,10 @@ class Settings:
     gemini_max_output_tokens: int = int(os.getenv("GEMINI_MAX_OUTPUT_TOKENS", "8192"))
     gemini_max_retries: int = int(os.getenv("GEMINI_MAX_RETRIES", "4"))
     gemini_retry_backoff_seconds: float = float(os.getenv("GEMINI_RETRY_BACKOFF_SECONDS", "2"))
+    gemini_embedding_model: str = os.getenv("GEMINI_EMBEDDING_MODEL", "text-embedding-004")
+    gemini_embedding_dimensions: int = int(os.getenv("GEMINI_EMBEDDING_DIMENSIONS", "384"))
+    llm_intent_enabled: bool = os.getenv("LLM_INTENT_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
+    llm_rerank_enabled: bool = os.getenv("LLM_RERANK_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
 
 
 settings = Settings()
