@@ -387,9 +387,12 @@ class ContractGenerationService:
         # Provide first ~500 chars of the best chunk as a preview
         preview = ""
         if retrieved_chunks:
-            raw = (retrieved_chunks[0].chunkText or "")[:500].strip()
-            if raw:
-                preview = f"\n\n**Nội dung tóm tắt:**\n> {raw}..."
+            raw = (retrieved_chunks[0].chunkText or "").strip()
+            # Split by ' > ' to clean breadcrumb prefixes
+            parts = raw.split(" > ")
+            clean_raw = parts[-1].strip()
+            if clean_raw:
+                preview = f"\n\n**Nội dung tóm tắt:**\n> {clean_raw[:500]}..."
 
         return (
             f"📋 **Tìm thấy mẫu văn bản phù hợp:** *{doc_title}*\n\n"
