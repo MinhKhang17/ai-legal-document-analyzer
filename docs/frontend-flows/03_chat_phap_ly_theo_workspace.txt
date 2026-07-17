@@ -26,102 +26,113 @@ Luồng chính:
 10. Backend lưu user message, gọi Python AI client, lưu assistant message.
 11. FE render câu trả lời, metadata, nút `Chi tiết`, citation và action tạo legal ticket nếu assistant đề xuất.
 12. Người dùng có thể:
-13. tạo session mới
-14. đổi tên session
-15. xóa session
-16. xem summary/memory của session
-17. mở chi tiết message
-18. tạo legal ticket từ assistant message
+    - tạo session mới
+    - đổi tên session
+    - xóa session
+    - xem summary/memory của session
+    - mở chi tiết message
+    - tạo legal ticket từ assistant message
+    - **Đánh giá câu trả lời LLM:** Dưới mỗi tin nhắn của AI Assistant, người dùng có thể bấm Thích/Không thích (hoặc chấm điểm từ 1-5) và gửi bình luận. FE gọi API gửi phản hồi.
+    - **Chia sẻ cuộc hội thoại:** Tại góc màn hình chat, khách hàng có thể nhấn nút "Chia sẻ". FE gọi API share, lấy về đường dẫn `/shared/chat/{shareToken}` và hiển thị cho khách hàng copy.
+
+13. Xem cuộc hội thoại được chia sẻ (Dành cho Admin và Expert):
+    - Admin hoặc Expert truy cập vào link `/shared/chat/{shareToken}`.
+    - Hệ thống kiểm tra quyền đăng nhập của Admin/Expert. Nếu đúng vai trò, hiển thị lịch sử cuộc hội thoại dưới dạng Read-Only.
+    - Giao diện này **không chứa khung nhập tin nhắn (prompt)** và không cho phép chỉnh sửa/xóa phiên chat.
 
 Sơ đồ text:
 - `select workspace/document/session -> load messages -> ask question -> AI response -> optional create legal ticket`
+- `AI Response -> Click Rate Star/Thumb -> Send Feedback API -> Save Feedback`
+- `Chat Screen -> Click Share -> Call Share API -> Copy URL -> Send to Admin/Expert`
+- `Admin/Expert -> Go to Shared URL -> Verify auth -> Load Shared Chat History -> Render Read-Only UI (No Prompt)`
 
 Màn hình / component:
 - `frontend/src/pages/chat/LegalChatPage.tsx`
 - `frontend/src/components/chat/ChatMessageContent.tsx`
-- modal chi tiết message trong cùng file
+- Component phản hồi/đánh giá tin nhắn LLM (ThumbsUp/Down hoặc Rating Stars dưới mỗi bubble chat) [MỚI]
+- `frontend/src/pages/chat/SharedChatPage.tsx` (Màn hình xem hội thoại chia sẻ ở chế độ Read-Only dành riêng cho Admin/Expert) [MỚI]
 
 Dữ liệu / state:
 - `workspaces`, `workspaceDocuments`, `chatSessions`
 - `selectedWorkspaceId`, `selectedSessionId`, `selectedDocumentId`
 - `messages`, `input`, `sending`
-- `sessionSummary`, `sessionMemory`
-- `messageDetail`, `messageCitations`
+- `shareUrl`, `sharingSessionId`
+- `sharedChatMessages`, `sharedSessionDetail` (cho SharedChatPage)
 
 Validation:
 - Message không được rỗng
 - Backend `ChatMessageServiceImpl.validateMessageRequest()` giới hạn message <= 5000 ký tự
 - `documentId` nếu có phải thuộc workspace và phải ở trạng thái `READY`
+- Chỉ hiển thị nút Chia sẻ với khách hàng sở hữu phiên chat.
 
 API / service tích hợp:
 - FE chat: `frontend/src/services/chat.service.ts`
 - FE AI citations: `frontend/src/api/aiFeatureApi.ts`
 - FE legal ticket bridge: `frontend/src/services/legalTicket.service.ts`
+- FE feedback: `frontend/src/services/feedback.service.ts`
 - BE:
-- `POST /api/v1/workspaces/{workspaceId}/chat-sessions`
-- `GET /api/v1/workspaces/{workspaceId}/chat-sessions`
-- `GET /api/v1/chat-sessions/{chatSessionId}`
-- `PUT /api/v1/chat-sessions/{chatSessionId}`
-- `DELETE /api/v1/chat-sessions/{chatSessionId}`
-- `POST /api/v1/workspaces/{workspaceId}/messages`
-- `POST /api/v1/chat-sessions/{chatSessionId}/messages`
-- `GET /api/v1/chat-sessions/{chatSessionId}/messages`
-- `GET /api/v1/chat-messages/{messageId}`
-- `GET /api/v1/chat-sessions/{id}/summary`
-- `GET /api/v1/chat-sessions/{id}/memory`
-- `POST /api/v1/chat-sessions/{id}/context`
+  - `POST /api/v1/workspaces/{workspaceId}/chat-sessions`
+  - `GET /api/v1/workspaces/{workspaceId}/chat-sessions`
+  - `GET /api/v1/chat-sessions/{chatSessionId}`
+  - `PUT /api/v1/chat-sessions/{chatSessionId}`
+  - `DELETE /api/v1/chat-sessions/{chatSessionId}`
+  - `POST /api/v1/workspaces/{workspaceId}/messages`
+  - `POST /api/v1/chat-sessions/{chatSessionId}/messages`
+  - `GET /api/v1/chat-sessions/{chatSessionId}/messages`
+  - `GET /api/v1/chat-messages/{messageId}`
+  - `POST /api/v1/chat-messages/{messageId}/feedback` (Gửi phản hồi rating/comment) [MỚI]
+  - `GET /api/v1/admin/chat-messages/feedback` (Admin xem toàn bộ đánh giá) [MỚI]
+  - `POST /api/v1/chat-sessions/{chatSessionId}/share` (Tạo mã chia sẻ hội thoại) [MỚI]
+  - `GET /api/v1/shared/chat/{shareToken}` (Lấy tin nhắn của hội thoại chia sẻ) [MỚI]
 
 UI states:
 - Không có workspace: nhắc chọn workspace
 - Không có message: empty state
 - AI fail: render assistant bubble lỗi và có nút retry
-- Có suggestion: render badge risk/confidence/suggestion và nút tạo ticket
+- Giao diện Shared Chat: Chỉ hiện danh sách tin nhắn, không có input text để chat.
 
 Edge cases:
-- Workspace có document nhưng chưa `READY`: backend ném `NoReadyDocumentsException`
-- Session bị xóa: backend chặn truy cập tiếp
-- AI timeout/unavailable: backend vẫn lưu message fail và FE có thể retry
+- Link chia sẻ bị truy cập bởi người không có quyền (Khách hàng khác hoặc người chưa đăng nhập): Trả về 403 Forbidden hoặc chuyển hướng về trang báo lỗi.
+- Đánh giá tin nhắn nhiều lần: Ghi đè đánh giá trước đó hoặc trả về lỗi.
 
 Business rules:
-- Session default được backend tạo tự động nếu gửi tin nhắn đầu tiên ở workspace
-- Nếu title session đang là `Default Conversation`, backend đổi title theo câu hỏi đầu tiên
-- Backend có check quota AI chat qua `SubscriptionQuotaService`
+- Chat session đã chia sẻ chỉ cho phép Admin/Expert truy cập.
+- Không thể chat thêm trong trang chia sẻ.
 
 Quyền:
-- Customer-only cho các endpoint chat chính
-- Summary/memory cho phép nhiều role, nhưng màn FE hiện tại dùng ở customer flow
+- Gửi tin nhắn và chia sẻ: `@PreAuthorize("hasRole('CUSTOMER')")`
+- Gửi feedback: `@PreAuthorize("isAuthenticated()")`
+- Xem danh sách feedback của User: `@PreAuthorize("hasRole('ADMIN')")`
+- Xem shared chat: `@PreAuthorize("hasAnyRole('ADMIN', 'EXPERT')")`
 
 File nguồn tham chiếu:
 - FE:
-- `frontend/src/pages/chat/LegalChatPage.tsx`
-- `frontend/src/services/chat.service.ts`
-- `frontend/src/services/workspace.service.ts`
+  - `frontend/src/pages/chat/LegalChatPage.tsx`
+  - `frontend/src/services/chat.service.ts`
+  - `frontend/src/services/feedback.service.ts`
 - BE:
-- `backend/src/main/java/com/analyzer/api/controller/ChatSessionController.java`
-- `backend/src/main/java/com/analyzer/api/controller/ChatMessageController.java`
-- `backend/src/main/java/com/analyzer/api/controller/chatsession/ChatSessionContextController.java`
-- `backend/src/main/java/com/analyzer/api/service/impl/ChatSessionServiceImpl.java`
-- `backend/src/main/java/com/analyzer/api/service/impl/ChatMessageServiceImpl.java`
+  - `backend/src/main/java/com/analyzer/api/controller/ChatSessionController.java`
+  - `backend/src/main/java/com/analyzer/api/controller/feedback/FeedbackController.java`
 
 Điểm chưa rõ:
-- `CHƯA XÁC ĐỊNH`: contract của citation endpoint `getChatMessageAiCitations()` nếu FE cần schema chi tiết.
-- `CHƯA XÁC ĐỊNH`: có streaming token-by-token hay không; mã hiện tại là request/response hoàn chỉnh.
+- `ĐÃ RÕ`: Sử dụng token UUID để sinh link chia sẻ bảo mật, chỉ Admin/Expert có quyền xem.
+- `ĐÃ RÕ`: Chỉ hỗ trợ xem, loại bỏ hoàn toàn ô chat box khi mở link share.
 
 Checklist FE:
-- Luôn sync query params `workspaceId/sessionId/documentId`.
-- Nếu document không `READY`, cần thông báo rõ thay vì để người dùng đoán.
-- Nên phân biệt `assistant failed` với `assistant trả lời nhưng risk cao`.
+- Tích hợp cụm nút rating dưới mỗi câu trả lời của AI.
+- Tạo màn hình `SharedChatPage` cho luồng xem hội thoại. Chặn render hộp thoại gửi tin nhắn tại trang này.
+- Thêm popup/modal hiển thị URL đã copy khi bấm nút Share.
 
 Tiêu chí hoàn thành:
-- Tạo/quản lý session được.
-- Gửi câu hỏi và nhận câu trả lời được.
-- Xem lịch sử, metadata và mở ticket từ chat được.
+- User đánh giá được câu trả lời AI.
+- Admin xem được danh sách đánh giá tại trang Quản trị Feedback.
+- Tạo link chia sẻ thành công và Admin/Expert truy cập xem được lịch sử chat mà không gửi được prompt.
 
 HIỆN TRẠNG:
-- Flow này có độ hoàn chỉnh cao và bám backend thật.
+- Chat cơ bản hoạt động tốt. Cần bổ sung các thành phần feedback UI và trang hiển thị hội thoại chia sẻ.
 
 SUY LUẬN:
-- Đây là flow nghiệp vụ trung tâm của sản phẩm.
+- Đánh giá câu trả lời LLM giúp quản trị viên nâng cao chất lượng RAG; chia sẻ phiên chat giúp Admin/Expert hiểu rõ bối cảnh khách hàng gặp phải trước khi tư vấn.
 
 ĐỀ XUẤT:
-- FE nên xem flow này là hub, từ đây điều hướng sang ticket hoặc project detail.
+- Hiển thị phản hồi sao (rating) trực quan dưới dạng ngôi sao hoặc ngón tay (like/dislike) để tăng tỷ lệ người dùng tham gia đánh giá.

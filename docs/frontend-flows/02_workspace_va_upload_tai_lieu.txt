@@ -24,14 +24,20 @@ Luồng chính:
 8. Backend trả document ở trạng thái accepted.
 9. FE thêm document vào list và điều hướng tới `/projects/:workspaceId`.
 10. Nếu có document `processing`, FE poll lại danh sách mỗi 3 giây.
+11. Tải tài liệu gốc (Dành cho Admin và Expert):
+    - Admin hoặc Expert khi xem thông tin chi tiết Workspace hoặc chi tiết Ticket có thể bấm vào nút "Tải tài liệu gốc".
+    - FE sẽ hướng trình duyệt tải file trực tiếp hoặc gọi API tải file nhị phân qua endpoint `GET /api/v1/admin/documents/{documentId}/download`.
 
 Sơ đồ text:
 - `UploadPage -> load workspaces -> create/select workspace -> upload file -> poll documents -> open project/chat`
+- `Admin/Expert -> Ticket Detail / Workspace -> Click Download -> Call Download API (receive binary stream) -> Save File to PC`
 
 Màn hình / component:
 - `frontend/src/pages/upload/UploadPage.tsx`
 - `frontend/src/components/upload/FileUploadZone.tsx`
 - `frontend/src/components/upload/ProcessingTimeline.tsx`
+- `frontend/src/pages/admin/AdminTicketDetailPage.tsx` (Thêm nút download tài liệu của user)
+- `frontend/src/pages/lawyer/LawyerTicketDetailPage.tsx` (Thêm nút download tài liệu của user)
 
 Dữ liệu / state:
 - `workspaces`
@@ -47,18 +53,16 @@ Validation:
 
 API / service tích hợp:
 - FE:
-- `frontend/src/services/workspace.service.ts`
-- `createWorkspace()`
-- `getWorkspaces()`
-- `getWorkspaceDocuments()`
-- `uploadDocument()`
+  - `frontend/src/services/workspace.service.ts`
+  - `createWorkspace()`, `getWorkspaces()`, `getWorkspaceDocuments()`, `uploadDocument()`
+  - `downloadDocument(documentId)` (gọi API nhị phân hoặc mở link trực tiếp) [MỚI]
 - BE:
-- `POST /api/v1/workspaces`
-- `GET /api/v1/workspaces`
-- `GET /api/v1/workspaces/{workspaceId}`
-- `GET /api/v1/workspaces/{workspaceId}/documents`
-- `POST /api/v1/workspaces/{workspaceId}/documents`
-- `GET /api/v1/workspaces/{workspaceId}/documents/{documentId}/download`
+  - `POST /api/v1/workspaces`
+  - `GET /api/v1/workspaces`
+  - `GET /api/v1/workspaces/{workspaceId}`
+  - `GET /api/v1/workspaces/{workspaceId}/documents`
+  - `POST /api/v1/workspaces/{workspaceId}/documents`
+  - `GET /api/v1/admin/documents/{documentId}/download` (API tải tài liệu gốc nhị phân) [MỚI]
 
 UI states:
 - Chưa có workspace: dropdown rỗng
@@ -77,36 +81,37 @@ Business rules:
 - Workspace hệ thống không được show cho upload flow customer
 
 Quyền:
-- `@PreAuthorize("hasRole('CUSTOMER')")`
+- Upload: `@PreAuthorize("hasRole('CUSTOMER')")`
+- Download: `@PreAuthorize("hasAnyRole('ADMIN', 'EXPERT')")`
 
 File nguồn tham chiếu:
 - FE:
-- `frontend/src/pages/upload/UploadPage.tsx`
-- `frontend/src/services/workspace.service.ts`
-- `frontend/src/api/workspaceApi.ts`
+  - `frontend/src/pages/upload/UploadPage.tsx`
+  - `frontend/src/services/workspace.service.ts`
+  - `frontend/src/api/workspaceApi.ts`
 - BE:
-- `backend/src/main/java/com/analyzer/api/controller/WorkspaceController.java`
-- `backend/src/main/java/com/analyzer/api/service/WorkspaceService.java`
+  - `backend/src/main/java/com/analyzer/api/controller/WorkspaceController.java`
+  - `backend/src/main/java/com/analyzer/api/service/WorkspaceService.java`
 
 Điểm chưa rõ:
-- `CHƯA XÁC ĐỊNH`: backend lưu file vật lý ở đâu và giới hạn dung lượng bao nhiêu.
-- `CHƯA XÁC ĐỊNH`: có hỗ trợ multi-upload hay chỉ từng file một.
+- `ĐÃ RÕ`: File vật lý được lưu trong thư mục cục bộ của server backend (`uploadRoot`).
+- `ĐÃ RÕ`: Hỗ trợ lưu file và download file nhị phân nguyên bản (PDF, DOCX...) cho Admin/Expert.
 
 Checklist FE:
 - Giữ query param `workspaceId` nhất quán.
 - Hiển thị trạng thái document theo backend (`UPLOADED/PROCESSING/READY/...`) sau khi normalize lowercase.
-- Nếu user muốn chat ngay, nên nhắc chỉ chat được khi có document `READY`.
+- Thêm nút Download tại các màn hình chi tiết của Admin và Chuyên gia.
 
 Tiêu chí hoàn thành:
 - Tạo workspace được.
 - Upload file được.
-- Danh sách document cập nhật và trạng thái processing được phản ánh trên UI.
+- Admin và Expert tải được file tài liệu gốc nhị phân thành công về máy.
 
 HIỆN TRẠNG:
-- Flow này có UI thật và backend thật, dùng được ngay ở mức cơ bản.
+- Đã có luồng upload và lưu trữ. Cần triển khai nút download trên giao diện admin/expert và liên kết tới API mới.
 
 SUY LUẬN:
-- Đây là entry point chính cho customer trước khi dùng chat hoặc ticket.
+- Admin và Expert cần tiếp cận được văn bản gốc của khách hàng để đối chiếu khi đưa ra tư vấn pháp lý chính thức.
 
 ĐỀ XUẤT:
-- Nếu FE cần tối ưu UX, nên thêm progress, file validation rõ ràng và trạng thái `READY` nổi bật hơn.
+- Nút tải file nên hiển thị kèm theo kích thước file và định dạng file (ví dụ: PDF, DOCX) để người dùng dễ theo dõi.
