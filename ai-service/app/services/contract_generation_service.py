@@ -8,7 +8,7 @@ import uuid
 import httpx
 
 from app.schemas import RagCitation, RagQueryRequest, RagQueryResponse
-from app.services.retrieval_service import RetrievalService
+from app.services.retrieval_service import RagChunkHit, RetrievalService
 
 logger = logging.getLogger(__name__)
 
@@ -88,12 +88,33 @@ class ContractGenerationService:
     def generate_contract(self, request: RagQueryRequest) -> RagQueryResponse:
         """Find the best matching template and return a download link."""
 
-        # 1. Search knowledge base for relevant template documents
-        retrieved_chunks = self.retrieval_service.search_knowledge_chunks(
-            request.question,
-            top_k=request.topKKnowledgeChunks or 3,
+        # 1. Search ALL chunks (not just SYSTEM_KB) for relevant template documents.
+        #    We bypass search_knowledge_chunks() because its metadata filter
+        #    (source_type=SYSTEM_KB, ingest_source=INGEST_V2) excludes most
+        #    knowledge base chunks that were ingested without those metadata fields.
+        embedding = self.retrieval_service.embed_question(request.question)
+        from app.models.knowledge_models import RetrievedChunk
+        raw_chunks = self.retrieval_service.repository.search_chunks(
+            embedding,
+            top_k=request.topKKnowledgeChunks or 5,
             query_text=request.question,
         )
+        # Convert raw RetrievedChunk objects to RagChunkHit for uniform handling
+        retrieved_chunks = [
+            RagChunkHit(
+                citationId=f"T{i}",
+                sourceType="SYSTEM_KB",
+                score=float(ch.score),
+                chunkText=ch.text,
+                documentId=str((ch.metadata or {}).get("document_id", "")),
+                knowledgeDocumentId=str((ch.metadata or {}).get("document_id", "")),
+                fileName=(ch.metadata or {}).get("file_name", ""),
+                title=ch.title,
+                rawChunkId=ch.chunk_id,
+                metadata=ch.metadata,
+            )
+            for i, ch in enumerate(raw_chunks, start=1)
+        ]
 
         if not retrieved_chunks:
             return self._no_template_response(request, retrieved_chunks=[])
