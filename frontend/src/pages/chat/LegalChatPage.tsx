@@ -742,7 +742,8 @@ export function LegalChatPage() {
                   </label>
                   <select
                     id="documentSelect"
-                    className="form-field"
+                    className="form-field min-w-0 max-w-full"
+                    title={selectedDocument?.originalFileName}
                     value={selectedDocumentId}
                     onChange={(event) => {
                       const nextDocumentId = event.target.value;
@@ -795,18 +796,20 @@ export function LegalChatPage() {
                       nextParams.documentId = document.documentId;
                       setSearchParams(nextParams);
                     }}
-                    className={`w-full rounded-xl border p-md text-left transition ${
+                    className={`w-full overflow-hidden rounded-xl border p-md text-left transition ${
                       selectedDocumentId === document.documentId
                         ? "border-primary bg-surface-container-high dark:border-inverse-primary dark:bg-slate-800"
                         : "border-legal-border hover:bg-surface-container-low dark:border-slate-700 dark:hover:bg-slate-800"
                     }`}
                   >
                     <div className="flex items-start gap-md">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-surface-container-high text-primary dark:bg-slate-800 dark:text-inverse-primary">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-surface-container-high text-primary dark:bg-slate-800 dark:text-inverse-primary">
                         <FileText className="h-5 w-5" />
                       </div>
-                      <div className="min-w-0">
-                        <p className="font-semibold">{document.originalFileName}</p>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-semibold" title={document.originalFileName}>
+                          {document.originalFileName}
+                        </p>
                         <p className="text-sm text-on-surface-variant dark:text-slate-400">
                           {(document.fileSize / 1024 / 1024).toFixed(2)} MB · {document.fileType}
                         </p>
