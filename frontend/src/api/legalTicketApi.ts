@@ -1,8 +1,34 @@
 export {
   assignLawyerToLegalTicket,
+  cancelLegalTicket,
+  closeLegalTicket,
   createLegalTicket,
+  getAdminLegalTicket,
   getAdminLegalTickets,
+  getAdminTicketChatHistory,
+  getAdminTicketFiles,
+  getAdminTicketSummary,
   getLegalTicket,
+  getLegalTicketMessages,
+  getMyLegalTickets,
+  rejectLegalTicket,
+  reassignLawyerToLegalTicket,
+  reopenLegalTicket,
+  replyToLegalTicket,
 } from "../services/legalTicket.service";
 
-export type { CreateLegalTicketRequest, LegalTicket } from "../types/legalTicket";
+export type {
+  AdminChatHistory,
+  AdminTicketFile,
+  AssignLawyerRequest,
+  CancelLegalTicketRequest,
+  CloseLegalTicketRequest,
+  CreateLegalTicketRequest,
+  CustomerTicketReplyRequest,
+  LegalTicket,
+  LegalTicketMessage,
+  PageResponse,
+  RejectLegalTicketRequest,
+  ReopenLegalTicketRequest,
+  TicketSummary,
+} from "../types/legalTicket";

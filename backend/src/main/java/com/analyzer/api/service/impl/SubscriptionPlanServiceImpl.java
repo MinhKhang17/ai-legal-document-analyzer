@@ -37,6 +37,11 @@ public class SubscriptionPlanServiceImpl implements SubscriptionPlanService {
         } else {
             plan.setActive(true);
         }
+        plan.setAiQuota(request.getAiQuota());
+        plan.setTicketQuota(request.getTicketQuota());
+        plan.setMaxWorkspaces(request.getMaxWorkspaces());
+        plan.setMaxContractsPerWorkspace(request.getMaxContractsPerWorkspace());
+        plan.setMaxDraftContracts(request.getMaxDraftContracts());
 
         SubscriptionPlan savedPlan = subscriptionPlanRepository.save(plan);
         return subscriptionPlanMapper.toResponseDTO(savedPlan);
@@ -75,6 +80,11 @@ public class SubscriptionPlanServiceImpl implements SubscriptionPlanService {
         plan.setPrice(request.getPrice());
         plan.setDurationDays(request.getDurationDays());
         plan.setMaxQuota(request.getMaxQuota());
+        plan.setAiQuota(request.getAiQuota());
+        plan.setTicketQuota(request.getTicketQuota());
+        plan.setMaxWorkspaces(request.getMaxWorkspaces());
+        plan.setMaxContractsPerWorkspace(request.getMaxContractsPerWorkspace());
+        plan.setMaxDraftContracts(request.getMaxDraftContracts());
         if (request.getActive() != null) {
             plan.setActive(request.getActive());
         }

@@ -99,6 +99,9 @@ export function RiskReviewPage() {
     [contractReport],
   );
 
+  const aiServiceUnavailable =
+    Boolean(error) && !loadingFormats && contractFormats.length === 0 && riskFormats.length === 0;
+
   const handleContractUpload = async (file: File) => {
     setUploadingContract(true);
     setError('');
@@ -182,7 +185,9 @@ export function RiskReviewPage() {
             >
               {t('billing.refresh')}
             </Button>
-            <Badge tone="gold">{t('riskReview.liveScanning')}</Badge>
+            <Badge tone={aiServiceUnavailable ? 'amber' : 'gold'}>
+              {aiServiceUnavailable ? t('status.offline') : t('riskReview.liveScanning')}
+            </Badge>
           </>
         }
       />
@@ -211,7 +216,11 @@ export function RiskReviewPage() {
           subtitle={t('risk.contractAnalysisSubtitle')}
           actions={<Badge tone="amber">{t('risk.directAiService')}</Badge>}
         >
-          <FileUploadZone onUpload={handleContractUpload} disabled={uploadingContract} compact />
+          <FileUploadZone
+            onUpload={handleContractUpload}
+            disabled={uploadingContract || loadingFormats || aiServiceUnavailable}
+            compact
+          />
           {loadingFormats && (
             <p className="mt-md text-sm text-on-surface-variant dark:text-slate-400">{t('risk.checkingContractFormats')}</p>
           )}
@@ -272,7 +281,7 @@ export function RiskReviewPage() {
             <Button
               leftIcon={<Search className="h-4 w-4" />}
               onClick={() => void handleRiskQuery()}
-              disabled={!riskQuery.trim() || queryingRisk}
+              disabled={!riskQuery.trim() || queryingRisk || loadingFormats || aiServiceUnavailable}
             >
               {queryingRisk ? t('actions.querying') : t('actions.query')}
             </Button>
@@ -280,7 +289,7 @@ export function RiskReviewPage() {
               variant="secondary"
               leftIcon={<UploadCloud className="h-4 w-4" />}
               onClick={() => riskImportInputRef.current?.click()}
-              disabled={uploadingRiskKnowledge}
+              disabled={uploadingRiskKnowledge || loadingFormats || aiServiceUnavailable}
             >
               {uploadingRiskKnowledge ? t('actions.importing') : t('actions.import')}
             </Button>

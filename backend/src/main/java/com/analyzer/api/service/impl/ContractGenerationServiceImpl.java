@@ -16,8 +16,10 @@ import com.analyzer.api.repository.contract.ContractVersionRepository;
 import com.analyzer.api.repository.contract.UserContractRepository;
 import com.analyzer.api.security.UserDetailsImpl;
 import com.analyzer.api.service.AiClient;
+import com.analyzer.api.service.SubscriptionQuotaService;
 import com.analyzer.api.service.contract.ContractGenerationService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Primary;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -27,6 +29,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Service
+@Primary
 @RequiredArgsConstructor
 public class ContractGenerationServiceImpl implements ContractGenerationService {
 
@@ -38,6 +41,7 @@ public class ContractGenerationServiceImpl implements ContractGenerationService 
     private final UserContractRepository userContractRepository;
     private final ContractVersionRepository contractVersionRepository;
     private final AiClient aiClient;
+    private final SubscriptionQuotaService subscriptionQuotaService;
 
     @Override
     @Transactional
@@ -60,6 +64,7 @@ public class ContractGenerationServiceImpl implements ContractGenerationService 
         Long userId = getCurrentUserId();
         User requester = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
+        subscriptionQuotaService.checkCanDraftContract(requester);
 
         Workspace workspace = workspaceRepository.findById(request.getWorkspaceId())
                 .orElseThrow(() -> new RuntimeException("Workspace not found with id: " + request.getWorkspaceId()));
@@ -149,6 +154,7 @@ public class ContractGenerationServiceImpl implements ContractGenerationService 
                     .build();
 
             contractVersionRepository.save(version);
+            subscriptionQuotaService.recordDraftContractUsage(requester);
 
         } catch (Exception e) {
             job.setStatus(ContractGenerationStatus.FAILED);

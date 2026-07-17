@@ -5,6 +5,8 @@ import {
 } from "./http";
 import type {
   DeleteChatSessionResponse,
+  ChatSessionMemory,
+  ChatSessionSummary,
   WorkspaceChatConversation,
   WorkspaceChatMessage,
   WorkspaceChatSession,
@@ -33,6 +35,7 @@ type SendMessageRequest = {
   message: string;
   documentId?: string;
 };
+
 
 const getAuthHeaders = (accessToken: string): HeadersInit => ({
   Authorization: `Bearer ${accessToken}`,
@@ -246,6 +249,33 @@ export async function getChatMessageDetail(
 
   return mapMessage(response.data);
 }
+
+export async function getChatSessionSummary(
+  accessToken: string,
+  chatSessionId: string,
+): Promise<ChatSessionSummary> {
+  const response = await getJson<ApiResponse<ChatSessionSummary>>(
+    API_ENDPOINTS.chat.summary(chatSessionId),
+    "Không thể tải tóm tắt chat session",
+    accessToken,
+  );
+
+  return response.data;
+}
+
+export async function getChatSessionMemory(
+  accessToken: string,
+  chatSessionId: string,
+): Promise<ChatSessionMemory> {
+  const response = await getJson<ApiResponse<ChatSessionMemory>>(
+    API_ENDPOINTS.chat.memory(chatSessionId),
+    "Không thể tải memory chat session",
+    accessToken,
+  );
+
+  return response.data;
+}
+
 
 export async function createChatSession(
   accessToken: string,

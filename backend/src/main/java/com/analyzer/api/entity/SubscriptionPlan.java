@@ -48,6 +48,15 @@ public class SubscriptionPlan {
     @Column(name = "ticket_quota")
     private Integer ticketQuota;
 
+    @Column(name = "max_workspaces")
+    private Integer maxWorkspaces;
+
+    @Column(name = "max_contracts_per_workspace")
+    private Integer maxContractsPerWorkspace;
+
+    @Column(name = "max_draft_contracts")
+    private Integer maxDraftContracts;
+
     @Column(name = "feature_limits_json", columnDefinition = "TEXT")
     private String featureLimitsJson;
 

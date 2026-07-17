@@ -10,7 +10,9 @@ import com.analyzer.api.entity.User;
 import com.analyzer.api.entity.Workspace;
 import com.analyzer.api.exception.workspace.DocumentProcessingDispatchException;
 import com.analyzer.api.repository.DocumentRepository;
+import com.analyzer.api.repository.UserRepository;
 import com.analyzer.api.repository.WorkspaceRepository;
+import com.analyzer.api.service.SubscriptionQuotaService;
 import com.analyzer.api.service.WorkspaceService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -54,6 +56,8 @@ public class WorkspaceServiceImpl implements WorkspaceService {
 
     private final WorkspaceRepository workspaceRepository;
     private final DocumentRepository documentRepository;
+    private final UserRepository userRepository;
+    private final SubscriptionQuotaService subscriptionQuotaService;
 
     @Value("${app.storage.upload-root:uploads}")
     private String uploadRoot;
@@ -67,9 +71,13 @@ public class WorkspaceServiceImpl implements WorkspaceService {
     @Override
     @Transactional
     public WorkspaceResponseDTO createWorkspace(Long userId, WorkspaceRequestDTO request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Khong tim thay nguoi dung"));
+        subscriptionQuotaService.checkCanCreateWorkspace(user);
+
         Workspace workspace = Workspace.builder()
                 .id(generateWorkspaceId())
-                .user(User.builder().id(userId).build())
+                .user(user)
                 .name(request.name().trim())
                 .description(request.description())
                 .status(STATUS_ACTIVE)
@@ -116,6 +124,10 @@ public class WorkspaceServiceImpl implements WorkspaceService {
         if (file == null || file.isEmpty()) {
             throw new RuntimeException("File khong duoc de trong");
         }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Khong tim thay nguoi dung"));
+        subscriptionQuotaService.checkCanUploadOrAnalyzeContract(user, workspaceId);
 
         workspaceRepository.findByIdAndUserIdAndStatus(workspaceId, userId, STATUS_ACTIVE)
                 .orElseThrow(() -> new RuntimeException("Workspace khong ton tai hoac khong thuoc user hien tai"));

@@ -1,0 +1,124 @@
+FLOW 07 - BILLING, GÓI DỊCH VỤ VÀ THANH TOÁN
+
+Mục tiêu:
+- Cho customer xem gói hiện tại, quota sử dụng, lịch sử giao dịch, đăng ký gói mới, tạo link thanh toán VNPAY, hủy gói và gửi yêu cầu refund.
+
+Actor:
+- `CUSTOMER`
+
+Điểm bắt đầu:
+- Route `/billing`
+- Route `/billing/subscribe`
+- Route `/billing/payment-result`
+
+Điều kiện tiên quyết:
+- Đăng nhập
+- FE env subscription/payment endpoint đúng
+
+Luồng chính:
+1. `BillingPage` tải:
+2. gói hiện tại `getMyCustomerPlan()`
+3. payment transactions `getMyPaymentTransactions()`
+4. usage history `getMySubscriptionUsage()`
+5. Nếu chưa có gói, UI hiển thị CTA sang `/billing/subscribe`.
+6. Ở `SubscribePlanPage`, FE tải danh sách plan.
+7. User chọn plan, chọn payment method `VNPAY`, xác nhận subscribe.
+8. FE gọi `subscribeCustomerPlan()`.
+9. Nếu response có `latestTransactionId`, FE gọi `createVnPayPaymentUrl()` và redirect sang VNPAY.
+10. Sau callback, backend redirect về frontend payment result URL.
+11. Tại billing page, user có thể:
+12. tạo lại payment URL cho giao dịch pending
+13. hủy plan
+14. tạo refund request cho giao dịch success
+
+Sơ đồ text:
+- `billing -> current plan/usage/transactions`
+- `subscribe page -> choose plan -> create subscription -> VNPAY URL -> payment result`
+
+Màn hình / component:
+- `frontend/src/pages/billing/BillingPage.tsx`
+- `frontend/src/pages/billing/SubscribePlanPage.tsx`
+- `frontend/src/pages/billing/PaymentResultPage.tsx`
+- `frontend/src/pages/billing/PaymentResultRedirect.tsx`
+
+Dữ liệu / state:
+- `customerPlan`, `hasNoPlan`
+- `paymentTransactions`
+- `usageRows`
+- subscribe: `plans`, `selectedPlanId`, `paymentMethod`, `subscribedPlan`
+
+Validation:
+- Phải chọn plan trước khi subscribe
+- Chỉ active plan mới subscribe được
+- Refund yêu cầu nhập reason
+
+API / service tích hợp:
+- FE:
+- `frontend/src/services/subscription.service.ts`
+- `frontend/src/services/paymentTransaction.service.ts`
+- BE subscription:
+- `GET /api/v1/subscriptions/plans`
+- `POST /api/v1/subscriptions/subscribe`
+- `GET /api/v1/subscriptions/my-plan`
+- `PUT /api/v1/subscriptions/my-plan/{id}/cancel`
+- `GET /api/v1/subscriptions/my-usage`
+- `POST /api/v1/subscriptions/refunds`
+- `GET /api/v1/subscriptions/refunds/{id}`
+- BE payment:
+- `GET /api/v1/payment-transactions/me`
+- `POST /api/v1/payment-transactions/{id}/vnpay-url`
+- `GET /api/v1/payment-transactions/vnpay-return`
+- `GET /api/v1/payment-transactions/vnpay-ipn`
+
+UI states:
+- Chưa có gói
+- Có gói active/pending/cancelled
+- Payment pending/success/failed
+- Usage empty hoặc có lịch sử
+
+Edge cases:
+- Subscribe thành công nhưng không lấy được VNPAY URL
+- Chưa có plan: `isCustomerPlanMissingError()` cố nhận diện theo text lỗi
+- Có nhiều endpoint gần nghĩa nhau `/me`, `/my-plan`, `/usage`, `/my-usage`; FE hiện đang dùng `/my-plan` và `/my-usage`
+
+Business rules:
+- Payment method hiện FE chỉ expose `VNPAY`
+- Billing page dùng transaction history + usage history để giải thích quota
+- Backend có callback redirect sang `paymentResultUrl`
+
+Quyền:
+- `isAuthenticated()` cho customer billing API
+- Admin có endpoint payment list toàn hệ thống nhưng chưa nằm trong flow customer này
+
+File nguồn tham chiếu:
+- FE:
+- `frontend/src/pages/billing/BillingPage.tsx`
+- `frontend/src/pages/billing/SubscribePlanPage.tsx`
+- `frontend/src/services/subscription.service.ts`
+- `frontend/src/services/paymentTransaction.service.ts`
+- BE:
+- `backend/src/main/java/com/analyzer/api/controller/subscription/SubscriptionManagementController.java`
+- `backend/src/main/java/com/analyzer/api/controller/PaymentTransactionController.java`
+
+Điểm chưa rõ:
+- `CHƯA XÁC ĐỊNH`: format chính xác payload/result của `PaymentResultPage` vì chưa đọc sâu page này.
+- `CHƯA XÁC ĐỊNH`: có auto renew logic runtime thật hay mới chỉ model field.
+
+Checklist FE:
+- Phân biệt rõ `CustomerPlan` với `SubscriptionPlan`.
+- Handle trường hợp subscribe thành công nhưng redirect thanh toán lỗi.
+- Không dùng nhầm endpoint summary `/usage` thay cho paged history `/my-usage`.
+
+Tiêu chí hoàn thành:
+- User xem plan, usage, transaction được.
+- User subscribe và đi qua VNPAY được.
+- User cancel plan và request refund được.
+
+HIỆN TRẠNG:
+- Flow này có controller và page thật, mức sẵn sàng cao.
+
+SUY LUẬN:
+- Billing đã được kết nối tương đối thực tế với VNPAY.
+
+ĐỀ XUẤT:
+- FE nên có state machine rõ cho `pending payment`, `active plan`, `refund requested`.

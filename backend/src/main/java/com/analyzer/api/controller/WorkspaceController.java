@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -29,7 +30,7 @@ import java.io.IOException;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/workspaces")
+@RequestMapping({"/api/v1/workspaces", "/api/workspaces"})
 @RequiredArgsConstructor
 @Tag(name = "Workspace Management", description = "APIs for managing user workspaces and workspace documents")
 public class WorkspaceController {
@@ -72,7 +73,7 @@ public class WorkspaceController {
         return ResponseEntity.ok(ApiResponseDTO.success("Lấy danh sách document thành công", response));
     }
 
-    @PostMapping(value = "/{workspaceId}/documents", consumes = "multipart/form-data")
+    @PostMapping("/{workspaceId}/documents")
     @PreAuthorize("hasRole('CUSTOMER')")
     @Operation(summary = "Upload workspace document", description = "Upload a user document, save it, and request Python AI Service processing.")
     public ResponseEntity<ApiResponseDTO<DocumentResponseDTO>> uploadDocument(

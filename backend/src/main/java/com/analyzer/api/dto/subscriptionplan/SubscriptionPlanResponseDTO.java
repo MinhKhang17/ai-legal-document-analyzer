@@ -2,6 +2,7 @@ package com.analyzer.api.dto.subscriptionplan;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -15,7 +16,7 @@ public class SubscriptionPlanResponseDTO {
     @Schema(description = "Name of the subscription plan", example = "Premium Plan")
     private String planName;
 
-    @Schema(description = "Type of the subscription plan", example = "MONTHLY")
+    @Schema(description = "Type of the subscription plan", example = "PREMIUM")
     private String planType;
 
     @Schema(description = "Description of the plan features", example = "Unlimited legal analysis and chat")
@@ -27,8 +28,23 @@ public class SubscriptionPlanResponseDTO {
     @Schema(description = "Duration of the plan in days", example = "30")
     private Integer durationDays;
 
-    @Schema(description = "Maximum quota of services", example = "100")
+    @Schema(description = "Maximum contract analysis quota per month", example = "200")
     private Integer maxQuota;
+
+    @Schema(description = "Monthly AI token quota", example = "8500000")
+    private Integer aiQuota;
+
+    @Schema(description = "Monthly expert ticket quota", example = "1")
+    private Integer ticketQuota;
+
+    @Schema(description = "Maximum workspaces for the plan", example = "20")
+    private Integer maxWorkspaces;
+
+    @Schema(description = "Maximum contracts per workspace", example = "50")
+    private Integer maxContractsPerWorkspace;
+
+    @Schema(description = "Maximum draft contracts per month", example = "40")
+    private Integer maxDraftContracts;
 
     @Schema(description = "Status of the plan", example = "true")
     private Boolean active;

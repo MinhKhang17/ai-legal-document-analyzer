@@ -19,10 +19,10 @@ export function RegisterPage() {
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState<RegisterFormData>({
-    firstName: 'Legal',
-    lastName: 'Team',
-    email: 'legal.team@lexiguard.ai',
-    password: 'lexiguard',
+    firstName: '',
+    lastName: '',
+    email: '',
+    password: '',
     confirmPassword: '',
   });
   const [confirmPasswordTouched, setConfirmPasswordTouched] = useState(false);
@@ -40,6 +40,10 @@ export function RegisterPage() {
   const canSubmit =
     !isSubmitting &&
     acceptedTerms &&
+    formData.firstName.trim().length > 0 &&
+    formData.lastName.trim().length > 0 &&
+    formData.email.trim().length > 0 &&
+    formData.password.length > 0 &&
     formData.password === formData.confirmPassword &&
     formData.confirmPassword.length > 0;
 

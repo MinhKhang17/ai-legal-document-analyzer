@@ -13,7 +13,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-@Service
+@Service("legacyContractTemplateServiceImpl")
 @RequiredArgsConstructor
 public class ContractTemplateServiceImpl implements ContractTemplateService {
 

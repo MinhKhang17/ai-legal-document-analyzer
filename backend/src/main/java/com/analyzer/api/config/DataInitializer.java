@@ -4,6 +4,7 @@ import com.analyzer.api.entity.Role;
 import com.analyzer.api.entity.SubscriptionPlan;
 import com.analyzer.api.entity.User;
 import com.analyzer.api.enums.RoleName;
+import com.analyzer.api.enums.SubscriptionTier;
 import com.analyzer.api.repository.RoleRepository;
 import com.analyzer.api.repository.SubscriptionPlanRepository;
 import com.analyzer.api.repository.UserRepository;
@@ -18,15 +19,12 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.util.Arrays;
 
-/**
- * Automatically cleans legacy database columns and seeds default roles,
- * default users, and subscription plans on startup.
- */
 @Component
 @RequiredArgsConstructor
 public class DataInitializer implements CommandLineRunner {
 
     private static final Logger logger = LoggerFactory.getLogger(DataInitializer.class);
+
     private final RoleRepository roleRepository;
     private final UserRepository userRepository;
     private final SubscriptionPlanRepository subscriptionPlanRepository;
@@ -34,8 +32,7 @@ public class DataInitializer implements CommandLineRunner {
     private final JdbcTemplate jdbcTemplate;
 
     @Override
-    public void run(String... args) throws Exception {
-        // 1. Clean legacy columns from previous schemas (if they exist)
+    public void run(String... args) {
         try {
             logger.info("Cleaning up legacy database columns...");
             jdbcTemplate.execute("ALTER TABLE users DROP COLUMN IF EXISTS role CASCADE");
@@ -46,23 +43,18 @@ public class DataInitializer implements CommandLineRunner {
             jdbcTemplate.execute("ALTER TABLE customer_plans DROP COLUMN IF EXISTS used_chat_messages CASCADE");
             jdbcTemplate.execute("ALTER TABLE customer_plans DROP COLUMN IF EXISTS used_expert_reviews CASCADE");
             logger.info("Legacy columns cleaned up successfully.");
-        } catch (Exception e) {
-            logger.warn("Failed to clean up legacy columns: {}", e.getMessage());
+        } catch (Exception ex) {
+            logger.warn("Failed to clean up legacy columns: {}", ex.getMessage());
         }
 
-        // 2. Seed Roles
         logger.info("Seeding default roles...");
         Arrays.stream(RoleName.values()).forEach(roleName -> {
             if (roleRepository.findByName(roleName).isEmpty()) {
-                Role role = Role.builder()
-                        .name(roleName)
-                        .build();
-                roleRepository.save(role);
+                roleRepository.save(Role.builder().name(roleName).build());
                 logger.info("Seeded role: {}", roleName);
             }
         });
 
-        // 3. Seed default users
         logger.info("Seeding default users...");
         Role adminRole = roleRepository.findByName(RoleName.ADMIN)
                 .orElseThrow(() -> new RuntimeException("ADMIN role not found in database"));
@@ -75,50 +67,20 @@ public class DataInitializer implements CommandLineRunner {
         seedUser("user", "user", "user@123", "pass@123", customerRole);
         seedUser("expert", "expert", "expert@123", "pass@123", expertRole);
 
-        // 4. Seed Subscription Plans
-        logger.info("Checking for default Subscription Plans...");
-        if (subscriptionPlanRepository.count() == 0) {
-            SubscriptionPlan freePlan = SubscriptionPlan.builder()
-                    .planName("Gói Miễn Phí")
-                    .planType("FREE")
-                    .description("Gói cơ bản trải nghiệm dịch vụ phân tích văn bản pháp lý")
-                    .price(BigDecimal.ZERO)
-                    .durationDays(30)
-                    .maxQuota(5)
-                    .active(true)
-                    .build();
-
-            SubscriptionPlan standardPlan = SubscriptionPlan.builder()
-                    .planName("Gói Tiêu Chuẩn")
-                    .planType("MONTHLY")
-                    .description("Gói tiêu chuẩn cho cá nhân, truy cập nhiều lượt phân tích và chat")
-                    .price(new BigDecimal("150000"))
-                    .durationDays(30)
-                    .maxQuota(50)
-                    .active(true)
-                    .build();
-
-            SubscriptionPlan premiumPlan = SubscriptionPlan.builder()
-                    .planName("Gói Cao Cấp")
-                    .planType("MONTHLY")
-                    .description("Gói cao cấp không giới hạn tính năng cho chuyên gia pháp lý")
-                    .price(new BigDecimal("499000"))
-                    .durationDays(30)
-                    .maxQuota(200)
-                    .active(true)
-                    .build();
-
-            subscriptionPlanRepository.saveAll(Arrays.asList(freePlan, standardPlan, premiumPlan));
-            logger.info("Seeded 3 default Subscription Plans: Gói Miễn Phí, Gói Tiêu Chuẩn, Gói Cao Cấp.");
-        } else {
-            logger.info("Subscription Plans already exist.");
-        }
+        logger.info("Seeding subscription plans...");
+        seedOrUpdatePlan("FREE", "Free Plan", SubscriptionTier.BASIC,
+                "Free plan for trial legal analysis usage.",
+                BigDecimal.ZERO, 30, 5, 50_000, 0, 1, 3, 1);
+        seedOrUpdatePlan("STANDARD", "Standard Plan", SubscriptionTier.PRO,
+                "Standard monthly plan for regular contract analysis and AI chat.",
+                new BigDecimal("79000"), 30, 50, 1_500_000, 0, 5, 15, 10);
+        seedOrUpdatePlan("PREMIUM", "Premium Plan", SubscriptionTier.PREMIUM,
+                "Premium monthly plan with higher AI limits and one expert review ticket.",
+                new BigDecimal("299000"), 30, 200, 8_500_000, 1, 20, 50, 40);
     }
 
     private void seedUser(String firstName, String lastName, String email, String rawPassword, Role role) {
-        User user = userRepository.findByEmail(email)
-                .orElseGet(User::new);
-
+        User user = userRepository.findByEmail(email).orElseGet(User::new);
         user.setFirstName(firstName);
         user.setLastName(lastName);
         user.setEmail(email);
@@ -126,8 +88,42 @@ public class DataInitializer implements CommandLineRunner {
         user.setAcceptedTerms(true);
         user.setRole(role);
         user.setActive(true);
-
         userRepository.save(user);
         logger.info("Seeded default user: {} / {}", email, rawPassword);
+    }
+
+    private void seedOrUpdatePlan(
+            String planType,
+            String planName,
+            SubscriptionTier tier,
+            String description,
+            BigDecimal price,
+            int durationDays,
+            int maxQuota,
+            int aiQuota,
+            int ticketQuota,
+            int maxWorkspaces,
+            int maxContractsPerWorkspace,
+            int maxDraftContracts) {
+        SubscriptionPlan plan = subscriptionPlanRepository.findByPlanTypeIgnoreCase(planType)
+                .orElseGet(SubscriptionPlan::new);
+
+        plan.setPlanType(planType);
+        plan.setPlanName(planName);
+        plan.setTier(tier);
+        plan.setDescription(description);
+        plan.setPrice(price);
+        plan.setDurationDays(durationDays);
+        plan.setMaxQuota(maxQuota);
+        plan.setAiQuota(aiQuota);
+        plan.setTicketQuota(ticketQuota);
+        plan.setMaxWorkspaces(maxWorkspaces);
+        plan.setMaxContractsPerWorkspace(maxContractsPerWorkspace);
+        plan.setMaxDraftContracts(maxDraftContracts);
+        plan.setFeatureLimitsJson(null);
+        plan.setActive(true);
+
+        subscriptionPlanRepository.save(plan);
+        logger.info("Seeded or updated subscription plan {}", planType);
     }
 }

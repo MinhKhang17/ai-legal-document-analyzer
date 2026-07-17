@@ -106,72 +106,63 @@ export interface AiRagQueryRequest {
   user_id: string;
   workspace_id: string;
   document_id?: string | null;
+  chat_session_id?: string | null;
+  chat_history?: string | null;
   question: string;
+  top_k_user_chunks?: number;
   top_k_checklist?: number;
   top_k_user_chunks_per_checklist?: number;
   top_k_knowledge_chunks?: number;
 }
 
-export interface AiRagChecklistResult {
-  checklist_id: string;
-  category: string;
-  title: string;
-  risk_question: string;
-  priority: number;
-  user_chunks_found: Array<Record<string, unknown>>;
+export interface AiRagCitation {
+  citationId: string;
+  sourceType: "USER_DOCUMENT" | "SYSTEM_KB";
+  score: number;
+  documentId?: string | null;
+  workspaceId?: string | null;
+  userId?: string | null;
+  fileName?: string | null;
+  knowledgeDocumentId?: string | null;
+  lawName?: string | null;
+  lawCode?: string | null;
+  legalDomain?: string | null;
+  pageNumber?: number | null;
+  articleNumber?: string | null;
+  clauseNumber?: string | null;
+  sectionTitle?: string | null;
 }
 
 export interface AiRagQueryResponse {
-  request_id: string;
-  success: boolean;
-  answer: string | null;
-  confidence_score: number | null;
-  should_suggest_ticket: boolean;
-  suggestion_type: string;
-  suggestion_reason: string | null;
-  missing_information: string | null;
-  checklist_results: AiRagChecklistResult[];
-  risk_level: string;
-  legal_domain: string | null;
-  user_action_hint: string;
-  knowledge_chunks: Array<Record<string, unknown>>;
-  total_checklist_items: number;
-  total_user_chunks: number;
-  total_knowledge_chunks: number;
-  processing_time_ms: number;
-  error_message: string | null;
+  requestId: string;
+  chatSessionId: string | null;
+  answer: string;
+  confidenceScore: number | null;
+  shouldSuggestTicket: boolean;
+  suggestionType: "NONE" | "ASK_MORE_INFO" | "SUGGEST_LAWYER" | "REQUIRE_LAWYER" | string;
+  suggestionReason: string | null;
+  missingInformation: string | null;
+  riskLevel: "LOW" | "MEDIUM" | "HIGH" | "NEED_EXPERT" | "UNKNOWN" | string;
+  legalDomain: string | null;
+  userActionHint: "CONTINUE_CHAT" | "PROVIDE_MORE_INFO" | "CREATE_TICKET" | string;
+  citations: AiRagCitation[];
+  retrievedUserChunks: number;
+  retrievedKnowledgeChunks: number;
 }
 
-export interface AiLegalQueryRequest {
-  request_id?: string | null;
-  user_id?: string | null;
-  workspace_id?: string | null;
-  document_id?: string | null;
+export interface AiRagPreviewChunk extends AiRagCitation {
+  chunkText: string;
+}
+
+export interface AiRagPreviewResponse {
+  requestId: string;
+  chatSessionId: string | null;
   question: string;
-  top_k_checklist?: number;
-  top_k_user_chunks_per_checklist?: number;
-  top_k_knowledge_chunks?: number;
-}
-
-export interface AiLegalQueryResponse {
-  request_id: string | null;
-  success: boolean | null;
-  answer: string | null;
-  confidence_score: number | null;
-  should_suggest_ticket: boolean | null;
-  suggestion_type: string | null;
-  suggestion_reason: string | null;
-  missing_information: string | null;
-  risk_level: string | null;
-  legal_domain: string | null;
-  user_action_hint: string | null;
-  usage?: {
-    prompt_tokens?: number | null;
-    completion_tokens?: number | null;
-    total_tokens?: number | null;
-  } | null;
-  model?: string | null;
-  error_message?: string | null;
+  legalSearchQuery: string;
+  userChunks: AiRagPreviewChunk[];
+  knowledgeChunks: AiRagPreviewChunk[];
+  retrievedUserChunks: number;
+  retrievedKnowledgeChunks: number;
 }
 
 export interface AiLegalBasis {

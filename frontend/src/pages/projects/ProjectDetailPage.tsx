@@ -11,8 +11,10 @@ import { StatusBadge } from "../../components/common/StatusBadge";
 import { getWorkspaceDetail, getWorkspaceDocuments } from "../../api/workspaceApi";
 import { useI18n } from "../../hooks/useI18n";
 import type { Document, Workspace } from "../../types/workspace";
+import { formatDisplayDateTime } from "../../utils/format";
 
-const getAccessToken = () => localStorage.getItem("accessToken") ?? "";
+import { getAccessToken as getSessionAccessToken } from "../../services/authSession";
+const getAccessToken = () => getSessionAccessToken() ?? "";
 
 export function ProjectDetailPage() {
   const { id = "" } = useParams();
@@ -54,7 +56,7 @@ export function ProjectDetailPage() {
     return () => {
       active = false;
     };
-  }, [id]);
+  }, [id, t]);
 
   const summary = useMemo(() => {
     const readyDocuments = documents.filter((document) => document.status === "ready").length;
@@ -69,16 +71,13 @@ export function ProjectDetailPage() {
   }, [documents]);
 
   const columns: DataTableColumn<Document>[] = [
-    { header: "File", cell: (document) => document.originalFileName },
+    { header: t("common.file"), cell: (document) => document.originalFileName },
     { header: t("documents.type"), cell: (document) => document.fileType },
     { header: t("table.status"), cell: (document) => <StatusBadge status={document.status} /> },
     {
       header: t("table.date"),
       cell: (document) =>
-        new Intl.DateTimeFormat(language === "vi" ? "vi-VN" : "en-US", {
-          dateStyle: "medium",
-          timeStyle: "short",
-        }).format(new Date(document.uploadedAt)),
+        formatDisplayDateTime(document.uploadedAt, "-", language === "vi" ? "vi-VN" : "en-US"),
     },
   ];
 
@@ -90,7 +89,7 @@ export function ProjectDetailPage() {
       <PageHeader
         title={workspace?.name ?? t("workspace.detailsTitle")}
         subtitle={workspace?.description ?? t("workspace.detailsSubtitle")}
-        eyebrow={workspace ? `${workspace.workspaceId} · ${workspace.status}` : "Workspace"}
+        eyebrow={workspace ? `${workspace.workspaceId} · ${workspace.status}` : t("workspace.title")}
         actions={
           <>
             <Link to={workspaceUploadUrl}>
@@ -218,11 +217,11 @@ export function ProjectDetailPage() {
             <Card title={t("workspace.info")} actions={<UsersRound className="h-5 w-5 text-primary dark:text-inverse-primary" />}>
               <div className="space-y-md">
                 <div>
-                  <p className="label-uppercase">Workspace ID</p>
+                  <p className="label-uppercase">{t("workspace.workspaceId")}</p>
                   <p className="mt-xs break-all text-sm">{workspace.workspaceId}</p>
                 </div>
                 <div>
-                  <p className="label-uppercase">Description</p>
+                  <p className="label-uppercase">{t("common.description")}</p>
                   <p className="mt-xs text-sm text-on-surface-variant dark:text-slate-400">
                     {workspace.description || t("workspace.noDescription")}
                   </p>
@@ -230,10 +229,7 @@ export function ProjectDetailPage() {
                 <div>
                   <p className="label-uppercase">{t("workspace.createdAt")}</p>
                   <p className="mt-xs text-sm">
-                    {new Intl.DateTimeFormat(language === "vi" ? "vi-VN" : "en-US", {
-                      dateStyle: "medium",
-                      timeStyle: "short",
-                    }).format(new Date(workspace.createdAt))}
+                    {formatDisplayDateTime(workspace.createdAt, "-", language === "vi" ? "vi-VN" : "en-US")}
                   </p>
                 </div>
                 <div>

@@ -1,0 +1,112 @@
+FLOW 02 - TẠO WORKSPACE VÀ UPLOAD TÀI LIỆU
+
+Mục tiêu:
+- Cho khách hàng tạo workspace, chọn workspace và upload tài liệu để backend dispatch sang AI service xử lý.
+
+Actor:
+- `CUSTOMER`
+
+Điểm bắt đầu:
+- Route `/upload`
+
+Điều kiện tiên quyết:
+- Người dùng đã đăng nhập role customer
+- Có `accessToken`
+
+Luồng chính:
+1. `UploadPage` load danh sách workspace bằng `getWorkspaces()`.
+2. FE loại bỏ workspace hệ thống có description `System workspace for general contract assistant chat`.
+3. Người dùng có thể tạo workspace mới bằng form `workspaceName`, `workspaceDescription`.
+4. FE gọi `createWorkspace()`, cập nhật list và set `workspaceId` vào query string.
+5. Khi đã chọn workspace, FE gọi `getWorkspaceDocuments()`.
+6. Người dùng upload file qua `FileUploadZone`.
+7. FE gọi `uploadDocument(accessToken, workspaceId, file)` với `FormData`.
+8. Backend trả document ở trạng thái accepted.
+9. FE thêm document vào list và điều hướng tới `/projects/:workspaceId`.
+10. Nếu có document `processing`, FE poll lại danh sách mỗi 3 giây.
+
+Sơ đồ text:
+- `UploadPage -> load workspaces -> create/select workspace -> upload file -> poll documents -> open project/chat`
+
+Màn hình / component:
+- `frontend/src/pages/upload/UploadPage.tsx`
+- `frontend/src/components/upload/FileUploadZone.tsx`
+- `frontend/src/components/upload/ProcessingTimeline.tsx`
+
+Dữ liệu / state:
+- `workspaces`
+- `selectedWorkspaceId`
+- `documents`
+- `uploading`, `creatingWorkspace`, `loadingWorkspaces`, `loadingDocuments`
+- `error`
+
+Validation:
+- Tên workspace không được trống
+- Chưa chọn workspace thì không upload
+- Validation file type/size cụ thể: `CHƯA XÁC ĐỊNH` từ mã đã đọc
+
+API / service tích hợp:
+- FE:
+- `frontend/src/services/workspace.service.ts`
+- `createWorkspace()`
+- `getWorkspaces()`
+- `getWorkspaceDocuments()`
+- `uploadDocument()`
+- BE:
+- `POST /api/v1/workspaces`
+- `GET /api/v1/workspaces`
+- `GET /api/v1/workspaces/{workspaceId}`
+- `GET /api/v1/workspaces/{workspaceId}/documents`
+- `POST /api/v1/workspaces/{workspaceId}/documents`
+- `GET /api/v1/workspaces/{workspaceId}/documents/{documentId}/download`
+
+UI states:
+- Chưa có workspace: dropdown rỗng
+- Đang upload: disable upload zone
+- Có document processing: hiện queue và poll
+- Có lỗi: hiện banner đỏ
+
+Edge cases:
+- Workspace query param không hợp lệ: FE tự fallback sang workspace đầu tiên
+- Upload xong document mới ở trạng thái `processing`, chưa thể chat ngay
+- Có endpoint alias backend `/api/workspaces`, nhưng FE phải bám env thực tế
+
+Business rules:
+- Backend `WorkspaceController.uploadDocument()` trả HTTP 202 Accepted
+- Backend gắn upload với user hiện tại và workspace hiện tại
+- Workspace hệ thống không được show cho upload flow customer
+
+Quyền:
+- `@PreAuthorize("hasRole('CUSTOMER')")`
+
+File nguồn tham chiếu:
+- FE:
+- `frontend/src/pages/upload/UploadPage.tsx`
+- `frontend/src/services/workspace.service.ts`
+- `frontend/src/api/workspaceApi.ts`
+- BE:
+- `backend/src/main/java/com/analyzer/api/controller/WorkspaceController.java`
+- `backend/src/main/java/com/analyzer/api/service/WorkspaceService.java`
+
+Điểm chưa rõ:
+- `CHƯA XÁC ĐỊNH`: backend lưu file vật lý ở đâu và giới hạn dung lượng bao nhiêu.
+- `CHƯA XÁC ĐỊNH`: có hỗ trợ multi-upload hay chỉ từng file một.
+
+Checklist FE:
+- Giữ query param `workspaceId` nhất quán.
+- Hiển thị trạng thái document theo backend (`UPLOADED/PROCESSING/READY/...`) sau khi normalize lowercase.
+- Nếu user muốn chat ngay, nên nhắc chỉ chat được khi có document `READY`.
+
+Tiêu chí hoàn thành:
+- Tạo workspace được.
+- Upload file được.
+- Danh sách document cập nhật và trạng thái processing được phản ánh trên UI.
+
+HIỆN TRẠNG:
+- Flow này có UI thật và backend thật, dùng được ngay ở mức cơ bản.
+
+SUY LUẬN:
+- Đây là entry point chính cho customer trước khi dùng chat hoặc ticket.
+
+ĐỀ XUẤT:
+- Nếu FE cần tối ưu UX, nên thêm progress, file validation rõ ràng và trạng thái `READY` nổi bật hơn.

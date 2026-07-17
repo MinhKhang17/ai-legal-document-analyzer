@@ -10,8 +10,10 @@ import { StatusBadge } from "../../components/common/StatusBadge";
 import { getWorkspaces } from "../../api/workspaceApi";
 import { useI18n } from "../../hooks/useI18n";
 import type { Workspace } from "../../types/workspace";
+import { formatDisplayDateTime } from "../../utils/format";
 
-const getAccessToken = () => localStorage.getItem("accessToken") ?? "";
+import { getAccessToken as getSessionAccessToken } from "../../services/authSession";
+const getAccessToken = () => getSessionAccessToken() ?? "";
 
 export function ProjectsPage() {
   const { t, language } = useI18n();
@@ -85,10 +87,7 @@ export function ProjectsPage() {
     {
       header: t("workspace.createdAt"),
       cell: (workspace) =>
-        new Intl.DateTimeFormat(language === "vi" ? "vi-VN" : "en-US", {
-          dateStyle: "medium",
-          timeStyle: "short",
-        }).format(new Date(workspace.createdAt)),
+        formatDisplayDateTime(workspace.createdAt, "-", language === "vi" ? "vi-VN" : "en-US"),
     },
   ];
 
@@ -141,7 +140,7 @@ export function ProjectsPage() {
                     : "text-on-surface-variant"
                 }`}
                 type="button"
-                aria-label="Grid view"
+                aria-label={t("projects.gridView")}
                 onClick={() => setView("grid")}
               >
                 <Grid2X2 className="h-4 w-4" />
@@ -153,7 +152,7 @@ export function ProjectsPage() {
                     : "text-on-surface-variant"
                 }`}
                 type="button"
-                aria-label="List view"
+                aria-label={t("projects.listView")}
                 onClick={() => setView("list")}
               >
                 <List className="h-4 w-4" />
@@ -208,10 +207,7 @@ export function ProjectsPage() {
               <div className="mt-lg rounded-lg bg-surface-container-low p-md dark:bg-slate-800">
                 <p className="label-uppercase">{t("workspace.createdAt")}</p>
                 <p className="mt-xs text-sm">
-                  {new Intl.DateTimeFormat(language === "vi" ? "vi-VN" : "en-US", {
-                    dateStyle: "medium",
-                    timeStyle: "short",
-                  }).format(new Date(workspace.createdAt))}
+                  {formatDisplayDateTime(workspace.createdAt, "-", language === "vi" ? "vi-VN" : "en-US")}
                 </p>
               </div>
               <div className="mt-lg flex flex-wrap gap-sm">

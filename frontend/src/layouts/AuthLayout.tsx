@@ -82,7 +82,7 @@ export function AuthLayout() {
               <div className="h-full max-h-[310px] min-h-[220px] w-full overflow-hidden rounded-lg border border-white/20 bg-[#071d2f] shadow-2xl">
                 <img
                   src="https://lh3.googleusercontent.com/aida-public/AB6AXuBnV7yVgFP_Jv-w1Mx2F1tVanluV7CuMqynzlMzzTpHHZH4vu5OZYUUbpP4NIqxEUEnadHufTbH7iruGOVyn6BUTvYwsviWW6exTVaXBTfnclN1xnngiR9fleBRcZmzW39yGJ2h6lCTO9_u4ag94K3owtyWn1sFKc4Ub6ChriHIDuLG3Tqb7Lz5qSG7tGyynncfb1CogRa3DHy4V6r6AOuxuhYBVi0NGX_JXpp6xpU2Cd0OQPYme_sGJU3G35f366S23n7ryNWaNwY"
-                  alt="Legal balance scale"
+                  alt={t('auth.workspaceIllustrationAlt')}
                   className="h-full w-full object-cover object-[center_45%]"
                 />
               </div>
