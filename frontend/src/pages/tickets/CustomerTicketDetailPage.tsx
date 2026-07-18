@@ -1,4 +1,4 @@
-import { ArrowLeft, Download, RefreshCw, Send } from "lucide-react";
+import { ArrowLeft, Download, Paperclip, RefreshCw, Send, Share2, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Badge } from "../../components/common/Badge";
@@ -14,7 +14,12 @@ import {
   getCustomerTicketFiles,
   downloadCustomerTicketFile,
   reopenLegalTicket,
-  replyToLegalTicket,
+  getTicketConversation,
+  sendTicketConversationMessage,
+  uploadTicketAttachment,
+  getAttachmentPolicy,
+  createTicketConversationShare,
+  downloadTicketAttachment,
 } from "../../services/legalTicket.service";
 import {
   getTicketAiAssessment,
@@ -24,7 +29,7 @@ import {
 import { useI18n } from "../../hooks/useI18n";
 import { useToast } from "../../hooks/useToast";
 import type { AiCitation, AiFeatureSummary, AiRiskAssessment } from "../../types/aiFeature";
-import type { AdminTicketFile, LegalTicket, LegalTicketMessage } from "../../types/legalTicket";
+import type { AdminTicketFile, AttachmentPolicy, LegalTicket, LegalTicketMessage } from "../../types/legalTicket";
 import { getLegalTicketStatusLabel } from "../../types/legalTicketStatus";
 import { formatDisplayDate } from "../../utils/format";
 import { ApiRequestError } from "../../services/http";
@@ -40,12 +45,15 @@ export function CustomerTicketDetailPage() {
   const [summary, setSummary] = useState<AiFeatureSummary | null>(null);
   const [citations, setCitations] = useState<AiCitation[]>([]);
   const [reply, setReply] = useState("");
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
+  const [attachmentPolicy, setAttachmentPolicy] = useState<AttachmentPolicy | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [auxiliaryError, setAuxiliaryError] = useState("");
   const locale = language === "vi" ? "vi-VN" : "en-US";
-  const canReply = Boolean(ticket?.status && ['ASSIGNED_TO_LAWYER', 'IN_REVIEW', 'NEED_MORE_INFO', 'CUSTOMER_RESPONDED', 'REOPENED'].includes(ticket.status));
+  const canReply = Boolean(ticket?.status && ['ASSIGNED', 'ASSIGNED_TO_LAWYER', 'IN_REVIEW', 'NEED_MORE_INFO', 'WAITING_FOR_USER', 'WAITING_FOR_EXPERT', 'CUSTOMER_RESPONDED', 'REOPENED'].includes(ticket.status));
   const reopenReference = ticket?.resolved_at ?? ticket?.closed_at;
   const canReopen = Boolean(ticket && (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') && reopenReference && new Date(reopenReference).getTime() + 7 * 24 * 60 * 60 * 1000 >= Date.now());
 
@@ -61,7 +69,7 @@ export function CustomerTicketDetailPage() {
 
       const [messagesResult, assessmentResult, summaryResult, citationsResult, filesResult] =
         await Promise.allSettled([
-          getLegalTicketMessages(id),
+          getTicketConversation(id).then((page) => page.items).catch(() => getLegalTicketMessages(id)),
           getTicketAiAssessment(id),
           getTicketAiSummary(id),
           getTicketAiCitations(id),
@@ -92,6 +100,7 @@ export function CustomerTicketDetailPage() {
 
   useEffect(() => {
     void loadTicket();
+    void getAttachmentPolicy().then(setAttachmentPolicy).catch(() => undefined);
     const intervalId = window.setInterval(() => void loadTicket(false), 4000);
     return () => window.clearInterval(intervalId);
   }, [loadTicket]);
@@ -102,6 +111,17 @@ export function CustomerTicketDetailPage() {
       const anchor = document.createElement('a'); anchor.href = objectUrl; anchor.download = file.originalFileName; anchor.click();
       window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
     } catch (downloadError) { toast.error(downloadError instanceof Error ? downloadError.message : 'Unable to download file.'); }
+  };
+
+  const openAttachment = async (attachmentId: string, fileName: string) => {
+    try {
+      const objectUrl = await downloadTicketAttachment(attachmentId);
+      const anchor = document.createElement("a");
+      anchor.href = objectUrl; anchor.download = fileName; anchor.click();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+    } catch (downloadError) {
+      toast.error(downloadError instanceof Error ? downloadError.message : "Không thể tải file đính kèm.");
+    }
   };
 
   const runAction = async (action: () => Promise<LegalTicket>, successMessage: string) => {
@@ -126,13 +146,48 @@ export function CustomerTicketDetailPage() {
 
   const handleReply = async () => {
     const message = reply.trim();
-    if (!id || !message) return;
+    if (!id || (!message && pendingFiles.length === 0)) return;
+    setSaving(true); setError("");
+    try {
+      const attachmentIds: string[] = [];
+      for (const file of pendingFiles) {
+        const uploaded = await uploadTicketAttachment(file, id, (progress) =>
+          setUploadProgress((current) => ({ ...current, [file.name]: progress })));
+        attachmentIds.push(uploaded.id);
+      }
+      await sendTicketConversationMessage(id, message, attachmentIds);
+      setReply(""); setPendingFiles([]); setUploadProgress({});
+      toast.success(t("legalTickets.detail.replySuccess"));
+      await loadTicket(false);
+    } catch (replyError) {
+      const messageText = replyError instanceof Error ? replyError.message : t("legalTickets.detail.actionError");
+      setError(messageText); toast.error(messageText);
+    } finally { setSaving(false); }
+  };
 
-    await runAction(
-      () => replyToLegalTicket(id, { message }),
-      t("legalTickets.detail.replySuccess"),
-    );
-    setReply("");
+  const selectAttachments = (list: FileList | null) => {
+    if (!list || !attachmentPolicy) return;
+    const selected = Array.from(list);
+    if (pendingFiles.length + selected.length > attachmentPolicy.maxAttachmentsPerMessage) {
+      setError(`Tối đa ${attachmentPolicy.maxAttachmentsPerMessage} tệp mỗi tin nhắn.`); return;
+    }
+    for (const file of selected) {
+      if (file.size > attachmentPolicy.maxAttachmentSizeKb * 1024) {
+        setError(`Tệp ${file.name} có dung lượng ${Math.ceil(file.size / 1024)} KB. Dung lượng tối đa là ${attachmentPolicy.maxAttachmentSizeKb} KB.`); return;
+      }
+      if (!attachmentPolicy.allowedMimeTypes.includes(file.type)) { setError(`Tệp ${file.name} không đúng loại được phép.`); return; }
+    }
+    setPendingFiles((current) => [...current, ...selected]); setError("");
+  };
+
+  const createShare = async () => {
+    if (!id) return;
+    try {
+      const expiresAt = new Date(Date.now() + 7 * 86400000).toISOString().replace("Z", "");
+      const share = await createTicketConversationShare(id, ticket?.conversationScope ?? "SELECTED_RESPONSE", expiresAt);
+      await navigator.clipboard.writeText(share.shareUrl);
+      toast.success("Đã tạo và sao chép link chia sẻ, hết hạn sau 7 ngày.");
+    } catch (shareError) { toast.error(shareError instanceof Error ? shareError.message : "Không thể tạo link chia sẻ."); }
   };
 
   return (
@@ -150,6 +205,7 @@ export function CustomerTicketDetailPage() {
             <Button variant="secondary" leftIcon={<RefreshCw className="h-4 w-4" />} onClick={() => void loadTicket()} disabled={loading}>
               {t("common.refresh")}
             </Button>
+            {ticket?.chat_session_id && <Button variant="secondary" leftIcon={<Share2 className="h-4 w-4" />} onClick={() => void createShare()}>Chia sẻ</Button>}
           </>
         }
       />
@@ -219,15 +275,16 @@ export function CustomerTicketDetailPage() {
                         <p className="text-xs text-on-surface-variant dark:text-slate-400">{formatDisplayDate(message.created_at, "-", locale)}</p>
                       </div>
                       <p className="mt-sm whitespace-pre-line">{message.content}</p>
+                      {message.attachments && message.attachments.length > 0 && <div className="mt-sm flex flex-wrap gap-xs">{message.attachments.map((attachment) => <button type="button" key={attachment.id} onClick={() => void openAttachment(attachment.id, attachment.originalFileName)} className="rounded-lg border border-legal-border px-sm py-xs text-xs font-semibold text-primary"><Paperclip className="mr-xs inline h-3 w-3" />{attachment.originalFileName}</button>)}</div>}
                     </article>
                   ))
                 )}
               </div>
-              {canReply && <div className="mt-md flex gap-sm">
+              {canReply && <div className="mt-md space-y-sm">
                 <textarea className="form-field min-h-24" value={reply} onChange={(event) => setReply(event.target.value)} placeholder={t("legalTickets.detail.replyPlaceholder")} />
-                <Button leftIcon={<Send className="h-4 w-4" />} onClick={() => void handleReply()} disabled={saving || !reply.trim()}>
-                  {t("legalTickets.detail.send")}
-                </Button>
+                {attachmentPolicy && <p className="text-xs text-on-surface-variant">Dung lượng tối đa {attachmentPolicy.maxAttachmentSizeKb} KB mỗi tệp. Tối đa {attachmentPolicy.maxAttachmentsPerMessage} tệp mỗi tin nhắn.</p>}
+                {pendingFiles.map((file) => <div key={`${file.name}-${file.lastModified}`} className="rounded-lg border border-legal-border p-sm text-sm"><div className="flex items-center gap-sm"><span className="min-w-0 flex-1 truncate">{file.name} · {Math.ceil(file.size / 1024)} KB</span><button type="button" disabled={saving} onClick={() => setPendingFiles((current) => current.filter((item) => item !== file))}><X className="h-4 w-4" /></button></div>{typeof uploadProgress[file.name] === "number" && <div className="mt-xs h-1.5 overflow-hidden rounded bg-slate-200"><div className="h-full bg-primary" style={{ width: `${uploadProgress[file.name]}%` }} /></div>}</div>)}
+                <div className="flex gap-sm"><label className="inline-flex cursor-pointer items-center gap-xs rounded-lg border border-legal-border px-md py-sm text-sm font-semibold"><Paperclip className="h-4 w-4" />Thêm file<input type="file" multiple className="hidden" accept=".jpg,.jpeg,.png,.webp,.pdf,.docx,.txt" onChange={(event) => selectAttachments(event.target.files)} /></label><Button leftIcon={<Send className="h-4 w-4" />} onClick={() => void handleReply()} disabled={saving || (!reply.trim() && pendingFiles.length === 0)}>{t("legalTickets.detail.send")}</Button></div>
               </div>}
             </Card>
 
@@ -252,6 +309,7 @@ export function CustomerTicketDetailPage() {
           </main>
 
           <aside className="space-y-gutter">
+            {ticket.contextSnapshot && <Card title="Context bất biến từ AI"><div className="space-y-md text-sm"><div><p className="label-uppercase">Câu hỏi</p><p className="mt-xs whitespace-pre-line">{ticket.contextSnapshot.userQuestion}</p></div><div><p className="label-uppercase">Câu trả lời AI</p><p className="mt-xs max-h-64 overflow-y-auto whitespace-pre-line text-on-surface-variant">{ticket.contextSnapshot.assistantAnswer || "—"}</p></div><div><p className="label-uppercase">Tài liệu được chia sẻ</p><pre className="mt-xs max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-surface-container-low p-sm text-xs">{ticket.contextSnapshot.documentSnapshotJson || "[]"}</pre></div><p className="break-all text-xs text-on-surface-variant">Hash: {ticket.contextSnapshot.contentHash}</p></div></Card>}
             <Card title={t("legalTickets.detail.actions")}>
               <div className="flex flex-col gap-sm">
                 {ticket.status === 'PENDING_ADMIN_REVIEW' && <Button variant="secondary" disabled={saving} onClick={() => void runAction(() => cancelLegalTicket(id, { reason: t("legalTickets.detail.cancelReason") }), t("legalTickets.detail.cancelSuccess"))}>

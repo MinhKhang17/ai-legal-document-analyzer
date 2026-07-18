@@ -1,5 +1,5 @@
-import { Bot, Check, ClipboardCheck, Download, FileText, Files, Info, MoreHorizontal, Paperclip, Pencil, Plus, RefreshCw, Send, Settings, Share2, Trash2, UserRound, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { ArrowDown, Bot, Check, ClipboardCheck, Download, FileText, Files, Info, MoreHorizontal, Paperclip, Pencil, Plus, RefreshCw, Send, Settings, Share2, Square, Trash2, UserRound, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Badge } from "../../components/common/Badge";
 import { Button } from "../../components/common/Button";
@@ -28,12 +28,14 @@ import { useI18n } from "../../hooks/useI18n";
 import { useToast } from "../../hooks/useToast";
 import { ChatMessageContent } from "../../components/chat/ChatMessageContent";
 import { ChatMessageFeedbackControls } from "../../components/chat/ChatMessageFeedbackControls";
+import { CreateTicketModal } from "../../components/tickets/CreateTicketModal";
+import type { CreateLegalTicketRequest } from "../../types/legalTicket";
 import type { ChatMessage, ChatSessionDocument } from "../../types/chat";
 import type { Document, Workspace } from "../../types/workspace";
 import type { WorkspaceChatMessage, WorkspaceChatSession } from "../../types/chat";
 import type { AiCitation } from "../../types/aiFeature";
-import { useRef } from "react";
 import { formatDisplayDateTime } from "../../utils/format";
+import { simulateStreaming } from "../../utils/simulateStreaming";
 
 import { getAccessToken as getSessionAccessToken } from "../../services/authSession";
 const getAccessToken = () => getSessionAccessToken() ?? "";
@@ -62,8 +64,8 @@ const toDisplayMessage = (
   status: message.status.toLowerCase() === "failed"
     ? "error"
     : message.status.toLowerCase() === "processing"
-      ? "done"
-      : "done",
+      ? "completed"
+      : "completed",
   errorMessage: message.errorMessage ?? undefined,
   requestId: message.requestId,
   confidenceScore: message.confidenceScore,
@@ -85,7 +87,7 @@ const createOptimisticUserMessage = (
   role: "user",
   content: message,
   timestamp: formatTimestamp(null, language, justNowLabel),
-  status: "done",
+  status: "completed",
 });
 
 type DisplayMessage = ChatMessage;
@@ -122,6 +124,7 @@ export function LegalChatPage() {
   const [sessionActionBusyId, setSessionActionBusyId] = useState("");
   const [creatingTicketMessageId, setCreatingTicketMessageId] = useState("");
   const [ticketNotices, setTicketNotices] = useState<Record<string, string>>({});
+  const [ticketDraft, setTicketDraft] = useState<{ assistant: DisplayMessage; user?: DisplayMessage } | null>(null);
   const [messageDetailOpen, setMessageDetailOpen] = useState(false);
   const [messageDetail, setMessageDetail] = useState<WorkspaceChatMessage | null>(null);
   const [messageDetailLoading, setMessageDetailLoading] = useState(false);
@@ -135,12 +138,24 @@ export function LegalChatPage() {
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [messageCitations, setMessageCitations] = useState<AiCitation[]>([]);
   const chatScrollContainerRef = useRef<HTMLDivElement>(null);
+  const chatInputRef = useRef<HTMLTextAreaElement>(null);
+  const activeRequestControllerRef = useRef<AbortController | null>(null);
+  const shouldAutoScrollRef = useRef(true);
+  const [showNewResponseButton, setShowNewResponseButton] = useState(false);
   const lastSubmissionRef = useRef<{
     workspaceId: string;
     sessionId: string;
     documentId?: string;
     message: string;
   } | null>(null);
+
+  const scrollChatToBottom = (behavior: ScrollBehavior = "smooth") => {
+    const container = chatScrollContainerRef.current;
+    if (!container) return;
+    container.scrollTo({ top: container.scrollHeight, behavior });
+    shouldAutoScrollRef.current = true;
+    setShowNewResponseButton(false);
+  };
 
   const selectedWorkspace = useMemo(
     () => workspaces.find((workspace) => workspace.workspaceId === selectedWorkspaceId),
@@ -324,14 +339,23 @@ export function LegalChatPage() {
     if (!container) return;
 
     const frame = window.requestAnimationFrame(() => {
-      container.scrollTo({
-        top: container.scrollHeight,
-        behavior: sending ? "smooth" : "auto",
-      });
+      if (shouldAutoScrollRef.current) {
+        container.scrollTo({ top: container.scrollHeight, behavior: sending ? "smooth" : "auto" });
+        setShowNewResponseButton(false);
+      } else if (sending) {
+        setShowNewResponseButton(true);
+      }
     });
 
     return () => window.cancelAnimationFrame(frame);
   }, [attachedDocuments.length, messages, selectedSessionId, sending]);
+
+  useEffect(() => {
+    shouldAutoScrollRef.current = true;
+    setShowNewResponseButton(false);
+  }, [selectedSessionId]);
+
+  useEffect(() => () => activeRequestControllerRef.current?.abort(), []);
 
   const handleCreateSession = async () => {
     if (!selectedWorkspaceId) {
@@ -458,65 +482,45 @@ export function LegalChatPage() {
     }
   };
 
-  const handleCreateTicket = async (assistantMessage: DisplayMessage, question: string) => {
-    const getCreateTicketErrorMessage = (err: unknown) => {
-      if (!(err instanceof Error)) {
-        return t("chat.ticketCreateError");
-      }
+  const getCreateTicketErrorMessage = (err: unknown) => {
+    if (!(err instanceof Error)) return t("chat.ticketCreateError");
+    const normalizedMessage = err.message.toUpperCase();
+    if (normalizedMessage.includes("AI_ANALYSIS_NOT_FOUND") || normalizedMessage.includes("ANALYSIS_NOT_FOUND")) {
+      return t("chat.ticketMissingAnalysis");
+    }
+    return err.message || t("chat.ticketCreateError");
+  };
 
-      const normalizedMessage = err.message.toUpperCase();
-
-      if (
-        normalizedMessage.includes("AI_ANALYSIS_NOT_FOUND") ||
-        normalizedMessage.includes("ANALYSIS_NOT_FOUND")
-      ) {
-        return t("chat.ticketMissingAnalysis");
-      }
-
-      return err.message || t("chat.ticketCreateError");
-    };
-
+  const handleCreateTicket = (assistantMessage: DisplayMessage, userMessage?: DisplayMessage) => {
     if (!selectedWorkspaceId) {
       setError(t("chat.ticketSelectWorkspace"));
       toast.warning(t("chat.ticketSelectWorkspace"), t("toast.warningTitle"));
       return;
     }
-
-    if (!assistantMessage.requestId?.trim()) {
+    if (assistantMessage.id.startsWith("local-")) {
       const message = t("chat.ticketMissingRequestId");
       setError(message);
       toast.warning(message, t("toast.warningTitle"));
       return;
     }
+    setTicketDraft({ assistant: assistantMessage, user: userMessage });
+  };
 
+  const submitTicket = async (request: CreateLegalTicketRequest) => {
+    if (!ticketDraft) return;
+    const assistantMessage = ticketDraft.assistant;
     setCreatingTicketMessageId(assistantMessage.id);
     setError("");
-
     try {
-      const ticket = await createLegalTicket({
-        ticket_type: "QUERY_ERROR",
-        chat_session_id: selectedSessionId || null,
-        chat_message_id: assistantMessage.id,
-        request_id: assistantMessage.requestId,
-        workspace_id: selectedWorkspaceId,
-        document_id: selectedDocumentId || null,
-        question: question.trim() || assistantMessage.content.slice(0, 500),
-        issue_fingerprint: assistantMessage.id,
-        customer_note:
-          question.trim() ||
-          assistantMessage.suggestionReason ||
-          assistantMessage.content.slice(0, 500),
-      });
-
-      setTicketNotices((previous) => ({
-        ...previous,
-        [assistantMessage.id]: `${t("chat.ticketCreated")} ${ticket.id}.`,
-      }));
+      const ticket = await createLegalTicket(request);
+      setTicketNotices((previous) => ({ ...previous, [assistantMessage.id]: `${t("chat.ticketCreated")} ${ticket.id}.` }));
       toast.success(`${t("chat.ticketCreated")} ${ticket.id}.`, t("toast.successTitle"));
+      setTicketDraft(null);
     } catch (err) {
       const message = getCreateTicketErrorMessage(err);
       setError(message);
       toast.error(message, t("toast.errorTitle"));
+      throw err;
     } finally {
       setCreatingTicketMessageId("");
     }
@@ -660,6 +664,8 @@ export function LegalChatPage() {
     sessionId?: string;
     documentId?: string;
   }) => {
+    if (sending || activeRequestControllerRef.current) return;
+
     const question = (override?.message ?? input).trim();
     const targetWorkspaceId = override?.workspaceId ?? selectedWorkspaceId;
     const targetSessionId = override?.sessionId ?? selectedSessionId;
@@ -675,14 +681,26 @@ export function LegalChatPage() {
 
     const optimisticUserMessage = createOptimisticUserMessage(question, language, t("common.justNow"));
     const assistantMessageId = `local-assistant-${Date.now()}`;
+    const controller = new AbortController();
+    activeRequestControllerRef.current = controller;
 
     setMessages((previous) => [
       ...previous,
       optimisticUserMessage,
+      {
+        id: assistantMessageId,
+        role: "assistant",
+        content: "",
+        timestamp: formatTimestamp(null, language, t("common.justNow")),
+        status: "thinking",
+        statusMessage: language === "vi" ? "Đang phân tích câu hỏi và nguồn tài liệu…" : "Analyzing your question and sources…",
+      },
     ]);
     setInput("");
     setSending(true);
     setError("");
+    shouldAutoScrollRef.current = true;
+    window.requestAnimationFrame(() => chatInputRef.current?.focus());
     lastSubmissionRef.current = {
       workspaceId: targetWorkspaceId,
       sessionId: targetSessionId ?? "",
@@ -695,6 +713,8 @@ export function LegalChatPage() {
         getAccessToken(),
         targetSessionId,
         question,
+        undefined,
+        controller.signal,
       );
 
       if (conversation?.chatSession) {
@@ -706,21 +726,57 @@ export function LegalChatPage() {
         ]);
       }
       if (conversation?.assistantMessage) {
-        setMessages((previous) => [
-          ...previous,
-          {
-            ...toDisplayMessage(conversation.assistantMessage, language, t("common.justNow")),
-            id: conversation.assistantMessage.messageId ?? assistantMessageId,
+        const completedMessage = toDisplayMessage(conversation.assistantMessage, language, t("common.justNow"));
+        setMessages((previous) => previous.map((item) => item.id === assistantMessageId
+          ? { ...completedMessage, id: assistantMessageId, content: "", status: "streaming", statusMessage: undefined }
+          : item));
+
+        await simulateStreaming(
+          completedMessage.content,
+          (visibleText) => {
+            setMessages((previous) => previous.map((item) => item.id === assistantMessageId
+              ? { ...item, content: visibleText, status: "streaming" }
+              : item));
           },
-        ]);
+          controller.signal,
+        );
+
+        setMessages((previous) => previous.map((item) => item.id === assistantMessageId
+          ? {
+              ...completedMessage,
+              id: conversation.assistantMessage.messageId ?? assistantMessageId,
+              status: "completed",
+            }
+          : item));
       }
     } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        setMessages((previous) => previous.map((item) => item.id === assistantMessageId
+          ? {
+              ...item,
+              status: "cancelled",
+              statusMessage: language === "vi" ? "Đã dừng trả lời." : "Response stopped.",
+            }
+          : item));
+        return;
+      }
       const message = err instanceof Error ? err.message : t("chat.messageSendError");
       setError(message);
+      setMessages((previous) => previous.map((item) => item.id === assistantMessageId
+        ? { ...item, status: "error", errorMessage: message }
+        : item));
       toast.error(message, t("toast.errorTitle"));
     } finally {
+      if (activeRequestControllerRef.current === controller) {
+        activeRequestControllerRef.current = null;
+      }
       setSending(false);
+      window.requestAnimationFrame(() => chatInputRef.current?.focus());
     }
+  };
+
+  const handleStopResponse = () => {
+    activeRequestControllerRef.current?.abort();
   };
 
   return (
@@ -1014,7 +1070,7 @@ export function LegalChatPage() {
 
         <section className="order-1 min-w-0 space-y-gutter">
           <Card
-            className="flex min-h-[680px] flex-col overflow-hidden border-legal-border p-0 xl:h-[calc(100vh-3rem)] xl:max-h-[900px]"
+            className="relative flex min-h-[680px] flex-col overflow-hidden border-legal-border p-0 xl:h-[calc(100vh-3rem)] xl:max-h-[900px]"
           >
             <div className="border-b border-legal-border bg-white p-md dark:border-slate-700 dark:bg-slate-900">
               <div className="mb-sm flex items-center justify-between gap-md">
@@ -1033,7 +1089,16 @@ export function LegalChatPage() {
               </div>
               <div className="mt-sm flex items-center gap-sm rounded-lg bg-blue-50 px-md py-sm text-xs font-medium text-blue-700 dark:bg-blue-950/30 dark:text-blue-200"><Bot className="h-4 w-4 shrink-0" /><span className="min-w-0 flex-1">{attachedDocuments.length > 0 ? (language === "vi" ? `AI đang trả lời dựa trên ${attachedDocuments.length} tài liệu đã chọn và kiến thức pháp luật được cập nhật.` : `AI is answering from ${attachedDocuments.length} selected document(s) and the published legal knowledge base.`) : (language === "vi" ? "AI đang trả lời bằng kho tri thức pháp luật do admin công khai." : "AI is answering from the admin-published legal knowledge base.")}</span><button type="button" className="shrink-0 font-semibold hover:underline" onClick={() => setActiveDrawer("documents")}>{language === "vi" ? "Xem nguồn" : "View sources"}</button></div>
             </div>
-            <div ref={chatScrollContainerRef} className="min-h-0 flex-1 space-y-md overflow-y-auto bg-surface-container-low/60 p-lg dark:bg-slate-950/40">
+            <div
+              ref={chatScrollContainerRef}
+              onScroll={(event) => {
+                const container = event.currentTarget;
+                const nearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 120;
+                shouldAutoScrollRef.current = nearBottom;
+                if (nearBottom) setShowNewResponseButton(false);
+              }}
+              className="min-h-0 flex-1 space-y-md overflow-y-auto bg-surface-container-low/60 p-lg dark:bg-slate-950/40"
+            >
                 {messages.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-outline-variant p-lg text-sm text-on-surface-variant dark:border-slate-700 dark:text-slate-400">
                     {selectedWorkspaceId
@@ -1044,22 +1109,15 @@ export function LegalChatPage() {
                   messages.map((message, messageIndex) => {
                     const assistant = message.role === "assistant";
                     const isError = message.status === "error";
+                    const isThinking = message.status === "queued" || message.status === "thinking";
+                    const isCompleted = message.status === "completed";
                     const previousUserMessage = assistant
                       ? [...messages]
                           .slice(0, messageIndex)
                           .reverse()
                           .find((item) => item.role === "user")
                       : undefined;
-                    const shouldShowTicketAction =
-                      assistant &&
-                      !isError &&
-                      Boolean(
-                        message.shouldSuggestTicket ||
-                          message.userActionHint ||
-                          message.suggestionType ||
-                          message.riskLevel ||
-                          typeof message.confidenceScore === "number",
-                      );
+                    const shouldShowTicketAction = assistant && isCompleted && !message.id.startsWith("local-");
                     return (
                     <article
                       key={message.id}
@@ -1077,7 +1135,14 @@ export function LegalChatPage() {
                               : "border-blue-100 bg-blue-50 text-on-surface dark:border-blue-900 dark:bg-blue-950/40 dark:text-slate-100"
                           }`}
                         >
-                        {assistant && isError ? (
+                        {assistant && isThinking ? (
+                          <div className="flex items-center gap-sm" role="status" aria-live="polite">
+                            <span>{message.statusMessage ?? (language === "vi" ? "Đang suy nghĩ" : "Thinking")}</span>
+                            <span className="flex gap-1" aria-hidden="true">
+                              {[0, 1, 2].map((index) => <span key={index} className="h-1.5 w-1.5 rounded-full bg-primary motion-safe:animate-pulse" style={{ animationDelay: `${index * 160}ms` }} />)}
+                            </span>
+                          </div>
+                        ) : assistant && isError ? (
                           <div className="space-y-sm">
                             <p className="font-medium text-error">{t("chat.responseFailed")}</p>
                             <p className="text-sm text-on-surface-variant dark:text-slate-400">
@@ -1106,7 +1171,9 @@ export function LegalChatPage() {
                               content={message.content}
                               className={assistant ? "text-on-surface dark:text-slate-100" : "text-white"}
                             />
-                            {assistant && !isError && !message.id.startsWith('local-') && <ChatMessageFeedbackControls messageId={message.id} language={language} />}
+                            {message.status === "streaming" && <span className="ml-1 inline-block h-4 w-0.5 bg-primary motion-safe:animate-pulse" aria-hidden="true" />}
+                            {message.status === "cancelled" && <p className="mt-sm text-xs font-medium text-on-surface-variant">{message.statusMessage ?? (language === "vi" ? "Đã dừng trả lời." : "Response stopped.")}</p>}
+                            {assistant && isCompleted && !message.id.startsWith('local-') && <ChatMessageFeedbackControls messageId={message.id} language={language} />}
                             {shouldShowTicketAction && (
                               <div className="mt-md rounded-lg border border-legal-border bg-surface-container-low p-sm dark:border-slate-700 dark:bg-slate-800">
                                 <div className="flex flex-wrap gap-xs">
@@ -1134,12 +1201,7 @@ export function LegalChatPage() {
                                     variant="secondary"
                                     size="sm"
                                     leftIcon={<ClipboardCheck className="h-4 w-4" />}
-                                    onClick={() =>
-                                      void handleCreateTicket(
-                                        message,
-                                        previousUserMessage?.content ?? "",
-                                      )
-                                    }
+                                    onClick={() => handleCreateTicket(message, previousUserMessage)}
                                     disabled={creatingTicketMessageId === message.id}
                                   >
                                     {creatingTicketMessageId === message.id
@@ -1157,7 +1219,7 @@ export function LegalChatPage() {
                           </>
                         )}
                         <div className="mt-sm flex items-center justify-end gap-sm text-[11px] opacity-70">
-                          {!message.id.startsWith("local-") && (
+                          {isCompleted && !message.id.startsWith("local-") && (
                             <button
                               type="button"
                               className="font-semibold text-primary hover:underline dark:text-inverse-primary"
@@ -1175,6 +1237,17 @@ export function LegalChatPage() {
               )}
             </div>
 
+            {showNewResponseButton && (
+              <button
+                type="button"
+                onClick={() => scrollChatToBottom()}
+                className="absolute bottom-36 left-1/2 z-10 flex -translate-x-1/2 items-center gap-xs rounded-full border border-primary/30 bg-white px-md py-sm text-xs font-semibold text-primary shadow-lg hover:bg-primary/5 dark:bg-slate-900"
+              >
+                <ArrowDown className="h-4 w-4" />
+                {language === "vi" ? "Xem câu trả lời mới" : "View new response"}
+              </button>
+            )}
+
             <form
               className="border-t border-legal-border bg-white p-md dark:border-slate-700 dark:bg-slate-900"
               onSubmit={(event) => {
@@ -1188,6 +1261,7 @@ export function LegalChatPage() {
               <div className="rounded-xl border border-legal-border bg-white p-sm shadow-sm dark:border-slate-700 dark:bg-slate-950">
                 <div className="flex gap-sm">
                 <textarea
+                  ref={chatInputRef}
                   id="legal-chat-input"
                   rows={1}
                   className="max-h-32 min-h-12 min-w-0 flex-1 resize-none border-0 bg-transparent px-sm py-md outline-none placeholder:text-on-surface-variant"
@@ -1200,16 +1274,29 @@ export function LegalChatPage() {
                     }
                   }}
                   placeholder={t("chat.inputPlaceholder")}
-                  disabled={!selectedWorkspaceId || sending}
+                  disabled={!selectedWorkspaceId}
                 />
-                <Button
-                  type="submit"
-                  size="icon"
-                  aria-label={t("actions.ask")}
-                  disabled={!input.trim() || !selectedWorkspaceId || sending}
-                >
-                  <Send className="h-5 w-5" />
-                </Button>
+                {sending ? (
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="danger"
+                    aria-label={language === "vi" ? "Dừng trả lời" : "Stop response"}
+                    title={language === "vi" ? "Dừng trả lời" : "Stop response"}
+                    onClick={handleStopResponse}
+                  >
+                    <Square className="h-4 w-4 fill-current" />
+                  </Button>
+                ) : (
+                  <Button
+                    type="submit"
+                    size="icon"
+                    aria-label={t("actions.ask")}
+                    disabled={!input.trim() || !selectedWorkspaceId}
+                  >
+                    <Send className="h-5 w-5" />
+                  </Button>
+                )}
                 </div>
                 <div className="mt-sm flex flex-wrap gap-xs border-t border-legal-border pt-sm dark:border-slate-800">
                   <Button type="button" size="sm" variant="ghost" leftIcon={<Paperclip className="h-4 w-4" />} onClick={() => void handleOpenDocumentModal()}>{language === "vi" ? "Thêm tài liệu" : "Add document"}</Button>
@@ -1229,6 +1316,23 @@ export function LegalChatPage() {
           </nav>
         </aside>
       </div>
+
+      {ticketDraft && <CreateTicketModal
+        open
+        workspaceId={selectedWorkspaceId}
+        sessionId={selectedSessionId}
+        userMessageId={ticketDraft.user?.id}
+        assistantMessageId={ticketDraft.assistant.id}
+        requestId={ticketDraft.assistant.requestId ?? undefined}
+        question={ticketDraft.user?.content ?? ticketDraft.assistant.suggestionReason ?? "Cần hỗ trợ xác minh câu trả lời AI"}
+        answer={ticketDraft.assistant.content}
+        documents={attachedDocuments.map((document) => ({ id: document.documentId, name: document.originalFileName }))}
+        focusedDocumentId={selectedDocumentId || undefined}
+        citationIds={Array.from(ticketDraft.assistant.content.matchAll(/\[((?:KB|USER)-\d+)]/gi), (match) => match[1].toUpperCase())}
+        submitting={creatingTicketMessageId === ticketDraft.assistant.id}
+        onClose={() => setTicketDraft(null)}
+        onSubmit={submitTicket}
+      />}
 
       <Modal
         open={documentModalOpen}

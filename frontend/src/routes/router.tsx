@@ -44,6 +44,7 @@ import { LawyerTicketsPage } from "../pages/lawyer/LawyerTicketsPage";
 import { LawyerTicketDetailPage } from "../pages/lawyer/LawyerTicketDetailPage";
 import { CreateCustomerTicketPage } from "../pages/tickets/CreateCustomerTicketPage";
 import { SharedChatPage } from "../pages/chat/SharedChatPage";
+import { SharedTicketConversationPage } from "../pages/tickets/SharedTicketConversationPage";
 
 const RiskReviewPage = lazy(() => import("../pages/editor/RiskReviewPage").then((module) => ({ default: module.RiskReviewPage })));
 const ContractAssistantPage = lazy(() => import("../pages/chat/ContractAssistantPage").then((module) => ({ default: module.ContractAssistantPage })));
@@ -332,6 +333,7 @@ export const router = createBrowserRouter([
         ),
       },
       { path: "/shared/chat/:shareToken", element: <AdminOrExpertRoute><SharedChatPage /></AdminOrExpertRoute> },
+      { path: "/shared-conversation/:token", element: <SharedTicketConversationPage /> },
     ],
   },
   {

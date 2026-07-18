@@ -1,6 +1,9 @@
 package com.analyzer.api.dto.legalticket;
 
 import com.analyzer.api.enums.LegalTicketType;
+import com.analyzer.api.enums.ConversationScope;
+import com.analyzer.api.enums.TicketPriority;
+import com.analyzer.api.enums.TicketRecipientType;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
@@ -16,6 +19,33 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Schema(description = "Request to create a legal ticket")
 public class CreateLegalTicketRequest {
+
+    @Size(max = 255)
+    private String title;
+
+    @Size(max = 5000)
+    private String description;
+
+    private TicketRecipientType recipientType;
+
+    private TicketPriority priority;
+
+    private ConversationScope conversationScope;
+
+    private String userMessageId;
+
+    private String assistantMessageId;
+
+    private String focusedDocumentId;
+
+    @Builder.Default
+    private java.util.List<String> documentIds = java.util.List.of();
+
+    @Builder.Default
+    private java.util.List<String> citationIds = java.util.List.of();
+
+    @Builder.Default
+    private java.util.List<String> attachmentIds = java.util.List.of();
 
     @JsonProperty("ticket_type")
     private LegalTicketType ticketType;

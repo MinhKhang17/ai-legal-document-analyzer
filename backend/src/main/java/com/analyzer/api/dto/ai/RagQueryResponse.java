@@ -67,6 +67,39 @@ public class RagQueryResponse {
     @JsonProperty("error_message")
     private String errorMessage;
 
+    @JsonProperty("conversation_memory_update")
+    @JsonAlias("conversationMemoryUpdate")
+    private ConversationMemoryUpdate conversationMemoryUpdate;
+
+    @JsonProperty("token_usage_breakdown")
+    @JsonAlias("tokenUsageBreakdown")
+    private TokenUsageBreakdown tokenUsageBreakdown;
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class ConversationMemoryUpdate {
+        private String summaryJson;
+        private String summarizedThroughMessageId;
+        private Boolean updated;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class TokenUsageBreakdown {
+        private Integer systemPrompt;
+        private Integer conversationSummary;
+        private Integer recentHistory;
+        private Integer relevantHistory;
+        private Integer userDocumentContext;
+        private Integer legalKbContext;
+        private Integer output;
+    }
+
     @Data
     @Builder
     @NoArgsConstructor

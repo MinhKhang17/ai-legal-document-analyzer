@@ -3,7 +3,8 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
-  status?: 'thinking' | 'streaming' | 'done' | 'error';
+  status?: 'queued' | 'thinking' | 'streaming' | 'completed' | 'error' | 'cancelled';
+  statusMessage?: string;
   errorMessage?: string;
   citations?: string[];
   requestId?: string | null;

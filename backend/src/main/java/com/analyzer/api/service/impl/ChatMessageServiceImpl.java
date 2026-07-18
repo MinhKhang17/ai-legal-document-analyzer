@@ -39,6 +39,9 @@ import com.analyzer.api.repository.WorkspaceRepository;
 import com.analyzer.api.repository.ai.AiCitationRepository;
 import com.analyzer.api.service.ChatMessageService;
 import com.analyzer.api.service.SubscriptionQuotaService;
+import com.analyzer.api.service.conversation.ConversationHistoryAssembler;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,6 +54,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -71,6 +75,8 @@ public class ChatMessageServiceImpl implements ChatMessageService {
     private final AiCitationRepository aiCitationRepository;
     private final ChatMessageFeedbackRepository chatMessageFeedbackRepository;
     private final ChatSessionDocumentRepository chatSessionDocumentRepository;
+    private final ConversationHistoryAssembler conversationHistoryAssembler;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
     @Transactional(noRollbackFor = {AiServiceUnavailableException.class, AiServiceTimeoutException.class})
@@ -108,7 +114,7 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         ChatMessage userMessage = createAndSaveUserMessage(chatSession, request.getMessage().trim());
 
         // Process AI Query
-        return executeAiQuery(currentUser, workspace, chatSession, userMessage, request.getMessage().trim(), selectedDocument);
+        return executeAiQuery(currentUser, workspace, chatSession, userMessage, request.getMessage().trim(), selectedDocument, request);
     }
 
     @Override
@@ -148,7 +154,7 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         ChatMessage userMessage = createAndSaveUserMessage(chatSession, request.getMessage().trim());
 
         // Process AI Query
-        return executeAiQuery(currentUser, workspace, chatSession, userMessage, request.getMessage().trim(), selectedDocument);
+        return executeAiQuery(currentUser, workspace, chatSession, userMessage, request.getMessage().trim(), selectedDocument, request);
     }
 
     @Override
@@ -370,7 +376,8 @@ public class ChatMessageServiceImpl implements ChatMessageService {
             ChatSession chatSession,
             ChatMessage userMessage,
             String question,
-            Document selectedDocument) {
+            Document selectedDocument,
+            SendMessageRequest sendRequest) {
         String requestId = "req_" + UUID.randomUUID().toString().replace("-", "");
         userMessage.setRequestId(requestId);
 
@@ -383,18 +390,8 @@ public class ChatMessageServiceImpl implements ChatMessageService {
             chatSession.setTitle(title);
         }
 
-        // Build chat history string
-        List<ChatMessage> historyMessages = chatMessageRepository.findByChatSessionIdAndStatusOrderByCreatedAtAsc(
-                chatSession.getId(),
-                ChatMessageStatus.COMPLETED
-        );
-        StringBuilder historyBuilder = new StringBuilder();
-        for (ChatMessage msg : historyMessages) {
-            historyBuilder.append(msg.getRole().name()).append(": ").append(msg.getContent()).append("\n\n");
-        }
-        String chatHistoryStr = historyBuilder.toString().trim();
-
         RagQueryResponse aiResponse;
+        String assistantMessageId = "msg_" + UUID.randomUUID().toString().replace("-", "");
         try {
             var activeMappings = chatSessionDocumentRepository
                     .findByChatSessionIdAndUserIdAndActiveTrueOrderByAttachedAtAsc(chatSession.getId(), currentUser.getId());
@@ -409,6 +406,19 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                         "Attached documents are still processing",
                         workspace.getId(), 0, activeMappings.size());
             }
+            List<String> messageAttachedDocumentIds = resolveMessageAttachedDocumentIds(
+                    currentUser.getId(), workspace.getId(), sendRequest.getMessageAttachedDocumentIds());
+            String focusedDocumentId = resolveFocusedDocumentId(
+                    currentUser.getId(), workspace.getId(), sendRequest.getFocusedDocumentId(), selectedDocument);
+            updateSessionConversationState(
+                    chatSession,
+                    attachedDocumentIds,
+                    focusedDocumentId,
+                    messageAttachedDocumentIds,
+                    sendRequest.getUserRole(),
+                    sendRequest.getConversationMode());
+            ConversationHistoryAssembler.MemoryWindow memoryWindow = conversationHistoryAssembler.build(
+                    chatSession, attachedDocumentIds);
             RagQueryRequest aiRequest = RagQueryRequest.builder()
                     .requestId(requestId)
                     .userId(String.valueOf(workspace.getUser().getId()))
@@ -420,7 +430,16 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                             : attachedDocumentIds)
                     .chatSessionId(chatSession.getId())
                     .question(question)
-                    .chatHistory(chatHistoryStr.isEmpty() ? null : chatHistoryStr)
+                    .chatHistory(null)
+                    .conversationSummaryJson(chatSession.getConversationSummaryJson())
+                    .recentHistory(memoryWindow.recentHistory())
+                    .evictedMessages(memoryWindow.evictedMessages())
+                    .currentUserMessageId(userMessage.getId())
+                    .currentAssistantMessageId(assistantMessageId)
+                    .focusedDocumentId(focusedDocumentId)
+                    .messageAttachedDocumentIds(messageAttachedDocumentIds)
+                    .conversationUserRole(chatSession.getConversationUserRole())
+                    .conversationMode(chatSession.getConversationMode())
                     .topKUserChunks(5)
                     .topKKnowledgeChunks(5)
                     .build();
@@ -437,7 +456,6 @@ public class ChatMessageServiceImpl implements ChatMessageService {
             chatMessageRepository.save(userMessage);
 
             // Persist failed assistant message
-            String assistantMessageId = "msg_" + UUID.randomUUID().toString().replace("-", "");
             ChatMessage assistantMessage = ChatMessage.builder()
                     .id(assistantMessageId)
                     .chatSession(chatSession)
@@ -463,7 +481,6 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         chatMessageRepository.save(userMessage);
 
         // Create successful assistant message
-        String assistantMessageId = "msg_" + UUID.randomUUID().toString().replace("-", "");
         ChatMessage.ChatMessageBuilder assistantBuilder = ChatMessage.builder()
                 .id(assistantMessageId)
                 .chatSession(chatSession)
@@ -493,6 +510,7 @@ public class ChatMessageServiceImpl implements ChatMessageService {
 
         ChatMessage assistantMessage = assistantBuilder.build();
         chatMessageRepository.save(assistantMessage);
+        applyConversationMemoryUpdate(chatSession, aiResponse.getConversationMemoryUpdate());
         saveCitations(aiResponse.getCitations(), assistantMessage);
         subscriptionQuotaService.recordAiChatUsage(
                 currentUser,
@@ -594,6 +612,58 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                 })
                 .toList();
         aiCitationRepository.saveAll(entities);
+    }
+
+    private List<String> resolveMessageAttachedDocumentIds(
+            Long userId, String workspaceId, List<String> requestedDocumentIds) {
+        if (requestedDocumentIds == null || requestedDocumentIds.isEmpty()) return List.of();
+        List<String> validated = new ArrayList<>();
+        for (String documentId : requestedDocumentIds) {
+            if (documentId == null || documentId.isBlank() || validated.contains(documentId.trim())) continue;
+            validated.add(resolveSelectedDocument(userId, workspaceId, documentId).getId());
+        }
+        return List.copyOf(validated);
+    }
+
+    private String resolveFocusedDocumentId(
+            Long userId, String workspaceId, String requestedFocusedDocumentId, Document selectedDocument) {
+        if (requestedFocusedDocumentId != null && !requestedFocusedDocumentId.isBlank()) {
+            return resolveSelectedDocument(userId, workspaceId, requestedFocusedDocumentId).getId();
+        }
+        return selectedDocument == null ? null : selectedDocument.getId();
+    }
+
+    private void updateSessionConversationState(
+            ChatSession session,
+            List<String> activeDocumentIds,
+            String focusedDocumentId,
+            List<String> messageAttachedDocumentIds,
+            String userRole,
+            String conversationMode) {
+        try {
+            session.setActiveDocumentIdsJson(objectMapper.writeValueAsString(activeDocumentIds));
+            session.setMessageAttachedDocumentIdsJson(objectMapper.writeValueAsString(messageAttachedDocumentIds));
+        } catch (JsonProcessingException exception) {
+            logger.warn("Unable to serialize conversation document state for session {}", session.getId());
+        }
+        session.setFocusedDocumentId(focusedDocumentId);
+        if (userRole != null && !userRole.isBlank()) session.setConversationUserRole(userRole.trim());
+        if (conversationMode != null && !conversationMode.isBlank()) session.setConversationMode(conversationMode.trim());
+        session.setMemoryUpdatedAt(LocalDateTime.now());
+    }
+
+    private void applyConversationMemoryUpdate(
+            ChatSession session, RagQueryResponse.ConversationMemoryUpdate memoryUpdate) {
+        if (memoryUpdate == null || !Boolean.TRUE.equals(memoryUpdate.getUpdated())
+                || memoryUpdate.getSummaryJson() == null || memoryUpdate.getSummaryJson().isBlank()) {
+            return;
+        }
+        session.setConversationSummaryJson(memoryUpdate.getSummaryJson());
+        session.setSummary(memoryUpdate.getSummaryJson());
+        session.setMemoryJson(memoryUpdate.getSummaryJson());
+        session.setSummaryThroughMessageId(memoryUpdate.getSummarizedThroughMessageId());
+        session.setSummaryUpdatedAt(LocalDateTime.now());
+        session.setMemoryUpdatedAt(LocalDateTime.now());
     }
 
     private String firstNonBlank(String... values) {

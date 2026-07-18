@@ -5,6 +5,9 @@ import com.analyzer.api.enums.LegalTicketType;
 import com.analyzer.api.enums.RiskLevel;
 import com.analyzer.api.enums.SuggestionType;
 import com.analyzer.api.enums.UserActionHint;
+import com.analyzer.api.enums.ConversationScope;
+import com.analyzer.api.enums.TicketPriority;
+import com.analyzer.api.enums.TicketRecipientType;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -31,6 +34,9 @@ public class LegalTicket {
     @Id
     private String id;
 
+    @Column(name = "ticket_code", unique = true)
+    private String ticketCode;
+
     @Column(name = "request_id", nullable = false)
     private String requestId;
 
@@ -49,6 +55,36 @@ public class LegalTicket {
 
     @Column(name = "related_chat_message_id")
     private String relatedChatMessageId;
+
+    @Column(name = "source_user_message_id")
+    private String sourceUserMessageId;
+
+    @Column(name = "source_assistant_message_id")
+    private String sourceAssistantMessageId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "recipient_type")
+    private TicketRecipientType recipientType;
+
+    @Column(name = "title")
+    private String title;
+
+    @Column(name = "description", columnDefinition = "TEXT")
+    private String description;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "priority")
+    private TicketPriority priority;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "conversation_scope")
+    private ConversationScope conversationScope;
+
+    @Column(name = "shared_document_ids_json", columnDefinition = "TEXT")
+    private String sharedDocumentIdsJson;
+
+    @Column(name = "focused_document_id")
+    private String focusedDocumentId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by_id", nullable = false)
@@ -184,6 +220,12 @@ public class LegalTicket {
         if (this.id == null || this.id.isBlank()) {
             this.id = "ticket_" + UUID.randomUUID().toString().replace("-", "");
         }
+        if (this.ticketCode == null || this.ticketCode.isBlank()) {
+            this.ticketCode = "TKT-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        }
+        if (this.priority == null) this.priority = TicketPriority.NORMAL;
+        if (this.recipientType == null) this.recipientType = TicketRecipientType.EXPERT;
+        if (this.conversationScope == null) this.conversationScope = ConversationScope.SELECTED_RESPONSE;
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
         this.deleted = false;

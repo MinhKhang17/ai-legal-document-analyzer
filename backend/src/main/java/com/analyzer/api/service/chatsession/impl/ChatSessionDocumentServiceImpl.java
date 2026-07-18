@@ -10,6 +10,8 @@ import com.analyzer.api.repository.ChatSessionDocumentRepository;
 import com.analyzer.api.repository.ChatSessionRepository;
 import com.analyzer.api.repository.DocumentRepository;
 import com.analyzer.api.service.chatsession.ChatSessionDocumentService;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +24,7 @@ public class ChatSessionDocumentServiceImpl implements ChatSessionDocumentServic
     private final ChatSessionRepository chatSessionRepository;
     private final DocumentRepository documentRepository;
     private final ChatSessionDocumentRepository mappingRepository;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
     @Transactional(readOnly = true)
@@ -49,7 +52,9 @@ public class ChatSessionDocumentServiceImpl implements ChatSessionDocumentServic
                 .orElseGet(() -> ChatSessionDocument.builder()
                         .chatSession(session).document(document).user(session.getUser()).build());
         mapping.setActive(true);
-        return toResponse(mappingRepository.save(mapping));
+        ChatSessionDocument saved = mappingRepository.save(mapping);
+        syncActiveDocumentState(session, userId);
+        return toResponse(saved);
     }
 
     @Override
@@ -61,6 +66,7 @@ public class ChatSessionDocumentServiceImpl implements ChatSessionDocumentServic
                 .orElseThrow(() -> new ResourceNotFoundException("SESSION_DOCUMENT_NOT_FOUND"));
         mapping.setActive(false);
         mappingRepository.save(mapping);
+        syncActiveDocumentState(mapping.getChatSession(), userId);
     }
 
     private ChatSession requireOwnedSession(Long userId, String sessionId) {
@@ -75,5 +81,20 @@ public class ChatSessionDocumentServiceImpl implements ChatSessionDocumentServic
                 .documentId(document.getId()).originalFileName(document.getOriginalFileName())
                 .contentType(document.getFileType()).size(document.getFileSize())
                 .uploadStatus(document.getStatus()).attachedAt(mapping.getAttachedAt()).active(mapping.isActive()).build();
+    }
+
+    private void syncActiveDocumentState(ChatSession session, Long userId) {
+        List<String> activeDocumentIds = mappingRepository
+                .findByChatSessionIdAndUserIdAndActiveTrueOrderByAttachedAtAsc(session.getId(), userId)
+                .stream().map(mapping -> mapping.getDocument().getId()).distinct().toList();
+        try {
+            session.setActiveDocumentIdsJson(objectMapper.writeValueAsString(activeDocumentIds));
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("Unable to serialize active document state", exception);
+        }
+        if (session.getFocusedDocumentId() != null && !activeDocumentIds.contains(session.getFocusedDocumentId())) {
+            session.setFocusedDocumentId(null);
+        }
+        chatSessionRepository.save(session);
     }
 }

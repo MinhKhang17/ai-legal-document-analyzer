@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import logging
 import re
+import unicodedata
+from pathlib import Path
 
 from app.core.knowledge_access import is_published_system_kb
 from app.core.config import settings
@@ -12,8 +14,18 @@ from app.models.intent_enums import (
     RiskLevel,
     SuggestionType,
 )
-from app.schemas import RagCitation, RagPreviewChunk, RagPreviewResponse, RagQueryRequest, RagQueryResponse, RagUsage
+from app.schemas import (
+    ConversationMemoryUpdate,
+    RagCitation,
+    RagPreviewChunk,
+    RagPreviewResponse,
+    RagQueryRequest,
+    RagQueryResponse,
+    RagUsage,
+    TokenUsageBreakdown,
+)
 from app.services.completeness_checker import check_completeness
+from app.services.conversation_memory_service import ConversationMemoryService, PreparedConversationMemory
 from app.services.conversation_context import (
     LegalConversationContextStore,
     build_analysis_snapshot,
@@ -23,13 +35,29 @@ from app.services.conversation_context import (
 from app.services.intent_detector import detect_intent
 from app.services.llm_client import RagLlmClient, build_default_llm_client, sanitize_response
 from app.services.prompt_builder import build_intent_instruction, build_system_prompt, build_user_prompt
-from app.services.query_builder import build_legal_search_query, build_legal_text_query, extract_recent_user_history
+from app.services.query_builder import (
+    build_knowledge_context,
+    build_legal_search_query,
+    build_legal_text_query,
+    build_user_context,
+    extract_recent_user_history,
+)
 from app.services.retrieval_service import RagChunkHit, RetrievalService
+from app.services.token_budget import PromptTokenBudget, budget_for_intent, estimate_tokens, truncate_to_token_budget
 
 
 logger = logging.getLogger(__name__)
 
 _CITATION_PATTERN = re.compile(r"\[((?:KB|USER)-\d+)\]", re.IGNORECASE)
+_SINGULAR_DOCUMENT_REFERENCE = re.compile(
+    r"\b(?:tài liệu|hợp đồng|văn bản)\s+(?:này|đó|trên)\b|\bthis\s+(?:document|contract)\b",
+    re.IGNORECASE,
+)
+_LEGAL_SUMMARY_MARKERS = (
+    "đánh giá", "rủi ro", "pháp lý", "hợp pháp", "hiệu lực", "vô hiệu",
+    "căn cứ pháp luật", "quy định pháp luật", "vi phạm",
+    "legal risk", "legality", "validity",
+)
 _TICKET_ELIGIBLE_INTENTS = frozenset(
     {
         LegalQueryIntent.STUDENT_RENTAL_CONTRACT_REVIEW,
@@ -63,22 +91,38 @@ class RagQueryService:
         retrieval_service: RetrievalService | None = None,
         llm_client: RagLlmClient | None = None,
         context_store: LegalConversationContextStore | None = None,
+        conversation_memory_service: ConversationMemoryService | None = None,
         llm_enabled: bool | None = None,
     ) -> None:
         self.retrieval_service = retrieval_service or RetrievalService()
         self.llm_client = llm_client or build_default_llm_client()
         self.context_store = context_store or LegalConversationContextStore()
+        self.conversation_memory_service = conversation_memory_service
         self.llm_enabled = (
             settings.llm_query_enabled
             if llm_enabled is None and llm_client is None
             else (True if llm_enabled is None else llm_enabled)
         )
 
+    def _get_conversation_memory_service(self) -> ConversationMemoryService:
+        if self.conversation_memory_service is None:
+            embedding_service = getattr(self.retrieval_service, "embedding_service", None)
+            self.conversation_memory_service = ConversationMemoryService(embedding_service=embedding_service)
+        return self.conversation_memory_service
+
+    def _request_history_text(self, request: RagQueryRequest) -> str | None:
+        if request.recentHistory:
+            return "\n\n".join(
+                f"{message.role.upper()}: {message.content}" for message in request.recentHistory
+            )
+        return request.chatHistory
+
     def query(self, request: RagQueryRequest) -> RagQueryResponse:
         from app.services.contract_generation_service import ContractGenerationService, is_contract_generation_intent
 
         follow_up = is_follow_up_query(request.question)
         previous_snapshot = self.context_store.latest(request.chatSessionId) if follow_up else None
+        bounded_history_text = self._request_history_text(request)
 
         if is_contract_generation_intent(request.question) and not follow_up:
             gen_service = ContractGenerationService(
@@ -89,6 +133,8 @@ class RagQueryService:
             return gen_service.generate_contract(request)
 
         user_hits, legal_search_query, knowledge_hits = self._retrieve(request)
+        if self._needs_document_selection(request, user_hits):
+            return self._build_document_selection_response(request, user_hits, knowledge_hits)
         if follow_up and previous_snapshot is None:
             return self._build_missing_snapshot_response(request, user_hits, knowledge_hits)
 
@@ -96,7 +142,7 @@ class RagQueryService:
             request.question,
             has_user_chunks=bool(user_hits),
             has_knowledge_chunks=bool(knowledge_hits),
-            conversation_context=extract_recent_user_history(request.chatHistory),
+            conversation_context=extract_recent_user_history(bounded_history_text),
         )
         completeness = check_completeness(
             intent_result.intent,
@@ -104,7 +150,7 @@ class RagQueryService:
             user_role=intent_result.user_role,
             has_user_chunks=bool(user_hits),
             question=request.question,
-            conversation_context=extract_recent_user_history(request.chatHistory),
+            conversation_context=extract_recent_user_history(bounded_history_text),
         )
 
         if self._should_short_circuit(intent_result.intent) and (
@@ -128,6 +174,10 @@ class RagQueryService:
                 knowledge_hits=knowledge_hits,
             )
 
+        contract_summary_only = (
+            intent_result.intent == LegalQueryIntent.CONTRACT_SUMMARY
+            and not self._summary_requires_legal_kb(request.question)
+        )
         retrieval_issue = None if follow_up else self._detect_retrieval_issue(
             request.question,
             intent_result.intent,
@@ -146,22 +196,62 @@ class RagQueryService:
         prompt_user_hits = user_hits
         prompt_knowledge_hits = knowledge_hits
         if follow_up and previous_snapshot is not None:
+            if request.attachedDocumentIds is not None:
+                allowed_snapshot_document_ids = set(request.attachedDocumentIds)
+            elif request.documentId:
+                allowed_snapshot_document_ids = {request.documentId}
+            else:
+                allowed_snapshot_document_ids = None
             prompt_user_hits, prompt_knowledge_hits = merge_snapshot_with_current_hits(
                 previous_snapshot,
                 user_hits,
                 knowledge_hits,
+                allowed_document_ids=allowed_snapshot_document_ids,
             )
         system_prompt = build_system_prompt()
+        try:
+            prepared_memory = self._get_conversation_memory_service().prepare(
+                request,
+                llm_client=self.llm_client,
+                llm_enabled=self.llm_enabled,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Conversation memory preparation failed for session %s: %s",
+                request.chatSessionId,
+                type(exc).__name__,
+            )
+            prepared_memory = PreparedConversationMemory(
+                summary_json=request.conversationSummaryJson or "[none]",
+                recent_history=bounded_history_text or "[none]",
+                relevant_history="[none]",
+                memory_update=None,
+            )
+        budget_intent = (
+            LegalQueryIntent.CONTRACT_RISK_ANALYSIS
+            if intent_result.intent == LegalQueryIntent.CONTRACT_SUMMARY and not contract_summary_only
+            else intent_result.intent
+        )
+        token_budget = budget_for_intent(budget_intent)
+        system_prompt = truncate_to_token_budget(system_prompt, token_budget.system_prompt)
         user_prompt = build_user_prompt(
             request.question,
             prompt_user_hits,
             prompt_knowledge_hits,
-            chat_history=request.chatHistory,
+            chat_history=None,
             available_user_docs=available_user_docs,
             available_system_docs=available_system_docs,
             workspace_id=request.workspaceId,
             analysis_snapshot=previous_snapshot,
             is_follow_up=follow_up,
+            session_active_document_ids=request.attachedDocumentIds,
+            message_attached_document_ids=request.messageAttachedDocumentIds,
+            focused_document_id=request.focusedDocumentId or request.documentId,
+            contract_summary_only=contract_summary_only,
+            conversation_summary=prepared_memory.summary_json,
+            recent_history=prepared_memory.recent_history,
+            relevant_history=prepared_memory.relevant_history,
+            token_budget=token_budget,
         )
         user_prompt += build_intent_instruction(
             intent_result.intent,
@@ -169,8 +259,26 @@ class RagQueryService:
             response_mode=intent_result.response_mode,
             completeness_questions=None,
         )
+        token_breakdown = self._build_token_breakdown(
+            system_prompt=system_prompt,
+            prepared_memory=prepared_memory,
+            user_hits=prompt_user_hits,
+            knowledge_hits=prompt_knowledge_hits,
+            budget=token_budget,
+        )
 
         if not self.llm_enabled:
+            logger.info(
+                "Prompt token breakdown request=%s intent=%s system=%s summary=%s recent=%s relevant=%s user_docs=%s legal_kb=%s output=0",
+                request.requestId,
+                intent_result.intent.value,
+                token_breakdown.systemPrompt,
+                token_breakdown.conversationSummary,
+                token_breakdown.recentHistory,
+                token_breakdown.relevantHistory,
+                token_breakdown.userDocumentContext,
+                token_breakdown.legalKbContext,
+            )
             logger.info("LLM_QUERY_ENABLED=false; returning prompt preview for request %s", request.requestId)
             return self._build_prompt_preview_response(
                 request=request,
@@ -180,6 +288,8 @@ class RagQueryService:
                 completeness=completeness,
                 user_hits=prompt_user_hits,
                 knowledge_hits=prompt_knowledge_hits,
+                memory_update=prepared_memory.memory_update,
+                token_breakdown=token_breakdown,
             )
 
         llm_result = self.llm_client.generate(system_prompt=system_prompt, user_prompt=user_prompt)
@@ -207,9 +317,13 @@ class RagQueryService:
             if hit.citationId in used_ids
         ]
         recommendations_grounded = self._recommendation_section_is_grounded(answer)
+        requires_legal_grounding = (
+            intent_result.intent in _LEGAL_GROUNDED_INTENTS
+            or (intent_result.intent == LegalQueryIntent.CONTRACT_SUMMARY and not contract_summary_only)
+        )
         grounding_failed = bool(invalid_citation_ids) or (
-            intent_result.intent in _LEGAL_GROUNDED_INTENTS and not used_knowledge_ids
-        ) or (intent_result.intent in _LEGAL_GROUNDED_INTENTS and not recommendations_grounded)
+            requires_legal_grounding and not used_knowledge_ids
+        ) or (requires_legal_grounding and not recommendations_grounded)
         if grounding_failed:
             logger.warning(
                 "Grounding validation failed for request %s: used_kb=%s invalid=%s recommendations_grounded=%s",
@@ -303,7 +417,28 @@ class RagQueryService:
                 totalTokens=llm_result.total_tokens,
             ),
             llmExecuted=True,
+            conversationMemoryUpdate=prepared_memory.memory_update,
+            tokenUsageBreakdown=token_breakdown.model_copy(update={"output": llm_result.completion_tokens}),
         )
+        self._get_conversation_memory_service().index_completed_turn(
+            request,
+            answer,
+            [*used_user_ids, *used_knowledge_ids],
+        )
+        final_breakdown = response.tokenUsageBreakdown
+        if final_breakdown is not None:
+            logger.info(
+                "Prompt token breakdown request=%s intent=%s system=%s summary=%s recent=%s relevant=%s user_docs=%s legal_kb=%s output=%s",
+                request.requestId,
+                intent_result.intent.value,
+                final_breakdown.systemPrompt,
+                final_breakdown.conversationSummary,
+                final_breakdown.recentHistory,
+                final_breakdown.relevantHistory,
+                final_breakdown.userDocumentContext,
+                final_breakdown.legalKbContext,
+                final_breakdown.output,
+            )
         if request.chatSessionId:
             self.context_store.append(
                 build_analysis_snapshot(
@@ -326,6 +461,28 @@ class RagQueryService:
             )
         return response
 
+    def _build_token_breakdown(
+        self,
+        *,
+        system_prompt: str,
+        prepared_memory: PreparedConversationMemory,
+        user_hits: list[RagChunkHit],
+        knowledge_hits: list[RagChunkHit],
+        budget: PromptTokenBudget,
+    ) -> TokenUsageBreakdown:
+        return TokenUsageBreakdown(
+            systemPrompt=min(estimate_tokens(system_prompt), budget.system_prompt),
+            conversationSummary=min(
+                estimate_tokens(prepared_memory.summary_json), budget.conversation_summary),
+            recentHistory=min(estimate_tokens(prepared_memory.recent_history), budget.recent_history),
+            relevantHistory=min(estimate_tokens(prepared_memory.relevant_history), budget.relevant_history),
+            userDocumentContext=min(
+                estimate_tokens(build_user_context(user_hits)), budget.user_document_context),
+            legalKbContext=min(
+                estimate_tokens(build_knowledge_context(knowledge_hits)), budget.legal_kb_context),
+            output=0,
+        )
+
     def _build_prompt_preview_response(
         self,
         *,
@@ -336,6 +493,8 @@ class RagQueryService:
         completeness,
         user_hits: list[RagChunkHit],
         knowledge_hits: list[RagChunkHit],
+        memory_update: ConversationMemoryUpdate | None = None,
+        token_breakdown: TokenUsageBreakdown | None = None,
     ) -> RagQueryResponse:
         answer = (
             "[LLM PROMPT PREVIEW - PROMPT CHUA DUOC GUI TOI LLM]\n\n"
@@ -372,6 +531,8 @@ class RagQueryService:
             llmExecuted=False,
             systemPromptPreview=system_prompt,
             userPromptPreview=user_prompt,
+            conversationMemoryUpdate=memory_update,
+            tokenUsageBreakdown=token_breakdown,
         )
 
     def preview(self, request: RagQueryRequest) -> RagPreviewResponse:
@@ -390,29 +551,114 @@ class RagQueryService:
     def _retrieve(self, request: RagQueryRequest) -> tuple[list[RagChunkHit], str, list[RagChunkHit]]:
         # [] is an explicit KB-only session. None retains legacy workspace and
         # single-document request behavior for backward compatibility.
-        if request.attachedDocumentIds == []:
+        if request.messageAttachedDocumentIds:
+            effective_document_ids = request.messageAttachedDocumentIds
+        elif request.focusedDocumentId:
+            effective_document_ids = [request.focusedDocumentId]
+        elif request.attachedDocumentIds is not None:
+            effective_document_ids = request.attachedDocumentIds
+        elif request.documentId:
+            effective_document_ids = [request.documentId]
+        else:
+            effective_document_ids = None
+
+        if effective_document_ids == []:
             user_hits = []
         else:
             search_kwargs = {
                 "user_id": request.userId,
                 "workspace_id": request.workspaceId,
                 "top_k": request.topKUserChunks,
-                "document_id": request.documentId,
             }
-            if request.attachedDocumentIds:
-                search_kwargs["document_ids"] = request.attachedDocumentIds
+            if effective_document_ids:
+                search_kwargs["document_ids"] = effective_document_ids
             user_hits = self.retrieval_service.search_user_chunks(request.question, **search_kwargs)
+        bounded_history_text = self._request_history_text(request)
         legal_search_query = build_legal_search_query(
             request.question,
             user_hits,
-            chat_history=request.chatHistory,
+            chat_history=bounded_history_text,
         )
-        knowledge_hits = self.retrieval_service.search_knowledge_chunks(
-            legal_search_query,
-            top_k=request.topKKnowledgeChunks,
-            query_text=build_legal_text_query(request.question, chat_history=request.chatHistory),
-        )
+        preliminary_intent = detect_intent(
+            request.question,
+            has_user_chunks=bool(user_hits),
+            has_knowledge_chunks=False,
+            conversation_context=extract_recent_user_history(bounded_history_text),
+        ).intent
+        if (
+            preliminary_intent == LegalQueryIntent.CONTRACT_SUMMARY
+            and not self._summary_requires_legal_kb(request.question)
+        ):
+            knowledge_hits = []
+        else:
+            knowledge_hits = self.retrieval_service.search_knowledge_chunks(
+                legal_search_query,
+                top_k=request.topKKnowledgeChunks,
+                query_text=build_legal_text_query(request.question, chat_history=bounded_history_text),
+            )
         return user_hits, legal_search_query, knowledge_hits
+
+    def _summary_requires_legal_kb(self, question: str) -> bool:
+        normalized = unicodedata.normalize("NFC", question).casefold()
+        return any(marker in normalized for marker in _LEGAL_SUMMARY_MARKERS)
+
+    def _needs_document_selection(self, request: RagQueryRequest, user_hits: list[RagChunkHit]) -> bool:
+        if (request.documentId or request.focusedDocumentId or request.messageAttachedDocumentIds
+                or not request.attachedDocumentIds or len(set(request.attachedDocumentIds)) < 2):
+            return False
+        if not _SINGULAR_DOCUMENT_REFERENCE.search(request.question):
+            return False
+
+        normalized_question = unicodedata.normalize("NFC", request.question).casefold()
+        for hit in user_hits:
+            if not hit.fileName:
+                continue
+            normalized_name = unicodedata.normalize("NFC", Path(hit.fileName).stem).casefold().strip()
+            if len(normalized_name) >= 4 and normalized_name in normalized_question:
+                return False
+        return True
+
+    def _build_document_selection_response(
+        self,
+        request: RagQueryRequest,
+        user_hits: list[RagChunkHit],
+        knowledge_hits: list[RagChunkHit],
+    ) -> RagQueryResponse:
+        document_names = list(dict.fromkeys(hit.fileName for hit in user_hits if hit.fileName))
+        choices = ""
+        if document_names:
+            choices = " Các tài liệu liên quan: " + "; ".join(document_names) + "."
+        return RagQueryResponse(
+            requestId=request.requestId,
+            chatSessionId=request.chatSessionId,
+            answer=(
+                "Phiên chat đang có nhiều tài liệu nên mình chưa xác định được “tài liệu này” hoặc "
+                "“hợp đồng này” là tài liệu nào."
+                f"{choices} Vui lòng chọn hoặc gọi đúng tên tài liệu cần hỏi."
+            ),
+            confidenceScore=1.0,
+            shouldSuggestTicket=False,
+            suggestionType=SuggestionType.ASK_MORE_FACTS.value,
+            suggestionReason="Cần xác định đúng tài liệu đích trước khi phân tích.",
+            missingInformation="Tài liệu cụ thể cần sử dụng cho câu hỏi hiện tại.",
+            riskLevel=RiskLevel.UNKNOWN.value,
+            legalDomain=None,
+            userActionHint="PROVIDE_MORE_INFO",
+            citations=[],
+            usedKnowledgeCitationIds=[],
+            usedUserCitationIds=[],
+            retrievedUserChunks=len(user_hits),
+            retrievedKnowledgeChunks=len(knowledge_hits),
+            intent=LegalQueryIntent.INSUFFICIENT_FACTS.value,
+            contractType=ContractType.UNKNOWN.value,
+            userRole="UNKNOWN",
+            jurisdiction="VIETNAM",
+            responseStatus=ResponseStatus.NEED_MORE_INFORMATION.value,
+            responseMode="ASK_FOR_INFORMATION",
+            inputComplete=False,
+            missingInputs=["targetDocument"],
+            llmExecuted=False,
+        )
 
     def _should_short_circuit(self, intent: LegalQueryIntent) -> bool:
         return intent in {
@@ -515,6 +761,8 @@ class RagQueryService:
             LegalQueryIntent.SIGNING_DECISION_SUPPORT,
         }
         lowered = question.lower()
+        if intent == LegalQueryIntent.CONTRACT_SUMMARY and not self._summary_requires_legal_kb(question):
+            return None
         if not knowledge_hits:
             issue_intent = LegalQueryIntent.OUTDATED_KNOWLEDGE_BASE if any(word in lowered for word in ["mới nhất", "hiện hành", "cập nhật"]) else LegalQueryIntent.NO_RELEVANT_DOCUMENT_FOUND
             return self._make_retrieval_issue(issue_intent)

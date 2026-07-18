@@ -95,7 +95,10 @@ const requestJson = async <TResponse>(
 
   try {
     response = await fetch(buildApiUrl(endpointPath), requestInit);
-  } catch {
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw error;
+    }
     throw new Error(BACKEND_API_UNAVAILABLE_MESSAGE);
   }
 
@@ -132,6 +135,7 @@ const postJson = async <TResponse>(
   payload: object,
   errorMessage: string,
   accessToken: string,
+  signal?: AbortSignal,
 ): Promise<TResponse> =>
   requestJson<TResponse>(
     endpointPath,
@@ -143,6 +147,7 @@ const postJson = async <TResponse>(
       },
       credentials: "include",
       body: JSON.stringify(payload),
+      signal,
     },
     errorMessage,
   );
@@ -354,12 +359,14 @@ export async function sendChatSessionMessage(
   chatSessionId: string,
   message: string,
   documentId?: string,
+  signal?: AbortSignal,
 ): Promise<WorkspaceChatConversation> {
   const response = await postJson<ApiResponse<WorkspaceChatConversation>>(
     API_ENDPOINTS.chat.sessionMessages(chatSessionId),
     { message, ...(documentId ? { documentId } : {}) } satisfies SendMessageRequest,
     "Không thể gửi câu hỏi",
     accessToken,
+    signal,
   );
 
   return {

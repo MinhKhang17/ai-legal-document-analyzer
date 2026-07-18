@@ -63,6 +63,15 @@ app:
   storage:
     upload-root: ${APP_STORAGE_UPLOAD_ROOT:uploads}
 
+  frontend:
+    base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
+
+  ticket-attachments:
+    max-size-kb: ${TICKET_ATTACHMENT_MAX_SIZE_KB:500}
+    max-per-message: ${TICKET_ATTACHMENT_MAX_PER_MESSAGE:5}
+    max-per-ticket: ${TICKET_ATTACHMENT_MAX_PER_TICKET:30}
+    upload-root: ${TICKET_ATTACHMENT_UPLOAD_ROOT:uploads/ticket_attachments}
+
   mail:
     from: ${MAIL_FROM:${SMTP_USERNAME:}}
     enabled: ${MAIL_ENABLED:true}

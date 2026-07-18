@@ -22,6 +22,7 @@ services:
     environment:
       DB_URL: jdbc:postgresql://postgres:5432/ai_legal_db
       APP_STORAGE_UPLOAD_ROOT: /app/uploads
+      TICKET_ATTACHMENT_UPLOAD_ROOT: /app/uploads/ticket_attachments
       APP_AI_SERVICE_BASE_URL: http://ai-service:8000
       APP_API_CALLBACK_BASE_URL: http://backend:8080
       VNPAY_RETURN_URL: ${NGROK_URL:-http://localhost:8080}/api/v1/payment-transactions/vnpay-return

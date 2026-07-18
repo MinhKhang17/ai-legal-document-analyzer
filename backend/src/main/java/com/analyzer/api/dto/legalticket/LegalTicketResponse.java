@@ -14,6 +14,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -22,6 +23,18 @@ import java.time.LocalDateTime;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @Schema(description = "Legal ticket response details")
 public class LegalTicketResponse {
+
+    private String ticketCode;
+    private String title;
+    private String description;
+    private String recipientType;
+    private String priority;
+    private String conversationScope;
+    private String sourceUserMessageId;
+    private String sourceAssistantMessageId;
+    private String focusedDocumentId;
+    private List<String> sharedDocumentIds;
+    private TicketContextSnapshotResponse contextSnapshot;
 
     @JsonProperty("ticket_type")
     private LegalTicketType ticketType;

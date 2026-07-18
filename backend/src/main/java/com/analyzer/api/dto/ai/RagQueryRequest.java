@@ -43,4 +43,44 @@ public class RagQueryRequest {
 
     @JsonProperty("chat_history")
     private String chatHistory;
+
+    @JsonProperty("conversation_summary_json")
+    private String conversationSummaryJson;
+
+    @JsonProperty("recent_history")
+    private List<ConversationMessage> recentHistory;
+
+    @JsonProperty("evicted_messages")
+    private List<ConversationMessage> evictedMessages;
+
+    @JsonProperty("current_user_message_id")
+    private String currentUserMessageId;
+
+    @JsonProperty("current_assistant_message_id")
+    private String currentAssistantMessageId;
+
+    @JsonProperty("focused_document_id")
+    private String focusedDocumentId;
+
+    @JsonProperty("message_attached_document_ids")
+    private List<String> messageAttachedDocumentIds;
+
+    @JsonProperty("conversation_user_role")
+    private String conversationUserRole;
+
+    @JsonProperty("conversation_mode")
+    private String conversationMode;
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ConversationMessage {
+        private String messageId;
+        private String role;
+        private String content;
+        private String createdAt;
+        private List<String> documentIds;
+        private List<String> citationIds;
+    }
 }
