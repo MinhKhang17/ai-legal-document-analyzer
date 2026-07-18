@@ -14,6 +14,14 @@ public interface UserMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "role", ignore = true)
     @Mapping(target = "active", ignore = true)
+    @Mapping(target = "emailVerified", ignore = true)
+    @Mapping(target = "emailVerificationToken", ignore = true)
+    @Mapping(target = "emailVerificationTokenExpiry", ignore = true)
+    @Mapping(target = "specialty", ignore = true)
+    @Mapping(target = "legalDomain", ignore = true)
+    @Mapping(target = "description", ignore = true)
+    @Mapping(target = "mustChangePassword", ignore = true)
+    @Mapping(target = "passwordResetDeadline", ignore = true)
     User toEntity(UserRequestDTO requestDTO);
 
     @Mapping(target = "role", source = "role.name")

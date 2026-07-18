@@ -5,6 +5,8 @@ import com.analyzer.api.dto.auth.LoginRequestDTO;
 import com.analyzer.api.dto.user.UserResponseDTO;
 import com.analyzer.api.entity.RefreshToken;
 import com.analyzer.api.entity.User;
+import com.analyzer.api.exception.auth.ExpiredVerificationTokenException;
+import com.analyzer.api.exception.common.ResourceNotFoundException;
 import com.analyzer.api.mapper.UserMapper;
 import com.analyzer.api.repository.RefreshTokenRepository;
 import com.analyzer.api.repository.UserRepository;
@@ -22,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -189,5 +192,28 @@ public class AuthServiceImpl implements AuthService {
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         return userMapper.toResponseDTO(user);
+    }
+
+    @Override
+    @Transactional
+    public void verifyEmail(String token) {
+        User user = userRepository.findByEmailVerificationToken(token)
+                .orElseThrow(() -> new ResourceNotFoundException("Token xác thực không hợp lệ"));
+
+        if (user.isEmailVerified()) {
+            return;
+        }
+
+        if (user.getEmailVerificationTokenExpiry() == null
+                || user.getEmailVerificationTokenExpiry().isBefore(LocalDateTime.now())) {
+            throw new ExpiredVerificationTokenException(
+                    "Token xác thực đã hết hạn. Vui lòng yêu cầu gửi lại email xác thực.");
+        }
+
+        user.setEmailVerified(true);
+        user.setActive(true);
+        user.setEmailVerificationToken(null);
+        user.setEmailVerificationTokenExpiry(null);
+        userRepository.save(user);
     }
 }

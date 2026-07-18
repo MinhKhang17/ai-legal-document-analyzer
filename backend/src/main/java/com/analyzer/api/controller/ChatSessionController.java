@@ -4,6 +4,7 @@ import com.analyzer.api.dto.ApiResponseDTO;
 import com.analyzer.api.dto.PageResponse;
 import com.analyzer.api.dto.chatsession.ChatSessionResponse;
 import com.analyzer.api.dto.chatsession.CreateChatSessionRequest;
+import com.analyzer.api.dto.chatsession.ShareChatSessionResponse;
 import com.analyzer.api.enums.ChatSessionStatus;
 import com.analyzer.api.security.UserDetailsImpl;
 import com.analyzer.api.service.ChatSessionService;
@@ -93,6 +94,15 @@ public class ChatSessionController {
             @PathVariable String chatSessionId) {
         com.analyzer.api.dto.chatsession.DeleteChatSessionResponse response = chatSessionService.deleteChatSession(getCurrentUserId(), chatSessionId);
         return ResponseEntity.ok(ApiResponseDTO.success("Chat session deleted successfully", response));
+    }
+
+    @PostMapping("/api/v1/chat-sessions/{chatSessionId}/share")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    @Operation(summary = "Share chat session", description = "Generates (or reuses) a read-only share link for Admin/Expert to view this chat session's history.")
+    public ResponseEntity<ApiResponseDTO<ShareChatSessionResponse>> shareChatSession(
+            @PathVariable String chatSessionId) {
+        ShareChatSessionResponse response = chatSessionService.shareChatSession(getCurrentUserId(), chatSessionId);
+        return ResponseEntity.ok(ApiResponseDTO.success("Chat session shared successfully", response));
     }
 
     private Long getCurrentUserId() {

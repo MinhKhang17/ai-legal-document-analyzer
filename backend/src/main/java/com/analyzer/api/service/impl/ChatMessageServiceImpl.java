@@ -4,11 +4,14 @@ import com.analyzer.api.client.PythonAiClient;
 import com.analyzer.api.dto.PageResponse;
 import com.analyzer.api.dto.ai.RagQueryRequest;
 import com.analyzer.api.dto.ai.RagQueryResponse;
+import com.analyzer.api.dto.chatmessage.ChatMessageFeedbackRequest;
+import com.analyzer.api.dto.chatmessage.ChatMessageFeedbackResponse;
 import com.analyzer.api.dto.chatmessage.ChatMessageResponse;
 import com.analyzer.api.dto.chatmessage.SendMessageRequest;
 import com.analyzer.api.dto.chatmessage.SendMessageResponse;
 import com.analyzer.api.dto.chatsession.ChatSessionResponse;
 import com.analyzer.api.entity.ChatMessage;
+import com.analyzer.api.entity.ChatMessageFeedback;
 import com.analyzer.api.entity.ChatSession;
 import com.analyzer.api.entity.AiCitation;
 import com.analyzer.api.entity.Document;
@@ -19,11 +22,14 @@ import com.analyzer.api.enums.ChatMessageStatus;
 import com.analyzer.api.enums.ChatMessageType;
 import com.analyzer.api.enums.ChatSessionStatus;
 import com.analyzer.api.enums.CitationSourceType;
+import com.analyzer.api.enums.FeedbackReason;
+import com.analyzer.api.enums.FeedbackRating;
 import com.analyzer.api.exception.common.*;
 import com.analyzer.api.exception.workspace.*;
 import com.analyzer.api.exception.chat.*;
 import com.analyzer.api.exception.ai.*;
 import com.analyzer.api.exception.validation.*;
+import com.analyzer.api.repository.ChatMessageFeedbackRepository;
 import com.analyzer.api.repository.ChatMessageRepository;
 import com.analyzer.api.repository.ChatSessionRepository;
 import com.analyzer.api.repository.DocumentRepository;
@@ -43,8 +49,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -60,6 +68,7 @@ public class ChatMessageServiceImpl implements ChatMessageService {
     private final UserRepository userRepository;
     private final SubscriptionQuotaService subscriptionQuotaService;
     private final AiCitationRepository aiCitationRepository;
+    private final ChatMessageFeedbackRepository chatMessageFeedbackRepository;
 
     @Override
     @Transactional(noRollbackFor = {AiServiceUnavailableException.class, AiServiceTimeoutException.class})
@@ -213,6 +222,64 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         }
 
         return toChatMessageResponse(chatMessage);
+    }
+
+    @Override
+    @Transactional
+    public ChatMessageFeedbackResponse submitFeedback(Long userId, String messageId, ChatMessageFeedbackRequest request) {
+        ChatMessage chatMessage = chatMessageRepository.findById(messageId)
+                .orElseThrow(() -> new ResourceNotFoundException("Message not found"));
+
+        if (!chatMessage.getUser().getId().equals(userId)) {
+            throw new ForbiddenException("You do not have permission to rate this message");
+        }
+
+        if (chatMessage.getRole() != ChatMessageRole.ASSISTANT) {
+            throw new ForbiddenException("Only AI assistant messages can be rated");
+        }
+
+        ChatMessageFeedback feedback = chatMessageFeedbackRepository.findByChatMessageId(messageId)
+                .orElseGet(() -> ChatMessageFeedback.builder().chatMessage(chatMessage).build());
+        feedback.setRating(request.getRating());
+        feedback.setReasons(request.getRating() == FeedbackRating.THUMBS_DOWN
+                ? joinReasons(request.getReasons())
+                : null);
+        feedback.setComment(request.getComment());
+
+        ChatMessageFeedback saved = chatMessageFeedbackRepository.save(feedback);
+        return toChatMessageFeedbackResponse(saved);
+    }
+
+    private static String joinReasons(List<FeedbackReason> reasons) {
+        if (reasons == null || reasons.isEmpty()) {
+            return null;
+        }
+        return reasons.stream().map(Enum::name).collect(Collectors.joining(","));
+    }
+
+    private static List<FeedbackReason> splitReasons(String reasons) {
+        if (reasons == null || reasons.isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(reasons.split(","))
+                .map(FeedbackReason::valueOf)
+                .collect(Collectors.toList());
+    }
+
+    private ChatMessageFeedbackResponse toChatMessageFeedbackResponse(ChatMessageFeedback feedback) {
+        String content = feedback.getChatMessage().getContent();
+        User submittedBy = feedback.getChatMessage().getUser();
+        return ChatMessageFeedbackResponse.builder()
+                .id(feedback.getId())
+                .chatMessageId(feedback.getChatMessage().getId())
+                .messageContent(content != null && content.length() > 200 ? content.substring(0, 200) + "..." : content)
+                .rating(feedback.getRating())
+                .reasons(splitReasons(feedback.getReasons()))
+                .comment(feedback.getComment())
+                .submittedById(submittedBy.getId())
+                .submittedByName(submittedBy.getFirstName() + " " + submittedBy.getLastName())
+                .createdAt(feedback.getCreatedAt())
+                .build();
     }
 
     private void validateMessageRequest(SendMessageRequest request) {

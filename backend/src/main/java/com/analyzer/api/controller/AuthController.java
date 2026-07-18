@@ -88,4 +88,14 @@ public class AuthController {
         UserResponseDTO currentUser = authService.getCurrentUser();
         return ResponseEntity.ok(ApiResponseDTO.success("Lấy thông tin người dùng thành công", currentUser));
     }
+
+    @GetMapping("/verify-email")
+    @Operation(
+            summary = "Verify email",
+            description = "Verifies a user's email using the token sent at registration and activates the account."
+    )
+    public ResponseEntity<ApiResponseDTO<Void>> verifyEmail(@RequestParam String token) {
+        authService.verifyEmail(token);
+        return ResponseEntity.ok(ApiResponseDTO.success("Xác thực email thành công"));
+    }
 }

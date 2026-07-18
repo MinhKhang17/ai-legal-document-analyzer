@@ -25,4 +25,16 @@ public class UserResponseDTO {
 
     @Schema(description = "Status of the user account", example = "true")
     private boolean active;
+
+    @Schema(description = "Whether the user's email has been verified", example = "true")
+    private boolean emailVerified;
+
+    @Schema(description = "Expert's main specialty (EXPERT role only)", example = "Tư vấn doanh nghiệp")
+    private String specialty;
+
+    @Schema(description = "Legal domain the expert practices in (EXPERT role only)", example = "Luật Thương mại")
+    private String legalDomain;
+
+    @Schema(description = "Free-text description of the expert's experience (EXPERT role only)", example = "5 năm kinh nghiệm giải quyết tranh chấp kinh doanh")
+    private String description;
 }
