@@ -62,6 +62,21 @@ public class EmailServiceImpl implements EmailService {
         send(toEmail, "Thông tin tài khoản Expert của bạn", body);
     }
 
+    @Override
+    @Async
+    public void sendTicketNotificationAsync(String toEmail, String recipientName, String ticketId,
+                                            String ticketType, String ticketStatus, String relativePath,
+                                            String detail) {
+        String ticketUrl = frontendBaseUrl + (StringUtils.hasText(relativePath) ? relativePath : "");
+        String body = "Xin chao " + safeName(recipientName) + ",\n\n"
+                + "Ticket " + ticketId + " vua duoc cap nhat.\n"
+                + "Loai: " + ticketType + "\n"
+                + "Trang thai: " + ticketStatus + "\n"
+                + (StringUtils.hasText(detail) ? detail + "\n" : "")
+                + (StringUtils.hasText(relativePath) ? "Mo ticket: " + ticketUrl : "");
+        send(toEmail, "Cap nhat ticket " + ticketId, body);
+    }
+
     private void send(String toEmail, String subject, String body) {
         if (!mailEnabled || !StringUtils.hasText(mailFrom)) {
             logger.warn("Mail is not configured (app.mail.enabled/from/SMTP_USERNAME missing) - skipping email to {}", toEmail);

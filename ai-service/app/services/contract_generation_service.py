@@ -6,7 +6,7 @@ import re
 import datetime
 import httpx
 from fastapi import HTTPException
-from app.schemas import RagCitation, RagQueryRequest, RagQueryResponse
+from app.schemas import RagCitation, RagQueryRequest, RagQueryResponse, RagUsage
 from app.services.llm_client import build_default_llm_client
 from app.services.retrieval_service import RetrievalService
 
@@ -62,9 +62,11 @@ class ContractGenerationService:
         *,
         retrieval_service: RetrievalService | None = None,
         llm_client: None = None,
+        llm_enabled: bool = True,
     ) -> None:
         self.retrieval_service = retrieval_service or RetrievalService()
         self.llm_client = llm_client or build_default_llm_client()
+        self.llm_enabled = llm_enabled
 
     def generate_contract(self, request: RagQueryRequest) -> RagQueryResponse:
         # Search Neo4j for the Top K relevant legal contract templates
@@ -233,6 +235,36 @@ Format guidelines for the content inside <noi_dung>:
             "</noi_dung>\n"
             "--- KẾT THÚC VÍ DỤ ---"
         )
+
+        if not self.llm_enabled:
+            logger.info("LLM_QUERY_ENABLED=false; returning contract prompt preview for request %s", request.requestId)
+            return RagQueryResponse(
+                requestId=request.requestId,
+                chatSessionId=request.chatSessionId,
+                answer=(
+                    "[LLM PROMPT PREVIEW - PROMPT CHUA DUOC GUI TOI LLM]\n\n"
+                    "===== SYSTEM PROMPT =====\n"
+                    f"{system_prompt}\n\n"
+                    "===== USER PROMPT =====\n"
+                    f"{user_prompt}"
+                ),
+                confidenceScore=None,
+                shouldSuggestTicket=False,
+                suggestionType="NONE",
+                suggestionReason="LLM preview mode is enabled.",
+                missingInformation=None,
+                riskLevel="NONE",
+                legalDomain="Contract Law",
+                userActionHint="CONTINUE_CHAT",
+                citations=[],
+                retrievedUserChunks=len(user_hits),
+                retrievedKnowledgeChunks=len(retrieved_chunks),
+                model="prompt-preview",
+                usage=RagUsage(promptTokens=0, completionTokens=0, totalTokens=0),
+                llmExecuted=False,
+                systemPromptPreview=system_prompt,
+                userPromptPreview=user_prompt,
+            )
 
         # Call LLM to generate contract
         llm_result = self.llm_client.generate(system_prompt=system_prompt, user_prompt=user_prompt)
@@ -1037,4 +1069,5 @@ Format guidelines for the content inside <noi_dung>:
             citations=citations,
             retrievedUserChunks=len(user_hits),
             retrievedKnowledgeChunks=len(retrieved_chunks),
+            llmExecuted=True,
         )

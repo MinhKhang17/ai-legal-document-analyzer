@@ -1,5 +1,7 @@
 import type { LegalTicketStatus } from "./legalTicketStatus";
 
+export type LegalTicketType = "SYSTEM_ERROR" | "QUERY_ERROR" | "CONTACT_EXPERT";
+
 export interface PageResponse<T> {
   items: T[];
   page: number;
@@ -9,6 +11,9 @@ export interface PageResponse<T> {
 }
 
 export interface CreateLegalTicketRequest {
+  ticket_type?: LegalTicketType;
+  chat_session_id?: string | null;
+  chat_message_id?: string | null;
   request_id?: string | null;
   workspace_id: string;
   document_id?: string | null;
@@ -45,6 +50,9 @@ export interface ReopenLegalTicketRequest {
 
 export interface LegalTicket {
   id: string;
+  ticket_type?: LegalTicketType | null;
+  chat_session_id?: string | null;
+  chat_message_id?: string | null;
 
   request_id: string | null;
 

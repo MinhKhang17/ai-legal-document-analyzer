@@ -3,6 +3,7 @@ package com.analyzer.api.service;
 import com.analyzer.api.dto.PageResponse;
 import com.analyzer.api.dto.legalticket.*;
 import com.analyzer.api.enums.LegalTicketStatus;
+import com.analyzer.api.enums.LegalTicketType;
 import com.analyzer.api.enums.RiskLevel;
 
 import java.util.List;
@@ -26,7 +27,7 @@ public interface LegalTicketService {
 
     LegalTicketResponse customerReply(Long customerId, String ticketId, CustomerTicketReplyRequest request);
 
-    PageResponse<LegalTicketResponse> listAdminTickets(LegalTicketStatus status, RiskLevel riskLevel, int page, int size);
+    PageResponse<LegalTicketResponse> listAdminTickets(LegalTicketStatus status, RiskLevel riskLevel, LegalTicketType ticketType, int page, int size);
 
     LegalTicketResponse rejectTicket(Long adminId, String ticketId, RejectLegalTicketRequest request);
 

@@ -200,3 +200,14 @@ export async function logout(): Promise<void> {
     buildAuthHeaders({ Accept: "application/json" }),
   );
 }
+
+export async function verifyEmail(token: string): Promise<void> {
+  await getJson<unknown>(
+    `${API_ENDPOINTS.auth.verifyEmail}?token=${encodeURIComponent(token)}`,
+    "Email verification failed. The link may be invalid or expired.",
+  );
+}
+
+export async function resendVerificationEmail(email: string): Promise<void> {
+  await postJson<unknown>(API_ENDPOINTS.auth.resendVerification, { email }, "Unable to resend verification email.");
+}

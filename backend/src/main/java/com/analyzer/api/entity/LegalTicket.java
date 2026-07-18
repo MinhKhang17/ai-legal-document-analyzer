@@ -1,6 +1,7 @@
 package com.analyzer.api.entity;
 
 import com.analyzer.api.enums.LegalTicketStatus;
+import com.analyzer.api.enums.LegalTicketType;
 import com.analyzer.api.enums.RiskLevel;
 import com.analyzer.api.enums.SuggestionType;
 import com.analyzer.api.enums.UserActionHint;
@@ -38,6 +39,16 @@ public class LegalTicket {
 
     @Column(name = "customer_note", columnDefinition = "TEXT")
     private String customerNote;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "ticket_type")
+    private LegalTicketType ticketType;
+
+    @Column(name = "related_chat_session_id")
+    private String relatedChatSessionId;
+
+    @Column(name = "related_chat_message_id")
+    private String relatedChatMessageId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by_id", nullable = false)

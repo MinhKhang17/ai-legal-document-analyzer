@@ -83,8 +83,19 @@ legal-rag-platform/
 ### Quick Start
 
 1. Clone the repository.
-2. Create environment files from service examples when available.
-3. Start local dependencies and service placeholders:
+2. Create one environment file for each service:
+
+```bash
+cp backend/.env.example backend/.env
+cp ai-service/.env.example ai-service/.env
+cp frontend/.env.example frontend/.env
+```
+
+The root Compose file loads `backend/.env` and `ai-service/.env` as runtime environment files. The frontend is a static Vite build, so its Docker image reads `frontend/.env` while building. Rebuild the frontend image after changing a `VITE_*` value.
+
+The root `.env` is reserved for Docker Compose-level values such as ngrok configuration.
+
+3. Start the complete stack:
 
 ```bash
 docker compose up --build

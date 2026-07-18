@@ -337,6 +337,9 @@ public class WorkspaceServiceImpl implements WorkspaceService {
         if (!document.getWorkspace().getId().equals(workspaceId)) {
             throw new RuntimeException("Document khong thuoc workspace nay");
         }
+        if (document.getUser() == null || !userId.equals(document.getUser().getId())) {
+            throw new ForbiddenException("DOCUMENT_ACCESS_DENIED");
+        }
 
         try {
             java.nio.file.Path filePath = java.nio.file.Path.of(document.getFilePath()).toAbsolutePath().normalize();

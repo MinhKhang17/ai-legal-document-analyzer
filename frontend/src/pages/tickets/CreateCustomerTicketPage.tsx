@@ -13,6 +13,7 @@ import { Card } from "../../components/common/Card";
 import { PageHeader } from "../../components/common/PageHeader";
 import { useI18n } from "../../hooks/useI18n";
 import { useToast } from "../../hooks/useToast";
+import type { LegalTicketType } from "../../types/legalTicket";
 
 import { getAccessToken as getSessionAccessToken } from "../../services/authSession";
 const getAccessToken = () => getSessionAccessToken() ?? "";
@@ -30,6 +31,7 @@ export function CreateCustomerTicketPage() {
   const [issueFingerprint, setIssueFingerprint] = useState("");
   const [customerNote, setCustomerNote] = useState("");
   const [question, setQuestion] = useState("");
+  const [ticketType, setTicketType] = useState<LegalTicketType>("CONTACT_EXPERT");
 
   const [loadingWorkspaces, setLoadingWorkspaces] = useState(true);
   const [loadingDocuments, setLoadingDocuments] = useState(false);
@@ -126,6 +128,7 @@ export function CreateCustomerTicketPage() {
 
     try {
       const ticket = await createLegalTicket({
+        ticket_type: ticketType,
         request_id: null,
         workspace_id: selectedWorkspaceId,
         document_id: selectedDocumentId,
@@ -163,6 +166,14 @@ export function CreateCustomerTicketPage() {
 
       <Card title={t("legalTickets.create.formTitle")}>
         <form className="space-y-lg" onSubmit={handleSubmit}>
+          <div>
+            <label className="mb-2 block text-sm font-medium">Lý do tạo ticket</label>
+            <select className="form-field" value={ticketType} onChange={(event) => setTicketType(event.target.value as LegalTicketType)} disabled={submitting}>
+              <option value="CONTACT_EXPERT">Liên hệ chuyên gia / luật sư</option>
+              <option value="QUERY_ERROR">Câu trả lời AI sai hoặc thiếu</option>
+              <option value="SYSTEM_ERROR">Lỗi hệ thống / kỹ thuật</option>
+            </select>
+          </div>
           <div>
             <label className="mb-2 block text-sm font-medium">
               {t("legalTickets.create.workspace")}

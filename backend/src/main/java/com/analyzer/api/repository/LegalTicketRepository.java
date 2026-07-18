@@ -2,6 +2,7 @@ package com.analyzer.api.repository;
 
 import com.analyzer.api.entity.LegalTicket;
 import com.analyzer.api.enums.LegalTicketStatus;
+import com.analyzer.api.enums.LegalTicketType;
 import com.analyzer.api.enums.RiskLevel;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -43,6 +44,18 @@ public interface LegalTicketRepository extends JpaRepository<LegalTicket, String
 
     @EntityGraph(attributePaths = {"workspace", "document", "createdBy", "assignedLawyer"})
     Page<LegalTicket> findByStatusAndRiskLevelAndDeletedFalse(LegalTicketStatus status, RiskLevel riskLevel, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"workspace", "document", "createdBy", "assignedLawyer"})
+    Page<LegalTicket> findByTicketTypeAndDeletedFalse(LegalTicketType ticketType, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"workspace", "document", "createdBy", "assignedLawyer"})
+    Page<LegalTicket> findByStatusAndTicketTypeAndDeletedFalse(LegalTicketStatus status, LegalTicketType ticketType, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"workspace", "document", "createdBy", "assignedLawyer"})
+    Page<LegalTicket> findByRiskLevelAndTicketTypeAndDeletedFalse(RiskLevel riskLevel, LegalTicketType ticketType, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"workspace", "document", "createdBy", "assignedLawyer"})
+    Page<LegalTicket> findByStatusAndRiskLevelAndTicketTypeAndDeletedFalse(LegalTicketStatus status, RiskLevel riskLevel, LegalTicketType ticketType, Pageable pageable);
 
     long countByCreatedByIdAndDeletedFalseAndCreatedAtBetween(Long createdById, LocalDateTime start, LocalDateTime end);
 

@@ -17,8 +17,8 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: create-drop
-    show-sql: true
+      ddl-auto: ${JPA_DDL_AUTO:create-drop}
+    show-sql: ${JPA_SHOW_SQL:true}
     properties:
       hibernate:
         format_sql: true
@@ -42,7 +42,7 @@ spring:
             enable: true
 
 server:
-  port: 8080
+  port: ${SERVER_PORT:8080}
 
 springdoc:
   api-docs:
@@ -53,15 +53,15 @@ springdoc:
 
 app:
   api:
-    callback-base-url: http://localhost:8080
+    callback-base-url: ${APP_API_CALLBACK_BASE_URL:http://localhost:8080}
 
   ai-service:
-    base-url: http://localhost:8000
+    base-url: ${APP_AI_SERVICE_BASE_URL:http://localhost:8000}
     connect-timeout: ${AI_SERVICE_CONNECT_TIMEOUT:5s}
     read-timeout: ${AI_SERVICE_READ_TIMEOUT:130s}
 
   storage:
-    upload-root: uploads
+    upload-root: ${APP_STORAGE_UPLOAD_ROOT:uploads}
 
   mail:
     from: ${MAIL_FROM:${SMTP_USERNAME:}}
@@ -69,21 +69,21 @@ app:
     frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
 
   jwt:
-    secret: a-very-secure-secret-key-that-should-be-at-least-256-bits-long-for-hmac-sha-256
-    access-token-expiration-ms: 900000
-    refresh-token-expiration-ms: 604800000
-    refresh-cookie-name: refreshToken
+    secret: ${JWT_SECRET:a-very-secure-secret-key-that-should-be-at-least-256-bits-long-for-hmac-sha-256}
+    access-token-expiration-ms: ${JWT_ACCESS_TOKEN_EXPIRATION_MS:900000}
+    refresh-token-expiration-ms: ${JWT_REFRESH_TOKEN_EXPIRATION_MS:604800000}
+    refresh-cookie-name: ${JWT_REFRESH_COOKIE_NAME:refreshToken}
 
   payment:
     vnpay:
-      pay-url: https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
+      pay-url: ${VNPAY_PAY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
       return-url: ${VNPAY_RETURN_URL:http://localhost:8080/api/v1/payment-transactions/vnpay-return}
 
-      tmn-code: JSLOYW6T
-      hash-secret: QPZPU6FGA8L3WXRHEWV1UQHFBHLMWUPP
+      tmn-code: ${VNPAY_TMN_CODE:}
+      hash-secret: ${VNPAY_HASH_SECRET:}
 
-      version: 2.1.0
-      command: pay
-      curr-code: VND
-      order-type: other
-      locale: vn
+      version: ${VNPAY_VERSION:2.1.0}
+      command: ${VNPAY_COMMAND:pay}
+      curr-code: ${VNPAY_CURR_CODE:VND}
+      order-type: ${VNPAY_ORDER_TYPE:other}
+      locale: ${VNPAY_LOCALE:vn}

@@ -23,7 +23,7 @@ import {
   getSubscriptionPlans,
   updateSubscriptionPlan,
 } from '../../services/subscription.service';
-import { getUserDetail, getUsers, type BackendUser } from '../../services/user.service';
+import { createExpert, getAdminExperts, getUserDetail, getUsers, resendExpertActivation, type BackendUser } from '../../services/user.service';
 import { useAppStore, type ThemeMode } from '../../store/AppStore';
 import type { LegalTicket } from '../../types/legalTicket';
 import { getLegalTicketStatusLabel } from '../../types/legalTicketStatus';
@@ -112,16 +112,20 @@ export function AdminConsolePage() {
   const [ticketActionMessage, setTicketActionMessage] = useState<string | null>(null);
   const [ticketError, setTicketError] = useState<string | null>(null);
   const [assigningTicketId, setAssigningTicketId] = useState<string | null>(null);
+  const [createExpertOpen, setCreateExpertOpen] = useState(false);
+  const [savingExpert, setSavingExpert] = useState(false);
+  const [expertForm, setExpertForm] = useState({ firstName: '', lastName: '', email: '', specialty: '', legalDomain: '', description: '' });
 
   const loadAdminData = useCallback(async () => {
     setIsLoadingAdminData(true);
     setAdminError(null);
 
-    const [usersResult, paymentsResult, plansResult, ticketsResult] = await Promise.allSettled([
+    const [usersResult, paymentsResult, plansResult, ticketsResult, expertsResult] = await Promise.allSettled([
       getUsers(),
       getAllPaymentTransactions(),
       getSubscriptionPlans(),
       getAdminLegalTickets(),
+      getAdminExperts(),
     ]);
 
     if (usersResult.status === 'fulfilled') {
@@ -166,6 +170,13 @@ export function AdminConsolePage() {
       setTicketError(ticketsResult.reason instanceof Error ? ticketsResult.reason.message : t('admin.errors.loadTickets'));
     }
 
+    if (expertsResult.status === 'fulfilled') {
+      setBackendUsers((current) => {
+        const nonExperts = current.filter((entry) => entry.role !== 'EXPERT');
+        return [...nonExperts, ...expertsResult.value];
+      });
+    }
+
     setIsLoadingAdminData(false);
   }, [t]);
 
@@ -197,6 +208,31 @@ export function AdminConsolePage() {
     } finally {
       setUserDetailLoading(false);
     }
+  };
+
+  const handleCreateExpert = async () => {
+    if (!expertForm.firstName.trim() || !expertForm.lastName.trim() || !expertForm.email.trim() || !expertForm.specialty.trim() || !expertForm.legalDomain.trim()) {
+      toast.warning(language === 'vi' ? 'Vui lòng nhập họ, tên, email, chuyên môn và lĩnh vực pháp lý.' : 'First name, last name, email, specialty and legal domain are required.');
+      return;
+    }
+    setSavingExpert(true);
+    try {
+      await createExpert({ ...expertForm, active: true });
+      setCreateExpertOpen(false);
+      setExpertForm({ firstName: '', lastName: '', email: '', specialty: '', legalDomain: '', description: '' });
+      toast.success(language === 'vi' ? 'Đã tạo Expert với mật khẩu tạm 12345678; Expert phải đổi trong 7 ngày.' : 'Expert created with temporary password 12345678; it must be changed within 7 days.');
+      await loadAdminData();
+    } catch (error) { toast.error(error instanceof Error ? error.message : 'Unable to create expert.'); }
+    finally { setSavingExpert(false); }
+  };
+
+  const handleResendExpert = async (email: string) => {
+    if (!window.confirm(language === 'vi' ? `Reset mật khẩu tạm và gửi lại email cho ${email}?` : `Reset temporary password and resend activation to ${email}?`)) return;
+    try {
+      await resendExpertActivation(email);
+      toast.success(language === 'vi' ? 'Đã gửi lại thông tin kích hoạt.' : 'Activation details resent.');
+      await loadAdminData();
+    } catch (error) { toast.error(error instanceof Error ? error.message : 'Unable to resend activation.'); }
   };
 
   const resetPlanForm = () => {
@@ -467,7 +503,18 @@ export function AdminConsolePage() {
         <div className="space-y-gutter">
           <Card
             title={t('admin.users')}
-            actions={<Badge tone="blue">{isLoadingAdminData ? '...' : `${adminUsers.length} users`}</Badge>}
+            actions={
+              <div className="flex items-center gap-sm">
+                <Badge tone="blue">{isLoadingAdminData ? '...' : `${adminUsers.length} users`}</Badge>
+                <Button
+                  size="sm"
+                  leftIcon={<UserPlus className="h-4 w-4" />}
+                  onClick={() => setCreateExpertOpen(true)}
+                >
+                  {language === 'vi' ? 'Tạo Expert' : 'Create Expert'}
+                </Button>
+              </div>
+            }
           >
             {isLoadingAdminData ? (
               <p className="text-sm text-on-surface-variant dark:text-slate-400">{t('admin.loadingUsers')}</p>
@@ -908,7 +955,6 @@ export function AdminConsolePage() {
             >
               {t('billing.refresh')}
             </Button>
-            <Button leftIcon={<UserPlus className="h-4 w-4" />}>{t('admin.addUser')}</Button>
           </>
         }
       />
@@ -970,10 +1016,28 @@ export function AdminConsolePage() {
               <dt className="label-uppercase">{t('table.role')}</dt>
               <dd className="mt-xs">{selectedUserDetail.role}</dd>
             </div>
+            {selectedUserDetail.role === 'EXPERT' && (
+              <div className="sm:col-span-2">
+                <p className="text-sm text-on-surface-variant dark:text-slate-400">{selectedUserDetail.specialty || '-'} · {selectedUserDetail.legalDomain || '-'}</p>
+                <Button className="mt-sm" variant="secondary" onClick={() => void handleResendExpert(selectedUserDetail.email)}>{language === 'vi' ? 'Gửi lại kích hoạt' : 'Resend activation'}</Button>
+              </div>
+            )}
           </dl>
         ) : (
           <p className="text-sm text-on-surface-variant dark:text-slate-400">{t('admin.noUserDetail')}</p>
         )}
+      </Modal>
+
+      <Modal open={createExpertOpen} title={language === 'vi' ? 'Tạo tài khoản Expert' : 'Create Expert account'} onClose={() => setCreateExpertOpen(false)} footer={<><Button variant="secondary" onClick={() => setCreateExpertOpen(false)}>{t('actions.close')}</Button><Button onClick={() => void handleCreateExpert()} disabled={savingExpert}>{savingExpert ? (language === 'vi' ? 'Đang tạo…' : 'Creating…') : (language === 'vi' ? 'Tạo Expert' : 'Create Expert')}</Button></>}>
+        <p className="mb-md text-sm text-on-surface-variant dark:text-slate-400">{language === 'vi' ? 'Không cần nhập mật khẩu. Hệ thống dùng mật khẩu tạm mặc định và yêu cầu Expert đổi trong 7 ngày.' : 'No password input is needed. The system issues a temporary password that must be changed within 7 days.'}</p>
+        <div className="grid gap-md sm:grid-cols-2">
+          <label className="text-sm font-semibold">{language === 'vi' ? 'Họ' : 'First name'}<input className="form-field mt-xs" value={expertForm.firstName} onChange={(e) => setExpertForm((v) => ({ ...v, firstName: e.target.value }))} /></label>
+          <label className="text-sm font-semibold">{language === 'vi' ? 'Tên' : 'Last name'}<input className="form-field mt-xs" value={expertForm.lastName} onChange={(e) => setExpertForm((v) => ({ ...v, lastName: e.target.value }))} /></label>
+          <label className="text-sm font-semibold sm:col-span-2">Email<input className="form-field mt-xs" type="email" value={expertForm.email} onChange={(e) => setExpertForm((v) => ({ ...v, email: e.target.value }))} /></label>
+          <label className="text-sm font-semibold">{language === 'vi' ? 'Chuyên môn' : 'Specialty'}<input className="form-field mt-xs" value={expertForm.specialty} onChange={(e) => setExpertForm((v) => ({ ...v, specialty: e.target.value }))} /></label>
+          <label className="text-sm font-semibold">{language === 'vi' ? 'Lĩnh vực pháp lý' : 'Legal domain'}<input className="form-field mt-xs" value={expertForm.legalDomain} onChange={(e) => setExpertForm((v) => ({ ...v, legalDomain: e.target.value }))} /></label>
+          <label className="text-sm font-semibold sm:col-span-2">{language === 'vi' ? 'Mô tả kinh nghiệm' : 'Experience description'}<textarea className="form-field mt-xs min-h-24" value={expertForm.description} onChange={(e) => setExpertForm((v) => ({ ...v, description: e.target.value }))} /></label>
+        </div>
       </Modal>
     </div>
   );

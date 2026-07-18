@@ -6,6 +6,7 @@ import com.analyzer.api.entity.LegalTicket;
 import com.analyzer.api.entity.LegalTicketMessage;
 import com.analyzer.api.entity.User;
 import com.analyzer.api.enums.LegalTicketStatus;
+import com.analyzer.api.enums.LegalTicketMessageType;
 import com.analyzer.api.enums.RiskLevel;
 import com.analyzer.api.enums.SuggestionType;
 import com.analyzer.api.exception.common.ConflictException;
@@ -16,6 +17,7 @@ import com.analyzer.api.repository.LegalTicketMessageRepository;
 import com.analyzer.api.repository.LegalTicketRepository;
 import com.analyzer.api.repository.UserRepository;
 import com.analyzer.api.service.admin.AdminTicketManagementService;
+import com.analyzer.api.service.EmailService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +33,7 @@ public class AdminTicketManagementServiceImpl implements AdminTicketManagementSe
     private final DocumentRepository documentRepository;
     private final UserRepository userRepository;
     private final LegalTicketMapper legalTicketMapper;
+    private final EmailService emailService;
 
     @Override
     @Transactional
@@ -46,11 +49,19 @@ public class AdminTicketManagementServiceImpl implements AdminTicketManagementSe
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy Luật sư ID: " + request.getLawyerId()));
 
         ticket.setAssignedLawyer(lawyer);
+        ticket.setAssignedAt(java.time.LocalDateTime.now());
         if (ticket.getStatus() == LegalTicketStatus.PENDING_ADMIN_REVIEW || ticket.getStatus() == LegalTicketStatus.DRAFT) {
             ticket.setStatus(LegalTicketStatus.ASSIGNED_TO_LAWYER);
         }
 
         LegalTicket savedTicket = legalTicketRepository.save(ticket);
+        String ticketType = savedTicket.getTicketType() != null ? savedTicket.getTicketType().name() : "CONTACT_EXPERT";
+        emailService.sendTicketNotificationAsync(lawyer.getEmail(), lawyer.getFirstName(), savedTicket.getId(),
+                ticketType, savedTicket.getStatus().name(), "/lawyer/tickets/" + savedTicket.getId(),
+                "Ban vua duoc admin phan cong ticket.");
+        emailService.sendTicketNotificationAsync(savedTicket.getCreatedBy().getEmail(), savedTicket.getCreatedBy().getFirstName(), savedTicket.getId(),
+                ticketType, savedTicket.getStatus().name(), "/tickets/" + savedTicket.getId(),
+                "Ticket da duoc phan cong cho chuyen gia.");
         return legalTicketMapper.toResponse(savedTicket);
     }
 
@@ -59,6 +70,46 @@ public class AdminTicketManagementServiceImpl implements AdminTicketManagementSe
     public LegalTicketResponse reassignLawyer(String ticketId, Long adminId, AssignLawyerRequest request) {
         request.setForceReassign(true);
         return assignLawyer(ticketId, adminId, request);
+    }
+
+    @Override
+    @Transactional
+    public LegalTicketResponse approveInternal(String ticketId, Long adminId) {
+        LegalTicket ticket = legalTicketRepository.findByIdAndDeletedFalse(ticketId)
+                .orElseThrow(() -> new ResourceNotFoundException("TICKET_NOT_FOUND"));
+        if (ticket.getStatus() != LegalTicketStatus.PENDING_ADMIN_REVIEW) {
+            throw new ConflictException("INVALID_STATUS_TRANSITION");
+        }
+        User admin = userRepository.findById(adminId)
+                .orElseThrow(() -> new ResourceNotFoundException("ADMIN_NOT_FOUND"));
+        ticket.setStatus(LegalTicketStatus.IN_REVIEW);
+        legalTicketMessageRepository.save(LegalTicketMessage.builder().ticket(ticket).sender(admin)
+                .content("Admin da tiep nhan va dang xu ly noi bo.")
+                .messageType(LegalTicketMessageType.SYSTEM).internalOnly(false).build());
+        return legalTicketMapper.toResponse(legalTicketRepository.save(ticket));
+    }
+
+    @Override
+    @Transactional
+    public LegalTicketResponse closeInternal(String ticketId, Long adminId, String note) {
+        LegalTicket ticket = legalTicketRepository.findByIdAndDeletedFalse(ticketId)
+                .orElseThrow(() -> new ResourceNotFoundException("TICKET_NOT_FOUND"));
+        User admin = userRepository.findById(adminId)
+                .orElseThrow(() -> new ResourceNotFoundException("ADMIN_NOT_FOUND"));
+        if (ticket.getStatus() == LegalTicketStatus.CLOSED || ticket.getStatus() == LegalTicketStatus.CANCELLED) {
+            throw new ConflictException("INVALID_STATUS_TRANSITION");
+        }
+        ticket.setStatus(LegalTicketStatus.CLOSED);
+        ticket.setClosedAt(java.time.LocalDateTime.now());
+        ticket.setAdminNote(note);
+        legalTicketMessageRepository.save(LegalTicketMessage.builder().ticket(ticket).sender(admin)
+                .content("Admin da dong ticket." + (note == null || note.isBlank() ? "" : " " + note))
+                .messageType(LegalTicketMessageType.SYSTEM).internalOnly(false).build());
+        LegalTicket saved = legalTicketRepository.save(ticket);
+        emailService.sendTicketNotificationAsync(saved.getCreatedBy().getEmail(), saved.getCreatedBy().getFirstName(),
+                saved.getId(), saved.getTicketType() != null ? saved.getTicketType().name() : "CONTACT_EXPERT",
+                saved.getStatus().name(), "/tickets/" + saved.getId(), note);
+        return legalTicketMapper.toResponse(saved);
     }
 
     @Override

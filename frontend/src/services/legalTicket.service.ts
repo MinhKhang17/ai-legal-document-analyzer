@@ -1,4 +1,4 @@
-import { API_ENDPOINTS } from "../config/api";
+import { API_ENDPOINTS, buildApiUrl } from "../config/api";
 import type {
   AdminChatHistory,
   AdminTicketFile,
@@ -15,6 +15,7 @@ import type {
   TicketSummary,
 } from "../types/legalTicket";
 import type { LegalTicketStatus } from "../types/legalTicketStatus";
+import type { LegalTicketType } from "../types/legalTicket";
 import { normalizeLegalTicketStatus } from "../types/legalTicketStatus";
 import { buildAuthHeaders, requestApiData } from "./http";
 
@@ -170,11 +171,13 @@ export const getAdminLegalTickets = async (
   size = 10,
   status?: LegalTicketStatus,
   riskLevel?: string,
+  ticketType?: LegalTicketType,
 ): Promise<PageResponse<LegalTicket>> =>
   getJson<PageResponse<LegalTicket>>(
     `${API_ENDPOINTS.legalTickets.adminList}?${buildPageQuery(page, size, {
       status: getLegalTicketStatusQueryParam(status),
       riskLevel,
+      ticketType,
     })}`,
     "Không thể tải danh sách legal ticket admin",
   );
@@ -240,3 +243,24 @@ export const rejectLegalTicket = async (
     payload,
     "Không thể từ chối legal ticket",
   );
+
+export const approveLegalTicketInternal = async (ticketId: string): Promise<LegalTicket> =>
+  postJson<LegalTicket>(API_ENDPOINTS.legalTickets.adminApprove(ticketId), undefined, "Khong the tiep nhan ticket");
+
+export const closeLegalTicketInternal = async (ticketId: string, note?: string): Promise<LegalTicket> =>
+  postJson<LegalTicket>(API_ENDPOINTS.legalTickets.adminClose(ticketId), { note }, "Khong the dong ticket");
+
+export const getCustomerTicketFiles = async (ticketId: string): Promise<AdminTicketFile[]> =>
+  getJson<AdminTicketFile[]>(API_ENDPOINTS.legalTickets.files(ticketId), "Không thể tải file của ticket");
+
+export const downloadCustomerTicketFile = async (ticketId: string, documentId: string): Promise<string> => {
+  const response = await fetch(buildApiUrl(API_ENDPOINTS.legalTickets.downloadFile(ticketId, documentId)), { method: 'GET', headers: buildAuthHeaders({ Accept: 'application/octet-stream' }), credentials: 'include' });
+  if (!response.ok) throw new Error('Không thể tải file');
+  return URL.createObjectURL(await response.blob());
+};
+
+export const downloadStaffDocument = async (documentId: string): Promise<string> => {
+  const response = await fetch(buildApiUrl(API_ENDPOINTS.adminDocuments.download(documentId)), { method: 'GET', headers: buildAuthHeaders({ Accept: 'application/octet-stream' }), credentials: 'include' });
+  if (!response.ok) throw new Error('Không thể tải tài liệu gốc');
+  return URL.createObjectURL(await response.blob());
+};

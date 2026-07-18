@@ -24,7 +24,6 @@ import {
 import { Link, useParams } from "react-router-dom";
 import { LAWYER_UPLOAD_ACCEPT, validateLawyerUpload } from "../../config/lawyerUpload";
 import {
-  closeLawyerTicket,
   downloadLawyerTicketFile,
   getLawyerTicketDetail,
   getLawyerTicketFiles,
@@ -47,6 +46,7 @@ import { PageHeader } from "../../components/common/PageHeader";
 import { useI18n } from "../../hooks/useI18n";
 import { useToast } from "../../hooks/useToast";
 import { formatDisplayDate } from "../../utils/format";
+import { ApiRequestError } from "../../services/http";
 
 const getValue = (value?: string | number | null) =>
   value === undefined || value === null || value === "" ? "—" : String(value);
@@ -63,8 +63,12 @@ const terminalStatuses = new Set(["REJECTED_BY_ADMIN", "RESOLVED", "CLOSED", "CA
 const canStartReview = (status?: string | null) =>
   status === "ASSIGNED_TO_LAWYER" || status === "CUSTOMER_RESPONDED" || status === "REOPENED";
 
-const canWorkOnTicket = (status?: string | null) =>
-  Boolean(status) && !terminalStatuses.has(String(status));
+const canChatOnTicket = (status?: string | null) =>
+  Boolean(status && ['ASSIGNED_TO_LAWYER', 'IN_REVIEW', 'NEED_MORE_INFO', 'CUSTOMER_RESPONDED', 'REOPENED'].includes(status));
+const canRequestMoreInfo = (status?: string | null) =>
+  Boolean(status && ['ASSIGNED_TO_LAWYER', 'IN_REVIEW', 'CUSTOMER_RESPONDED'].includes(status));
+const canResolveTicket = (status?: string | null) =>
+  Boolean(status && ['ASSIGNED_TO_LAWYER', 'IN_REVIEW', 'CUSTOMER_RESPONDED', 'REOPENED'].includes(status));
 
 const fileToBase64 = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -100,7 +104,6 @@ export function LawyerTicketDetailPage() {
   const [uploadValidationError, setUploadValidationError] = useState("");
   const [openingDocumentId, setOpeningDocumentId] = useState("");
 
-  const [closingTicket, setClosingTicket] = useState(false);
   const [startingReview, setStartingReview] = useState(false);
   const [requestInfoOpen, setRequestInfoOpen] = useState(false);
   const [requestInfoMessage, setRequestInfoMessage] = useState("");
@@ -111,7 +114,6 @@ export function LawyerTicketDetailPage() {
   const [resolveSubmitting, setResolveSubmitting] = useState(false);
   const [actionError, setActionError] = useState("");
 
-  const isClosed = ticket?.status === "CLOSED";
   const isTerminal = terminalStatuses.has(String(ticket?.status ?? ""));
 
   const loadTicket = useCallback(async () => {
@@ -184,12 +186,13 @@ export function LawyerTicketDetailPage() {
       setMessageValue("");
       toast.success(t("lawyerTickets.messages.sendSuccess"));
       await loadMessages();
-    } catch {
-      toast.error(t("lawyerTickets.messages.sendError"));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("lawyerTickets.messages.sendError"));
+      if (error instanceof ApiRequestError && error.status === 409) await refreshAll();
     } finally {
       setSendingMessage(false);
     }
-  }, [ticketId, messageValue, toast, t, loadMessages]);
+  }, [ticketId, messageValue, toast, t, loadMessages, refreshAll]);
 
   const handleUploadFile = useCallback(
     async (event: ChangeEvent<HTMLInputElement>) => {
@@ -229,40 +232,15 @@ export function LawyerTicketDetailPage() {
         toast.success(t("lawyerTickets.files.uploadSuccess"));
         setSelectedUploadFile(null);
         await loadFiles();
-      } catch {
-        toast.error(t("lawyerTickets.files.uploadError"));
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : t("lawyerTickets.files.uploadError"));
+        if (error instanceof ApiRequestError && error.status === 409) await refreshAll();
       } finally {
         setUploadingFile(false);
       }
     },
-    [ticketId, ticket, loadFiles, toast, t],
+    [ticketId, ticket, loadFiles, refreshAll, toast, t],
   );
-
-  const handleCloseTicket = useCallback(async () => {
-    if (!ticketId || isClosed) return;
-
-    const confirmed = window.confirm(
-      t("lawyerTickets.close.confirmDescription"),
-    );
-
-    if (!confirmed) return;
-
-    try {
-      setClosingTicket(true);
-
-      const data = await closeLawyerTicket(ticketId, {
-        feedback: t("lawyerTickets.close.defaultFeedback"),
-      });
-
-      setTicket(data);
-      toast.success(t("lawyerTickets.close.success"));
-      await loadTicket();
-    } catch {
-      toast.error(t("lawyerTickets.close.error"));
-    } finally {
-      setClosingTicket(false);
-    }
-  }, [ticketId, isClosed, loadTicket, toast, t]);
 
   const handleStartReview = useCallback(async () => {
     if (!ticketId || !ticket || !canStartReview(ticket.status)) return;
@@ -278,6 +256,7 @@ export function LawyerTicketDetailPage() {
       const message = error instanceof Error ? error.message : "Không thể bắt đầu xử lý ticket.";
       setActionError(message);
       toast.error(message);
+      if (error instanceof ApiRequestError && error.status === 409) await refreshAll();
     } finally {
       setStartingReview(false);
     }
@@ -300,6 +279,7 @@ export function LawyerTicketDetailPage() {
       const messageText = error instanceof Error ? error.message : "Không thể gửi yêu cầu bổ sung thông tin.";
       setActionError(messageText);
       toast.error(messageText);
+      if (error instanceof ApiRequestError && error.status === 409) await refreshAll();
     } finally {
       setRequestInfoSubmitting(false);
     }
@@ -326,6 +306,7 @@ export function LawyerTicketDetailPage() {
       const message = error instanceof Error ? error.message : "Không thể gửi kết luận xử lý ticket.";
       setActionError(message);
       toast.error(message);
+      if (error instanceof ApiRequestError && error.status === 409) await refreshAll();
     } finally {
       setResolveSubmitting(false);
     }
@@ -355,7 +336,16 @@ export function LawyerTicketDetailPage() {
 
   useEffect(() => {
     void refreshAll();
-  }, [refreshAll]);
+    const intervalId = window.setInterval(() => {
+      if (!ticketId) return;
+      void Promise.allSettled([
+        getLawyerTicketDetail(ticketId).then(setTicket),
+        getLawyerTicketMessages(ticketId).then((items) => setMessages(items ?? [])),
+        getLawyerTicketFiles(ticketId).then((items) => setFiles(items ?? [])),
+      ]);
+    }, 4000);
+    return () => window.clearInterval(intervalId);
+  }, [refreshAll, ticketId]);
 
   return (
     <div className="space-y-6">
@@ -376,14 +366,6 @@ export function LawyerTicketDetailPage() {
               {t("lawyerTickets.detail.refresh")}
             </Button>
 
-            <Button
-              onClick={handleCloseTicket}
-              disabled={!ticket || loading || closingTicket || isClosed}
-            >
-              {closingTicket
-                ? t("common.loading")
-                : t("lawyerTickets.close.button")}
-            </Button>
           </div>
         }
       />
@@ -477,13 +459,13 @@ export function LawyerTicketDetailPage() {
                 <Button
                   variant="secondary"
                   onClick={() => setRequestInfoOpen(true)}
-                  disabled={!canWorkOnTicket(ticket.status)}
+                  disabled={!canRequestMoreInfo(ticket.status)}
                 >
                   Yêu cầu bổ sung
                 </Button>
                 <Button
                   onClick={() => setResolveOpen(true)}
-                  disabled={!canWorkOnTicket(ticket.status)}
+                  disabled={!canResolveTicket(ticket.status)}
                 >
                   Gửi kết luận
                 </Button>
@@ -663,7 +645,7 @@ export function LawyerTicketDetailPage() {
               </div>
             )}
 
-            <div className="mt-4 flex gap-2">
+            {canChatOnTicket(ticket.status) && <div className="mt-4 flex gap-2">
               <textarea
                 value={messageValue}
                 onChange={(event) => setMessageValue(event.target.value)}
@@ -677,7 +659,7 @@ export function LawyerTicketDetailPage() {
                 <Send className="mr-2 h-4 w-4" />
                 {t("lawyerTickets.messages.send")}
               </Button>
-            </div>
+            </div>}
           </Card>
 
           <Card className="p-6">
@@ -695,7 +677,7 @@ export function LawyerTicketDetailPage() {
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <label className="inline-flex cursor-pointer items-center rounded-lg border px-4 py-2 text-sm font-medium">
+                {canChatOnTicket(ticket.status) && <label className="inline-flex cursor-pointer items-center rounded-lg border px-4 py-2 text-sm font-medium">
                   <input
                     type="file"
                     accept={LAWYER_UPLOAD_ACCEPT}
@@ -706,7 +688,7 @@ export function LawyerTicketDetailPage() {
                   {uploadingFile
                     ? t("common.loading")
                     : t("lawyerTickets.files.upload")}
-                </label>
+                </label>}
 
                 <Button onClick={loadFiles} disabled={filesLoading}>
                   <RefreshCw className="mr-2 h-4 w-4" />

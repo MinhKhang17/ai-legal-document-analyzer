@@ -1,6 +1,7 @@
 package com.analyzer.api.dto.legalticket;
 
 import com.analyzer.api.enums.LegalTicketStatus;
+import com.analyzer.api.enums.LegalTicketType;
 import com.analyzer.api.enums.RiskLevel;
 import com.analyzer.api.enums.SuggestionType;
 import com.analyzer.api.enums.UserActionHint;
@@ -21,6 +22,15 @@ import java.time.LocalDateTime;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @Schema(description = "Legal ticket response details")
 public class LegalTicketResponse {
+
+    @JsonProperty("ticket_type")
+    private LegalTicketType ticketType;
+
+    @JsonProperty("chat_session_id")
+    private String relatedChatSessionId;
+
+    @JsonProperty("chat_message_id")
+    private String relatedChatMessageId;
 
     @JsonProperty("id")
     private String id;

@@ -1,4 +1,4 @@
-export type UserRole = "ADMIN" | "CUSTOMER" | "USER" | string;
+export type UserRole = "ADMIN" | "CUSTOMER" | "EXPERT" | "USER" | string;
 
 export interface CurrentUser {
   id: number;
@@ -7,6 +7,9 @@ export interface CurrentUser {
   email: string;
   role: UserRole;
   active: boolean;
+  emailVerified?: boolean;
+  mustChangePassword?: boolean;
+  passwordResetDeadline?: string | null;
 }
 
 export interface ApiResponse<T> {

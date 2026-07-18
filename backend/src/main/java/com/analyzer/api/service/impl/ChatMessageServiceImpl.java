@@ -32,6 +32,7 @@ import com.analyzer.api.exception.validation.*;
 import com.analyzer.api.repository.ChatMessageFeedbackRepository;
 import com.analyzer.api.repository.ChatMessageRepository;
 import com.analyzer.api.repository.ChatSessionRepository;
+import com.analyzer.api.repository.ChatSessionDocumentRepository;
 import com.analyzer.api.repository.DocumentRepository;
 import com.analyzer.api.repository.UserRepository;
 import com.analyzer.api.repository.WorkspaceRepository;
@@ -69,6 +70,7 @@ public class ChatMessageServiceImpl implements ChatMessageService {
     private final SubscriptionQuotaService subscriptionQuotaService;
     private final AiCitationRepository aiCitationRepository;
     private final ChatMessageFeedbackRepository chatMessageFeedbackRepository;
+    private final ChatSessionDocumentRepository chatSessionDocumentRepository;
 
     @Override
     @Transactional(noRollbackFor = {AiServiceUnavailableException.class, AiServiceTimeoutException.class})
@@ -93,12 +95,9 @@ public class ChatMessageServiceImpl implements ChatMessageService {
             throw new WorkspaceDeletedException("Workspace has been deleted", workspaceId, workspace.getStatus());
         }
 
-        // Validate Documents
+        // An explicitly selected document remains supported for legacy clients. When no
+        // document is selected, the request continues in system-KB-only mode.
         Document selectedDocument = resolveSelectedDocument(userId, workspaceId, request.getDocumentId());
-        boolean isSandboxWorkspace = "System workspace for general contract assistant chat".equals(workspace.getDescription());
-        if (!isSandboxWorkspace) {
-            validateWorkspaceDocuments(userId, workspaceId, selectedDocument);
-        }
 
         // Find or create default ChatSession
         ChatSession chatSession = chatSessionRepository.findByWorkspaceIdAndUserIdAndIsDefaultTrueAndStatus(
@@ -141,12 +140,9 @@ public class ChatMessageServiceImpl implements ChatMessageService {
             throw new WorkspaceDeletedException("Workspace has been deleted", workspace.getId(), workspace.getStatus());
         }
 
-        // Validate Documents
+        // No attached document means system-KB-only mode. An explicit document ID is
+        // still validated to preserve compatibility with older API clients.
         Document selectedDocument = resolveSelectedDocument(userId, workspace.getId(), request.getDocumentId());
-        boolean isSandboxWorkspace = "System workspace for general contract assistant chat".equals(workspace.getDescription());
-        if (!isSandboxWorkspace) {
-            validateWorkspaceDocuments(userId, workspace.getId(), selectedDocument);
-        }
 
         // Create User Message
         ChatMessage userMessage = createAndSaveUserMessage(chatSession, request.getMessage().trim());
@@ -400,11 +396,28 @@ public class ChatMessageServiceImpl implements ChatMessageService {
 
         RagQueryResponse aiResponse;
         try {
+            var activeMappings = chatSessionDocumentRepository
+                    .findByChatSessionIdAndUserIdAndActiveTrueOrderByAttachedAtAsc(chatSession.getId(), currentUser.getId());
+            List<String> attachedDocumentIds = activeMappings.stream()
+                    .map(mapping -> mapping.getDocument())
+                    .filter(document -> "READY".equalsIgnoreCase(document.getStatus()))
+                    .map(Document::getId)
+                    .distinct()
+                    .toList();
+            if (!activeMappings.isEmpty() && attachedDocumentIds.isEmpty()) {
+                throw new NoReadyDocumentsException(
+                        "Attached documents are still processing",
+                        workspace.getId(), 0, activeMappings.size());
+            }
             RagQueryRequest aiRequest = RagQueryRequest.builder()
                     .requestId(requestId)
                     .userId(String.valueOf(workspace.getUser().getId()))
                     .workspaceId(workspace.getId())
-                    .documentId(selectedDocument != null ? selectedDocument.getId() : null)
+                    .documentId(activeMappings.isEmpty() && selectedDocument != null ? selectedDocument.getId() : null)
+                    // [] explicitly means system-KB-only; null preserves legacy single-document behavior.
+                    .attachedDocumentIds(activeMappings.isEmpty() && selectedDocument != null
+                            ? null
+                            : attachedDocumentIds)
                     .chatSessionId(chatSession.getId())
                     .question(question)
                     .chatHistory(chatHistoryStr.isEmpty() ? null : chatHistoryStr)
@@ -412,6 +425,11 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                     .topKKnowledgeChunks(5)
                     .build();
             aiResponse = pythonAiClient.query(aiRequest);
+        } catch (NoReadyDocumentsException ex) {
+            userMessage.setStatus(ChatMessageStatus.FAILED);
+            userMessage.setErrorMessage(ex.getMessage());
+            chatMessageRepository.save(userMessage);
+            throw ex;
         } catch (AiServiceUnavailableException | AiServiceTimeoutException ex) {
             // Persist failed user message state
             userMessage.setStatus(ChatMessageStatus.FAILED);

@@ -85,13 +85,16 @@ class GraphRepository:
         *,
         query_text: str | None = None,
         document_id: str | None = None,
+        document_ids: list[str] | None = None,
     ) -> list[RetrievedChunk]:
         metadata_filter: dict[str, Any] = {
             "source_type": "USER_DOCUMENT",
             "user_id": user_id,
             "workspace_id": workspace_id,
         }
-        if document_id:
+        if document_ids:
+            metadata_filter["document_id"] = set(document_ids)
+        elif document_id:
             metadata_filter["document_id"] = document_id
         return self._search_chunks_with_filter(
             query_embedding=embedding,

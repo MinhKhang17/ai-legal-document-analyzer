@@ -20,4 +20,8 @@ public interface EmailService {
      * as {@link #sendVerificationEmailAsync}.
      */
     void sendExpertAccountCreatedEmailAsync(String toEmail, String recipientName, String temporaryPassword, int passwordChangeDeadlineDays);
+
+    void sendTicketNotificationAsync(String toEmail, String recipientName, String ticketId,
+                                     String ticketType, String ticketStatus, String relativePath,
+                                     String detail);
 }

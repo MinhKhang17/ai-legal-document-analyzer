@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -23,6 +25,9 @@ public class RagQueryRequest {
 
     @JsonProperty("document_id")
     private String documentId;
+
+    @JsonProperty("attached_document_ids")
+    private List<String> attachedDocumentIds;
 
     @JsonProperty("chat_session_id")
     private String chatSessionId;

@@ -361,6 +361,7 @@ export function ContractAssistantPage() {
 
     try {
       const ticket = await createLegalTicket({
+        ticket_type: "QUERY_ERROR",
         request_id: assistantMessage.requestId,
         workspace_id: sandboxWorkspaceId,
         document_id: null,

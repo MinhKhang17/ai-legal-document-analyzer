@@ -6,6 +6,7 @@ import com.analyzer.api.entity.*;
 import com.analyzer.api.enums.ChatMessageRole;
 import com.analyzer.api.enums.LegalTicketMessageType;
 import com.analyzer.api.enums.LegalTicketStatus;
+import com.analyzer.api.enums.LegalTicketType;
 import com.analyzer.api.enums.RiskLevel;
 import com.analyzer.api.enums.RoleName;
 import com.analyzer.api.exception.common.ConflictException;
@@ -14,6 +15,7 @@ import com.analyzer.api.exception.common.ResourceNotFoundException;
 import com.analyzer.api.mapper.LegalTicketMapper;
 import com.analyzer.api.repository.*;
 import com.analyzer.api.service.LegalTicketService;
+import com.analyzer.api.service.EmailService;
 import com.analyzer.api.service.SubscriptionQuotaService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -41,13 +43,17 @@ public class LegalTicketServiceImpl implements LegalTicketService {
     private final DocumentRepository documentRepository;
     private final LegalTicketMapper legalTicketMapper;
     private final SubscriptionQuotaService subscriptionQuotaService;
+    private final EmailService emailService;
 
     @Override
     @Transactional
     public LegalTicketResponse createTicket(Long customerId, CreateLegalTicketRequest request) {
         User customer = userRepository.findById(customerId)
                 .orElseThrow(() -> new ResourceNotFoundException("USER_NOT_FOUND"));
-        subscriptionQuotaService.checkCanCreateExpertTicket(customer);
+        LegalTicketType requestedType = request.getTicketType() != null ? request.getTicketType() : LegalTicketType.CONTACT_EXPERT;
+        if (requestedType == LegalTicketType.CONTACT_EXPERT) {
+            subscriptionQuotaService.checkCanCreateExpertTicket(customer);
+        }
 
         Workspace workspace = workspaceRepository.findById(request.getWorkspaceId())
                 .orElseThrow(() -> new ForbiddenException("WORKSPACE_ACCESS_DENIED"));
@@ -94,6 +100,10 @@ public class LegalTicketServiceImpl implements LegalTicketService {
                 .requestId(requestId)
                 .issueFingerprint(request.getIssueFingerprint())
                 .customerNote(customerNote)
+                .ticketType(requestedType)
+                .relatedChatSessionId(firstNonBlank(request.getChatSessionId(),
+                        chatMsg != null && chatMsg.getChatSession() != null ? chatMsg.getChatSession().getId() : null))
+                .relatedChatMessageId(firstNonBlank(request.getChatMessageId(), chatMsg != null ? chatMsg.getId() : null))
                 .createdBy(customer)
                 .workspace(workspace)
                 .document(document)
@@ -130,7 +140,15 @@ public class LegalTicketServiceImpl implements LegalTicketService {
                 .internalOnly(false)
                 .build();
         legalTicketMessageRepository.save(systemMsg);
-        subscriptionQuotaService.recordExpertTicketUsage(customer);
+        if (requestedType == LegalTicketType.CONTACT_EXPERT) {
+            subscriptionQuotaService.recordExpertTicketUsage(customer);
+        }
+
+        for (User admin : userRepository.findAllByRole_NameAndActiveTrue(RoleName.ADMIN)) {
+            emailService.sendTicketNotificationAsync(admin.getEmail(), admin.getFirstName(), ticket.getId(),
+                    ticket.getTicketType().name(), ticket.getStatus().name(), "/admin/tickets/" + ticket.getId(),
+                    "Co ticket moi tu " + customer.getEmail());
+        }
 
         return legalTicketMapper.toResponse(ticket);
     }
@@ -312,11 +330,19 @@ public class LegalTicketServiceImpl implements LegalTicketService {
 
     @Override
     @Transactional(readOnly = true)
-    public PageResponse<LegalTicketResponse> listAdminTickets(LegalTicketStatus status, RiskLevel riskLevel, int page, int size) {
+    public PageResponse<LegalTicketResponse> listAdminTickets(LegalTicketStatus status, RiskLevel riskLevel, LegalTicketType ticketType, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<LegalTicket> pageResult;
 
-        if (status != null && riskLevel != null) {
+        if (status != null && riskLevel != null && ticketType != null) {
+            pageResult = legalTicketRepository.findByStatusAndRiskLevelAndTicketTypeAndDeletedFalse(status, riskLevel, ticketType, pageable);
+        } else if (status != null && ticketType != null) {
+            pageResult = legalTicketRepository.findByStatusAndTicketTypeAndDeletedFalse(status, ticketType, pageable);
+        } else if (riskLevel != null && ticketType != null) {
+            pageResult = legalTicketRepository.findByRiskLevelAndTicketTypeAndDeletedFalse(riskLevel, ticketType, pageable);
+        } else if (ticketType != null) {
+            pageResult = legalTicketRepository.findByTicketTypeAndDeletedFalse(ticketType, pageable);
+        } else if (status != null && riskLevel != null) {
             pageResult = legalTicketRepository.findByStatusAndRiskLevelAndDeletedFalse(status, riskLevel, pageable);
         } else if (status != null) {
             pageResult = legalTicketRepository.findByStatusAndDeletedFalse(status, pageable);
@@ -363,6 +389,10 @@ public class LegalTicketServiceImpl implements LegalTicketService {
                 .internalOnly(false)
                 .build();
         legalTicketMessageRepository.save(msg);
+
+        emailService.sendTicketNotificationAsync(ticket.getCreatedBy().getEmail(), ticket.getCreatedBy().getFirstName(),
+                ticket.getId(), ticket.getTicketType() != null ? ticket.getTicketType().name() : "CONTACT_EXPERT",
+                ticket.getStatus().name(), "/tickets/" + ticket.getId(), request.getReason());
 
         return legalTicketMapper.toResponse(ticket);
     }

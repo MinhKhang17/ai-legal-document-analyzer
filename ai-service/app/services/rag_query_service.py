@@ -4,6 +4,7 @@ import logging
 import re
 
 from app.core.knowledge_access import is_published_system_kb
+from app.core.config import settings
 from app.models.intent_enums import (
     ContractType,
     LegalQueryIntent,
@@ -62,10 +63,16 @@ class RagQueryService:
         retrieval_service: RetrievalService | None = None,
         llm_client: RagLlmClient | None = None,
         context_store: LegalConversationContextStore | None = None,
+        llm_enabled: bool | None = None,
     ) -> None:
         self.retrieval_service = retrieval_service or RetrievalService()
         self.llm_client = llm_client or build_default_llm_client()
         self.context_store = context_store or LegalConversationContextStore()
+        self.llm_enabled = (
+            settings.llm_query_enabled
+            if llm_enabled is None and llm_client is None
+            else (True if llm_enabled is None else llm_enabled)
+        )
 
     def query(self, request: RagQueryRequest) -> RagQueryResponse:
         from app.services.contract_generation_service import ContractGenerationService, is_contract_generation_intent
@@ -77,6 +84,7 @@ class RagQueryService:
             gen_service = ContractGenerationService(
                 retrieval_service=self.retrieval_service,
                 llm_client=self.llm_client,
+                llm_enabled=self.llm_enabled,
             )
             return gen_service.generate_contract(request)
 
@@ -161,6 +169,18 @@ class RagQueryService:
             response_mode=intent_result.response_mode,
             completeness_questions=None,
         )
+
+        if not self.llm_enabled:
+            logger.info("LLM_QUERY_ENABLED=false; returning prompt preview for request %s", request.requestId)
+            return self._build_prompt_preview_response(
+                request=request,
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                intent_result=intent_result,
+                completeness=completeness,
+                user_hits=prompt_user_hits,
+                knowledge_hits=prompt_knowledge_hits,
+            )
 
         llm_result = self.llm_client.generate(system_prompt=system_prompt, user_prompt=user_prompt)
         if llm_result.error or not llm_result.answer:
@@ -282,6 +302,7 @@ class RagQueryService:
                 completionTokens=llm_result.completion_tokens,
                 totalTokens=llm_result.total_tokens,
             ),
+            llmExecuted=True,
         )
         if request.chatSessionId:
             self.context_store.append(
@@ -305,6 +326,54 @@ class RagQueryService:
             )
         return response
 
+    def _build_prompt_preview_response(
+        self,
+        *,
+        request: RagQueryRequest,
+        system_prompt: str,
+        user_prompt: str,
+        intent_result,
+        completeness,
+        user_hits: list[RagChunkHit],
+        knowledge_hits: list[RagChunkHit],
+    ) -> RagQueryResponse:
+        answer = (
+            "[LLM PROMPT PREVIEW - PROMPT CHUA DUOC GUI TOI LLM]\n\n"
+            "===== SYSTEM PROMPT =====\n"
+            f"{system_prompt}\n\n"
+            "===== USER PROMPT =====\n"
+            f"{user_prompt}"
+        )
+        return RagQueryResponse(
+            requestId=request.requestId,
+            chatSessionId=request.chatSessionId,
+            answer=answer,
+            confidenceScore=None,
+            shouldSuggestTicket=False,
+            suggestionType="NONE",
+            suggestionReason="LLM preview mode is enabled.",
+            missingInformation=None,
+            riskLevel=intent_result.risk_level.value,
+            legalDomain=self._default_legal_domain(intent_result.contract_type),
+            userActionHint="CONTINUE_CHAT",
+            citations=[self._to_citation(hit) for hit in [*user_hits, *knowledge_hits]],
+            retrievedUserChunks=len(user_hits),
+            retrievedKnowledgeChunks=len(knowledge_hits),
+            intent=intent_result.intent.value,
+            contractType=intent_result.contract_type.value,
+            userRole=intent_result.user_role.value,
+            jurisdiction=intent_result.jurisdiction.value,
+            responseStatus="PROMPT_PREVIEW",
+            responseMode=intent_result.response_mode.value,
+            inputComplete=completeness.is_complete,
+            missingInputs=completeness.missing_items or None,
+            model="prompt-preview",
+            usage=RagUsage(promptTokens=0, completionTokens=0, totalTokens=0),
+            llmExecuted=False,
+            systemPromptPreview=system_prompt,
+            userPromptPreview=user_prompt,
+        )
+
     def preview(self, request: RagQueryRequest) -> RagPreviewResponse:
         user_hits, legal_search_query, knowledge_hits = self._retrieve(request)
         return RagPreviewResponse(
@@ -319,13 +388,20 @@ class RagQueryService:
         )
 
     def _retrieve(self, request: RagQueryRequest) -> tuple[list[RagChunkHit], str, list[RagChunkHit]]:
-        user_hits = self.retrieval_service.search_user_chunks(
-            request.question,
-            user_id=request.userId,
-            workspace_id=request.workspaceId,
-            top_k=request.topKUserChunks,
-            document_id=request.documentId,
-        )
+        # [] is an explicit KB-only session. None retains legacy workspace and
+        # single-document request behavior for backward compatibility.
+        if request.attachedDocumentIds == []:
+            user_hits = []
+        else:
+            search_kwargs = {
+                "user_id": request.userId,
+                "workspace_id": request.workspaceId,
+                "top_k": request.topKUserChunks,
+                "document_id": request.documentId,
+            }
+            if request.attachedDocumentIds:
+                search_kwargs["document_ids"] = request.attachedDocumentIds
+            user_hits = self.retrieval_service.search_user_chunks(request.question, **search_kwargs)
         legal_search_query = build_legal_search_query(
             request.question,
             user_hits,

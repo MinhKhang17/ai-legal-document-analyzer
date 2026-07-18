@@ -506,6 +506,11 @@ class TaxonomyMapper:
 @lru_cache(maxsize=8)
 def load_knowledge_base(docs_dir: Path | None = None) -> RiskKnowledgeBase:
     docs_root = docs_dir or settings.docs_flow_dir
+    # Some deployments invoke the service from the monorepo root while the
+    # bundled legal KB remains under ai-service/docs. Fall back only when the
+    # caller-provided directory is absent, preserving every valid override.
+    if not docs_root.exists() and settings.docs_flow_dir.exists():
+        docs_root = settings.docs_flow_dir
     parser = KnowledgeBaseParser()
 
     source_files = [

@@ -10,6 +10,12 @@ import type {
   WorkspaceChatConversation,
   WorkspaceChatMessage,
   WorkspaceChatSession,
+  ChatFeedbackRating,
+  ChatFeedbackReason,
+  ChatMessageFeedback,
+  ShareChatSessionResponse,
+  SharedChatSession,
+  ChatSessionDocument,
 } from "../types/chat";
 
 interface ApiResponse<T> {
@@ -361,4 +367,53 @@ export async function sendChatSessionMessage(
     userMessage: mapMessage(response.data.userMessage),
     assistantMessage: mapMessage(response.data.assistantMessage),
   };
+}
+
+export async function getChatSessionDocuments(accessToken: string, chatSessionId: string): Promise<ChatSessionDocument[]> {
+  const response = await getJson<ApiResponse<ChatSessionDocument[]>>(
+    API_ENDPOINTS.chat.sessionDocuments(chatSessionId),
+    "Khong the tai danh sach tai lieu cua phien chat",
+    accessToken,
+  );
+  return response.data;
+}
+
+export async function attachChatSessionDocument(accessToken: string, chatSessionId: string, documentId: string): Promise<ChatSessionDocument> {
+  const response = await postJson<ApiResponse<ChatSessionDocument>>(
+    `${API_ENDPOINTS.chat.sessionDocuments(chatSessionId)}/${documentId}`,
+    {},
+    "Khong the them tai lieu vao phien chat",
+    accessToken,
+  );
+  return response.data;
+}
+
+export async function detachChatSessionDocument(accessToken: string, chatSessionId: string, documentId: string): Promise<void> {
+  await deleteJson<ApiResponse<unknown>>(
+    `${API_ENDPOINTS.chat.sessionDocuments(chatSessionId)}/${documentId}`,
+    "Khong the go tai lieu khoi phien chat",
+    accessToken,
+  );
+}
+
+export async function submitChatMessageFeedback(accessToken: string, messageId: string, payload: { rating: ChatFeedbackRating; reasons?: ChatFeedbackReason[]; comment?: string }): Promise<ChatMessageFeedback> {
+  const response = await postJson<ApiResponse<ChatMessageFeedback>>(API_ENDPOINTS.chat.feedback(messageId), payload, "Không thể gửi đánh giá", accessToken);
+  return response.data;
+}
+
+export async function shareChatSession(accessToken: string, chatSessionId: string): Promise<ShareChatSessionResponse> {
+  const response = await postJson<ApiResponse<ShareChatSessionResponse>>(API_ENDPOINTS.chat.share(chatSessionId), {}, "Không thể chia sẻ phiên chat", accessToken);
+  return response.data;
+}
+
+export async function getSharedChatSession(accessToken: string, shareToken: string): Promise<SharedChatSession> {
+  const response = await getJson<ApiResponse<SharedChatSession>>(API_ENDPOINTS.chat.shared(shareToken), "Không thể tải phiên chat được chia sẻ", accessToken);
+  return { ...response.data, messages: response.data.messages.map(mapMessage) };
+}
+
+export async function getAdminChatFeedback(accessToken: string, page = 0, size = 50, rating?: ChatFeedbackRating): Promise<PageResponse<ChatMessageFeedback>> {
+  const query = new URLSearchParams({ page: String(page), size: String(size) });
+  if (rating) query.set('rating', rating);
+  const response = await getJson<ApiResponse<PageResponse<ChatMessageFeedback>>>(`${API_ENDPOINTS.feedback.adminChatRatings}?${query}`, "Không thể tải đánh giá câu trả lời AI", accessToken);
+  return response.data;
 }

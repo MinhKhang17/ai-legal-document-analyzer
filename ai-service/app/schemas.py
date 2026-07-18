@@ -88,6 +88,7 @@ class RagQueryRequest(BaseModel):
     userId: str = Field(alias="user_id")
     workspaceId: str = Field(alias="workspace_id")
     documentId: str | None = Field(default=None, alias="document_id")
+    attachedDocumentIds: list[str] | None = Field(default=None, alias="attached_document_ids")
     chatSessionId: str | None = Field(default=None, alias="chat_session_id")
     chatHistory: str | None = Field(default=None, alias="chat_history")
     question: str = Field(..., min_length=1)
@@ -223,6 +224,9 @@ class RagQueryResponse(BaseModel):
     analysis: AnalysisResult | None = Field(default=None, description="Structured analysis output.")
     model: str | None = None
     usage: RagUsage | None = None
+    llmExecuted: bool | None = Field(default=None, description="True only when the prompt was sent to the configured LLM provider.")
+    systemPromptPreview: str | None = Field(default=None, description="Final system prompt in LLM preview mode.")
+    userPromptPreview: str | None = Field(default=None, description="Final user prompt in LLM preview mode.")
 
 
 

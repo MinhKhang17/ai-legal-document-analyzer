@@ -1,5 +1,6 @@
 package com.analyzer.api.dto.legalticket;
 
+import com.analyzer.api.enums.LegalTicketType;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
@@ -15,6 +16,15 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Schema(description = "Request to create a legal ticket")
 public class CreateLegalTicketRequest {
+
+    @JsonProperty("ticket_type")
+    private LegalTicketType ticketType;
+
+    @JsonProperty("chat_session_id")
+    private String chatSessionId;
+
+    @JsonProperty("chat_message_id")
+    private String chatMessageId;
 
     @JsonProperty("request_id")
     @Schema(description = "AI request id that triggered the ticket suggestion, if the ticket is created from AI chat", example = "msg_abc123")

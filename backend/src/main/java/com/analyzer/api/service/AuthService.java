@@ -35,4 +35,6 @@ public interface AuthService {
      * Idempotent: verifying an already-verified account succeeds silently.
      */
     void verifyEmail(String token);
+
+    void resendVerificationEmail(String email);
 }

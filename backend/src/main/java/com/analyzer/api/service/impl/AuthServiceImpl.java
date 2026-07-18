@@ -13,6 +13,7 @@ import com.analyzer.api.repository.UserRepository;
 import com.analyzer.api.security.JwtTokenProvider;
 import com.analyzer.api.security.UserDetailsImpl;
 import com.analyzer.api.service.AuthService;
+import com.analyzer.api.service.EmailService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -35,6 +37,7 @@ public class AuthServiceImpl implements AuthService {
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final UserMapper userMapper;
+    private final EmailService emailService;
 
     @Override
     @Transactional
@@ -215,5 +218,20 @@ public class AuthServiceImpl implements AuthService {
         user.setEmailVerificationToken(null);
         user.setEmailVerificationTokenExpiry(null);
         userRepository.save(user);
+    }
+
+    @Override
+    @Transactional
+    public void resendVerificationEmail(String email) {
+        userRepository.findByEmail(email.trim().toLowerCase()).ifPresent(user -> {
+            if (user.isEmailVerified()) {
+                return;
+            }
+            String token = UUID.randomUUID().toString();
+            user.setEmailVerificationToken(token);
+            user.setEmailVerificationTokenExpiry(LocalDateTime.now().plusHours(24));
+            userRepository.save(user);
+            emailService.sendVerificationEmailAsync(user.getEmail(), user.getFirstName(), token);
+        });
     }
 }

@@ -1,4 +1,4 @@
-import { ArrowLeft, RefreshCw, Send } from "lucide-react";
+import { ArrowLeft, Download, RefreshCw, Send } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Badge } from "../../components/common/Badge";
@@ -11,6 +11,8 @@ import {
   closeLegalTicket,
   getLegalTicket,
   getLegalTicketMessages,
+  getCustomerTicketFiles,
+  downloadCustomerTicketFile,
   reopenLegalTicket,
   replyToLegalTicket,
 } from "../../services/legalTicket.service";
@@ -22,9 +24,10 @@ import {
 import { useI18n } from "../../hooks/useI18n";
 import { useToast } from "../../hooks/useToast";
 import type { AiCitation, AiFeatureSummary, AiRiskAssessment } from "../../types/aiFeature";
-import type { LegalTicket, LegalTicketMessage } from "../../types/legalTicket";
+import type { AdminTicketFile, LegalTicket, LegalTicketMessage } from "../../types/legalTicket";
 import { getLegalTicketStatusLabel } from "../../types/legalTicketStatus";
 import { formatDisplayDate } from "../../utils/format";
+import { ApiRequestError } from "../../services/http";
 
 export function CustomerTicketDetailPage() {
   const { id = "" } = useParams();
@@ -32,6 +35,7 @@ export function CustomerTicketDetailPage() {
   const toast = useToast();
   const [ticket, setTicket] = useState<LegalTicket | null>(null);
   const [messages, setMessages] = useState<LegalTicketMessage[]>([]);
+  const [files, setFiles] = useState<AdminTicketFile[]>([]);
   const [assessment, setAssessment] = useState<AiRiskAssessment | null>(null);
   const [summary, setSummary] = useState<AiFeatureSummary | null>(null);
   const [citations, setCitations] = useState<AiCitation[]>([]);
@@ -41,10 +45,13 @@ export function CustomerTicketDetailPage() {
   const [error, setError] = useState("");
   const [auxiliaryError, setAuxiliaryError] = useState("");
   const locale = language === "vi" ? "vi-VN" : "en-US";
+  const canReply = Boolean(ticket?.status && ['ASSIGNED_TO_LAWYER', 'IN_REVIEW', 'NEED_MORE_INFO', 'CUSTOMER_RESPONDED', 'REOPENED'].includes(ticket.status));
+  const reopenReference = ticket?.resolved_at ?? ticket?.closed_at;
+  const canReopen = Boolean(ticket && (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') && reopenReference && new Date(reopenReference).getTime() + 7 * 24 * 60 * 60 * 1000 >= Date.now());
 
-  const loadTicket = useCallback(async () => {
+  const loadTicket = useCallback(async (showLoading = true) => {
     if (!id) return;
-    setLoading(true);
+    if (showLoading) setLoading(true);
     setError("");
     setAuxiliaryError("");
 
@@ -52,19 +59,21 @@ export function CustomerTicketDetailPage() {
       const loadedTicket = await getLegalTicket(id);
       setTicket(loadedTicket);
 
-      const [messagesResult, assessmentResult, summaryResult, citationsResult] =
+      const [messagesResult, assessmentResult, summaryResult, citationsResult, filesResult] =
         await Promise.allSettled([
           getLegalTicketMessages(id),
           getTicketAiAssessment(id),
           getTicketAiSummary(id),
           getTicketAiCitations(id),
+          getCustomerTicketFiles(id),
         ]);
 
       setMessages(messagesResult.status === "fulfilled" ? messagesResult.value : []);
       setAssessment(assessmentResult.status === "fulfilled" ? assessmentResult.value : null);
       setSummary(summaryResult.status === "fulfilled" ? summaryResult.value : null);
       setCitations(citationsResult.status === "fulfilled" ? citationsResult.value : []);
-      if ([messagesResult, assessmentResult, summaryResult, citationsResult].some((result) => result.status === "rejected")) {
+      setFiles(filesResult.status === "fulfilled" ? filesResult.value : []);
+      if ([messagesResult, assessmentResult, summaryResult, citationsResult, filesResult].some((result) => result.status === "rejected")) {
         setAuxiliaryError(t("common.partialDataError"));
       }
     } catch (ticketError) {
@@ -73,16 +82,27 @@ export function CustomerTicketDetailPage() {
       setAssessment(null);
       setSummary(null);
       setCitations([]);
+      setFiles([]);
       console.error("Failed to load customer legal ticket detail", ticketError);
       setError(t("legalTickets.detail.loadError"));
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   }, [id, t]);
 
   useEffect(() => {
     void loadTicket();
+    const intervalId = window.setInterval(() => void loadTicket(false), 4000);
+    return () => window.clearInterval(intervalId);
   }, [loadTicket]);
+
+  const openFile = async (file: AdminTicketFile) => {
+    try {
+      const objectUrl = await downloadCustomerTicketFile(id, file.documentId);
+      const anchor = document.createElement('a'); anchor.href = objectUrl; anchor.download = file.originalFileName; anchor.click();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+    } catch (downloadError) { toast.error(downloadError instanceof Error ? downloadError.message : 'Unable to download file.'); }
+  };
 
   const runAction = async (action: () => Promise<LegalTicket>, successMessage: string) => {
     setSaving(true);
@@ -95,8 +115,10 @@ export function CustomerTicketDetailPage() {
       await loadTicket();
     } catch (actionError) {
       console.error("Failed to update customer legal ticket", actionError);
-      setError(t("legalTickets.detail.actionError"));
-      toast.error(t("legalTickets.detail.actionError"), t("toast.errorTitle"));
+      const message = actionError instanceof Error ? actionError.message : t("legalTickets.detail.actionError");
+      setError(message);
+      toast.error(message, t("toast.errorTitle"));
+      if (actionError instanceof ApiRequestError && actionError.status === 409) await loadTicket(false);
     } finally {
       setSaving(false);
     }
@@ -201,12 +223,12 @@ export function CustomerTicketDetailPage() {
                   ))
                 )}
               </div>
-              <div className="mt-md flex gap-sm">
+              {canReply && <div className="mt-md flex gap-sm">
                 <textarea className="form-field min-h-24" value={reply} onChange={(event) => setReply(event.target.value)} placeholder={t("legalTickets.detail.replyPlaceholder")} />
                 <Button leftIcon={<Send className="h-4 w-4" />} onClick={() => void handleReply()} disabled={saving || !reply.trim()}>
                   {t("legalTickets.detail.send")}
                 </Button>
-              </div>
+              </div>}
             </Card>
 
             <Card title={t("legalTickets.detail.aiCitations")}>
@@ -223,20 +245,24 @@ export function CustomerTicketDetailPage() {
                 </div>
               )}
             </Card>
+
+            <Card title={language === 'vi' ? 'Tệp được chia sẻ' : 'Shared files'}>
+              {files.length === 0 ? <p className="text-sm text-on-surface-variant">{language === 'vi' ? 'Chưa có tệp nào được chia sẻ với bạn.' : 'No files have been shared with you.'}</p> : <div className="space-y-sm">{files.map((file) => <div key={file.documentId} className="flex items-center justify-between gap-md rounded-lg border border-legal-border p-md dark:border-slate-700"><div><p className="font-semibold">{file.originalFileName}</p><p className="text-xs text-on-surface-variant">{file.fileType} · {Math.ceil(file.fileSize / 1024)} KB</p></div><Button size="sm" variant="secondary" leftIcon={<Download className="h-4 w-4" />} onClick={() => void openFile(file)}>{language === 'vi' ? 'Tải xuống' : 'Download'}</Button></div>)}</div>}
+            </Card>
           </main>
 
           <aside className="space-y-gutter">
             <Card title={t("legalTickets.detail.actions")}>
               <div className="flex flex-col gap-sm">
-                <Button variant="secondary" disabled={saving} onClick={() => void runAction(() => cancelLegalTicket(id, { reason: t("legalTickets.detail.cancelReason") }), t("legalTickets.detail.cancelSuccess"))}>
+                {ticket.status === 'PENDING_ADMIN_REVIEW' && <Button variant="secondary" disabled={saving} onClick={() => void runAction(() => cancelLegalTicket(id, { reason: t("legalTickets.detail.cancelReason") }), t("legalTickets.detail.cancelSuccess"))}>
                   {t("legalTickets.detail.cancel")}
-                </Button>
-                <Button variant="secondary" disabled={saving} onClick={() => void runAction(() => closeLegalTicket(id, { feedback: t("legalTickets.detail.closeFeedback") }), t("legalTickets.detail.closeSuccess"))}>
+                </Button>}
+                {ticket.status === 'RESOLVED' && <Button variant="secondary" disabled={saving} onClick={() => void runAction(() => closeLegalTicket(id, { feedback: t("legalTickets.detail.closeFeedback") }), t("legalTickets.detail.closeSuccess"))}>
                   {t("legalTickets.detail.close")}
-                </Button>
-                <Button disabled={saving} onClick={() => void runAction(() => reopenLegalTicket(id, { reason: t("legalTickets.detail.reopenReason") }), t("legalTickets.detail.reopenSuccess"))}>
+                </Button>}
+                {canReopen && <Button disabled={saving} onClick={() => void runAction(() => reopenLegalTicket(id, { reason: t("legalTickets.detail.reopenReason") }), t("legalTickets.detail.reopenSuccess"))}>
                   {t("legalTickets.detail.reopen")}
-                </Button>
+                </Button>}
               </div>
             </Card>
           </aside>

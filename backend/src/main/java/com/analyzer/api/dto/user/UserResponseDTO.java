@@ -4,6 +4,8 @@ import com.analyzer.api.enums.RoleName;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
+import java.time.LocalDateTime;
+
 @Data
 @Schema(description = "Response payload containing user details")
 public class UserResponseDTO {
@@ -28,6 +30,12 @@ public class UserResponseDTO {
 
     @Schema(description = "Whether the user's email has been verified", example = "true")
     private boolean emailVerified;
+
+    @Schema(description = "Whether the user must replace a temporary password", example = "false")
+    private boolean mustChangePassword;
+
+    @Schema(description = "Deadline for replacing a temporary password")
+    private LocalDateTime passwordResetDeadline;
 
     @Schema(description = "Expert's main specialty (EXPERT role only)", example = "Tư vấn doanh nghiệp")
     private String specialty;

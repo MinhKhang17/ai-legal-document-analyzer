@@ -5,6 +5,7 @@ import com.analyzer.api.dto.auth.JwtResponseDTO;
 import com.analyzer.api.dto.auth.LoginRequestDTO;
 import com.analyzer.api.dto.user.UserRequestDTO;
 import com.analyzer.api.dto.user.UserResponseDTO;
+import com.analyzer.api.dto.auth.ResendVerificationEmailRequestDTO;
 import com.analyzer.api.service.AuthService;
 import com.analyzer.api.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -97,5 +98,13 @@ public class AuthController {
     public ResponseEntity<ApiResponseDTO<Void>> verifyEmail(@RequestParam String token) {
         authService.verifyEmail(token);
         return ResponseEntity.ok(ApiResponseDTO.success("Xác thực email thành công"));
+    }
+
+    @PostMapping("/resend-verification")
+    @Operation(summary = "Resend email verification", description = "Issues a fresh verification link when the account exists and is still unverified.")
+    public ResponseEntity<ApiResponseDTO<Void>> resendVerificationEmail(
+            @Valid @RequestBody ResendVerificationEmailRequestDTO request) {
+        authService.resendVerificationEmail(request.getEmail());
+        return ResponseEntity.ok(ApiResponseDTO.success("Neu email hop le, lien ket xac thuc moi da duoc gui"));
     }
 }
