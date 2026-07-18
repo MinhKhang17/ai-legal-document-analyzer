@@ -26,8 +26,20 @@ class RagQueryService:
         self.llm_client = llm_client or build_default_llm_client()
 
     def query(self, request: RagQueryRequest) -> RagQueryResponse:
-        # ── Step 0: Contract generation shortcut (existing) ──
-        from app.services.contract_generation_service import ContractGenerationService, is_contract_generation_intent
+        # ── Step 0a: Export chat to DOCX shortcut ──
+        from app.services.contract_generation_service import (
+            ContractGenerationService,
+            is_contract_generation_intent,
+            is_export_docx_intent,
+        )
+        if is_export_docx_intent(request.question):
+            gen_service = ContractGenerationService(
+                retrieval_service=self.retrieval_service,
+                llm_client=self.llm_client,
+            )
+            return gen_service.export_chat_to_docx(request)
+
+        # ── Step 0b: Contract generation shortcut (existing) ──
         if is_contract_generation_intent(request.question):
             gen_service = ContractGenerationService(
                 retrieval_service=self.retrieval_service,

@@ -146,10 +146,9 @@ def build_system_prompt() -> str:
         "→ Đưa ra tóm tắt ngắn gọn\n\n"
 
         "── SOẠN THẢO / TẠO HỢP ĐỒNG ──\n"
-        "Câu hỏi kiểu: 'soạn hợp đồng', 'tạo hợp đồng thuê nhà', 'mẫu hợp đồng'\n"
-        "→ Kiểm tra danh sách tài liệu hệ thống để tìm mẫu phù hợp\n"
-        "→ Nếu có mẫu → cung cấp đường dẫn tải xuống\n"
-        "→ Nếu không → tạo mẫu hợp đồng theo yêu cầu\n\n"
+        "Câu hỏi kiểu: 'soạn hợp đồng', 'tạo hợp đồng thuê nhà', 'mẫu hợp đồng', 'làm bản hợp đồng', 'soạn thảo lại', 'cho tôi mẫu'...\n"
+        "→ BẮT BUỘC: Bạn PHẢI tự động soạn thảo đầy đủ nội dung hợp đồng đó (bao gồm các điều khoản chi tiết từ đầu tới cuối) bằng tiếng Việt trực tiếp trong câu trả lời. Sử dụng các ký hiệu đặt chỗ dạng [Họ tên], [CMND], [Địa chỉ], [Giá thuê] để người dùng tự điền sau.\n"
+        "→ Tuyệt đối KHÔNG được chỉ liệt kê cấu trúc hoặc từ chối soạn thảo với lý do không tìm thấy file hay thiếu thông tin.\n\n"
 
         "═══════════════════════════════════════════════════\n"
         "FORMAT TRẢ LỜI BẮT BUỘC\n"
@@ -411,12 +410,14 @@ def build_intent_instruction(
         ct_name = contract_type.value if contract_type != ContractType.UNKNOWN else "được hỏi"
         parts.append(
             f"BẠN ĐANG THỰC HIỆN: PHÂN TÍCH TỔNG QUAN LOẠI HỢP ĐỒNG ({ct_name})\n\n"
-            "User chưa upload file. Hãy trả lời theo cấu trúc:\n"
-            "1. **Khái quát** về loại hợp đồng\n"
-            "2. **Các nhóm điều khoản quan trọng** thường có\n"
-            "3. **Rủi ro phổ biến** theo loại hợp đồng\n"
-            "4. **Checklist kiểm tra** khi ký loại hợp đồng này\n"
-            "5. **Gợi ý**: Upload file để phân tích cụ thể\n\n"
+            "User chưa upload file. Hãy lưu ý:\n"
+            "1. Nếu người dùng yêu cầu soạn thảo, viết, hoặc tạo mẫu hợp đồng này (hoặc 'làm một bản khác'), bạn PHẢI bỏ qua cấu trúc khái quát bên dưới và tiến hành SOẠN THẢO CHI TIẾT TOÀN BỘ HỢP ĐỒNG trực tiếp bằng tiếng Việt với các trường trống dạng [Họ tên].\n"
+            "2. Nếu người dùng chỉ hỏi lý thuyết/kiến thức chung, trả lời theo cấu trúc:\n"
+            "   - **Khái quát** về loại hợp đồng\n"
+            "   - **Các nhóm điều khoản quan trọng** thường có\n"
+            "   - **Rủi ro phổ biến** theo loại hợp đồng\n"
+            "   - **Checklist kiểm tra** khi ký loại hợp đồng này\n"
+            "   - **Gợi ý**: Upload file để phân tích cụ thể\n\n"
         )
 
     elif intent == LegalQueryIntent.CLAUSE_ANALYSIS:
@@ -521,6 +522,14 @@ def build_intent_instruction(
             "1. Nói rõ hệ thống chưa đủ dữ liệu cho vấn đề này\n"
             "2. Gợi ý admin cập nhật knowledge base\n"
             "3. Đề xuất tham khảo luật sư\n\n"
+        )
+
+    elif intent == LegalQueryIntent.GENERAL_LEGAL_QUESTION:
+        parts.append(
+            "BẠN ĐANG THỰC HIỆN: TRẢ LỜI CÂU HỎI PHÁP LÝ CHUNG\n\n"
+            "Hãy lưu ý:\n"
+            "1. Nếu lịch sử hội thoại trước đó đang thảo luận về một hợp đồng/văn bản cụ thể và người dùng yêu cầu 'làm một bản khác', 'soạn lại', hoặc tạo file mẫu hợp đồng đó, bạn PHẢI tiến hành soạn thảo toàn bộ văn bản chi tiết trực tiếp bằng tiếng Việt với các trường trống dạng [Họ tên].\n"
+            "2. Nếu là câu hỏi lý thuyết hoặc khái niệm thông thường, hãy giải thích rõ ràng quy định pháp lý dựa trên kiến thức pháp lý sẵn có.\n\n"
         )
 
     # ── Add completeness questions if any ──
