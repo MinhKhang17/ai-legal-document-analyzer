@@ -18,10 +18,17 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.core.io.Resource;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import com.analyzer.api.security.UserDetailsImpl;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.io.IOException;
 
 @RestController
 @RequestMapping("/api/v1/admin/knowledge-base")
@@ -44,14 +51,59 @@ public class KnowledgeBaseManagementController {
                 .body(ApiResponseDTO.created("Upload knowledge base thanh cong", knowledgeUploadService.upload(request)));
     }
 
+    @PostMapping(value = "/{id}/source-file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponseDTO<KnowledgeBaseVersionResponse>> uploadSourceFile(
+            @PathVariable("id") String entryId,
+            @RequestPart("file") MultipartFile file) throws IOException {
+        return ResponseEntity.ok(ApiResponseDTO.success("Luu file goc knowledge base thanh cong",
+                knowledgeUploadService.storeSourceFile(entryId, file)));
+    }
+
+    @GetMapping("/{id}/source-file")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Resource> downloadSourceFile(@PathVariable("id") String entryId) {
+        KnowledgeBaseVersionResponse version = knowledgeUploadService.getCurrentVersion(entryId);
+        Resource resource = knowledgeUploadService.loadSourceFile(entryId);
+        MediaType mediaType;
+        try { mediaType = MediaType.parseMediaType(version.getContentType()); }
+        catch (Exception ignored) { mediaType = MediaType.APPLICATION_OCTET_STREAM; }
+        return ResponseEntity.ok()
+                .contentType(mediaType)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + version.getFileName().replace("\"", "") + "\"")
+                .body(resource);
+    }
+
     @PostMapping("/{id}/ingest")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponseDTO<KnowledgeIngestionJobResponse>> ingestKnowledge(
             @PathVariable("id") String knowledgeBaseEntryId,
-            @Valid @RequestBody IngestKnowledgeRequest request) {
+            @Valid @RequestBody IngestKnowledgeRequest request,
+            Authentication authentication) {
+        Long adminId = authentication != null && authentication.getPrincipal() instanceof UserDetailsImpl userDetails
+                ? userDetails.getId() : null;
         return ResponseEntity.accepted()
                 .body(ApiResponseDTO.accepted("Ingest knowledge base thanh cong",
-                        knowledgeIngestionService.ingest(knowledgeBaseEntryId, request)));
+                        knowledgeIngestionService.ingest(knowledgeBaseEntryId, request, adminId)));
+    }
+
+    @GetMapping("/ingestion-jobs/{jobId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponseDTO<KnowledgeIngestionJobResponse>> getIngestionJob(
+            @PathVariable String jobId) {
+        return ResponseEntity.ok(ApiResponseDTO.success("Lay trang thai ingest job thanh cong",
+                knowledgeIngestionService.getJob(jobId)));
+    }
+
+    @PostMapping("/ingestion-jobs/{jobId}/failed")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponseDTO<KnowledgeIngestionJobResponse>> failIngestionJob(
+            @PathVariable String jobId,
+            @RequestBody KnowledgeIngestionProgressRequest request) {
+        request.setStatus("FAILED");
+        request.setProgressPercent(100);
+        return ResponseEntity.ok(ApiResponseDTO.success("Danh dau ingest job that bai thanh cong",
+                knowledgeIngestionService.updateProgress(jobId, request)));
     }
 
     @GetMapping
@@ -102,6 +154,14 @@ public class KnowledgeBaseManagementController {
                 knowledgePublicationService.publish(knowledgeBaseEntryId, request)));
     }
 
+    @PostMapping("/{id}/unpublish")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponseDTO<KnowledgeBaseVersionResponse>> unpublishKnowledge(
+            @PathVariable("id") String knowledgeBaseEntryId) {
+        return ResponseEntity.ok(ApiResponseDTO.success("Unpublish knowledge base thanh cong",
+                knowledgePublicationService.unpublish(knowledgeBaseEntryId)));
+    }
+
     @PostMapping("/{id}/archive")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponseDTO<KnowledgeBaseVersionResponse>> archiveKnowledge(
@@ -137,6 +197,12 @@ public class KnowledgeBaseManagementController {
                 .rawContent(version.getRawContent())
                 .extractedContent(version.getExtractedContent())
                 .status(version.getStatus())
+                .ingestStatus(version.getIngestStatus())
+                .visibility(version.getVisibility())
+                .active(version.getActive())
+                .ingestedAt(version.getIngestedAt())
+                .ingestedById(version.getIngestedBy() == null ? null : version.getIngestedBy().getId())
+                .errorMessage(version.getErrorMessage())
                 .reviewDecision(version.getReviewDecision())
                 .reviewedById(version.getReviewedBy() == null ? null : version.getReviewedBy().getId())
                 .reviewedAt(version.getReviewedAt())
@@ -147,6 +213,12 @@ public class KnowledgeBaseManagementController {
                 .failedReason(version.getFailedReason())
                 .createdAt(version.getCreatedAt())
                 .updatedAt(version.getUpdatedAt())
+                .description(version.getDescription())
+                .fileName(version.getOriginalFileName())
+                .contentType(version.getSourceContentType())
+                .size(version.getSourceFileSize())
+                .uploadedAt(version.getSourceUploadedAt())
+                .sourceFileAvailable(version.getSourceStoragePath() != null)
                 .build();
     }
 

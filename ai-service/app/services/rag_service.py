@@ -6,6 +6,7 @@ from app.database.neo4j_client import neo4j_client
 from app.services.embedding_service import embedding_service
 from app.services.gemini_service import gemini_service
 from app.services.retrieval_service import RetrievalService, RagChunkHit
+from app.services.query_builder import build_legal_text_query
 from app.schemas import RagQueryRequest, RagQueryResponse, RagCitation
 
 logger = logging.getLogger(__name__)
@@ -148,11 +149,15 @@ class RagService:
             top_k=request.topKUserChunksPerChecklist,
             document_id=request.documentId,
         )
-        legal_search_query = self.retrieval_service.build_legal_search_query(request.question, user_hits)
+        legal_search_query = self.retrieval_service.build_legal_search_query(
+            request.question,
+            user_hits,
+            chat_history=request.chatHistory,
+        )
         knowledge_hits = self.retrieval_service.search_knowledge_chunks(
             legal_search_query,
             top_k=request.topKKnowledgeChunks,
-            query_text=request.question,
+            query_text=build_legal_text_query(request.question, chat_history=request.chatHistory),
         )
         return user_hits, legal_search_query, knowledge_hits
 

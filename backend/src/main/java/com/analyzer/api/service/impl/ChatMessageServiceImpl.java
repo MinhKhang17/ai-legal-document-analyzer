@@ -4,12 +4,16 @@ import com.analyzer.api.client.PythonAiClient;
 import com.analyzer.api.dto.PageResponse;
 import com.analyzer.api.dto.ai.RagQueryRequest;
 import com.analyzer.api.dto.ai.RagQueryResponse;
+import com.analyzer.api.dto.chatmessage.ChatMessageFeedbackRequest;
+import com.analyzer.api.dto.chatmessage.ChatMessageFeedbackResponse;
 import com.analyzer.api.dto.chatmessage.ChatMessageResponse;
 import com.analyzer.api.dto.chatmessage.SendMessageRequest;
 import com.analyzer.api.dto.chatmessage.SendMessageResponse;
 import com.analyzer.api.dto.chatsession.ChatSessionResponse;
 import com.analyzer.api.entity.ChatMessage;
+import com.analyzer.api.entity.ChatMessageFeedback;
 import com.analyzer.api.entity.ChatSession;
+import com.analyzer.api.entity.AiCitation;
 import com.analyzer.api.entity.Document;
 import com.analyzer.api.entity.User;
 import com.analyzer.api.entity.Workspace;
@@ -17,18 +21,27 @@ import com.analyzer.api.enums.ChatMessageRole;
 import com.analyzer.api.enums.ChatMessageStatus;
 import com.analyzer.api.enums.ChatMessageType;
 import com.analyzer.api.enums.ChatSessionStatus;
+import com.analyzer.api.enums.CitationSourceType;
+import com.analyzer.api.enums.FeedbackReason;
+import com.analyzer.api.enums.FeedbackRating;
 import com.analyzer.api.exception.common.*;
 import com.analyzer.api.exception.workspace.*;
 import com.analyzer.api.exception.chat.*;
 import com.analyzer.api.exception.ai.*;
 import com.analyzer.api.exception.validation.*;
+import com.analyzer.api.repository.ChatMessageFeedbackRepository;
 import com.analyzer.api.repository.ChatMessageRepository;
 import com.analyzer.api.repository.ChatSessionRepository;
+import com.analyzer.api.repository.ChatSessionDocumentRepository;
 import com.analyzer.api.repository.DocumentRepository;
 import com.analyzer.api.repository.UserRepository;
 import com.analyzer.api.repository.WorkspaceRepository;
+import com.analyzer.api.repository.ai.AiCitationRepository;
 import com.analyzer.api.service.ChatMessageService;
 import com.analyzer.api.service.SubscriptionQuotaService;
+import com.analyzer.api.service.conversation.ConversationHistoryAssembler;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,8 +53,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -56,6 +72,11 @@ public class ChatMessageServiceImpl implements ChatMessageService {
     private final PythonAiClient pythonAiClient;
     private final UserRepository userRepository;
     private final SubscriptionQuotaService subscriptionQuotaService;
+    private final AiCitationRepository aiCitationRepository;
+    private final ChatMessageFeedbackRepository chatMessageFeedbackRepository;
+    private final ChatSessionDocumentRepository chatSessionDocumentRepository;
+    private final ConversationHistoryAssembler conversationHistoryAssembler;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
     @Transactional(noRollbackFor = {AiServiceUnavailableException.class, AiServiceTimeoutException.class})
@@ -80,12 +101,9 @@ public class ChatMessageServiceImpl implements ChatMessageService {
             throw new WorkspaceDeletedException("Workspace has been deleted", workspaceId, workspace.getStatus());
         }
 
-        // Validate Documents
+        // An explicitly selected document remains supported for legacy clients. When no
+        // document is selected, the request continues in system-KB-only mode.
         Document selectedDocument = resolveSelectedDocument(userId, workspaceId, request.getDocumentId());
-        boolean isSandboxWorkspace = "System workspace for general contract assistant chat".equals(workspace.getDescription());
-        if (!isSandboxWorkspace) {
-            validateWorkspaceDocuments(userId, workspaceId, selectedDocument);
-        }
 
         // Find or create default ChatSession
         ChatSession chatSession = chatSessionRepository.findByWorkspaceIdAndUserIdAndIsDefaultTrueAndStatus(
@@ -96,7 +114,7 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         ChatMessage userMessage = createAndSaveUserMessage(chatSession, request.getMessage().trim());
 
         // Process AI Query
-        return executeAiQuery(currentUser, workspace, chatSession, userMessage, request.getMessage().trim(), selectedDocument);
+        return executeAiQuery(currentUser, workspace, chatSession, userMessage, request.getMessage().trim(), selectedDocument, request);
     }
 
     @Override
@@ -128,18 +146,15 @@ public class ChatMessageServiceImpl implements ChatMessageService {
             throw new WorkspaceDeletedException("Workspace has been deleted", workspace.getId(), workspace.getStatus());
         }
 
-        // Validate Documents
+        // No attached document means system-KB-only mode. An explicit document ID is
+        // still validated to preserve compatibility with older API clients.
         Document selectedDocument = resolveSelectedDocument(userId, workspace.getId(), request.getDocumentId());
-        boolean isSandboxWorkspace = "System workspace for general contract assistant chat".equals(workspace.getDescription());
-        if (!isSandboxWorkspace) {
-            validateWorkspaceDocuments(userId, workspace.getId(), selectedDocument);
-        }
 
         // Create User Message
         ChatMessage userMessage = createAndSaveUserMessage(chatSession, request.getMessage().trim());
 
         // Process AI Query
-        return executeAiQuery(currentUser, workspace, chatSession, userMessage, request.getMessage().trim(), selectedDocument);
+        return executeAiQuery(currentUser, workspace, chatSession, userMessage, request.getMessage().trim(), selectedDocument, request);
     }
 
     @Override
@@ -209,6 +224,64 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         }
 
         return toChatMessageResponse(chatMessage);
+    }
+
+    @Override
+    @Transactional
+    public ChatMessageFeedbackResponse submitFeedback(Long userId, String messageId, ChatMessageFeedbackRequest request) {
+        ChatMessage chatMessage = chatMessageRepository.findById(messageId)
+                .orElseThrow(() -> new ResourceNotFoundException("Message not found"));
+
+        if (!chatMessage.getUser().getId().equals(userId)) {
+            throw new ForbiddenException("You do not have permission to rate this message");
+        }
+
+        if (chatMessage.getRole() != ChatMessageRole.ASSISTANT) {
+            throw new ForbiddenException("Only AI assistant messages can be rated");
+        }
+
+        ChatMessageFeedback feedback = chatMessageFeedbackRepository.findByChatMessageId(messageId)
+                .orElseGet(() -> ChatMessageFeedback.builder().chatMessage(chatMessage).build());
+        feedback.setRating(request.getRating());
+        feedback.setReasons(request.getRating() == FeedbackRating.THUMBS_DOWN
+                ? joinReasons(request.getReasons())
+                : null);
+        feedback.setComment(request.getComment());
+
+        ChatMessageFeedback saved = chatMessageFeedbackRepository.save(feedback);
+        return toChatMessageFeedbackResponse(saved);
+    }
+
+    private static String joinReasons(List<FeedbackReason> reasons) {
+        if (reasons == null || reasons.isEmpty()) {
+            return null;
+        }
+        return reasons.stream().map(Enum::name).collect(Collectors.joining(","));
+    }
+
+    private static List<FeedbackReason> splitReasons(String reasons) {
+        if (reasons == null || reasons.isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(reasons.split(","))
+                .map(FeedbackReason::valueOf)
+                .collect(Collectors.toList());
+    }
+
+    private ChatMessageFeedbackResponse toChatMessageFeedbackResponse(ChatMessageFeedback feedback) {
+        String content = feedback.getChatMessage().getContent();
+        User submittedBy = feedback.getChatMessage().getUser();
+        return ChatMessageFeedbackResponse.builder()
+                .id(feedback.getId())
+                .chatMessageId(feedback.getChatMessage().getId())
+                .messageContent(content != null && content.length() > 200 ? content.substring(0, 200) + "..." : content)
+                .rating(feedback.getRating())
+                .reasons(splitReasons(feedback.getReasons()))
+                .comment(feedback.getComment())
+                .submittedById(submittedBy.getId())
+                .submittedByName(submittedBy.getFirstName() + " " + submittedBy.getLastName())
+                .createdAt(feedback.getCreatedAt())
+                .build();
     }
 
     private void validateMessageRequest(SendMessageRequest request) {
@@ -303,7 +376,8 @@ public class ChatMessageServiceImpl implements ChatMessageService {
             ChatSession chatSession,
             ChatMessage userMessage,
             String question,
-            Document selectedDocument) {
+            Document selectedDocument,
+            SendMessageRequest sendRequest) {
         String requestId = "req_" + UUID.randomUUID().toString().replace("-", "");
         userMessage.setRequestId(requestId);
 
@@ -316,31 +390,65 @@ public class ChatMessageServiceImpl implements ChatMessageService {
             chatSession.setTitle(title);
         }
 
-        // Build chat history string
-        List<ChatMessage> historyMessages = chatMessageRepository.findByChatSessionIdAndStatusOrderByCreatedAtAsc(
-                chatSession.getId(),
-                ChatMessageStatus.COMPLETED
-        );
-        StringBuilder historyBuilder = new StringBuilder();
-        for (ChatMessage msg : historyMessages) {
-            historyBuilder.append(msg.getRole().name()).append(": ").append(msg.getContent()).append("\n\n");
-        }
-        String chatHistoryStr = historyBuilder.toString().trim();
-
         RagQueryResponse aiResponse;
+        String assistantMessageId = "msg_" + UUID.randomUUID().toString().replace("-", "");
         try {
+            var activeMappings = chatSessionDocumentRepository
+                    .findByChatSessionIdAndUserIdAndActiveTrueOrderByAttachedAtAsc(chatSession.getId(), currentUser.getId());
+            List<String> attachedDocumentIds = activeMappings.stream()
+                    .map(mapping -> mapping.getDocument())
+                    .filter(document -> "READY".equalsIgnoreCase(document.getStatus()))
+                    .map(Document::getId)
+                    .distinct()
+                    .toList();
+            if (!activeMappings.isEmpty() && attachedDocumentIds.isEmpty()) {
+                throw new NoReadyDocumentsException(
+                        "Attached documents are still processing",
+                        workspace.getId(), 0, activeMappings.size());
+            }
+            List<String> messageAttachedDocumentIds = resolveMessageAttachedDocumentIds(
+                    currentUser.getId(), workspace.getId(), sendRequest.getMessageAttachedDocumentIds());
+            String focusedDocumentId = resolveFocusedDocumentId(
+                    currentUser.getId(), workspace.getId(), sendRequest.getFocusedDocumentId(), selectedDocument);
+            updateSessionConversationState(
+                    chatSession,
+                    attachedDocumentIds,
+                    focusedDocumentId,
+                    messageAttachedDocumentIds,
+                    sendRequest.getUserRole(),
+                    sendRequest.getConversationMode());
+            ConversationHistoryAssembler.MemoryWindow memoryWindow = conversationHistoryAssembler.build(
+                    chatSession, attachedDocumentIds);
             RagQueryRequest aiRequest = RagQueryRequest.builder()
                     .requestId(requestId)
                     .userId(String.valueOf(workspace.getUser().getId()))
                     .workspaceId(workspace.getId())
-                    .documentId(selectedDocument != null ? selectedDocument.getId() : null)
+                    .documentId(activeMappings.isEmpty() && selectedDocument != null ? selectedDocument.getId() : null)
+                    // [] explicitly means system-KB-only; null preserves legacy single-document behavior.
+                    .attachedDocumentIds(activeMappings.isEmpty() && selectedDocument != null
+                            ? null
+                            : attachedDocumentIds)
+                    .chatSessionId(chatSession.getId())
                     .question(question)
-                    .chatHistory(chatHistoryStr.isEmpty() ? null : chatHistoryStr)
-                    .topKChecklist(10)
-                    .topKUserChunksPerChecklist(3)
+                    .chatHistory(null)
+                    .conversationSummaryJson(chatSession.getConversationSummaryJson())
+                    .recentHistory(memoryWindow.recentHistory())
+                    .evictedMessages(memoryWindow.evictedMessages())
+                    .currentUserMessageId(userMessage.getId())
+                    .currentAssistantMessageId(assistantMessageId)
+                    .focusedDocumentId(focusedDocumentId)
+                    .messageAttachedDocumentIds(messageAttachedDocumentIds)
+                    .conversationUserRole(chatSession.getConversationUserRole())
+                    .conversationMode(chatSession.getConversationMode())
+                    .topKUserChunks(5)
                     .topKKnowledgeChunks(5)
                     .build();
             aiResponse = pythonAiClient.query(aiRequest);
+        } catch (NoReadyDocumentsException ex) {
+            userMessage.setStatus(ChatMessageStatus.FAILED);
+            userMessage.setErrorMessage(ex.getMessage());
+            chatMessageRepository.save(userMessage);
+            throw ex;
         } catch (AiServiceUnavailableException | AiServiceTimeoutException ex) {
             // Persist failed user message state
             userMessage.setStatus(ChatMessageStatus.FAILED);
@@ -348,7 +456,6 @@ public class ChatMessageServiceImpl implements ChatMessageService {
             chatMessageRepository.save(userMessage);
 
             // Persist failed assistant message
-            String assistantMessageId = "msg_" + UUID.randomUUID().toString().replace("-", "");
             ChatMessage assistantMessage = ChatMessage.builder()
                     .id(assistantMessageId)
                     .chatSession(chatSession)
@@ -374,7 +481,6 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         chatMessageRepository.save(userMessage);
 
         // Create successful assistant message
-        String assistantMessageId = "msg_" + UUID.randomUUID().toString().replace("-", "");
         ChatMessage.ChatMessageBuilder assistantBuilder = ChatMessage.builder()
                 .id(assistantMessageId)
                 .chatSession(chatSession)
@@ -404,6 +510,8 @@ public class ChatMessageServiceImpl implements ChatMessageService {
 
         ChatMessage assistantMessage = assistantBuilder.build();
         chatMessageRepository.save(assistantMessage);
+        applyConversationMemoryUpdate(chatSession, aiResponse.getConversationMemoryUpdate());
+        saveCitations(aiResponse.getCitations(), assistantMessage);
         subscriptionQuotaService.recordAiChatUsage(
                 currentUser,
                 assistantMessage.getPromptTokens() == null ? estimateTokens(question) : assistantMessage.getPromptTokens(),
@@ -472,6 +580,99 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                 .createdAt(message.getCreatedAt())
                 .updatedAt(message.getUpdatedAt())
                 .build();
+    }
+
+    private void saveCitations(List<RagQueryResponse.Citation> citations, ChatMessage assistantMessage) {
+        if (citations == null || citations.isEmpty()) {
+            return;
+        }
+
+        List<AiCitation> entities = citations.stream()
+                .map(citation -> {
+                    boolean knowledgeBase = "SYSTEM_KB".equalsIgnoreCase(citation.getSourceType());
+                    String sourceReferenceId = firstNonBlank(
+                            knowledgeBase ? citation.getKnowledgeDocumentId() : citation.getDocumentId(),
+                            citation.getDocumentId(),
+                            citation.getCitationId());
+                    String label = firstNonBlank(
+                            citation.getLawName(),
+                            citation.getFileName(),
+                            citation.getSectionTitle(),
+                            citation.getCitationId());
+                    return AiCitation.builder()
+                            .id("cite_" + UUID.randomUUID().toString().replace("-", ""))
+                            .sourceType(knowledgeBase ? CitationSourceType.KNOWLEDGE_BASE : CitationSourceType.DOCUMENT)
+                            .sourceReferenceId(sourceReferenceId)
+                            .label(label)
+                            .excerpt(citation.getExcerpt())
+                            .pageNumber(citation.getPageNumber())
+                            .score(citation.getScore())
+                            .chatMessage(assistantMessage)
+                            .build();
+                })
+                .toList();
+        aiCitationRepository.saveAll(entities);
+    }
+
+    private List<String> resolveMessageAttachedDocumentIds(
+            Long userId, String workspaceId, List<String> requestedDocumentIds) {
+        if (requestedDocumentIds == null || requestedDocumentIds.isEmpty()) return List.of();
+        List<String> validated = new ArrayList<>();
+        for (String documentId : requestedDocumentIds) {
+            if (documentId == null || documentId.isBlank() || validated.contains(documentId.trim())) continue;
+            validated.add(resolveSelectedDocument(userId, workspaceId, documentId).getId());
+        }
+        return List.copyOf(validated);
+    }
+
+    private String resolveFocusedDocumentId(
+            Long userId, String workspaceId, String requestedFocusedDocumentId, Document selectedDocument) {
+        if (requestedFocusedDocumentId != null && !requestedFocusedDocumentId.isBlank()) {
+            return resolveSelectedDocument(userId, workspaceId, requestedFocusedDocumentId).getId();
+        }
+        return selectedDocument == null ? null : selectedDocument.getId();
+    }
+
+    private void updateSessionConversationState(
+            ChatSession session,
+            List<String> activeDocumentIds,
+            String focusedDocumentId,
+            List<String> messageAttachedDocumentIds,
+            String userRole,
+            String conversationMode) {
+        try {
+            session.setActiveDocumentIdsJson(objectMapper.writeValueAsString(activeDocumentIds));
+            session.setMessageAttachedDocumentIdsJson(objectMapper.writeValueAsString(messageAttachedDocumentIds));
+        } catch (JsonProcessingException exception) {
+            logger.warn("Unable to serialize conversation document state for session {}", session.getId());
+        }
+        session.setFocusedDocumentId(focusedDocumentId);
+        if (userRole != null && !userRole.isBlank()) session.setConversationUserRole(userRole.trim());
+        if (conversationMode != null && !conversationMode.isBlank()) session.setConversationMode(conversationMode.trim());
+        session.setMemoryUpdatedAt(LocalDateTime.now());
+    }
+
+    private void applyConversationMemoryUpdate(
+            ChatSession session, RagQueryResponse.ConversationMemoryUpdate memoryUpdate) {
+        if (memoryUpdate == null || !Boolean.TRUE.equals(memoryUpdate.getUpdated())
+                || memoryUpdate.getSummaryJson() == null || memoryUpdate.getSummaryJson().isBlank()) {
+            return;
+        }
+        session.setConversationSummaryJson(memoryUpdate.getSummaryJson());
+        session.setSummary(memoryUpdate.getSummaryJson());
+        session.setMemoryJson(memoryUpdate.getSummaryJson());
+        session.setSummaryThroughMessageId(memoryUpdate.getSummarizedThroughMessageId());
+        session.setSummaryUpdatedAt(LocalDateTime.now());
+        session.setMemoryUpdatedAt(LocalDateTime.now());
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return "unknown";
     }
 
     private int estimateTokens(String content) {

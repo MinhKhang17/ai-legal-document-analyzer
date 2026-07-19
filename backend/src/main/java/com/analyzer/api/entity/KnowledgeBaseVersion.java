@@ -2,6 +2,7 @@ package com.analyzer.api.entity;
 
 import com.analyzer.api.enums.KnowledgeReviewDecision;
 import com.analyzer.api.enums.KnowledgeStatus;
+import com.analyzer.api.enums.KnowledgeVisibility;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -43,6 +44,29 @@ public class KnowledgeBaseVersion {
     private KnowledgeStatus status;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "ingest_status")
+    private KnowledgeStatus ingestStatus;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "visibility")
+    @Builder.Default
+    private KnowledgeVisibility visibility = KnowledgeVisibility.PRIVATE;
+
+    @Column(name = "active")
+    @Builder.Default
+    private Boolean active = false;
+
+    @Column(name = "ingested_at")
+    private LocalDateTime ingestedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ingested_by_id")
+    private User ingestedBy;
+
+    @Column(name = "ingest_error_message", columnDefinition = "TEXT")
+    private String errorMessage;
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "review_decision")
     private KnowledgeReviewDecision reviewDecision;
 
@@ -69,6 +93,27 @@ public class KnowledgeBaseVersion {
 
     @Column(name = "failed_reason", columnDefinition = "TEXT")
     private String failedReason;
+
+    @Column(columnDefinition = "TEXT")
+    private String description;
+
+    @Column(name = "original_file_name")
+    private String originalFileName;
+
+    @Column(name = "source_content_type")
+    private String sourceContentType;
+
+    @Column(name = "source_file_size")
+    private Long sourceFileSize;
+
+    @Column(name = "source_storage_path", columnDefinition = "TEXT")
+    private String sourceStoragePath;
+
+    @Column(name = "source_uploaded_at")
+    private LocalDateTime sourceUploadedAt;
+
+    @Column(name = "ingest_notified_at")
+    private LocalDateTime ingestNotifiedAt;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

@@ -18,93 +18,93 @@ Luồng chính:
 2. FE gọi `getAdminLegalTickets(page, size, status?, riskLevel?)`.
 3. Admin chọn một ticket để mở detail.
 4. `AdminTicketDetailPage` tải song song:
-5. ticket detail
-6. admin AI summary
-7. chat history
-8. user files
-9. AI assessment
-10. AI summary/citations
-11. danh sách user để chọn expert
-12. Admin chọn expert và gọi assign hoặc reassign.
-13. Admin có thể nhập reject reason và từ chối ticket.
+   - ticket detail
+   - admin AI summary
+   - chat history
+   - user files
+   - AI assessment
+   - AI summary/citations
+   - Danh sách Expert từ API `getAdminExperts()`.
+5. Admin chọn expert từ danh sách (hiển thị rõ Chuyên ngành - specialty và Ngành luật - legalDomain của từng Expert).
+6. Admin gọi assign hoặc reassign.
+7. Admin có thể nhập reject reason và từ chối ticket.
 
 Sơ đồ text:
 - `admin list -> filter -> open detail -> inspect evidence -> assign/reassign/reject`
+- `load assign panel -> Call GET /admin/users/experts -> Render experts list with specialties/legal domain -> Select expert -> Call Assign API`
 
 Màn hình / component:
 - `frontend/src/pages/admin/AdminTicketsPage.tsx`
-- `frontend/src/pages/admin/AdminTicketDetailPage.tsx`
+- `frontend/src/pages/admin/AdminTicketDetailPage.tsx` (Hiển thị chuyên ngành của Expert trong danh sách lựa chọn phân công)
 
 Dữ liệu / state:
 - `tickets`, `statusFilter`, `riskLevel`
 - detail: `ticket`, `ticketSummary`, `chatMessages`, `files`, `assessment`, `aiSummary`, `citations`
-- assignment: `experts`, `selectedLawyerId`, `adminNote`
+- assignment: `experts` (chứa specialty, legalDomain), `selectedLawyerId`, `adminNote`
 - rejection: `rejectReason`
 
 Validation:
 - Assign/reassign phải có `selectedLawyerId`
 - Reject phải có `reason`
-- Danh sách expert hiện lọc phía FE: `user.active && user.role === "EXPERT"`
+- Danh sách expert lấy trực tiếp từ API chuyên biệt `GET /api/v1/admin/users/experts` đã lọc sẵn expert hoạt động trên backend.
 
 API / service tích hợp:
 - FE:
-- `frontend/src/services/legalTicket.service.ts`
-- `frontend/src/services/user.service.ts`
+  - `frontend/src/services/legalTicket.service.ts`
+  - `frontend/src/services/user.service.ts`
 - BE:
-- `GET /api/v1/admin/tickets`
-- `GET /api/v1/admin/tickets/{id}`
-- `GET /api/v1/admin/tickets/{id}/summary`
-- `GET /api/v1/admin/tickets/{id}/chat-history`
-- `GET /api/v1/admin/tickets/{id}/files`
-- `POST /api/v1/admin/tickets/{id}/assign-lawyer`
-- `POST /api/v1/admin/tickets/{id}/reassign-lawyer`
-- `POST /api/v1/admin/tickets/{id}/reject`
+  - `GET /api/v1/admin/tickets`
+  - `GET /api/v1/admin/tickets/{id}`
+  - `GET /api/v1/admin/tickets/{id}/summary`
+  - `GET /api/v1/admin/tickets/{id}/chat-history`
+  - `GET /api/v1/admin/tickets/{id}/files`
+  - `GET /api/v1/admin/users/experts` (Lấy danh sách expert kèm chuyên ngành) [MỚI]
+  - `POST /api/v1/admin/tickets/{id}/assign-lawyer`
+  - `POST /api/v1/admin/tickets/{id}/reassign-lawyer`
+  - `POST /api/v1/admin/tickets/{id}/reject`
 
 UI states:
 - Dashboard thống kê tổng ticket/open ticket/current filter
 - Detail có block AI summary, AI assessment, chat history, file list, citations
+- Dropdown chọn expert: mỗi hàng hiển thị "Tên Expert (Chuyên ngành - Lĩnh vực)" để admin dễ dàng đối chiếu.
 
 Edge cases:
-- Nếu `getUsers()` fail, admin vẫn mở được detail nhưng không assign được
-- `hasAssignedLawyer` ảnh hưởng nút assign/reassign
-- Rule reassign khi `force_reassign` cần backend chốt
+- Nếu `getAdminExperts()` trả danh sách trống: hiển thị thông báo yêu cầu tạo tài khoản Expert trước.
+- `hasAssignedLawyer` ảnh hưởng nút assign/reassign.
 
 Business rules:
-- Admin nhìn thấy toàn hệ thống, không chỉ ticket của mình
-- Assign và reassign dùng cùng payload gần giống nhau
-- Reject là bước review của admin trước khi expert xử lý
+- Admin nhìn thấy toàn hệ thống, không chỉ ticket của mình.
+- Phân công dựa trên sự tương đồng giữa ngành luật của Ticket và chuyên ngành của Expert.
 
 Quyền:
 - Tất cả endpoint trong flow này đều `hasRole('ADMIN')`
 
 File nguồn tham chiếu:
 - FE:
-- `frontend/src/pages/admin/AdminTicketsPage.tsx`
-- `frontend/src/pages/admin/AdminTicketDetailPage.tsx`
-- `frontend/src/services/legalTicket.service.ts`
-- `frontend/src/services/user.service.ts`
+  - `frontend/src/pages/admin/AdminTicketsPage.tsx`
+  - `frontend/src/pages/admin/AdminTicketDetailPage.tsx`
+  - `frontend/src/services/legalTicket.service.ts`
+  - `frontend/src/services/user.service.ts`
 - BE:
-- `backend/src/main/java/com/analyzer/api/controller/admin/AdminTicketManagementController.java`
+  - `backend/src/main/java/com/analyzer/api/controller/admin/AdminTicketManagementController.java`
 
 Điểm chưa rõ:
-- `CHƯA XÁC ĐỊNH`: có pagination/size thực tế nào business muốn dùng ở admin list.
-- `CHƯA XÁC ĐỊNH`: admin có thể undo reject hay không.
+- `ĐÃ RÕ`: Lấy thông tin expert từ API `GET /api/v1/admin/users/experts` để có thông tin chuyên ngành.
 
 Checklist FE:
-- Nên phân biệt rõ `assign` lần đầu và `reassign`.
-- Cần hiển thị user role/name/email khi chọn expert để tránh chọn nhầm.
+- Thay thế API `getUsers()` thông thường bằng API `/admin/experts` khi mở panel assign ticket.
+- Cập nhật hiển thị dòng option trong select box hoặc combobox chọn expert: Hiển thị thêm Chuyên ngành và Ngành luật.
 - Nên disable action theo status ticket nếu backend có state machine chặt.
 
 Tiêu chí hoàn thành:
 - Admin xem được list và detail.
-- Admin assign/reassign/reject được.
-- Admin đọc được chat history, file, AI summary/citation liên quan.
+- Admin phân công được đúng Expert dựa vào thông tin chuyên ngành hiển thị trực quan.
 
 HIỆN TRẠNG:
-- Flow này đã có route, page, service và controller đồng bộ tương đối tốt.
+- Flow phân công hoạt động tốt nhưng thiếu hiển thị chuyên ngành. Cần thay đổi API lấy danh sách expert và cập nhật UI.
 
 SUY LUẬN:
-- Đây là lớp trung gian giữa AI suggestion/customer request và expert execution.
+- Giúp admin phân công chính xác ticket cho luật sư/expert phù hợp, tối ưu hóa thời gian xử lý ticket.
 
 ĐỀ XUẤT:
-- FE nên làm rõ visual state theo `unassigned / assigned / rejected / resolved` để thao tác admin nhanh hơn.
+- Nên hiển thị gợi ý (highlight) những expert có `legalDomain` trùng khớp với ngành luật của ticket để admin lựa chọn nhanh hơn.

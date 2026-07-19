@@ -14,6 +14,10 @@ public interface SubscriptionQuotaService {
 
     void checkCanUploadOrAnalyzeContract(User user, String workspaceId);
 
+    void checkCanUploadOrAnalyzeContract(User user, String workspaceId, long fileSizeBytes);
+
+    void checkCanAttachDocument(User user, int currentlyAttached);
+
     void checkCanUseAiChat(User user, int estimatedInputTokens);
 
     void recordAiChatUsage(User user, int inputTokens, int outputTokens);

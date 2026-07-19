@@ -3,6 +3,7 @@ package com.analyzer.api.service;
 import com.analyzer.api.dto.auth.JwtResponseDTO;
 import com.analyzer.api.dto.auth.LoginRequestDTO;
 import com.analyzer.api.dto.user.UserResponseDTO;
+import com.analyzer.api.dto.auth.RegistrationResponseDTO;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -29,4 +30,12 @@ public interface AuthService {
      * Get the current authenticated user's details.
      */
     UserResponseDTO getCurrentUser();
+
+    /**
+     * Verify a user's email using the token sent at registration.
+     * Idempotent: verifying an already-verified account succeeds silently.
+     */
+    void verifyEmail(String token);
+
+    RegistrationResponseDTO resendVerificationEmail(String email, String clientIp);
 }

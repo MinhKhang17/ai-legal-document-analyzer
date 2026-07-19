@@ -3,7 +3,6 @@ package com.analyzer.api.dto.user;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 @Data
@@ -23,11 +22,15 @@ public class AdminCreateLawyerRequestDTO {
     @Schema(description = "Email address for the lawyer account", example = "lawyer.demo@lexiguard.ai")
     private String email;
 
-    @NotBlank(message = "Mat khau khong duoc de trong")
-    @Size(min = 8, message = "Password must have at least 8 characters")
-    @Schema(description = "Password for the lawyer account", example = "Lawyer@123")
-    private String password;
-
     @Schema(description = "Whether the account is active", example = "true", defaultValue = "true")
     private Boolean active = true;
+
+    @Schema(description = "Expert's main specialty", example = "Tư vấn doanh nghiệp")
+    private String specialty;
+
+    @Schema(description = "Legal domain the expert practices in", example = "Luật Thương mại")
+    private String legalDomain;
+
+    @Schema(description = "Free-text description of the expert's experience", example = "5 năm kinh nghiệm giải quyết tranh chấp kinh doanh")
+    private String description;
 }

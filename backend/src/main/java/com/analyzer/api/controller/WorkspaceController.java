@@ -87,11 +87,12 @@ public class WorkspaceController {
     }
 
     @GetMapping("/{workspaceId}/documents/{documentId}/download")
+    @PreAuthorize("hasRole('CUSTOMER')")
     @Operation(summary = "Download workspace document", description = "Download a user document file by ID.")
     public ResponseEntity<org.springframework.core.io.Resource> downloadDocument(
             @PathVariable String workspaceId,
             @PathVariable String documentId) throws java.io.IOException {
-        org.springframework.core.io.Resource resource = workspaceService.downloadDocumentFilePublic(workspaceId, documentId);
+        org.springframework.core.io.Resource resource = workspaceService.downloadDocumentFile(getCurrentUserId(), workspaceId, documentId);
         return ResponseEntity.ok()
                 .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + resource.getFilename() + "\"")
                 .contentType(org.springframework.http.MediaType.APPLICATION_OCTET_STREAM)
@@ -99,6 +100,7 @@ public class WorkspaceController {
     }
 
     @GetMapping("/{workspaceId}/documents/system/download")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Download system knowledge base document", description = "Download a system knowledge base document by filename.")
     public ResponseEntity<org.springframework.core.io.Resource> downloadSystemDocument(
             @PathVariable String workspaceId,

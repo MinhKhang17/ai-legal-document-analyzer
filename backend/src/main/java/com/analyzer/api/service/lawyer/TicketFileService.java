@@ -13,4 +13,8 @@ public interface TicketFileService {
     TicketFileResponse uploadFile(String ticketId, Long lawyerId, UploadTicketFileRequest request);
 
     Resource downloadFile(String ticketId, Long lawyerId, String documentId);
+
+    List<TicketFileResponse> listCustomerVisibleFiles(String ticketId, Long customerId);
+
+    Resource downloadCustomerVisibleFile(String ticketId, Long customerId, String documentId);
 }

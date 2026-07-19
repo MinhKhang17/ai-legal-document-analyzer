@@ -12,6 +12,7 @@ import { getWorkspaceDocuments, getWorkspaces } from '../../api/workspaceApi';
 import { useI18n } from '../../hooks/useI18n';
 import type { Document, Workspace } from '../../types/workspace';
 import { formatDisplayDateTime } from '../../utils/format';
+import { useAppStore } from '../../store/AppStore';
 
 import { getAccessToken as getSessionAccessToken } from '../../services/authSession';
 const getAccessToken = () => getSessionAccessToken() ?? '';
@@ -20,6 +21,7 @@ type WorkspaceWithDocs = Workspace & { documents: Document[] };
 
 export function DashboardPage() {
   const { t, language } = useI18n();
+  const { user } = useAppStore();
   const [workspaces, setWorkspaces] = useState<WorkspaceWithDocs[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -122,6 +124,13 @@ export function DashboardPage() {
           </>
         }
       />
+
+      {user?.role === 'CUSTOMER' && user.emailVerified === false && (
+        <div className="mb-lg rounded-xl border border-warning/40 bg-warning/10 p-md text-sm text-on-surface dark:text-slate-100">
+          <p className="font-semibold">{language === 'vi' ? 'Email chưa được xác thực' : 'Email is not verified'}</p>
+          <p className="mt-xs text-on-surface-variant dark:text-slate-300">{language === 'vi' ? 'Hãy mở liên kết trong email đăng ký để kích hoạt đầy đủ tài khoản.' : 'Open the link in your registration email to fully activate the account.'}</p>
+        </div>
+      )}
 
       {error && (
         <div className="mb-lg rounded-xl border border-error/40 bg-error/10 p-md text-sm text-error">

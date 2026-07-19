@@ -5,6 +5,8 @@ import com.analyzer.api.dto.auth.JwtResponseDTO;
 import com.analyzer.api.dto.auth.LoginRequestDTO;
 import com.analyzer.api.dto.user.UserRequestDTO;
 import com.analyzer.api.dto.user.UserResponseDTO;
+import com.analyzer.api.dto.auth.ResendVerificationEmailRequestDTO;
+import com.analyzer.api.dto.auth.RegistrationResponseDTO;
 import com.analyzer.api.service.AuthService;
 import com.analyzer.api.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -31,9 +33,9 @@ public class AuthController {
             summary = "Register user",
             description = "Creates a new user account in the system"
     )
-    public ResponseEntity<ApiResponseDTO<UserResponseDTO>> register(
+    public ResponseEntity<ApiResponseDTO<RegistrationResponseDTO>> register(
             @RequestBody UserRequestDTO request) {
-        UserResponseDTO user = userService.createUser(request);
+        RegistrationResponseDTO user = userService.createUser(request);
         return new ResponseEntity<>(ApiResponseDTO.created("Tạo tài khoản thành công", user), HttpStatus.CREATED);
     }
 
@@ -87,5 +89,23 @@ public class AuthController {
     public ResponseEntity<ApiResponseDTO<UserResponseDTO>> getCurrentUser() {
         UserResponseDTO currentUser = authService.getCurrentUser();
         return ResponseEntity.ok(ApiResponseDTO.success("Lấy thông tin người dùng thành công", currentUser));
+    }
+
+    @GetMapping("/verify-email")
+    @Operation(
+            summary = "Verify email",
+            description = "Verifies a user's email using the token sent at registration and activates the account."
+    )
+    public ResponseEntity<ApiResponseDTO<Void>> verifyEmail(@RequestParam String token) {
+        authService.verifyEmail(token);
+        return ResponseEntity.ok(ApiResponseDTO.success("Xác thực email thành công"));
+    }
+
+    @PostMapping("/resend-verification")
+    @Operation(summary = "Resend email verification", description = "Issues a fresh verification link when the account exists and is still unverified.")
+    public ResponseEntity<ApiResponseDTO<RegistrationResponseDTO>> resendVerificationEmail(
+            @Valid @RequestBody ResendVerificationEmailRequestDTO request, HttpServletRequest httpRequest) {
+        RegistrationResponseDTO result = authService.resendVerificationEmail(request.getEmail(), httpRequest.getRemoteAddr());
+        return ResponseEntity.ok(ApiResponseDTO.success("Nếu email hợp lệ, liên kết xác thực mới đã được xử lý", result));
     }
 }

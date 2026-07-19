@@ -9,6 +9,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -32,6 +33,11 @@ public class LegalTicketMessageResponse {
     @JsonProperty("sender_role")
     private String senderRole;
 
+    private String replyToMessageId;
+
+    @Builder.Default
+    private List<TicketAttachmentResponse> attachments = List.of();
+
     @JsonProperty("content")
     private String content;
 
@@ -40,6 +46,8 @@ public class LegalTicketMessageResponse {
 
     @JsonProperty("created_at")
     private LocalDateTime createdAt;
+
+    private LocalDateTime editedAt;
 
     @JsonProperty("internal_only")
     private Boolean internalOnly;

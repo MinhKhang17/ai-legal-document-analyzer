@@ -24,17 +24,46 @@ Luồng chính:
 6. Nếu `accessToken` còn dùng được, FE gọi `/auth/me`.
 7. Nếu `/auth/me` trả 401/403, FE gọi `/auth/refresh`, sau đó gọi lại `/auth/me`.
 8. Người dùng được điều hướng:
-9. `CUSTOMER` -> `/dashboard`
-10. `ADMIN` -> `/admin`
-11. `EXPERT` -> `/lawyer/tickets`
+   - `CUSTOMER` -> `/dashboard` (Nếu email chưa xác thực, hiển thị banner yêu cầu xác thực email và hạn chế một số tính năng gửi yêu cầu).
+   - `ADMIN` -> `/admin`
+   - `EXPERT` -> `/lawyer/tickets`
+
+9. Luồng xác thực email chính chủ (CUSTOMER):
+   - Khi đăng ký qua `/register`, hệ thống gửi link xác thực về email.
+   - Người dùng bấm vào link chứa token (được điều hướng đến `/verify-email?token=xxx`).
+   - FE gọi API xác nhận email, nhận kết quả và chuyển hướng về `/login` với thông báo thành công.
+
+10. Luồng đổi mật khẩu (CUSTOMER & EXPERT):
+    - Tại màn hình Cài đặt (`SettingsPage`), hiển thị Form đổi mật khẩu bao gồm: Mật khẩu cũ, Mật khẩu mới, Xác nhận mật khẩu mới.
+    - FE gọi API đổi mật khẩu để cập nhật.
+
+11. Luồng Admin tạo tài khoản Expert:
+    - Tại Admin Console, Admin điền Form tạo Expert bao gồm: Họ, Tên, Email, Chuyên ngành (specialty), Ngành luật (legalDomain), Mô tả (description). **Không có ô nhập mật khẩu** — backend tự gán mật khẩu mặc định `12345678`.
+    - FE gọi API tạo Expert của Admin. Tài khoản Expert này được tự động kích hoạt và xác thực email, đồng thời nhận 1 email chứa mật khẩu tạm thời + cảnh báo phải đổi mật khẩu trong 7 ngày.
+    - Nếu Expert không đổi mật khẩu trong 7 ngày, backend tự khóa tài khoản (`active = false`) — Expert đăng nhập sẽ nhận lỗi 403.
+    - FE nên hiển thị rõ trong form/toast sau khi tạo: "Mật khẩu mặc định là 12345678, Expert cần đổi trong vòng 7 ngày kẻo bị khóa tài khoản" để Admin biết trước, tránh thắc mắc sau này.
+
+12. Luồng Admin gửi lại thông tin đăng nhập / mở khóa Expert:
+    - Tại Admin Console (màn quản lý Expert), thêm 1 nút "Gửi lại thông tin đăng nhập" cho mỗi dòng Expert trong danh sách, hoặc 1 form riêng cho Admin nhập email Expert cần xử lý.
+    - Dùng khi: (a) Expert báo không nhận được email lúc tạo tài khoản, hoặc (b) tài khoản Expert đã bị khóa do quá hạn 7 ngày.
+    - FE gọi API resend-activation với `email` của Expert. Backend reset mật khẩu về `12345678`, mở khóa tài khoản (nếu đang khóa), đặt lại hạn 7 ngày mới, và gửi lại email.
+    - FE nên hiện confirm dialog trước khi gọi (vì hành động này reset mật khẩu hiện tại của Expert, kể cả khi họ đã tự đổi).
 
 Sơ đồ text:
 - `PublicRoute -> login/register -> signIn -> role-based redirect`
 - `App load -> refreshSession -> me or refresh -> hydrate auth state -> guards unlock route`
+- `Verify Email -> Click link in email -> Go to /verify-email?token=xxx -> FE verify API -> Login`
+- `Settings -> Change Password form -> FE change password API -> Success Toast`
+- `Admin Console -> Create Expert Form (khong co truong password) -> FE admin create expert API -> Expert nhan email mat khau tam thoi -> Success`
+- `Expert khong doi mat khau trong 7 ngay -> Backend tu khoa account (active=false)`
+- `Admin Console -> Nut "Gui lai thong tin dang nhap" -> Nhap email -> FE goi resend-activation API -> Mo khoa + gui lai email`
 
 Màn hình / component liên quan:
 - `frontend/src/pages/auth/LoginPage.tsx`
 - `frontend/src/pages/auth/RegisterPage.tsx`
+- `frontend/src/pages/auth/VerifyEmailPage.tsx` [MỚI]
+- `frontend/src/pages/settings/SettingsPage.tsx` (Thêm phần đổi mật khẩu)
+- `frontend/src/pages/admin/AdminConsolePage.tsx` (Thêm tab/màn hình quản lý & tạo Expert)
 - `frontend/src/components/auth/AuthGuards.tsx`
 - `frontend/src/store/AppStore.tsx`
 
@@ -42,68 +71,89 @@ Dữ liệu / state chính:
 - `accessToken` trong `localStorage`
 - `lexiguard.authUser` trong `localStorage`
 - `isAuthLoading`, `isAuthReady`, `isAuthenticated`, `user`
+- Banner thông báo email chưa xác thực (`user.emailVerified === false`)
 
 Validation và rule:
 - `AuthController.login()` dùng `LoginRequestDTO`
-- `PublicRoute` chặn người đã đăng nhập quay lại login/register
-- `CustomerRoute`, `AdminRoute`, `ExpertRoute` chặn sai vai trò
+- Đổi mật khẩu: Kiểm tra mật khẩu cũ không trống, mật khẩu mới và xác nhận mật khẩu mới trùng nhau, tối thiểu 8 ký tự.
+- Tạo Expert: Các trường Họ tên, Email, Chuyên ngành, Ngành luật không được để trống. Không còn trường password trong payload.
+- Resend activation: chỉ cần `email`, backend tự validate email tồn tại và đúng role EXPERT.
 
 API / service tích hợp:
-- FE: `frontend/src/services/auth.service.ts`
+- FE: `frontend/src/services/auth.service.ts`, `frontend/src/services/user.service.ts`
 - BE:
-- `POST /api/v1/auth/register`
-- `POST /api/v1/auth/login`
-- `POST /api/v1/auth/refresh`
-- `POST /api/v1/auth/logout`
-- `GET /api/v1/auth/me`
+  - `POST /api/v1/auth/register` (Tạo tài khoản Customer)
+  - `POST /api/v1/auth/login`
+  - `POST /api/v1/auth/refresh`
+  - `POST /api/v1/auth/logout`
+  - `GET /api/v1/auth/me`
+  - `GET /api/v1/auth/verify-email?token={token}` (Xác nhận email chính chủ) [MỚI]
+  - `POST /api/v1/users/change-password` (Đổi mật khẩu cho User & Expert) [MỚI]
+  - `POST /api/v1/admin/users/experts` (Admin tạo tài khoản Expert — không nhận field `password`, backend tự gán `12345678`) [MỚI]
+  - `POST /api/v1/admin/users/experts/resend-activation` (Admin gửi lại mật khẩu tạm thời/mở khóa Expert, payload chỉ có `email`) [MỚI]
 
 UI states:
 - Đang kiểm tra phiên: loading spinner trong `AuthLoadingView`
 - Chưa đăng nhập: redirect về `/login`
 - Đăng nhập nhưng sai role: redirect sang home phù hợp hoặc access denied
+- Email chưa xác thực: Banner thông báo màu vàng ở đầu trang Dashboard.
 
 Edge cases:
 - User `active = false` bị coi như chưa đăng nhập
-- Refresh token hỏng: FE xóa local session
-- `/logout` fail vẫn clear local state
+- Đổi mật khẩu nhập sai mật khẩu cũ: Hiển thị lỗi từ backend
+- Link xác thực email hết hạn: Cần nút bấm để gửi lại email xác thực.
+- Expert đăng nhập sau khi bị khóa do quá hạn 7 ngày: nhận lỗi 403 giống hệt lỗi "email chưa xác thực" (dùng chung cơ chế `active=false`) — FE nên hiển thị thông báo gợi ý liên hệ Admin thay vì chỉ báo "sai tài khoản/mật khẩu".
+- Admin gọi resend-activation cho email không tồn tại hoặc không phải role EXPERT: backend trả 404/403 tương ứng, FE hiện lỗi rõ ràng.
+- Admin gọi resend-activation cho Expert đã tự đổi mật khẩu từ lâu (không còn `mustChangePassword`): vẫn hoạt động bình thường — API này luôn reset lại về mật khẩu mặc định + hạn 7 ngày mới, nên chỉ dùng khi thực sự cần (quên mật khẩu/bị khóa), không nên đặt nút này quá dễ bấm nhầm.
 
 Business rules:
 - Refresh token nằm trong cookie HttpOnly, access token nằm ở body rồi lưu local
-- Guard hiện bám role trực tiếp từ `user.role`
+- Tài khoản Expert do Admin tạo được đánh dấu `emailVerified = true` ngay lập tức.
+- Mật khẩu mặc định cho mọi Expert do Admin tạo/reset là cố định `12345678` — không random, không cấu hình được.
+- Hạn đổi mật khẩu là 7 ngày kể từ lúc tạo/reset; quá hạn mà chưa đổi thì tài khoản tự động bị khóa bởi 1 scheduled job chạy mỗi giờ ở backend (không phải real-time).
 
 Quyền:
-- Không đăng nhập chỉ được dùng public route
+- Không đăng nhập chỉ được dùng public route và trang verify email
 - Admin và expert không dùng route customer
+- Chỉ Admin có quyền tạo Expert.
 
 File nguồn tham chiếu:
 - FE:
-- `frontend/src/store/AppStore.tsx` - `refreshSession`, `signIn`, `signOut`
-- `frontend/src/services/auth.service.ts` - `login`, `refreshAccessToken`, `getCurrentUser`
-- `frontend/src/components/auth/AuthGuards.tsx` - `PublicRoute`, `AuthenticatedRoute`, `CustomerRoute`, `AdminRoute`, `ExpertRoute`
-- `frontend/src/routes/router.tsx`
+  - `frontend/src/store/AppStore.tsx` - `refreshSession`, `signIn`, `signOut`
+  - `frontend/src/services/auth.service.ts` - `login`, `refreshAccessToken`, `getCurrentUser`
+  - `frontend/src/components/auth/AuthGuards.tsx`
+  - `frontend/src/routes/router.tsx`
 - BE:
-- `backend/src/main/java/com/analyzer/api/controller/AuthController.java`
+  - `backend/src/main/java/com/analyzer/api/controller/AuthController.java`
+  - `backend/src/main/java/com/analyzer/api/controller/UserController.java`
 
 Điểm chưa rõ:
-- `CHƯA XÁC ĐỊNH`: form field cụ thể của `RegisterPage` nếu cần tài liệu UX chi tiết hơn.
-- `CHƯA XÁC ĐỊNH`: backend có email verification hay không, repo hiện chưa thể hiện.
+- `ĐÃ RÕ`: Luồng xác thực email qua link gửi kèm token.
+- `ĐÃ RÕ`: Admin tạo trực tiếp tài khoản Expert, Expert tự đăng nhập và đổi mật khẩu tạm thời.
+- `ĐÃ RÕ`: Mật khẩu mặc định cố định `12345678`, hạn đổi 7 ngày, tự khóa nếu quá hạn, Admin có API resend riêng để gửi lại/mở khóa.
 
 Checklist FE:
 - Đồng bộ redirect sau login theo role.
 - Luôn xử lý `isAuthLoading` trước khi render app shell.
-- Không tự lưu refresh token ở FE.
-- Chuẩn hóa thông báo session expired khi `/refresh` thất bại.
+- Thêm giao diện đổi mật khẩu vào `SettingsPage`.
+- Thiết kế Banner cảnh báo email chưa xác thực cho Customer.
+- Thêm Form Admin tạo Expert trong trang quản trị — bỏ hẳn ô nhập mật khẩu, thay bằng ghi chú "mật khẩu mặc định 12345678, hạn đổi 7 ngày".
+- Thêm nút "Gửi lại thông tin đăng nhập" trong danh sách Expert của Admin Console (hoặc form nhập email riêng), có confirm dialog trước khi gọi API resend-activation.
+- Hiển thị trạng thái tài khoản Expert bị khóa (nếu API list expert có field `active`) khác với trạng thái bình thường, để Admin biết cần bấm resend.
 
 Tiêu chí hoàn thành:
 - Người dùng đăng nhập xong vào đúng route.
-- Reload trang không bị mất phiên nếu refresh token còn hợp lệ.
-- Sai role không truy cập được màn không thuộc quyền.
+- Xác nhận email thành công khi click vào link.
+- User/Expert đổi được mật khẩu.
+- Admin tạo được tài khoản Expert đầy đủ thông tin chuyên ngành, không cần nhập mật khẩu.
+- Expert nhận được email chứa mật khẩu tạm thời sau khi Admin tạo/resend tài khoản.
+- Admin gửi lại được thông tin đăng nhập / mở khóa Expert qua email.
 
 HIỆN TRẠNG:
-- Flow này có đủ route, store, service và controller thật.
+- Luồng Auth cơ bản hoạt động tốt. Cần bổ sung các giao diện đổi mật khẩu, kích hoạt email và form tạo Expert của Admin.
 
 SUY LUẬN:
-- Đây là flow ổn định nhất của repo hiện tại.
+- Việc phân tách rõ vai trò và hoàn thiện bảo mật tài khoản (xác thực email, đổi mật khẩu) là bước bắt buộc để hệ thống sẵn sàng chạy thực tế.
 
 ĐỀ XUẤT:
-- FE có thể dùng flow này làm chuẩn cho các module còn lại.
+- Triển khai giao diện đổi mật khẩu trước vì ít phụ thuộc vào bên thứ ba (như SMTP Server gửi mail). Luồng xác thực email có thể dùng giao diện Mock thông báo gửi thành công trước khi kết nối mail server thật.

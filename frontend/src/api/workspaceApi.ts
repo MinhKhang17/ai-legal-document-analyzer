@@ -4,6 +4,7 @@ export {
   getWorkspaceDocuments,
   getWorkspaces,
   uploadDocument,
+  downloadWorkspaceDocument,
 } from "../services/workspace.service";
 
 export type {

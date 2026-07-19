@@ -5,7 +5,9 @@ import logging
 from collections import defaultdict
 from pathlib import Path
 
-from fastapi import APIRouter, Query
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.graph.repository import GraphRepository
@@ -17,12 +19,20 @@ class IngestedDocumentVersionResponse(BaseModel):
     effectiveFrom: str | None = None
     effectiveTo: str | None = None
     visibility: str | None = None
+    active: bool | None = None
     ingestStatus: str | None = None
     chunkCount: int = 0
     embeddedCount: int = 0
     sourceFileId: str | None = None
     contentHash: str | None = None
     ingestedAt: str | None = None
+    publishedAt: str | None = None
+    ingestedBy: str | None = None
+    errorMessage: str | None = None
+
+
+class LifecycleUpdateRequest(BaseModel):
+    public: bool
 
 
 class IngestedDocumentResponse(BaseModel):
@@ -62,6 +72,9 @@ def _safe_str(value: object | None) -> str | None:
 
 
 def _compute_status(chunk_count: int, metadata: dict[str, object]) -> str:
+    stored_status = _safe_str(metadata.get("ingest_status"))
+    if stored_status:
+        return stored_status.upper()
     if chunk_count <= 0:
         return "UNKNOWN"
     if metadata.get("embedding_text") is None:
@@ -119,6 +132,7 @@ def get_ingested_documents(
         source_file_id = _safe_str(metadata.get("document_id")) or document_id
         content_hash = _safe_str(metadata.get("file_hash"))
         visibility_value = _safe_str(metadata.get("visibility_scope") or metadata.get("visibility"))
+        active_value = metadata.get("active") if isinstance(metadata.get("active"), bool) else None
         chunk_text = _safe_str(row.get("text")) or ""
 
         entry = grouped[document_id]
@@ -137,12 +151,16 @@ def get_ingested_documents(
             effectiveFrom=None,
             effectiveTo=None,
             visibility=visibility_value,
+            active=active_value,
             ingestStatus=_compute_status(int(entry["chunkCount"]), metadata),
             chunkCount=int(entry["chunkCount"]),
             embeddedCount=int(entry["embeddedCount"]),
             sourceFileId=source_file_id,
             contentHash=content_hash,
             ingestedAt=_safe_str(metadata.get("ingested_at")),
+            publishedAt=_safe_str(metadata.get("published_at")),
+            ingestedBy=_safe_str(metadata.get("ingested_by_user_id")),
+            errorMessage=_safe_str(metadata.get("error_message")),
         )
         entry["versions"] = [version]
         entry["_text"] = f"{title or ''} {document_code or ''} {document_id or ''} {content_hash or ''} {visibility_value or ''} {chunk_text}"
@@ -180,4 +198,35 @@ def get_ingested_documents(
         size=size,
         totalItems=total_items,
         totalPages=total_pages,
+    )
+
+
+@router.put("/{kb_id}/ingested-documents/{document_id}/lifecycle", response_model=IngestedDocumentVersionResponse)
+def update_document_lifecycle(
+    kb_id: str,
+    document_id: str,
+    request: LifecycleUpdateRequest,
+) -> IngestedDocumentVersionResponse:
+    visibility = "PUBLIC" if request.public else "PRIVATE"
+    published_at = datetime.now(timezone.utc).isoformat() if request.public else None
+    repo = GraphRepository()
+    try:
+        updated = repo.update_document_lifecycle(
+            document_id,
+            visibility=visibility,
+            active=request.public,
+            published_at=published_at,
+        )
+    except Exception as exc:
+        logger.warning("Failed to update KB lifecycle kb_id=%s document_id=%s: %s", kb_id, document_id, exc)
+        raise HTTPException(status_code=503, detail="Knowledge store is unavailable") from exc
+    if updated == 0:
+        raise HTTPException(status_code=404, detail="Ingested document not found")
+    return IngestedDocumentVersionResponse(
+        versionId=document_id,
+        sourceFileId=document_id,
+        visibility=visibility,
+        active=request.public,
+        ingestStatus="INGESTED",
+        publishedAt=published_at,
     )

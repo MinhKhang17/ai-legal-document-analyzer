@@ -20,4 +20,5 @@ public class VnPayProperties {
     private String currCode;
     private String orderType;
     private String locale;
+    private boolean debugLogCredentials;
 }

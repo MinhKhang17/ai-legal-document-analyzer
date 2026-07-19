@@ -20,7 +20,9 @@ public class KnowledgeIngestionJobResponse {
     private KnowledgeStatus status;
     private String jobPayload;
     private String errorMessage;
+    private Integer progressPercent;
     private LocalDateTime startedAt;
     private LocalDateTime completedAt;
+    private Long ingestedById;
     private LocalDateTime createdAt;
 }

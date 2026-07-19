@@ -83,13 +83,32 @@ class DocumentProcessResult(BaseModel):
     errorMessage: str | None = None
 
 
+class ConversationMessage(BaseModel):
+    messageId: str
+    role: str
+    content: str
+    createdAt: str | None = None
+    documentIds: list[str] = Field(default_factory=list)
+    citationIds: list[str] = Field(default_factory=list)
+
+
 class RagQueryRequest(BaseModel):
     requestId: str = Field(alias="request_id")
     userId: str = Field(alias="user_id")
     workspaceId: str = Field(alias="workspace_id")
     documentId: str | None = Field(default=None, alias="document_id")
+    attachedDocumentIds: list[str] | None = Field(default=None, alias="attached_document_ids")
     chatSessionId: str | None = Field(default=None, alias="chat_session_id")
     chatHistory: str | None = Field(default=None, alias="chat_history")
+    conversationSummaryJson: str | None = Field(default=None, alias="conversation_summary_json")
+    recentHistory: list[ConversationMessage] = Field(default_factory=list, alias="recent_history")
+    evictedMessages: list[ConversationMessage] = Field(default_factory=list, alias="evicted_messages")
+    currentUserMessageId: str | None = Field(default=None, alias="current_user_message_id")
+    currentAssistantMessageId: str | None = Field(default=None, alias="current_assistant_message_id")
+    focusedDocumentId: str | None = Field(default=None, alias="focused_document_id")
+    messageAttachedDocumentIds: list[str] = Field(default_factory=list, alias="message_attached_document_ids")
+    conversationUserRole: str | None = Field(default=None, alias="conversation_user_role")
+    conversationMode: str | None = Field(default=None, alias="conversation_mode")
     question: str = Field(..., min_length=1)
     topKUserChunks: int = Field(default=5, ge=1, le=20, alias="top_k_user_chunks")
     topKKnowledgeChunks: int = Field(default=5, ge=1, le=20, alias="top_k_knowledge_chunks")
@@ -117,6 +136,29 @@ class RagCitation(BaseModel):
     articleNumber: str | None = None
     clauseNumber: str | None = None
     sectionTitle: str | None = None
+    excerpt: str | None = None
+
+
+class RagUsage(BaseModel):
+    promptTokens: int = 0
+    completionTokens: int = 0
+    totalTokens: int = 0
+
+
+class ConversationMemoryUpdate(BaseModel):
+    summaryJson: str | None = None
+    summarizedThroughMessageId: str | None = None
+    updated: bool = False
+
+
+class TokenUsageBreakdown(BaseModel):
+    systemPrompt: int = 0
+    conversationSummary: int = 0
+    recentHistory: int = 0
+    relevantHistory: int = 0
+    userDocumentContext: int = 0
+    legalKbContext: int = 0
+    output: int = 0
 
 
 class KeyClause(BaseModel):
@@ -165,29 +207,62 @@ class RagQueryResponse(BaseModel):
     answer: str
     confidenceScore: float | None = Field(default=None, description="AI confidence used by the UI to decide ticket escalation.")
     shouldSuggestTicket: bool = Field(default=False, description="Whether the frontend should surface a ticket action.")
-    suggestionType: Literal["NONE", "ASK_MORE_INFO", "SUGGEST_LAWYER", "REQUIRE_LAWYER"] = Field(
+    suggestionType: Literal[
+        "NONE",
+        "ASK_MORE_INFO",
+        "SUGGEST_LAWYER",
+        "REQUIRE_LAWYER",
+        "DIRECT_ANSWER",
+        "ASK_UPLOAD_CONTRACT",
+        "ASK_CONTRACT_TYPE",
+        "ASK_USER_ROLE",
+        "ASK_TARGET_CLAUSE",
+        "ASK_MORE_FACTS",
+        "SUGGEST_REVISE_CLAUSE",
+        "SUGGEST_NEGOTIATION",
+        "REDIRECT_TO_SUPPORTED_SCOPE",
+        "REFUSE_AND_REDIRECT",
+    ] = Field(
         default="NONE",
         description="Type of legal follow-up the AI recommends.",
     )
     suggestionReason: str | None = Field(default=None, description="Short explanation for the follow-up suggestion.")
     missingInformation: str | None = Field(default=None, description="What information the AI still needs from the user.")
-    riskLevel: Literal["LOW", "MEDIUM", "HIGH", "NEED_EXPERT", "UNKNOWN"]
+    riskLevel: Literal["NONE", "LOW", "MEDIUM", "HIGH", "CRITICAL", "UNKNOWN"]
     legalDomain: str | None = Field(default=None, description="Detected legal domain for UI grouping.")
     userActionHint: Literal["CONTINUE_CHAT", "PROVIDE_MORE_INFO", "CREATE_TICKET", "UPLOAD_CONTRACT", "CONTACT_LAWYER"] = Field(
         default="CONTINUE_CHAT",
         description="Small UX hint that tells the app how to guide the user next.",
     )
     citations: list[RagCitation] = Field(default_factory=list)
+    usedKnowledgeCitationIds: list[str] = Field(
+        default_factory=list,
+        description="Validated SYSTEM_KB citations actually used by the answer.",
+    )
+    usedUserCitationIds: list[str] = Field(
+        default_factory=list,
+        description="Validated user-document citations actually used by the answer.",
+    )
     retrievedUserChunks: int
     retrievedKnowledgeChunks: int
 
     # ── NEW fields (all optional for backward compatibility) ──
     intent: str | None = Field(default=None, description="Detected LegalQueryIntent (e.g. FULL_CONTRACT_REVIEW).")
     contractType: str | None = Field(default=None, description="Detected ContractType (e.g. RENTAL, LABOR).")
+    userRole: str | None = Field(default=None, description="Detected role of the user in the contract.")
+    jurisdiction: str | None = Field(default=None, description="Detected jurisdiction for the query.")
+    responseStatus: str | None = Field(default=None, description="Classifier decision on answerability.")
     responseMode: str | None = Field(default=None, description="ResponseMode used (e.g. DOCUMENT_BASED_ANALYSIS).")
     inputComplete: bool | None = Field(default=None, description="Whether the user provided all required input.")
     missingInputs: list[str] | None = Field(default=None, description="List of missing input items.")
     analysis: AnalysisResult | None = Field(default=None, description="Structured analysis output.")
+    model: str | None = None
+    usage: RagUsage | None = None
+    llmExecuted: bool | None = Field(default=None, description="True only when the prompt was sent to the configured LLM provider.")
+    systemPromptPreview: str | None = Field(default=None, description="Final system prompt in LLM preview mode.")
+    userPromptPreview: str | None = Field(default=None, description="Final user prompt in LLM preview mode.")
+    conversationMemoryUpdate: ConversationMemoryUpdate | None = None
+    tokenUsageBreakdown: TokenUsageBreakdown | None = None
 
 
 

@@ -17,12 +17,14 @@ import {
   cancelCustomerPlan,
   getMyCustomerPlan,
   getMySubscriptionUsage,
+  getSubscriptionUsageSummary,
+  getSubscriptionPlans,
   isCustomerPlanMissingError,
   isSubscriptionUnauthorizedError,
   requestSubscriptionRefund,
 } from '../../services/subscription.service';
 import type { PaymentTransaction } from '../../types/paymentTransaction';
-import type { CustomerPlan, SubscriptionUsage } from '../../types/subscription';
+import type { CustomerPlan, SubscriptionPlan, SubscriptionUsage, SubscriptionUsageSummary } from '../../types/subscription';
 import { formatDisplayDate, formatNumber, formatVndCurrency } from '../../utils/format';
 
 interface BillingMetricCardProps {
@@ -95,6 +97,8 @@ export function BillingPage() {
   const [isCancellingPlan, setIsCancellingPlan] = useState(false);
   const [usageRows, setUsageRows] = useState<SubscriptionUsage[]>([]);
   const [isLoadingUsage, setIsLoadingUsage] = useState(true);
+  const [usageSummary, setUsageSummary] = useState<SubscriptionUsageSummary | null>(null);
+  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const locale = language === 'vi' ? 'vi-VN' : 'en-US';
 
   const loadCustomerPlan = useCallback(async () => {
@@ -147,11 +151,18 @@ export function BillingPage() {
     setIsLoadingUsage(true);
 
     try {
-      const response = await getMySubscriptionUsage(0, 8);
-      setUsageRows(response.data?.items ?? []);
+      const [history, summary, availablePlans] = await Promise.all([
+        getMySubscriptionUsage(0, 8),
+        getSubscriptionUsageSummary(),
+        getSubscriptionPlans(),
+      ]);
+      setUsageRows(history.data?.items ?? []);
+      setUsageSummary(summary.data ?? null);
+      setPlans(availablePlans.data ?? []);
     } catch (error) {
       console.error('Failed to load subscription usage:', error);
       setUsageRows([]);
+      setUsageSummary(null);
     } finally {
       setIsLoadingUsage(false);
     }
@@ -164,6 +175,7 @@ export function BillingPage() {
   }, [loadCustomerPlan, loadPaymentTransactions, loadUsage]);
 
   const quotaPercent = useMemo(() => (customerPlan ? getQuotaPercent(customerPlan) : 0), [customerPlan]);
+  const usagePercent = (used: number, limit: number) => limit > 0 ? Math.min(100, (used / limit) * 100) : 0;
 
   const handleCreatePaymentUrl = async (transaction: PaymentTransaction) => {
     setPayingTransactionId(transaction.id);
@@ -221,7 +233,7 @@ export function BillingPage() {
     }
   };
 
-  const handleRequestRefund = async (amount: number, reason: string) => {
+  const handleRequestRefund = async (form: { amount: number; reason: string; bankName: string; accountNumber: string; accountHolderName: string }) => {
     const transaction = refundTransaction;
     if (!transaction) return;
     setRefundingTransactionId(transaction.id);
@@ -232,8 +244,14 @@ export function BillingPage() {
       await requestSubscriptionRefund({
         paymentTransactionId: transaction.id,
         customerPlanId: transaction.customerPlanId,
-        reason,
-        amount,
+        reason: form.reason,
+        refundReason: form.reason,
+        amount: form.amount,
+        bankName: form.bankName,
+        accountNumber: form.accountNumber,
+        accountHolderName: form.accountHolderName,
+        transactionId: transaction.transactionCode || String(transaction.id),
+        invoiceId: transaction.transactionCode || String(transaction.id),
       });
       const message = t('billing.refundSuccess');
       setTransactionActionMessage(message);
@@ -459,6 +477,25 @@ export function BillingPage() {
           </Card>
         </section>
 
+        {usageSummary && (
+          <section className="mt-xl">
+            <h2 className="mb-md text-title-lg font-semibold">Mức sử dụng gói hiện tại</h2>
+            <div className="grid gap-gutter md:grid-cols-2 xl:grid-cols-4">
+              {[
+                ['AI tokens', usageSummary.aiTokensUsed, usageSummary.aiTokensLimit],
+                ['Phân tích hợp đồng', usageSummary.contractAnalysisUsed, usageSummary.contractAnalysisLimit],
+                ['Workspace', usageSummary.workspacesUsed, usageSummary.workspacesLimit],
+                ['Tài liệu', usageSummary.documentsUsed, usageSummary.documentsLimit],
+                ['Lưu trữ (MB)', Math.round(usageSummary.storageUsedBytes / 1024 / 1024), Math.round(usageSummary.storageLimitBytes / 1024 / 1024)],
+                ['Bản nháp hợp đồng', usageSummary.draftContractsUsed, usageSummary.draftContractsLimit],
+                ['Ticket chuyên gia', usageSummary.expertTicketsUsed, usageSummary.expertTicketsLimit],
+              ].map(([label, used, limit]) => (
+                <BillingMetricCard key={String(label)} label={String(label)} value={`${formatNumber(Number(used))} / ${formatNumber(Number(limit))}`} progressValue={usagePercent(Number(used), Number(limit))} />
+              ))}
+            </div>
+          </section>
+        )}
+
         <section className="mt-xl grid gap-gutter xl:grid-cols-[0.9fr_1.1fr]">
           <Card
             className="bg-primary text-white dark:bg-slate-900"
@@ -526,6 +563,29 @@ export function BillingPage() {
         </section>
 
         {renderUsageCard()}
+
+        {plans.length > 0 && (
+          <Card className="mt-xl" title="So sánh gói Free · Standard · Premium" subtitle="Nâng cấp áp dụng ngay; hạ gói được lên lịch khi gói hiện tại hết hạn.">
+            <div className="grid gap-md md:grid-cols-3">
+              {plans.map((plan) => {
+                const current = plan.id === customerPlan.subscriptionPlan.id;
+                return <div key={plan.id} className={`rounded-xl border p-md ${current ? 'border-primary bg-primary/5' : 'border-legal-border dark:border-slate-700'}`}>
+                  <div className="flex items-center justify-between gap-sm"><h3 className="font-bold">{plan.displayName ?? plan.planName}</h3>{current && <Badge tone="green">Gói hiện tại</Badge>}</div>
+                  <p className="mt-sm text-2xl font-bold text-primary">{formatVndCurrency(plan.priceVnd ?? plan.price, t('billing.free'))}</p>
+                  <ul className="mt-md space-y-xs text-sm text-on-surface-variant dark:text-slate-300">
+                    <li>{formatNumber(plan.contractAnalysisLimit ?? plan.maxQuota)} lượt phân tích</li>
+                    <li>{formatNumber(plan.aiTokenLimit ?? 0)} AI tokens</li>
+                    <li>{plan.workspaceLimit ?? 0} workspace · {plan.documentPerWorkspaceLimit ?? 0} tài liệu/workspace</li>
+                    <li>{plan.storageLimitMb ?? 0} MB lưu trữ · {plan.maxFileSizeMb ?? 0} MB/file</li>
+                    <li>{plan.maxAttachedDocumentsPerSession ?? 0} tài liệu attach/phiên</li>
+                    <li>CONTACT_EXPERT: {plan.allowContactExpertTicket ? `${plan.expertTicketLimit ?? 0}/tháng` : 'Premium only'}</li>
+                  </ul>
+                  <Button className="mt-md w-full" disabled={current || !plan.active} onClick={() => navigate('/billing/subscribe')}>{current ? 'Đang sử dụng' : 'Chọn gói'}</Button>
+                </div>;
+              })}
+            </div>
+          </Card>
+        )}
       </>
     );
   };

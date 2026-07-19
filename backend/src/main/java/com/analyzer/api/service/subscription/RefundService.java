@@ -18,4 +18,6 @@ public interface RefundService {
     List<RefundResponseDTO> getRefunds(RefundStatus status);
 
     RefundResponseDTO updateRefundStatus(Long refundId, UpdateRefundStatusRequest request);
+
+    RefundResponseDTO confirmRefundEmail(String token);
 }

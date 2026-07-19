@@ -3,17 +3,19 @@ package com.analyzer.api.service.impl;
 import com.analyzer.api.dto.subscriptionplan.SubscriptionPlanRequestDTO;
 import com.analyzer.api.dto.subscriptionplan.SubscriptionPlanResponseDTO;
 import com.analyzer.api.entity.SubscriptionPlan;
+import com.analyzer.api.exception.common.ConflictException;
 import com.analyzer.api.mapper.SubscriptionPlanMapper;
 import com.analyzer.api.repository.CustomerPlanRepository;
 import com.analyzer.api.repository.PaymentTransactionRepository;
 import com.analyzer.api.repository.SubscriptionPlanRepository;
 import com.analyzer.api.service.SubscriptionPlanService;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -23,90 +25,168 @@ public class SubscriptionPlanServiceImpl implements SubscriptionPlanService {
     private final CustomerPlanRepository customerPlanRepository;
     private final PaymentTransactionRepository paymentTransactionRepository;
     private final SubscriptionPlanMapper subscriptionPlanMapper;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
     @Transactional
     public SubscriptionPlanResponseDTO createPlan(SubscriptionPlanRequestDTO request) {
-        if (subscriptionPlanRepository.existsByPlanName(request.getPlanName())) {
-            throw new RuntimeException("Tên gói đã tồn tại");
+        applyLegacyDefaults(request, null);
+        normalizeAndValidate(request);
+        if (subscriptionPlanRepository.existsByPlanName(request.getPlanName())
+                || subscriptionPlanRepository.existsByPlanTypeIgnoreCase(request.getPlanType())) {
+            throw new ConflictException("SUBSCRIPTION_PLAN_NAME_ALREADY_EXISTS");
         }
-
         SubscriptionPlan plan = subscriptionPlanMapper.toEntity(request);
-        if (request.getActive() != null) {
-            plan.setActive(request.getActive());
-        } else {
-            plan.setActive(true);
-        }
-        plan.setAiQuota(request.getAiQuota());
-        plan.setTicketQuota(request.getTicketQuota());
-        plan.setMaxWorkspaces(request.getMaxWorkspaces());
-        plan.setMaxContractsPerWorkspace(request.getMaxContractsPerWorkspace());
-        plan.setMaxDraftContracts(request.getMaxDraftContracts());
-
-        SubscriptionPlan savedPlan = subscriptionPlanRepository.save(plan);
-        return subscriptionPlanMapper.toResponseDTO(savedPlan);
+        plan.setActive(request.getActive() == null || request.getActive());
+        applyNewFields(plan, request);
+        return toResponse(subscriptionPlanRepository.save(plan));
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<SubscriptionPlanResponseDTO> getActivePlans() {
-        return subscriptionPlanRepository.findByActiveTrue().stream()
-                .map(subscriptionPlanMapper::toResponseDTO)
-                .collect(Collectors.toList());
+        return subscriptionPlanRepository.findByActiveTrue().stream().map(this::toResponse).toList();
     }
 
     @Override
     @Transactional(readOnly = true)
     public SubscriptionPlanResponseDTO getPlanById(Long id) {
-        SubscriptionPlan plan = subscriptionPlanRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy gói subscription với id: " + id));
-        return subscriptionPlanMapper.toResponseDTO(plan);
+        return toResponse(subscriptionPlanRepository.findById(id)
+                .orElseThrow(() -> new ConflictException("SUBSCRIPTION_PLAN_NOT_FOUND")));
     }
 
     @Override
     @Transactional
     public SubscriptionPlanResponseDTO updatePlan(Long id, SubscriptionPlanRequestDTO request) {
         SubscriptionPlan plan = subscriptionPlanRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy gói subscription với id: " + id));
-
-        if (!plan.getPlanName().equalsIgnoreCase(request.getPlanName()) && 
-                subscriptionPlanRepository.existsByPlanName(request.getPlanName())) {
-            throw new RuntimeException("Tên gói đã tồn tại");
+                .orElseThrow(() -> new ConflictException("SUBSCRIPTION_PLAN_NOT_FOUND"));
+        applyLegacyDefaults(request, plan);
+        normalizeAndValidate(request);
+        if ((!plan.getPlanName().equalsIgnoreCase(request.getPlanName())
+                && subscriptionPlanRepository.existsByPlanName(request.getPlanName()))
+                || (!plan.getPlanType().equalsIgnoreCase(request.getPlanType())
+                && subscriptionPlanRepository.existsByPlanTypeIgnoreCase(request.getPlanType()))) {
+            throw new ConflictException("SUBSCRIPTION_PLAN_NAME_ALREADY_EXISTS");
         }
-
         plan.setPlanName(request.getPlanName());
         plan.setPlanType(request.getPlanType());
         plan.setDescription(request.getDescription());
         plan.setPrice(request.getPrice());
         plan.setDurationDays(request.getDurationDays());
         plan.setMaxQuota(request.getMaxQuota());
-        plan.setAiQuota(request.getAiQuota());
-        plan.setTicketQuota(request.getTicketQuota());
-        plan.setMaxWorkspaces(request.getMaxWorkspaces());
-        plan.setMaxContractsPerWorkspace(request.getMaxContractsPerWorkspace());
-        plan.setMaxDraftContracts(request.getMaxDraftContracts());
-        if (request.getActive() != null) {
-            plan.setActive(request.getActive());
-        }
-
-        SubscriptionPlan updatedPlan = subscriptionPlanRepository.save(plan);
-        return subscriptionPlanMapper.toResponseDTO(updatedPlan);
+        if (request.getActive() != null) plan.setActive(request.getActive());
+        applyNewFields(plan, request);
+        return toResponse(subscriptionPlanRepository.save(plan));
     }
 
     @Override
     @Transactional
     public void deletePlan(Long id) {
         SubscriptionPlan plan = subscriptionPlanRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy gói subscription với id: " + id));
-
-        boolean hasCustomerPlans = customerPlanRepository.existsBySubscriptionPlanId(id);
-        boolean hasTransactions = paymentTransactionRepository.existsBySubscriptionPlanId(id);
-
-        if (hasCustomerPlans || hasTransactions) {
+                .orElseThrow(() -> new ConflictException("SUBSCRIPTION_PLAN_NOT_FOUND"));
+        if (customerPlanRepository.existsBySubscriptionPlanId(id)
+                || paymentTransactionRepository.existsBySubscriptionPlanId(id)) {
             plan.setActive(false);
             subscriptionPlanRepository.save(plan);
         } else {
             subscriptionPlanRepository.delete(plan);
         }
     }
+
+    private void normalizeAndValidate(SubscriptionPlanRequestDTO request) {
+        request.setPlanType(firstText(request.getName(), request.getPlanType()));
+        request.setPlanName(firstText(request.getDisplayName(), request.getPlanName()));
+        request.setPrice(request.getPriceVnd() != null ? request.getPriceVnd() : request.getPrice());
+        request.setDurationDays(first(request.getBillingCycleDays(), request.getDurationDays()));
+        request.setMaxQuota(first(request.getContractAnalysisLimit(), request.getMaxQuota()));
+        request.setAiQuota(first(request.getAiTokenLimit(), request.getAiQuota()));
+        request.setMaxWorkspaces(first(request.getWorkspaceLimit(), request.getMaxWorkspaces()));
+        request.setMaxContractsPerWorkspace(first(request.getDocumentPerWorkspaceLimit(), request.getMaxContractsPerWorkspace()));
+        request.setMaxDraftContracts(first(request.getContractDraftLimit(), request.getMaxDraftContracts()));
+        request.setTicketQuota(first(request.getExpertTicketLimit(), request.getTicketQuota()));
+        if (request.getPlanType() == null || request.getPlanName() == null
+                || request.getPrice() == null || request.getPrice().signum() < 0
+                || request.getDurationDays() == null || request.getDurationDays() <= 0) {
+            throw new ConflictException("INVALID_SUBSCRIPTION_PLAN");
+        }
+        Integer[] limits = {request.getMaxQuota(), request.getAiQuota(), request.getMaxWorkspaces(),
+                request.getMaxContractsPerWorkspace(), request.getStorageLimitMb(), request.getMaxFileSizeMb(),
+                request.getMaxAttachedDocumentsPerSession(), request.getMaxDraftContracts(), request.getTicketQuota()};
+        for (Integer limit : limits) {
+            if (limit == null || limit < 0) throw new ConflictException("INVALID_SUBSCRIPTION_PLAN_LIMITS");
+        }
+    }
+
+    private void applyLegacyDefaults(SubscriptionPlanRequestDTO request, SubscriptionPlan existing) {
+        if (request.getAiTokenLimit() == null && request.getAiQuota() == null) request.setAiQuota(existing == null ? 0 : safe(existing.getAiQuota()));
+        if (request.getWorkspaceLimit() == null && request.getMaxWorkspaces() == null) request.setMaxWorkspaces(existing == null ? 0 : safe(existing.getMaxWorkspaces()));
+        if (request.getDocumentPerWorkspaceLimit() == null && request.getMaxContractsPerWorkspace() == null) request.setMaxContractsPerWorkspace(existing == null ? 0 : safe(existing.getMaxContractsPerWorkspace()));
+        if (request.getContractDraftLimit() == null && request.getMaxDraftContracts() == null) request.setMaxDraftContracts(existing == null ? 0 : safe(existing.getMaxDraftContracts()));
+        if (request.getExpertTicketLimit() == null && request.getTicketQuota() == null) request.setTicketQuota(existing == null ? 0 : safe(existing.getTicketQuota()));
+        if (request.getStorageLimitMb() == null) request.setStorageLimitMb(existing == null ? 0 : safe(existing.getStorageLimitMb()));
+        if (request.getMaxFileSizeMb() == null) request.setMaxFileSizeMb(existing == null ? 0 : safe(existing.getMaxFileSizeMb()));
+        if (request.getMaxAttachedDocumentsPerSession() == null) request.setMaxAttachedDocumentsPerSession(existing == null ? 0 : safe(existing.getMaxAttachedDocumentsPerSession()));
+        if (existing != null) {
+            if (request.getAllowSystemErrorTicket() == null) request.setAllowSystemErrorTicket(existing.getAllowSystemErrorTicket());
+            if (request.getAllowQueryErrorTicket() == null) request.setAllowQueryErrorTicket(existing.getAllowQueryErrorTicket());
+            if (request.getAllowContactExpertTicket() == null) request.setAllowContactExpertTicket(existing.getAllowContactExpertTicket());
+        }
+    }
+
+    private int safe(Integer value) { return value == null ? 0 : value; }
+
+    private void applyNewFields(SubscriptionPlan plan, SubscriptionPlanRequestDTO request) {
+        plan.setAiQuota(request.getAiQuota());
+        plan.setTicketQuota(request.getTicketQuota());
+        plan.setMaxWorkspaces(request.getMaxWorkspaces());
+        plan.setMaxContractsPerWorkspace(request.getMaxContractsPerWorkspace());
+        plan.setMaxDraftContracts(request.getMaxDraftContracts());
+        plan.setStorageLimitMb(request.getStorageLimitMb());
+        plan.setMaxFileSizeMb(request.getMaxFileSizeMb());
+        plan.setMaxAttachedDocumentsPerSession(request.getMaxAttachedDocumentsPerSession());
+        if (request.getAllowSystemErrorTicket() != null) plan.setAllowSystemErrorTicket(request.getAllowSystemErrorTicket());
+        if (request.getAllowQueryErrorTicket() != null) plan.setAllowQueryErrorTicket(request.getAllowQueryErrorTicket());
+        if (request.getAllowContactExpertTicket() != null) plan.setAllowContactExpertTicket(request.getAllowContactExpertTicket());
+        if (request.getFeatures() != null || plan.getId() == null) {
+            try {
+                plan.setFeatureLimitsJson(objectMapper.writeValueAsString(request.getFeatures() == null ? List.of() : request.getFeatures()));
+            } catch (Exception exception) {
+                throw new ConflictException("INVALID_SUBSCRIPTION_PLAN_FEATURES");
+            }
+        }
+    }
+
+    private SubscriptionPlanResponseDTO toResponse(SubscriptionPlan plan) {
+        SubscriptionPlanResponseDTO response = subscriptionPlanMapper.toResponseDTO(plan);
+        response.setName(plan.getPlanType());
+        response.setDisplayName(plan.getPlanName());
+        response.setPriceVnd(plan.getPrice());
+        response.setBillingCycleDays(plan.getDurationDays());
+        response.setContractAnalysisLimit(plan.getMaxQuota());
+        response.setAiTokenLimit(plan.getAiQuota());
+        response.setWorkspaceLimit(plan.getMaxWorkspaces());
+        response.setDocumentPerWorkspaceLimit(plan.getMaxContractsPerWorkspace());
+        response.setStorageLimitMb(plan.getStorageLimitMb());
+        response.setMaxFileSizeMb(plan.getMaxFileSizeMb());
+        response.setMaxAttachedDocumentsPerSession(plan.getMaxAttachedDocumentsPerSession());
+        response.setContractDraftLimit(plan.getMaxDraftContracts());
+        response.setExpertTicketLimit(plan.getTicketQuota());
+        response.setAllowSystemErrorTicket(plan.getAllowSystemErrorTicket());
+        response.setAllowQueryErrorTicket(plan.getAllowQueryErrorTicket());
+        response.setAllowContactExpertTicket(plan.getAllowContactExpertTicket());
+        try {
+            response.setFeatures(plan.getFeatureLimitsJson() == null ? List.of()
+                    : objectMapper.readValue(plan.getFeatureLimitsJson(), new TypeReference<List<String>>() {}));
+        } catch (Exception ignored) {
+            response.setFeatures(List.of());
+        }
+        return response;
+    }
+
+    private String firstText(String preferred, String legacy) {
+        String value = preferred != null && !preferred.isBlank() ? preferred : legacy;
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private Integer first(Integer preferred, Integer legacy) { return preferred != null ? preferred : legacy; }
 }

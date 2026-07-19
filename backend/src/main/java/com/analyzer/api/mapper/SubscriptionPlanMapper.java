@@ -13,6 +13,14 @@ public interface SubscriptionPlanMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
+    @Mapping(target = "tier", ignore = true)
+    @Mapping(target = "featureLimitsJson", ignore = true)
+    @Mapping(target = "storageLimitMb", ignore = true)
+    @Mapping(target = "maxFileSizeMb", ignore = true)
+    @Mapping(target = "maxAttachedDocumentsPerSession", ignore = true)
+    @Mapping(target = "allowSystemErrorTicket", ignore = true)
+    @Mapping(target = "allowQueryErrorTicket", ignore = true)
+    @Mapping(target = "allowContactExpertTicket", ignore = true)
     SubscriptionPlan toEntity(SubscriptionPlanRequestDTO requestDTO);
 
     SubscriptionPlanResponseDTO toResponseDTO(SubscriptionPlan plan);

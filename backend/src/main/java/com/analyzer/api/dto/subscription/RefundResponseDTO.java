@@ -23,6 +23,14 @@ public class RefundResponseDTO {
     private RefundStatus status;
     private BigDecimal amount;
     private String adminNote;
+    private String legalTicketId;
+    private String bankName;
+    private String accountNumber;
+    private String accountHolderName;
+    private String invoiceId;
+    private LocalDateTime confirmationExpiresAt;
+    private LocalDateTime emailConfirmedAt;
+    private Boolean emailConfirmed;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

@@ -7,10 +7,13 @@ import {
   CustomerRoute,
   PublicRoute,
   ExpertRoute,
+  AdminOrExpertRoute,
 } from "../components/auth/AuthGuards";
 import { AuthLayout } from "../layouts/AuthLayout";
 import { LoginPage } from "../pages/auth/LoginPage";
 import { RegisterPage } from "../pages/auth/RegisterPage";
+import { VerifyEmailPage } from "../pages/auth/VerifyEmailPage";
+import { CheckEmailPage } from "../pages/auth/CheckEmailPage";
 import { DashboardPage } from "../pages/dashboard/DashboardPage";
 import { ProjectsPage } from "../pages/projects/ProjectsPage";
 import { ProjectDetailPage } from "../pages/projects/ProjectDetailPage";
@@ -20,14 +23,13 @@ import { UploadPage } from "../pages/upload/UploadPage";
 import { EditorPage } from "../pages/editor/EditorPage";
 import { CustomerTicketDetailPage } from "../pages/tickets/CustomerTicketDetailPage";
 import { CustomerTicketsPage } from "../pages/tickets/CustomerTicketsPage";
-import { ReportsPage } from "../pages/reports/ReportsPage";
-import { ReportDetailPage } from "../pages/reports/ReportDetailPage";
 import { KnowledgeBasePage } from "../pages/knowledge-base/KnowledgeBasePage";
 import { KnowledgeBaseDetailPage } from "../pages/knowledge-base/KnowledgeBaseDetailPage";
 import { BillingPage } from "../pages/billing/BillingPage";
 import { PaymentResultPage } from "../pages/billing/PaymentResultPage";
 import { RefundHistoryPage } from "../pages/billing/RefundHistoryPage";
 import { RefundDetailPage } from "../pages/billing/RefundDetailPage";
+import { RefundEmailConfirmationPage } from "../pages/billing/RefundEmailConfirmationPage";
 import { SubscribePlanPage } from "../pages/billing/SubscribePlanPage";
 import { AdminFeedbackPage } from "../pages/admin/AdminFeedbackPage";
 import { AdminTicketsPage } from "../pages/admin/AdminTicketsPage";
@@ -43,6 +45,8 @@ import { PaymentResultRedirect } from "../pages/billing/PaymentResultRedirect";
 import { LawyerTicketsPage } from "../pages/lawyer/LawyerTicketsPage";
 import { LawyerTicketDetailPage } from "../pages/lawyer/LawyerTicketDetailPage";
 import { CreateCustomerTicketPage } from "../pages/tickets/CreateCustomerTicketPage";
+import { SharedChatPage } from "../pages/chat/SharedChatPage";
+import { SharedTicketConversationPage } from "../pages/tickets/SharedTicketConversationPage";
 
 const RiskReviewPage = lazy(() => import("../pages/editor/RiskReviewPage").then((module) => ({ default: module.RiskReviewPage })));
 const ContractAssistantPage = lazy(() => import("../pages/chat/ContractAssistantPage").then((module) => ({ default: module.ContractAssistantPage })));
@@ -53,6 +57,8 @@ const TemplatesPage = lazy(() => import("../pages/templates/TemplatesPage").then
 const MyContractsPage = lazy(() => import("../pages/contracts/MyContractsPage").then((module) => ({ default: module.MyContractsPage })));
 
 export const router = createBrowserRouter([
+  { path: "/verify-email", element: <VerifyEmailPage /> },
+  { path: "/billing/refunds/confirm", element: <RefundEmailConfirmationPage /> },
   {
     path: "/",
     element: <Navigate to="/login" replace />,
@@ -66,6 +72,7 @@ export const router = createBrowserRouter([
     children: [
       { path: "/login", element: <LoginPage /> },
       { path: "/register", element: <RegisterPage /> },
+      { path: "/auth/check-email", element: <CheckEmailPage /> },
     ],
   },
   {
@@ -187,8 +194,6 @@ export const router = createBrowserRouter([
           </CustomerRoute>
         ),
       },
-      { path: "/reports", element: <ReportsPage /> },
-      { path: "/reports/:id", element: <ReportDetailPage /> },
       {
         path: "/knowledge-base",
         element: (
@@ -331,6 +336,8 @@ export const router = createBrowserRouter([
           </ExpertRoute>
         ),
       },
+      { path: "/shared/chat/:shareToken", element: <AdminOrExpertRoute><SharedChatPage /></AdminOrExpertRoute> },
+      { path: "/shared-conversation/:token", element: <SharedTicketConversationPage /> },
     ],
   },
   {
