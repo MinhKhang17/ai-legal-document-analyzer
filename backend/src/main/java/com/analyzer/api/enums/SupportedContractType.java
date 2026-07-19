@@ -28,24 +28,6 @@ public enum SupportedContractType {
         return this != UNSUPPORTED && this != UNKNOWN;
     }
 
-    public static SupportedContractType requireSupported(String value) {
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException("CONTRACT_TYPE_CONFIRMATION_REQUIRED");
-        }
-        try {
-            SupportedContractType type = valueOf(value.trim().toUpperCase());
-            if (!type.isSupported()) {
-                throw new IllegalArgumentException("UNSUPPORTED_CONTRACT_TYPE: " + supportedValues());
-            }
-            return type;
-        } catch (IllegalArgumentException exception) {
-            if (exception.getMessage() != null && exception.getMessage().startsWith("UNSUPPORTED_CONTRACT_TYPE")) {
-                throw exception;
-            }
-            throw new IllegalArgumentException("UNSUPPORTED_CONTRACT_TYPE: " + supportedValues());
-        }
-    }
-
     public static List<String> supportedValues() {
         return Arrays.stream(values()).filter(SupportedContractType::isSupported).map(Enum::name).toList();
     }

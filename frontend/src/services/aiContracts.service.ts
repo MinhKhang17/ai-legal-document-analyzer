@@ -1,7 +1,6 @@
 import { API_ENDPOINTS } from "../config/api";
 import type { AiContractAnalysisResponse } from "../types/ai";
 import { requestAiJson } from "./http";
-import type { SupportedContractType } from "../config/supportedContractTypes";
 
 export const getContractSupportedFormats = async (): Promise<string[]> =>
   requestAiJson<string[]>(
@@ -12,12 +11,10 @@ export const getContractSupportedFormats = async (): Promise<string[]> =>
 
 export const uploadContractForAnalysis = async (
   file: File,
-  contractType: SupportedContractType,
   title?: string,
 ): Promise<AiContractAnalysisResponse> => {
   const formData = new FormData();
   formData.append("file", file);
-  formData.append("contract_type", contractType);
   if (title?.trim()) {
     formData.append("title", title.trim());
   }

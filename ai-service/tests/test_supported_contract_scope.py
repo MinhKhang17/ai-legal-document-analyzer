@@ -1,10 +1,7 @@
 from app.models.intent_enums import ContractType
 from app.services.intent_detector import detect_contract_type
 from app.services.prompt_builder import build_system_prompt
-from fastapi.testclient import TestClient
-from app.main import app
-from app.models.knowledge_models import RetrievedChunk
-from app.services.retrieval_service import RetrievalService
+from app.schemas import DocumentProcessRequest
 
 
 def test_detector_uses_canonical_granular_types() -> None:
@@ -25,20 +22,17 @@ def test_system_prompt_states_scope_and_lawyer_limitation() -> None:
     assert "mua bán tài sản cá nhân nhỏ" in prompt
 
 
-def test_direct_analysis_rejects_unsupported_type_before_processing() -> None:
-    response = TestClient(app).post(
-        "/v2/contracts/upload",
-        data={"contract_type": "UNSUPPORTED"},
-        files={"file": ("hop-dong.pdf", b"%PDF-1.4", "application/pdf")},
+def test_document_processing_request_does_not_require_contract_type() -> None:
+    request = DocumentProcessRequest(
+        jobId="job-1",
+        documentId="doc-1",
+        workspaceId="ws-1",
+        userId="user-1",
+        sourceType="USER_DOCUMENT",
+        fileName="contract.pdf",
+        fileType="pdf",
+        filePath="/tmp/contract.pdf",
+        callbackUrl="http://backend/callback",
     )
-    assert response.status_code == 422
-    assert response.json()["detail"]["code"] == "UNSUPPORTED_CONTRACT_TYPE"
-
-
-def test_retrieval_filters_explicitly_unsupported_or_unconfirmed_vectors() -> None:
-    unsupported = RetrievedChunk("1", "text", 1.0, "title", metadata={"contract_type": "UNSUPPORTED", "contract_type_confirmed": True})
-    unconfirmed = RetrievedChunk("2", "text", 1.0, "title", metadata={"contract_type": "RENTAL", "contract_type_confirmed": False})
-    supported = RetrievedChunk("3", "text", 1.0, "title", metadata={"contract_type": "RENTAL", "contract_type_confirmed": True})
-    assert not RetrievalService._is_supported_user_contract_chunk(unsupported)
-    assert not RetrievalService._is_supported_user_contract_chunk(unconfirmed)
-    assert RetrievalService._is_supported_user_contract_chunk(supported)
+    assert request.contractType is None
+    assert request.contractTypeConfirmed is None

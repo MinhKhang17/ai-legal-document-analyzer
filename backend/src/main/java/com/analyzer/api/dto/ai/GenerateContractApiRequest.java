@@ -13,5 +13,4 @@ public class GenerateContractApiRequest {
     private String requestId;
     private String templateContent;
     private String inputJson;
-    private String contractType;
 }

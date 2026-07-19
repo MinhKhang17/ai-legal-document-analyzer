@@ -338,14 +338,6 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                     1,
                     0);
         }
-        if (!Boolean.TRUE.equals(document.getContractTypeConfirmed())
-                || document.getContractType() == null
-                || !document.getContractType().isSupported()) {
-            throw new IllegalArgumentException(
-                    "CONTRACT_TYPE_CONFIRMATION_REQUIRED: "
-                            + com.analyzer.api.enums.SupportedContractType.supportedValues());
-        }
-
         return document;
     }
 
@@ -402,16 +394,6 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         try {
             var activeMappings = chatSessionDocumentRepository
                     .findByChatSessionIdAndUserIdAndActiveTrueOrderByAttachedAtAsc(chatSession.getId(), currentUser.getId());
-            activeMappings.forEach(mapping -> {
-                Document document = mapping.getDocument();
-                if (!Boolean.TRUE.equals(document.getContractTypeConfirmed())
-                        || document.getContractType() == null
-                        || !document.getContractType().isSupported()) {
-                    throw new IllegalArgumentException(
-                            "CONTRACT_TYPE_CONFIRMATION_REQUIRED: "
-                                    + com.analyzer.api.enums.SupportedContractType.supportedValues());
-                }
-            });
             List<String> attachedDocumentIds = activeMappings.stream()
                     .map(mapping -> mapping.getDocument())
                     .filter(document -> "READY".equalsIgnoreCase(document.getStatus()))

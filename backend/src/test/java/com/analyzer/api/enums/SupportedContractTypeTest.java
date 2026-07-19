@@ -11,14 +11,4 @@ class SupportedContractTypeTest {
         assertFalse(SupportedContractType.supportedValues().contains("UNKNOWN"));
         assertFalse(SupportedContractType.supportedValues().contains("UNSUPPORTED"));
     }
-
-    @Test
-    void rejectsUnknownAndUnsupportedValuesClearly() {
-        assertTrue(assertThrows(IllegalArgumentException.class,
-                () -> SupportedContractType.requireSupported("OTHER")).getMessage()
-                .startsWith("UNSUPPORTED_CONTRACT_TYPE"));
-        assertEquals("CONTRACT_TYPE_CONFIRMATION_REQUIRED",
-                assertThrows(IllegalArgumentException.class,
-                        () -> SupportedContractType.requireSupported(null)).getMessage());
-    }
 }

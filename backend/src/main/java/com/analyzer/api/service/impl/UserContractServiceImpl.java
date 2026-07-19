@@ -4,7 +4,6 @@ import com.analyzer.api.dto.contract.ContractResponse;
 import com.analyzer.api.dto.contract.SaveContractRequest;
 import com.analyzer.api.entity.*;
 import com.analyzer.api.enums.ContractStatus;
-import com.analyzer.api.enums.SupportedContractType;
 import com.analyzer.api.repository.UserRepository;
 import com.analyzer.api.repository.WorkspaceRepository;
 import com.analyzer.api.repository.DocumentRepository;
@@ -96,7 +95,7 @@ public class UserContractServiceImpl implements UserContractService {
             contract.setGenerationJob(generationJob);
             contract.setSourceDocument(sourceDocument);
             contract.setTitle(request.getTitle());
-            contract.setContractType(SupportedContractType.requireSupported(request.getContractType()).name());
+            contract.setContractType(request.getContractType());
             contract.setStatus(ContractStatus.DRAFT);
             contract.setCurrentVersionNo(1);
             contract.setCurrentContentHash(contentHash);
@@ -118,7 +117,7 @@ public class UserContractServiceImpl implements UserContractService {
             contractVersionRepository.save(version);
         } else {
             contract.setTitle(request.getTitle());
-            contract.setContractType(SupportedContractType.requireSupported(request.getContractType()).name());
+            contract.setContractType(request.getContractType());
             contract.setCurrentVersionNo(contract.getCurrentVersionNo() + 1);
             contract.setCurrentContentHash(contentHash);
             contract.setUpdatedAt(LocalDateTime.now());

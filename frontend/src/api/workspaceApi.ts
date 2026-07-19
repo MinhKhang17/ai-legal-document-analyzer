@@ -5,7 +5,6 @@ export {
   getWorkspaces,
   uploadDocument,
   downloadWorkspaceDocument,
-  confirmDocumentContractType,
 } from "../services/workspace.service";
 
 export type {

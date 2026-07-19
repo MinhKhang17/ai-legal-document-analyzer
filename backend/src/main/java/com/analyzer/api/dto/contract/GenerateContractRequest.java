@@ -23,7 +23,6 @@ public class GenerateContractRequest {
 
     private String sourceDocumentId;
 
-    private String contractType;
 
     @NotBlank
     private String inputJson;

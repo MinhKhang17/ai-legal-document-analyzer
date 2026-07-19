@@ -18,8 +18,8 @@ class DocumentProcessRequest(BaseModel):
     fileType: str
     filePath: str
     callbackUrl: str
-    contractType: str
-    contractTypeConfirmed: bool = False
+    contractType: str | None = None
+    contractTypeConfirmed: bool | None = None
 
 
 class DocumentProcessAcceptedResponse(BaseModel):

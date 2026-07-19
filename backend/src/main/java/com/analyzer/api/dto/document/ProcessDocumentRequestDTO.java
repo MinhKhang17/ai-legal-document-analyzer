@@ -15,6 +15,4 @@ public class ProcessDocumentRequestDTO {
     private String fileType;
     private String filePath;
     private String callbackUrl;
-    private String contractType;
-    private Boolean contractTypeConfirmed;
 }

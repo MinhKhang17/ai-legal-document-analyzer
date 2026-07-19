@@ -6,7 +6,6 @@ from typing import Any, Literal
 from app.core.knowledge_access import is_published_system_kb
 from app.graph.repository import GraphRepository
 from app.models.knowledge_models import RetrievedChunk
-from app.models.intent_enums import ContractType
 from app.services.embedding_service import EmbeddingService
 
 
@@ -66,7 +65,6 @@ class RetrievalService:
             document_id=document_id,
             document_ids=document_ids,
         )
-        chunks = [chunk for chunk in chunks if self._is_supported_user_contract_chunk(chunk)]
         return [
             self._to_hit(
                 chunk,
@@ -75,25 +73,6 @@ class RetrievalService:
             )
             for index, chunk in enumerate(chunks, start=1)
         ]
-
-    @staticmethod
-    def _is_supported_user_contract_chunk(chunk: RetrievedChunk) -> bool:
-        metadata = dict(chunk.metadata or {})
-        confirmed = metadata.get("contract_type_confirmed")
-        if confirmed is False or str(confirmed).lower() == "false":
-            return False
-        contract_type = str(metadata.get("contract_type") or "").strip()
-        if not contract_type:
-            return True  # Legacy vectors remain readable; backend ownership/type checks gate new requests.
-        return contract_type in {
-            ContractType.RENTAL.value,
-            ContractType.PART_TIME_EMPLOYMENT.value,
-            ContractType.INTERNSHIP.value,
-            ContractType.COLLABORATOR.value,
-            ContractType.FREELANCE_SERVICE.value,
-            ContractType.SMALL_ASSET_SALE.value,
-            ContractType.PERSONAL_LOAN.value,
-        }
 
     def build_legal_search_query(
         self,

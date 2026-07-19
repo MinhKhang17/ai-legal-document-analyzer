@@ -9,8 +9,6 @@ from fastapi import HTTPException
 from app.schemas import RagCitation, RagQueryRequest, RagQueryResponse, RagUsage
 from app.services.llm_client import build_default_llm_client
 from app.services.retrieval_service import RetrievalService
-from app.models.intent_enums import ContractType
-from app.services.intent_detector import detect_contract_type
 
 logger = logging.getLogger(__name__)
 
@@ -71,33 +69,6 @@ class ContractGenerationService:
         self.llm_enabled = llm_enabled
 
     def generate_contract(self, request: RagQueryRequest) -> RagQueryResponse:
-        contract_type = detect_contract_type(request.question)
-        if contract_type in {ContractType.UNKNOWN, ContractType.UNSUPPORTED}:
-            missing_type = contract_type == ContractType.UNKNOWN
-            return RagQueryResponse(
-                requestId=request.requestId,
-                chatSessionId=request.chatSessionId,
-                answer=(
-                    "Vui lòng chọn loại hợp đồng trước khi soạn. Hệ thống chỉ hỗ trợ: thuê phòng/nhà; "
-                    "lao động bán thời gian; thực tập; cộng tác viên; dịch vụ/freelance quy mô nhỏ; "
-                    "mua bán tài sản cá nhân nhỏ; và vay cá nhân đơn giản."
-                    if missing_type else
-                    "Yêu cầu này nằm ngoài phạm vi hợp đồng cá nhân đơn giản được hỗ trợ. "
-                    "Hệ thống không xử lý hợp đồng thương mại phức tạp, đầu tư, ngân hàng, bảo hiểm, "
-                    "quốc tế, tố tụng hoặc hình sự. Vui lòng trao đổi với luật sư phù hợp."
-                ),
-                riskLevel="UNKNOWN",
-                suggestionType="ASK_CONTRACT_TYPE" if missing_type else "REDIRECT_TO_SUPPORTED_SCOPE",
-                suggestionReason="Contract type must be explicitly confirmed within the supported scope.",
-                missingInformation="contractType" if missing_type else None,
-                userActionHint="PROVIDE_MORE_INFO" if missing_type else "CONTACT_LAWYER",
-                retrievedUserChunks=0,
-                retrievedKnowledgeChunks=0,
-                contractType=contract_type.value,
-                responseStatus="INCOMPLETE_INPUT" if missing_type else "OUT_OF_SCOPE",
-                responseMode="ASK_FOR_INFORMATION" if missing_type else "SAFE_REDIRECT",
-                llmExecuted=False,
-            )
         # Search Neo4j for the Top K relevant legal contract templates
         retrieved_chunks = self.retrieval_service.search_knowledge_chunks(
             request.question,
@@ -168,7 +139,7 @@ class ContractGenerationService:
         user_prompt = f"""# ROLE
 You are an AI drafting assistant for simple Vietnamese personal civil and employment contracts only.
 You do not replace a lawyer and must not claim guaranteed legality, compliance, or accuracy.
-Only draft the confirmed supported contract type: {contract_type.value}.
+Infer the simple personal contract structure from the user's request and available document context.
 
 -----------------------------------------------------
 
@@ -229,7 +200,7 @@ Format guidelines for the content inside <noi_dung>:
         system_prompt = (
             "Bạn là trợ lý AI soạn thảo hợp đồng dân sự và lao động cá nhân đơn giản tại Việt Nam.\n"
             "Bạn không phải luật sư, không thay thế tư vấn pháp lý và không được cam kết tính hợp pháp, tuân thủ hoặc chính xác tuyệt đối.\n"
-            f"Chỉ soạn loại hợp đồng đã xác nhận: {contract_type.value}.\n\n"
+            "Tự xác định cấu trúc hợp đồng cá nhân đơn giản từ yêu cầu và tài liệu người dùng cung cấp.\n\n"
             "YÊU CẦU QUAN TRỌNG: Để tránh bộ lọc sao chép (recitation/copyright filter) của API tự động cắt cụt văn bản giữa chừng, bạn TUYỆT ĐỐI KHÔNG sao chép nguyên văn các đoạn dài của tài liệu nguồn. Hãy diễn đạt lại (rephrase) các điều khoản bằng văn phong pháp lý chuyên nghiệp của bạn. Lưu ý: Đối với phần nội dung trong thẻ <noi_dung>, bạn phải giữ lại toàn bộ các điều khoản chi tiết, quyền lợi, nghĩa vụ, điều kiện và các mục pháp lý quan trọng của tài liệu gốc, không được phép lược bỏ hay tóm tắt nội dung chi tiết này.\n\n"
             "YÊU CẦU ĐẶC BIỆT VỀ CẤU TRÚC PHẢN HỒI (RẤT QUAN TRỌNG):\n"
             "Bạn phải trả về phản hồi chính xác dưới cấu trúc sau:\n"
@@ -272,7 +243,7 @@ Format guidelines for the content inside <noi_dung>:
             "Bạn là trợ lý AI soạn thảo hợp đồng cá nhân đơn giản tại Việt Nam. "
             "Chỉ xử lý hợp đồng thuê phòng/nhà, lao động bán thời gian, thực tập, cộng tác viên, "
             "dịch vụ/freelance nhỏ, mua bán tài sản cá nhân nhỏ và vay cá nhân đơn giản. "
-            f"Loại đã xác nhận cho yêu cầu này là {contract_type.value}. "
+            "Tự nhận diện loại hợp đồng từ yêu cầu; không yêu cầu người dùng chọn loại trước. "
             "Không phải luật sư; không thay thế tư vấn pháp lý; không cam kết tính hợp pháp, "
             "tuân thủ hoặc chính xác tuyệt đối. Không tạo văn bản ngoài phạm vi đã xác nhận."
         )
