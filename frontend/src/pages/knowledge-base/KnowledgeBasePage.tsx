@@ -120,7 +120,10 @@ export function KnowledgeBasePage() {
         scope: form.scope,
         createdById: user.id,
         description: form.description.trim() || null,
-        extractedContent: "",
+        // Compatibility with older deployed backends where this hidden field was @NotBlank.
+        // The actual content is still extracted asynchronously by the AI ingest service.
+        extractedContent: form.extractedContent.trim()
+          || `[PENDING_AI_EXTRACTION:${selectedFile?.name ?? form.code.trim()}]`,
         rawContent: null,
       };
       const uploadedVersion = await uploadKnowledgeBaseEntry(payload);
