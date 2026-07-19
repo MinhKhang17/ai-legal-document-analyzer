@@ -13,6 +13,9 @@ import com.analyzer.api.repository.knowledge.KnowledgeBaseEntryRepository;
 import com.analyzer.api.repository.knowledge.KnowledgeBaseVersionRepository;
 import com.analyzer.api.repository.knowledge.KnowledgeIngestionJobRepository;
 import com.analyzer.api.repository.UserRepository;
+import com.analyzer.api.service.knowledge.KnowledgeIngestNotificationService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.analyzer.api.service.knowledge.KnowledgeIngestionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -25,10 +28,13 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class KnowledgeIngestionServiceImpl implements KnowledgeIngestionService {
 
+    private static final Logger logger = LoggerFactory.getLogger(KnowledgeIngestionServiceImpl.class);
+
     private final KnowledgeBaseEntryRepository entryRepository;
     private final KnowledgeBaseVersionRepository versionRepository;
     private final KnowledgeIngestionJobRepository jobRepository;
     private final UserRepository userRepository;
+    private final KnowledgeIngestNotificationService notificationService;
 
     @Override
     @Transactional
@@ -63,6 +69,7 @@ public class KnowledgeIngestionServiceImpl implements KnowledgeIngestionService 
         job.setStatus(nextStatus);
         if (nextStatus == KnowledgeStatus.INGESTED) {
             LocalDateTime now = LocalDateTime.now();
+            boolean firstSuccessfulCallback = version.getIngestNotifiedAt() == null;
             job.setProgressPercent(100);
             job.setCompletedAt(now);
             job.setErrorMessage(null);
@@ -72,6 +79,14 @@ public class KnowledgeIngestionServiceImpl implements KnowledgeIngestionService 
             version.setIngestedBy(job.getIngestedBy());
             version.setErrorMessage(null);
             entry.setCurrentStatus(KnowledgeStatus.INGESTED);
+            if (firstSuccessfulCallback) {
+                version.setIngestNotifiedAt(now);
+                try {
+                    notificationService.notifyFirstSuccessfulIngest(job, entry, version, now);
+                } catch (Exception exception) {
+                    logger.warn("Unable to deliver knowledge ingest notification jobId={}: {}", job.getId(), exception.getMessage());
+                }
+            }
         } else if (nextStatus == KnowledgeStatus.FAILED) {
             String message = request.getErrorMessage() == null ? "Ingest failed" : request.getErrorMessage();
             job.setProgressPercent(100);

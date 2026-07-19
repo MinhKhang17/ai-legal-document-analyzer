@@ -16,6 +16,7 @@ import {
   ingestKnowledgeBaseEntry,
   ingestKnowledgeBaseFile,
   uploadKnowledgeBaseEntry,
+  uploadKnowledgeBaseSourceFile,
 } from "../../services/knowledgeBase.service";
 import { useI18n } from "../../hooks/useI18n";
 import { useToast } from "../../hooks/useToast";
@@ -28,11 +29,10 @@ const emptyForm = {
   title: "",
   category: "LEGAL_SOURCE",
   scope: "GLOBAL",
+  description: "",
   extractedContent: "",
   rawContent: "",
 };
-
-const ACTIVE_INGEST_JOB_KEY = "adminKnowledgeActiveIngestJob";
 
 export function KnowledgeBasePage() {
   const { t, language } = useI18n();
@@ -47,14 +47,7 @@ export function KnowledgeBasePage() {
   const [form, setForm] = useState(emptyForm);
   const [selectedFileName, setSelectedFileName] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [activeJob, setActiveJob] = useState<KnowledgeIngestionJob | null>(() => {
-    try {
-      const stored = localStorage.getItem(ACTIVE_INGEST_JOB_KEY);
-      return stored ? JSON.parse(stored) as KnowledgeIngestionJob : null;
-    } catch {
-      return null;
-    }
-  });
+  const [activeJob, setActiveJob] = useState<KnowledgeIngestionJob | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -88,13 +81,14 @@ export function KnowledgeBasePage() {
         const job = await getKnowledgeIngestionJob(activeJob.id);
         if (cancelled) return;
         setActiveJob(job);
-        localStorage.setItem(ACTIVE_INGEST_JOB_KEY, JSON.stringify(job));
         if (job.status === "INGESTED") {
           toast.success(t("knowledge.backgroundIngestSuccess"));
           await loadEntries();
+          setActiveJob(null);
         } else if (job.status === "FAILED") {
           toast.error(job.errorMessage || t("knowledge.backgroundIngestFailed"));
           await loadEntries();
+          setActiveJob(null);
         }
       } catch {
         // Keep the last known progress and retry; navigation or a brief restart must not lose the job.
@@ -108,8 +102,8 @@ export function KnowledgeBasePage() {
     };
   }, [activeJob?.id, activeJob?.status, loadEntries, t, toast]);
 
-  const handleUpload = async () => {
-    if (!user?.id || !form.code.trim() || !form.title.trim() || !form.extractedContent.trim()) {
+  const handleUpload = async (startIngest: boolean) => {
+    if (!user?.id || !form.code.trim() || !form.title.trim() || (startIngest && !selectedFile)) {
       toast.warning(t("knowledge.requiredFields"));
       return;
     }
@@ -125,18 +119,21 @@ export function KnowledgeBasePage() {
         category: form.category.trim() || "LEGAL_SOURCE",
         scope: form.scope,
         createdById: user.id,
-        extractedContent: form.extractedContent.replace(/\u0000/g, "").trim(),
-        rawContent: form.rawContent.replace(/\u0000/g, "").trim() || null,
+        description: form.description.trim() || null,
+        extractedContent: "",
+        rawContent: null,
       };
       const uploadedVersion = await uploadKnowledgeBaseEntry(payload);
       if (selectedFile) {
+        await uploadKnowledgeBaseSourceFile(uploadedVersion.knowledgeBaseEntryId, selectedFile);
+      }
+      if (selectedFile && startIngest) {
         const job = await ingestKnowledgeBaseEntry(uploadedVersion.knowledgeBaseEntryId, {
           requestId: `kb-file-${Date.now()}-${selectedFile.name}`,
           jobPayload: JSON.stringify({ filename: selectedFile.name }),
         });
         createdJob = job;
         setActiveJob(job);
-        localStorage.setItem(ACTIVE_INGEST_JOB_KEY, JSON.stringify(job));
         await ingestKnowledgeBaseFile(
           selectedFile,
           uploadedVersion.knowledgeBaseEntryId,
@@ -145,7 +142,7 @@ export function KnowledgeBasePage() {
           job.id,
         );
       }
-      toast.success(selectedFile ? t("knowledge.backgroundIngestStarted") : t("knowledge.uploadSuccess"));
+      toast.success(startIngest ? t("knowledge.backgroundIngestStarted") : (language === "vi" ? "Đã lưu bản nháp riêng tư." : "Private draft saved."));
       setForm(emptyForm);
       setSelectedFileName("");
       setSelectedFile(null);
@@ -154,13 +151,12 @@ export function KnowledgeBasePage() {
       const message = uploadError instanceof Error ? uploadError.message : t("knowledge.uploadError");
       if (createdJob) {
         try {
-          const failedJob = await failKnowledgeIngestionJob(createdJob.id, message);
-          setActiveJob(failedJob);
-          localStorage.setItem(ACTIVE_INGEST_JOB_KEY, JSON.stringify(failedJob));
+          await failKnowledgeIngestionJob(createdJob.id, message);
         } catch {
           // Preserve the original upload error; polling can recover if AI accepted the job.
         }
       }
+      setActiveJob(null);
       setError(message);
       toast.error(message);
     } finally {
@@ -206,7 +202,7 @@ export function KnowledgeBasePage() {
     { header: t("knowledge.code"), cell: (entry) => entry.code },
     { header: t("knowledge.category"), cell: (entry) => entry.category },
     { header: t("knowledge.scope"), cell: (entry) => <Badge>{entry.scope}</Badge> },
-    { header: t("table.status"), cell: (entry) => <Badge>{entry.currentStatus || t("common.unknown")}</Badge> },
+    { header: t("table.status"), cell: (entry) => <div><Badge>{entry.currentStatus === "UPLOADED" ? "PENDING" : entry.currentStatus || t("common.unknown")}</Badge>{!entry.active && <p className="mt-xs text-xs text-on-surface-variant">Chưa đưa vào retrieval</p>}</div> },
     { header: t("knowledge.ingestedDocuments.active"), cell: (entry) => <Badge tone={entry.active ? "green" : "slate"}>{entry.active ? t("admin.active") : t("admin.inactive")}</Badge> },
     { header: t("table.updated"), cell: (entry) => formatDisplayDate(entry.updatedAt, "-", locale) },
   ];
@@ -234,7 +230,7 @@ export function KnowledgeBasePage() {
         </div>
       )}
 
-      <section className="mb-xl grid gap-gutter xl:grid-cols-2">
+      <section className="mb-xl grid gap-gutter xl:grid-cols-[1.35fr_0.65fr]">
         <Card title={t("knowledge.uploadEntry")} subtitle={t("knowledge.uploadEntrySubtitle")}>
           <div className="space-y-md">
             <div className="rounded-2xl border border-primary/20 bg-primary/5 p-md dark:border-indigo-400/20 dark:bg-indigo-950/20">
@@ -294,16 +290,24 @@ export function KnowledgeBasePage() {
               </label>
             </div>
             <label className="block text-sm font-semibold">
-              {t("knowledge.extractedContent")}
-              <textarea className="form-field mt-xs min-h-40" value={form.extractedContent} onChange={(event) => setForm((previous) => ({ ...previous, extractedContent: event.target.value }))} />
+              {language === "vi" ? "Mô tả ngắn (tùy chọn)" : "Short description (optional)"}
+              <textarea className="form-field mt-xs min-h-24" maxLength={500} value={form.description} onChange={(event) => setForm((previous) => ({ ...previous, description: event.target.value }))} />
             </label>
-            <label className="block text-sm font-semibold">
-              {t("knowledge.rawContent")}
-              <textarea className="form-field mt-xs min-h-24" value={form.rawContent} onChange={(event) => setForm((previous) => ({ ...previous, rawContent: event.target.value }))} />
-            </label>
-            <Button leftIcon={<Upload className="h-4 w-4" />} onClick={() => void handleUpload()} disabled={saving}>
-              {saving ? t("knowledge.uploading") : t("knowledge.upload")}
-            </Button>
+            {selectedFile && (
+              <div className="grid gap-sm rounded-xl border border-legal-border p-md text-sm dark:border-slate-700 sm:grid-cols-2">
+                <p><span className="text-on-surface-variant">File:</span> <strong>{selectedFile.name}</strong></p>
+                <p><span className="text-on-surface-variant">Content type:</span> {selectedFile.type || "application/octet-stream"}</p>
+                <p><span className="text-on-surface-variant">Dung lượng:</span> {(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                <p><span className="text-on-surface-variant">Uploaded at:</span> {new Date().toLocaleString(locale)}</p>
+              </div>
+            )}
+            <div className="flex flex-wrap justify-end gap-sm border-t border-legal-border pt-md dark:border-slate-700">
+              <Button variant="secondary" onClick={() => { setForm(emptyForm); setSelectedFile(null); setSelectedFileName(""); }} disabled={saving}>Hủy</Button>
+              <Button variant="secondary" onClick={() => void handleUpload(false)} disabled={saving}>{saving ? t("knowledge.uploading") : "Lưu nháp"}</Button>
+              <Button leftIcon={<Upload className="h-4 w-4" />} onClick={() => void handleUpload(true)} disabled={saving || !selectedFile}>
+                {saving ? t("knowledge.uploading") : "Bắt đầu ingest"}
+              </Button>
+            </div>
 
             {activeJob && (
               <div className={`rounded-2xl border p-md ${activeJob.status === "FAILED" ? "border-error/40 bg-error/10" : activeJob.status === "INGESTED" ? "border-green-500/30 bg-green-500/10" : "border-primary/20 bg-primary/5 dark:border-indigo-400/20 dark:bg-indigo-950/20"}`}>
@@ -340,6 +344,16 @@ export function KnowledgeBasePage() {
         </Card>
 
         <Card title={t("knowledge.entries")} actions={<Badge tone="blue">{totalItems}</Badge>}>
+          <div className="mb-md space-y-md rounded-2xl border border-primary/20 bg-primary/5 p-md dark:border-indigo-400/20 dark:bg-indigo-950/20">
+            <h3 className="font-semibold">Hướng dẫn nhập tài liệu</h3>
+            <ul className="space-y-xs text-sm text-on-surface-variant dark:text-slate-300">
+              <li>✓ PDF, DOC, DOCX, TXT, Markdown, CSV, JSON</li>
+              <li>✓ AI xử lý nền; bạn có thể rời trang</li>
+              <li>✓ Cần Review và Publish trước khi dùng cho RAG</li>
+              <li>✓ Có thể tải lại file gốc sau khi upload</li>
+            </ul>
+            <div className="flex flex-wrap gap-xs"><Badge tone="amber">PENDING</Badge><Badge tone="amber">PROCESSING</Badge><Badge tone="green">INGESTED</Badge><Badge tone="purple">REVIEWING</Badge><Badge tone="green">PUBLIC</Badge><Badge tone="red">FAILED</Badge></div>
+          </div>
           {error ? (
             <div role="alert" className="text-sm text-error">{error} <Button variant="secondary" onClick={() => void loadEntries()}>{t("common.retry")}</Button></div>
           ) : loading && entries.length === 0 ? (

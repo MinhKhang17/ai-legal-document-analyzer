@@ -1,4 +1,4 @@
-import { ArrowLeft, Download, RefreshCw, Send, UserCheck, XCircle } from "lucide-react";
+import { ArrowLeft, Download, Paperclip, RefreshCw, Send, UserCheck, XCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Badge } from "../../components/common/Badge";
@@ -10,7 +10,6 @@ import { PageHeader } from "../../components/common/PageHeader";
 import {
   assignLawyerToLegalTicket,
   getAdminLegalTicket,
-  getAdminTicketChatHistory,
   getAdminTicketFiles,
   getAdminTicketSummary,
   reassignLawyerToLegalTicket,
@@ -18,6 +17,10 @@ import {
   approveLegalTicketInternal,
   closeLegalTicketInternal,
   downloadStaffDocument,
+  getTicketConversation,
+  sendTicketConversationMessage,
+  uploadTicketAttachment,
+  getAttachmentPolicy,
 } from "../../services/legalTicket.service";
 import {
   getTicketAiAssessment,
@@ -68,6 +71,9 @@ export function AdminTicketDetailPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [auxiliaryError, setAuxiliaryError] = useState("");
+  const [conversationText, setConversationText] = useState("");
+  const [conversationFile, setConversationFile] = useState<File | null>(null);
+  const [attachmentMaxKb, setAttachmentMaxKb] = useState(500);
 
   const loadTicket = useCallback(async () => {
     if (!ticketId) return;
@@ -95,7 +101,7 @@ export function AdminTicketDetailPage() {
         usersResult,
       ] = await Promise.allSettled([
         getAdminTicketSummary(ticketId),
-        getAdminTicketChatHistory(ticketId),
+        getTicketConversation(ticketId),
         getAdminTicketFiles(ticketId),
         getTicketAiAssessment(ticketId),
         getTicketAiSummary(ticketId),
@@ -105,7 +111,7 @@ export function AdminTicketDetailPage() {
 
       setTicketSummary(summaryResult.status === "fulfilled" ? summaryResult.value : null);
       setChatMessages(
-        chatHistoryResult.status === "fulfilled" ? chatHistoryResult.value.messages ?? [] : [],
+        chatHistoryResult.status === "fulfilled" ? chatHistoryResult.value.items ?? [] : [],
       );
       setFiles(filesResult.status === "fulfilled" ? filesResult.value : []);
       setAssessment(assessmentResult.status === "fulfilled" ? assessmentResult.value : null);
@@ -137,7 +143,23 @@ export function AdminTicketDetailPage() {
 
   useEffect(() => {
     void loadTicket();
+    void getAttachmentPolicy().then((policy) => setAttachmentMaxKb(policy.maxAttachmentSizeKb)).catch(() => undefined);
   }, [loadTicket]);
+
+  const sendConversationMessage = async () => {
+    if (!ticketId || (!conversationText.trim() && !conversationFile)) return;
+    setSaving(true);
+    try {
+      const attachmentIds: string[] = [];
+      if (conversationFile) {
+        const uploaded = await uploadTicketAttachment(conversationFile, `draft_${crypto.randomUUID()}`, () => undefined);
+        attachmentIds.push(uploaded.id);
+      }
+      await sendTicketConversationMessage(ticketId, conversationText.trim(), attachmentIds);
+      setConversationText(""); setConversationFile(null); await loadTicket();
+    } catch (sendError) { toast.error(sendError instanceof Error ? sendError.message : "Không thể gửi tin nhắn."); }
+    finally { setSaving(false); }
+  };
 
   const hasAssignedLawyer = Boolean(ticket?.assigned_lawyer_id);
 
@@ -332,6 +354,11 @@ export function AdminTicketDetailPage() {
                 getRowKey={(message) => message.id}
                 emptyMessage={t("adminTickets.noChatHistory")}
               />
+              <div className="mt-md space-y-sm">
+                <textarea className="form-field min-h-24" value={conversationText} onChange={(event) => setConversationText(event.target.value)} placeholder="Nhập tin nhắn trong ticket…" />
+                {conversationFile && <p className="text-xs">{conversationFile.name} · {Math.ceil(conversationFile.size / 1024)} KB</p>}
+                <div className="flex gap-sm"><label className="inline-flex cursor-pointer items-center gap-xs rounded-lg border px-md py-sm text-sm font-semibold"><Paperclip className="h-4 w-4" />Thêm file<input type="file" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (!file) return; if (file.size > attachmentMaxKb * 1024) { toast.error(`Tệp ${file.name} có dung lượng ${Math.ceil(file.size / 1024)} KB. Dung lượng tối đa là ${attachmentMaxKb} KB.`); return; } setConversationFile(file); }} /></label><Button leftIcon={<Send className="h-4 w-4" />} disabled={saving || (!conversationText.trim() && !conversationFile)} onClick={() => void sendConversationMessage()}>Gửi</Button></div>
+              </div>
             </Card>
 
             <Card title={t("adminTickets.files")}>
@@ -360,6 +387,7 @@ export function AdminTicketDetailPage() {
           </main>
 
           <aside className="space-y-gutter">
+            {ticket.contextSnapshot && <Card title="Context bất biến từ AI"><div className="space-y-sm text-sm"><p><strong>Câu hỏi:</strong> {ticket.contextSnapshot.userQuestion}</p><p className="whitespace-pre-line"><strong>Câu trả lời AI:</strong> {ticket.contextSnapshot.assistantAnswer || "—"}</p><pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-surface-container-low p-sm text-xs">{ticket.contextSnapshot.documentSnapshotJson || "[]"}</pre><pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-surface-container-low p-sm text-xs">{ticket.contextSnapshot.citationSnapshotJson || "[]"}</pre></div></Card>}
             <Card title={t("adminTickets.assignmentControls")}>
               <div className="space-y-md">
                 <label className="block text-sm font-semibold">

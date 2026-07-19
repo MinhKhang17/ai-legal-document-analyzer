@@ -25,7 +25,6 @@ services:
       TICKET_ATTACHMENT_UPLOAD_ROOT: /app/uploads/ticket_attachments
       APP_AI_SERVICE_BASE_URL: http://ai-service:8000
       APP_API_CALLBACK_BASE_URL: http://backend:8080
-      VNPAY_RETURN_URL: ${NGROK_URL:-http://localhost:8080}/api/v1/payment-transactions/vnpay-return
     depends_on:
       - ai-service
       - postgres
@@ -35,15 +34,10 @@ services:
   ngrok:
     image: ngrok/ngrok:latest
     restart: unless-stopped
-    profiles:
-      - ngrok
-    command:
-      - http
-      - http://backend:8080
-      - --url
-      - ${NGROK_URL:-}
-    environment:
-      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN:-}
+    env_file:
+      - ./backend/.env
+    entrypoint: ["/bin/sh", "-c"]
+    command: ['exec ngrok http http://backend:8080 --url "$${NGROK_URL}"']
     ports:
       - "4040:4040"
     depends_on:

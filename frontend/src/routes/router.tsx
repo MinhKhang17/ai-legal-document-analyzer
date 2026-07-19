@@ -13,6 +13,7 @@ import { AuthLayout } from "../layouts/AuthLayout";
 import { LoginPage } from "../pages/auth/LoginPage";
 import { RegisterPage } from "../pages/auth/RegisterPage";
 import { VerifyEmailPage } from "../pages/auth/VerifyEmailPage";
+import { CheckEmailPage } from "../pages/auth/CheckEmailPage";
 import { DashboardPage } from "../pages/dashboard/DashboardPage";
 import { ProjectsPage } from "../pages/projects/ProjectsPage";
 import { ProjectDetailPage } from "../pages/projects/ProjectDetailPage";
@@ -28,6 +29,7 @@ import { BillingPage } from "../pages/billing/BillingPage";
 import { PaymentResultPage } from "../pages/billing/PaymentResultPage";
 import { RefundHistoryPage } from "../pages/billing/RefundHistoryPage";
 import { RefundDetailPage } from "../pages/billing/RefundDetailPage";
+import { RefundEmailConfirmationPage } from "../pages/billing/RefundEmailConfirmationPage";
 import { SubscribePlanPage } from "../pages/billing/SubscribePlanPage";
 import { AdminFeedbackPage } from "../pages/admin/AdminFeedbackPage";
 import { AdminTicketsPage } from "../pages/admin/AdminTicketsPage";
@@ -56,6 +58,7 @@ const MyContractsPage = lazy(() => import("../pages/contracts/MyContractsPage").
 
 export const router = createBrowserRouter([
   { path: "/verify-email", element: <VerifyEmailPage /> },
+  { path: "/billing/refunds/confirm", element: <RefundEmailConfirmationPage /> },
   {
     path: "/",
     element: <Navigate to="/login" replace />,
@@ -69,6 +72,7 @@ export const router = createBrowserRouter([
     children: [
       { path: "/login", element: <LoginPage /> },
       { path: "/register", element: <RegisterPage /> },
+      { path: "/auth/check-email", element: <CheckEmailPage /> },
     ],
   },
   {

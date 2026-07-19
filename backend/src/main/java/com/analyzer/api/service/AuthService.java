@@ -3,6 +3,7 @@ package com.analyzer.api.service;
 import com.analyzer.api.dto.auth.JwtResponseDTO;
 import com.analyzer.api.dto.auth.LoginRequestDTO;
 import com.analyzer.api.dto.user.UserResponseDTO;
+import com.analyzer.api.dto.auth.RegistrationResponseDTO;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -36,5 +37,5 @@ public interface AuthService {
      */
     void verifyEmail(String token);
 
-    void resendVerificationEmail(String email);
+    RegistrationResponseDTO resendVerificationEmail(String email, String clientIp);
 }

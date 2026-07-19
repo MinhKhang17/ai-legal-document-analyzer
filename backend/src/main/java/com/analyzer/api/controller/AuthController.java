@@ -6,6 +6,7 @@ import com.analyzer.api.dto.auth.LoginRequestDTO;
 import com.analyzer.api.dto.user.UserRequestDTO;
 import com.analyzer.api.dto.user.UserResponseDTO;
 import com.analyzer.api.dto.auth.ResendVerificationEmailRequestDTO;
+import com.analyzer.api.dto.auth.RegistrationResponseDTO;
 import com.analyzer.api.service.AuthService;
 import com.analyzer.api.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -32,9 +33,9 @@ public class AuthController {
             summary = "Register user",
             description = "Creates a new user account in the system"
     )
-    public ResponseEntity<ApiResponseDTO<UserResponseDTO>> register(
+    public ResponseEntity<ApiResponseDTO<RegistrationResponseDTO>> register(
             @RequestBody UserRequestDTO request) {
-        UserResponseDTO user = userService.createUser(request);
+        RegistrationResponseDTO user = userService.createUser(request);
         return new ResponseEntity<>(ApiResponseDTO.created("Tạo tài khoản thành công", user), HttpStatus.CREATED);
     }
 
@@ -102,9 +103,9 @@ public class AuthController {
 
     @PostMapping("/resend-verification")
     @Operation(summary = "Resend email verification", description = "Issues a fresh verification link when the account exists and is still unverified.")
-    public ResponseEntity<ApiResponseDTO<Void>> resendVerificationEmail(
-            @Valid @RequestBody ResendVerificationEmailRequestDTO request) {
-        authService.resendVerificationEmail(request.getEmail());
-        return ResponseEntity.ok(ApiResponseDTO.success("Neu email hop le, lien ket xac thuc moi da duoc gui"));
+    public ResponseEntity<ApiResponseDTO<RegistrationResponseDTO>> resendVerificationEmail(
+            @Valid @RequestBody ResendVerificationEmailRequestDTO request, HttpServletRequest httpRequest) {
+        RegistrationResponseDTO result = authService.resendVerificationEmail(request.getEmail(), httpRequest.getRemoteAddr());
+        return ResponseEntity.ok(ApiResponseDTO.success("Nếu email hợp lệ, liên kết xác thực mới đã được xử lý", result));
     }
 }

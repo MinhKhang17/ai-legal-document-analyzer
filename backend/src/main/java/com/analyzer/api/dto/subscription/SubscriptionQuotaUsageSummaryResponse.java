@@ -25,4 +25,8 @@ public class SubscriptionQuotaUsageSummaryResponse {
     private Integer expertTicketsLimit;
     private Integer workspacesUsed;
     private Integer workspacesLimit;
+    private Integer documentsUsed;
+    private Integer documentsLimit;
+    private Long storageUsedBytes;
+    private Long storageLimitBytes;
 }

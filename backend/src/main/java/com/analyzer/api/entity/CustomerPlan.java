@@ -26,6 +26,13 @@ public class CustomerPlan {
     @JoinColumn(name = "subscription_plan_id", nullable = false)
     private SubscriptionPlan subscriptionPlan;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "scheduled_subscription_plan_id")
+    private SubscriptionPlan scheduledSubscriptionPlan;
+
+    @Column(name = "plan_change_effective_at")
+    private LocalDateTime planChangeEffectiveAt;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private PlanStatus status;

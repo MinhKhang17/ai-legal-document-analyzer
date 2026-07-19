@@ -32,12 +32,17 @@ public class EmailServiceImpl implements EmailService {
     @Override
     @Async
     public void sendVerificationEmailAsync(String toEmail, String recipientName, String token) {
+        sendVerificationEmail(toEmail, recipientName, token);
+    }
+
+    @Override
+    public boolean sendVerificationEmail(String toEmail, String recipientName, String token) {
         String verifyUrl = frontendBaseUrl + "/verify-email?token=" + token;
         String body = "Xin chào " + safeName(recipientName) + ",\n\n"
                 + "Vui lòng xác thực địa chỉ email của bạn bằng cách truy cập liên kết dưới đây (hết hạn sau 24 giờ):\n"
                 + verifyUrl + "\n\n"
                 + "Nếu bạn không thực hiện đăng ký này, vui lòng bỏ qua email này.";
-        send(toEmail, "Xác thực địa chỉ email của bạn", body);
+        return send(toEmail, "Xác thực địa chỉ email của bạn", body);
     }
 
     @Override
@@ -77,10 +82,32 @@ public class EmailServiceImpl implements EmailService {
         send(toEmail, "Cap nhat ticket " + ticketId, body);
     }
 
-    private void send(String toEmail, String subject, String body) {
+    @Override
+    @Async
+    public void sendRefundConfirmationEmailAsync(String toEmail, String recipientName, Long refundId, String token) {
+        String url = frontendBaseUrl + "/billing/refunds/confirm?token=" + token;
+        String body = "Xin chao " + safeName(recipientName) + ",\n\n"
+                + "Yeu cau hoan tien #" + refundId + " da duoc tao. Vui long xac nhan email trong 24 gio:\n"
+                + url + "\n\nAdmin chi co the tao refund order sau khi ban xac nhan.";
+        send(toEmail, "Xac nhan yeu cau hoan tien #" + refundId, body);
+    }
+
+    @Override
+    @Async
+    public void sendKnowledgeIngestedEmailAsync(String toEmail, String recipientName, String title,
+                                                String code, String versionId, String jobId, String ingestedAt) {
+        String body = "Xin chao " + safeName(recipientName) + ",\n\n"
+                + "Tai lieu knowledge base da ingest thanh cong.\n"
+                + "Title: " + title + "\nCode: " + code + "\nVersion ID: " + versionId
+                + "\nJob ID: " + jobId + "\nIngested at: " + ingestedAt
+                + "\nStatus: INGESTED\n\nVui long review va publish de AI co the su dung.";
+        send(toEmail, "Knowledge base da ingest thanh cong: " + title, body);
+    }
+
+    private boolean send(String toEmail, String subject, String body) {
         if (!mailEnabled || !StringUtils.hasText(mailFrom)) {
             logger.warn("Mail is not configured (app.mail.enabled/from/SMTP_USERNAME missing) - skipping email to {}", toEmail);
-            return;
+            return false;
         }
 
         try {
@@ -90,8 +117,10 @@ public class EmailServiceImpl implements EmailService {
             message.setSubject(subject);
             message.setText(body);
             mailSender.send(message);
+            return true;
         } catch (MailException ex) {
             logger.error("Failed to send email to {}: {}", toEmail, ex.getMessage());
+            return false;
         }
     }
 

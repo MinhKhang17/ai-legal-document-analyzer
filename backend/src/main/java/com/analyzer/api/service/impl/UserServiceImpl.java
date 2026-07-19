@@ -5,6 +5,7 @@ import com.analyzer.api.dto.user.AdminCreateLawyerRequestDTO;
 import com.analyzer.api.dto.user.ChangePasswordRequestDTO;
 import com.analyzer.api.dto.user.UserRequestDTO;
 import com.analyzer.api.dto.user.UserResponseDTO;
+import com.analyzer.api.dto.auth.RegistrationResponseDTO;
 import com.analyzer.api.entity.Role;
 import com.analyzer.api.entity.User;
 import com.analyzer.api.exception.common.ConflictException;
@@ -24,6 +25,9 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import java.util.stream.Collectors;
 
 @Service
@@ -42,7 +46,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
-    public UserResponseDTO createUser(UserRequestDTO request) {
+    public RegistrationResponseDTO createUser(UserRequestDTO request) {
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new RuntimeException("Email already exists");
         }
@@ -66,14 +70,29 @@ public class UserServiceImpl implements UserService {
         user.setEmailVerified(false);
 
         String verificationToken = UUID.randomUUID().toString();
-        user.setEmailVerificationToken(verificationToken);
+        user.setEmailVerificationToken(sha256(verificationToken));
         user.setEmailVerificationTokenExpiry(LocalDateTime.now().plusHours(VERIFICATION_TOKEN_VALID_HOURS));
+        user.setEmailVerificationRequestedAt(LocalDateTime.now());
+        user.setEmailDeliveryStatus("PENDING");
 
         User savedUser = userRepository.save(user);
+        boolean sent = emailService.sendVerificationEmail(savedUser.getEmail(), savedUser.getFirstName(), verificationToken);
+        savedUser.setEmailDeliveryStatus(sent ? "SENT" : "FAILED");
+        userRepository.save(savedUser);
+        return RegistrationResponseDTO.builder().registrationStatus("PENDING_VERIFICATION")
+                .emailDeliveryStatus(savedUser.getEmailDeliveryStatus())
+                .maskedEmail(maskEmail(savedUser.getEmail())).resendAvailableInSeconds(60).build();
+    }
 
-        emailService.sendVerificationEmailAsync(savedUser.getEmail(), savedUser.getFirstName(), verificationToken);
+    private String maskEmail(String email) {
+        int at = email.indexOf('@');
+        if (at <= 1) return "***" + email.substring(Math.max(at, 0));
+        return email.substring(0, 1) + "***" + email.substring(at);
+    }
 
-        return userMapper.toResponseDTO(savedUser);
+    private String sha256(String value) {
+        try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8))); }
+        catch (Exception ex) { throw new IllegalStateException(ex); }
     }
 
     @Override

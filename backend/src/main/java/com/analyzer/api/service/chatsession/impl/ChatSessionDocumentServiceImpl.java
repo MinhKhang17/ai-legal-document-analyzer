@@ -10,6 +10,7 @@ import com.analyzer.api.repository.ChatSessionDocumentRepository;
 import com.analyzer.api.repository.ChatSessionRepository;
 import com.analyzer.api.repository.DocumentRepository;
 import com.analyzer.api.service.chatsession.ChatSessionDocumentService;
+import com.analyzer.api.service.SubscriptionQuotaService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +25,7 @@ public class ChatSessionDocumentServiceImpl implements ChatSessionDocumentServic
     private final ChatSessionRepository chatSessionRepository;
     private final DocumentRepository documentRepository;
     private final ChatSessionDocumentRepository mappingRepository;
+    private final SubscriptionQuotaService subscriptionQuotaService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
@@ -38,6 +40,12 @@ public class ChatSessionDocumentServiceImpl implements ChatSessionDocumentServic
     @Transactional
     public ChatSessionDocumentResponse attach(Long userId, String sessionId, String documentId) {
         ChatSession session = requireOwnedSession(userId, sessionId);
+        boolean alreadyActive = mappingRepository.findByChatSessionIdAndDocumentIdAndUserId(sessionId, documentId, userId)
+                .map(ChatSessionDocument::isActive).orElse(false);
+        if (!alreadyActive) {
+            int attached = mappingRepository.findByChatSessionIdAndUserIdAndActiveTrueOrderByAttachedAtAsc(sessionId, userId).size();
+            subscriptionQuotaService.checkCanAttachDocument(session.getUser(), attached);
+        }
         Document document = documentRepository.findById(documentId)
                 .orElseThrow(() -> new ResourceNotFoundException("DOCUMENT_NOT_FOUND"));
         if (document.getUser() == null || !userId.equals(document.getUser().getId())

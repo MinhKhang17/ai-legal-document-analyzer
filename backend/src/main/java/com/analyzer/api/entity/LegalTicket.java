@@ -91,7 +91,7 @@ public class LegalTicket {
     private User createdBy;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "workspace_id", nullable = false)
+    @JoinColumn(name = "workspace_id")
     private Workspace workspace;
 
     @ManyToOne(fetch = FetchType.LAZY)

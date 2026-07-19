@@ -23,6 +23,23 @@ export interface SubscriptionPlan {
   active: boolean;
   createdAt: string;
   updatedAt: string;
+  name?: string;
+  displayName?: string;
+  priceVnd?: number;
+  billingCycleDays?: number;
+  contractAnalysisLimit?: number;
+  aiTokenLimit?: number;
+  workspaceLimit?: number;
+  documentPerWorkspaceLimit?: number;
+  storageLimitMb?: number;
+  maxFileSizeMb?: number;
+  maxAttachedDocumentsPerSession?: number;
+  contractDraftLimit?: number;
+  expertTicketLimit?: number;
+  allowSystemErrorTicket?: boolean;
+  allowQueryErrorTicket?: boolean;
+  allowContactExpertTicket?: boolean;
+  features?: string[];
 }
 
 export type CustomerPlanStatus =
@@ -52,6 +69,23 @@ export interface SubscriptionPlanRequest {
   durationDays: number;
   maxQuota: number;
   active?: boolean;
+  name?: string;
+  displayName?: string;
+  priceVnd?: number;
+  billingCycleDays?: number;
+  contractAnalysisLimit?: number;
+  aiTokenLimit: number;
+  workspaceLimit: number;
+  documentPerWorkspaceLimit: number;
+  storageLimitMb: number;
+  maxFileSizeMb: number;
+  maxAttachedDocumentsPerSession: number;
+  contractDraftLimit: number;
+  expertTicketLimit: number;
+  allowSystemErrorTicket: boolean;
+  allowQueryErrorTicket: boolean;
+  allowContactExpertTicket: boolean;
+  features: string[];
 }
 
 export interface CustomerPlan {
@@ -68,6 +102,27 @@ export interface CustomerPlan {
   createdAt: string;
   updatedAt: string;
   subscriptionPlan: SubscriptionPlan;
+  scheduledSubscriptionPlan?: SubscriptionPlan | null;
+  planChangeEffectiveAt?: string | null;
+}
+
+export interface SubscriptionUsageSummary {
+  periodStart: string;
+  periodEnd: string;
+  contractAnalysisUsed: number;
+  contractAnalysisLimit: number;
+  aiTokensUsed: number;
+  aiTokensLimit: number;
+  draftContractsUsed: number;
+  draftContractsLimit: number;
+  expertTicketsUsed: number;
+  expertTicketsLimit: number;
+  workspacesUsed: number;
+  workspacesLimit: number;
+  documentsUsed: number;
+  documentsLimit: number;
+  storageUsedBytes: number;
+  storageLimitBytes: number;
 }
 
 export interface SubscriptionUsage {
@@ -85,6 +140,12 @@ export interface RefundRequestPayload {
   customerPlanId?: number | null;
   reason: string;
   amount: number;
+  bankName: string;
+  accountNumber: string;
+  accountHolderName: string;
+  transactionId?: string;
+  invoiceId: string;
+  refundReason?: string;
 }
 
 export interface RefundRequestRecord {
@@ -98,9 +159,17 @@ export interface RefundRequestRecord {
   adminNote: string | null;
   createdAt: string;
   updatedAt: string;
+  legalTicketId?: string | null;
+  bankName?: string | null;
+  accountNumber?: string | null;
+  accountHolderName?: string | null;
+  invoiceId?: string | null;
+  confirmationExpiresAt?: string | null;
+  emailConfirmedAt?: string | null;
+  emailConfirmed?: boolean;
 }
 
-export type RefundStatus = 'REQUESTED' | 'APPROVED' | 'REJECTED' | 'PROCESSING' | 'COMPLETED';
+export type RefundStatus = 'NEW' | 'ADMIN_REVIEWING' | 'WAITING_USER_BANK_INFO' | 'WAITING_EMAIL_CONFIRMATION' | 'EMAIL_CONFIRMED' | 'REFUND_REQUEST_CREATED' | 'REFUNDED' | 'REJECTED' | 'CLOSED' | 'REQUESTED' | 'APPROVED' | 'PROCESSING' | 'COMPLETED';
 
 export interface UpdateRefundStatusPayload {
   status: RefundStatus;

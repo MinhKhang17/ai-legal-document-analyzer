@@ -50,7 +50,39 @@ public class CustomerPlanServiceImpl implements CustomerPlanService {
             throw new RuntimeException("Gói dịch vụ này hiện đã ngừng hoạt động");
         }
 
+        CustomerPlan currentActivePlan = getActivePlanOrUpdateIfExpired(customerId);
+        if (currentActivePlan != null && currentActivePlan.getSubscriptionPlan() != null) {
+            int currentRank = planRank(currentActivePlan.getSubscriptionPlan());
+            int targetRank = planRank(plan);
+            if (currentActivePlan.getSubscriptionPlan().getId().equals(plan.getId())) {
+                throw new RuntimeException("CURRENT_SUBSCRIPTION_PLAN");
+            }
+            if (targetRank < currentRank) {
+                currentActivePlan.setScheduledSubscriptionPlan(plan);
+                currentActivePlan.setPlanChangeEffectiveAt(currentActivePlan.getEndDate());
+                currentActivePlan.setAutoRenew(false);
+                return customerPlanMapper.toResponseDTO(customerPlanRepository.save(currentActivePlan));
+            }
+        }
+
         // Tạo hoặc cập nhật CustomerPlan trạng thái PENDING
+        if (plan.getPrice().signum() == 0) {
+            LocalDateTime now = LocalDateTime.now();
+            CustomerPlan freePlan = CustomerPlan.builder()
+                    .customer(user).subscriptionPlan(plan).status(PlanStatus.ACTIVE)
+                    .usedQuota(currentActivePlan == null ? 0 : currentActivePlan.getUsedQuota())
+                    .startDate(now).endDate(now.plusDays(plan.getDurationDays()))
+                    .usageStartAt(currentActivePlan == null ? now : currentActivePlan.getUsageStartAt())
+                    .usageEndAt(currentActivePlan == null ? now.plusDays(plan.getDurationDays()) : currentActivePlan.getUsageEndAt())
+                    .billingCycleStartAt(now).billingCycleEndAt(now.plusDays(plan.getDurationDays()))
+                    .autoRenew(false).build();
+            if (currentActivePlan != null) {
+                currentActivePlan.setStatus(PlanStatus.EXPIRED);
+                customerPlanRepository.save(currentActivePlan);
+            }
+            return customerPlanMapper.toResponseDTO(customerPlanRepository.save(freePlan));
+        }
+
         if (request.getPaymentMethod() == PaymentMethod.VNPAY && !isValidVnPayAmount(plan.getPrice())) {
             throw new RuntimeException("So tien thanh toan VNPAY phai tu 5,000 VND den duoi 1 ty VND");
         }
@@ -166,12 +198,36 @@ public class CustomerPlanServiceImpl implements CustomerPlanService {
 
         if (activePlan != null && activePlan.getEndDate() != null) {
             if (LocalDateTime.now().isAfter(activePlan.getEndDate())) {
+                if (activePlan.getScheduledSubscriptionPlan() != null) {
+                    SubscriptionPlan scheduled = activePlan.getScheduledSubscriptionPlan();
+                    LocalDateTime now = LocalDateTime.now();
+                    activePlan.setSubscriptionPlan(scheduled);
+                    activePlan.setStartDate(now);
+                    activePlan.setEndDate(now.plusDays(scheduled.getDurationDays()));
+                    activePlan.setUsageStartAt(now);
+                    activePlan.setUsageEndAt(activePlan.getEndDate());
+                    activePlan.setBillingCycleStartAt(now);
+                    activePlan.setBillingCycleEndAt(activePlan.getEndDate());
+                    activePlan.setScheduledSubscriptionPlan(null);
+                    activePlan.setPlanChangeEffectiveAt(null);
+                    activePlan.setStatus(PlanStatus.ACTIVE);
+                    return customerPlanRepository.save(activePlan);
+                }
                 activePlan.setStatus(PlanStatus.EXPIRED);
                 activePlan = customerPlanRepository.save(activePlan);
                 return null;
             }
         }
         return activePlan;
+    }
+
+    private int planRank(SubscriptionPlan plan) {
+        if (plan.getTier() != null) return plan.getTier().ordinal();
+        return switch (plan.getPlanType().toUpperCase()) {
+            case "PREMIUM" -> 2;
+            case "STANDARD" -> 1;
+            default -> 0;
+        };
     }
 
     private boolean isValidVnPayAmount(BigDecimal amount) {

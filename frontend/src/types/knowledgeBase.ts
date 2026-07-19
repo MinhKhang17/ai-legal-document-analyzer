@@ -13,8 +13,9 @@ export interface UploadKnowledgeRequest {
   scope: "GLOBAL" | "WORKSPACE" | string;
   createdById: number;
   workspaceId?: number | null;
-  extractedContent: string;
+  extractedContent?: string;
   rawContent?: string | null;
+  description?: string | null;
 }
 
 export interface IngestKnowledgeRequest {
@@ -53,6 +54,12 @@ export interface KnowledgeBaseEntry {
   workspaceId: number | null;
   createdAt: string;
   updatedAt: string;
+  description?: string | null;
+  fileName?: string | null;
+  contentType?: string | null;
+  size?: number | null;
+  uploadedAt?: string | null;
+  sourceFileAvailable?: boolean;
 }
 
 export interface KnowledgeBaseVersion {
@@ -69,6 +76,12 @@ export interface KnowledgeBaseVersion {
   ingestedAt?: string | null;
   ingestedById?: number | null;
   errorMessage?: string | null;
+  description?: string | null;
+  fileName?: string | null;
+  contentType?: string | null;
+  size?: number | null;
+  uploadedAt?: string | null;
+  sourceFileAvailable?: boolean;
   reviewDecision: KnowledgeReviewDecision | null;
   reviewedById: number | null;
   reviewedAt: string | null;

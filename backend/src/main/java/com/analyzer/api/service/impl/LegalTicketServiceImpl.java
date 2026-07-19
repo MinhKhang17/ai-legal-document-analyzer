@@ -63,10 +63,7 @@ public class LegalTicketServiceImpl implements LegalTicketService {
         User customer = userRepository.findById(customerId)
                 .orElseThrow(() -> new ResourceNotFoundException("USER_NOT_FOUND"));
         LegalTicketType requestedType = request.getTicketType() != null ? request.getTicketType() : LegalTicketType.CONTACT_EXPERT;
-        if (requestedType == LegalTicketType.CONTACT_EXPERT
-                && request.getRecipientType() != com.analyzer.api.enums.TicketRecipientType.ADMIN) {
-            subscriptionQuotaService.checkCanCreateExpertTicket(customer);
-        }
+        validateTicketTypeForPlan(customer, requestedType);
 
         Workspace workspace = workspaceRepository.findById(request.getWorkspaceId())
                 .orElseThrow(() -> new ForbiddenException("WORKSPACE_ACCESS_DENIED"));
@@ -191,8 +188,7 @@ public class LegalTicketServiceImpl implements LegalTicketService {
                 .internalOnly(false)
                 .build();
         legalTicketMessageRepository.save(systemMsg);
-        if (requestedType == LegalTicketType.CONTACT_EXPERT
-                && request.getRecipientType() != com.analyzer.api.enums.TicketRecipientType.ADMIN) {
+        if (requestedType == LegalTicketType.CONTACT_EXPERT) {
             subscriptionQuotaService.recordExpertTicketUsage(customer);
         }
 
@@ -203,6 +199,24 @@ public class LegalTicketServiceImpl implements LegalTicketService {
         }
 
         return toResponse(ticket);
+    }
+
+    private void validateTicketTypeForPlan(User customer, LegalTicketType requestedType) {
+        SubscriptionPlan plan = subscriptionQuotaService.getCurrentPlan(customer);
+        switch (requestedType) {
+            case CONTACT_EXPERT -> subscriptionQuotaService.checkCanCreateExpertTicket(customer);
+            case SYSTEM_ERROR -> {
+                if (!Boolean.TRUE.equals(plan.getAllowSystemErrorTicket())) {
+                    throw new ConflictException("SYSTEM_ERROR_TICKET_NOT_ALLOWED");
+                }
+            }
+            case QUERY_ERROR -> {
+                if (!Boolean.TRUE.equals(plan.getAllowQueryErrorTicket())) {
+                    throw new ConflictException("QUERY_ERROR_TICKET_NOT_ALLOWED");
+                }
+            }
+            case REFUND_REQUEST -> { /* Refund tickets never consume expert quota. */ }
+        }
     }
 
     @Override

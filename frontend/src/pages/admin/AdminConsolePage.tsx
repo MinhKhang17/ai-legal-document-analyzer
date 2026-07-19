@@ -60,6 +60,23 @@ const emptyPlanForm: SubscriptionPlanRequest = {
   price: 0,
   durationDays: 30,
   maxQuota: 100,
+  name: '',
+  displayName: '',
+  priceVnd: 0,
+  billingCycleDays: 30,
+  contractAnalysisLimit: 0,
+  aiTokenLimit: 0,
+  workspaceLimit: 0,
+  documentPerWorkspaceLimit: 0,
+  storageLimitMb: 0,
+  maxFileSizeMb: 0,
+  maxAttachedDocumentsPerSession: 0,
+  contractDraftLimit: 0,
+  expertTicketLimit: 0,
+  allowSystemErrorTicket: true,
+  allowQueryErrorTicket: true,
+  allowContactExpertTicket: false,
+  features: [],
   active: true,
 };
 
@@ -247,6 +264,22 @@ export function AdminConsolePage() {
       toast.warning(t('admin.planNameRequired'), t('toast.warningTitle'));
       return;
     }
+    const numericLimits = [
+      planForm.priceVnd ?? planForm.price,
+      planForm.contractAnalysisLimit ?? planForm.maxQuota,
+      planForm.aiTokenLimit,
+      planForm.workspaceLimit,
+      planForm.documentPerWorkspaceLimit,
+      planForm.storageLimitMb,
+      planForm.maxFileSizeMb,
+      planForm.maxAttachedDocumentsPerSession,
+      planForm.contractDraftLimit,
+      planForm.expertTicketLimit,
+    ];
+    if ((planForm.billingCycleDays ?? planForm.durationDays) <= 0 || numericLimits.some((value) => value < 0)) {
+      setPlanError(language === 'vi' ? 'Chu kỳ phải lớn hơn 0 và mọi giới hạn phải từ 0 trở lên.' : 'Billing cycle must be positive and every limit must be non-negative.');
+      return;
+    }
 
     setSavingPlan(true);
     setPlanError(null);
@@ -287,6 +320,23 @@ export function AdminConsolePage() {
       price: plan.price,
       durationDays: plan.durationDays,
       maxQuota: plan.maxQuota,
+      name: plan.name ?? plan.planType,
+      displayName: plan.displayName ?? plan.planName,
+      priceVnd: plan.priceVnd ?? plan.price,
+      billingCycleDays: plan.billingCycleDays ?? plan.durationDays,
+      contractAnalysisLimit: plan.contractAnalysisLimit ?? plan.maxQuota,
+      aiTokenLimit: plan.aiTokenLimit ?? 0,
+      workspaceLimit: plan.workspaceLimit ?? 0,
+      documentPerWorkspaceLimit: plan.documentPerWorkspaceLimit ?? 0,
+      storageLimitMb: plan.storageLimitMb ?? 0,
+      maxFileSizeMb: plan.maxFileSizeMb ?? 0,
+      maxAttachedDocumentsPerSession: plan.maxAttachedDocumentsPerSession ?? 0,
+      contractDraftLimit: plan.contractDraftLimit ?? 0,
+      expertTicketLimit: plan.expertTicketLimit ?? 0,
+      allowSystemErrorTicket: plan.allowSystemErrorTicket ?? true,
+      allowQueryErrorTicket: plan.allowQueryErrorTicket ?? true,
+      allowContactExpertTicket: plan.allowContactExpertTicket ?? false,
+      features: plan.features ?? [],
       active: plan.active,
     });
     setActiveTab('plans');
@@ -585,7 +635,7 @@ export function AdminConsolePage() {
               <input
                 className="form-field mt-xs"
                 value={planForm.planName}
-                onChange={(event) => setPlanForm((previous) => ({ ...previous, planName: event.target.value }))}
+                onChange={(event) => setPlanForm((previous) => ({ ...previous, planName: event.target.value, displayName: event.target.value }))}
               />
             </label>
             <label className="text-sm font-semibold">
@@ -593,7 +643,7 @@ export function AdminConsolePage() {
               <input
                 className="form-field mt-xs"
                 value={planForm.planType}
-                onChange={(event) => setPlanForm((previous) => ({ ...previous, planType: event.target.value }))}
+                onChange={(event) => setPlanForm((previous) => ({ ...previous, planType: event.target.value, name: event.target.value }))}
               />
             </label>
             <label className="text-sm font-semibold">
@@ -603,7 +653,7 @@ export function AdminConsolePage() {
                 type="number"
                 min={0}
                 value={planForm.price}
-                onChange={(event) => setPlanForm((previous) => ({ ...previous, price: Number(event.target.value) }))}
+                onChange={(event) => setPlanForm((previous) => ({ ...previous, price: Number(event.target.value), priceVnd: Number(event.target.value) }))}
               />
             </label>
             <label className="text-sm font-semibold">
@@ -613,7 +663,7 @@ export function AdminConsolePage() {
                 type="number"
                 min={1}
                 value={planForm.durationDays}
-                onChange={(event) => setPlanForm((previous) => ({ ...previous, durationDays: Number(event.target.value) }))}
+                onChange={(event) => setPlanForm((previous) => ({ ...previous, durationDays: Number(event.target.value), billingCycleDays: Number(event.target.value) }))}
               />
             </label>
             <label className="text-sm font-semibold">
@@ -623,7 +673,7 @@ export function AdminConsolePage() {
                 type="number"
                 min={0}
                 value={planForm.maxQuota}
-                onChange={(event) => setPlanForm((previous) => ({ ...previous, maxQuota: Number(event.target.value) }))}
+                onChange={(event) => setPlanForm((previous) => ({ ...previous, maxQuota: Number(event.target.value), contractAnalysisLimit: Number(event.target.value) }))}
               />
             </label>
             <label className="flex items-center gap-sm pt-lg text-sm font-semibold">
@@ -635,6 +685,49 @@ export function AdminConsolePage() {
               {t('admin.active')}
             </label>
           </div>
+          <div className="grid gap-md md:grid-cols-2">
+            {([
+              ['aiTokenLimit', 'AI token limit'],
+              ['workspaceLimit', 'Workspace limit'],
+              ['documentPerWorkspaceLimit', 'Documents / workspace'],
+              ['storageLimitMb', 'Storage limit (MB)'],
+              ['maxFileSizeMb', 'Max file size (MB)'],
+              ['maxAttachedDocumentsPerSession', 'Attached docs / session'],
+              ['contractDraftLimit', 'Contract draft limit'],
+              ['expertTicketLimit', 'Expert ticket limit'],
+            ] as const).map(([field, label]) => (
+              <label key={field} className="text-sm font-semibold">
+                {label}
+                <input
+                  className="form-field mt-xs"
+                  type="number"
+                  min={0}
+                  value={planForm[field]}
+                  onChange={(event) => setPlanForm((previous) => ({ ...previous, [field]: Number(event.target.value) }))}
+                />
+              </label>
+            ))}
+          </div>
+          <div className="grid gap-sm rounded-xl border border-outline-variant/60 p-md md:grid-cols-3 dark:border-slate-700">
+            {([
+              ['allowSystemErrorTicket', 'SYSTEM_ERROR'],
+              ['allowQueryErrorTicket', 'QUERY_ERROR'],
+              ['allowContactExpertTicket', 'CONTACT_EXPERT'],
+            ] as const).map(([field, label]) => (
+              <label key={field} className="flex items-center gap-sm text-sm font-semibold">
+                <input type="checkbox" checked={planForm[field]} onChange={(event) => setPlanForm((previous) => ({ ...previous, [field]: event.target.checked }))} />
+                Cho phép {label}
+              </label>
+            ))}
+          </div>
+          <label className="block text-sm font-semibold">
+            Features (mỗi dòng một tính năng)
+            <textarea
+              className="form-field mt-xs min-h-24"
+              value={planForm.features.join('\n')}
+              onChange={(event) => setPlanForm((previous) => ({ ...previous, features: event.target.value.split('\n').map((item) => item.trim()).filter(Boolean) }))}
+            />
+          </label>
           <label className="block text-sm font-semibold">
             {t('common.description')}
             <textarea

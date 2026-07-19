@@ -99,6 +99,7 @@ export const API_ENDPOINTS = {
         customerPlanId,
       }),
     myUsage: fromEnv("VITE_SUBSCRIPTION_MY_USAGE_API"),
+    usageSummary: fromEnvOrDefault("VITE_SUBSCRIPTION_USAGE_API", "/api/v1/subscriptions/usage"),
     refunds: fromEnv("VITE_SUBSCRIPTION_REFUNDS_API"),
     myRefunds: fromEnvOrDefault("VITE_SUBSCRIPTION_MY_REFUNDS_API", "/api/v1/subscriptions/refunds/me"),
     refundDetail: (refundId: number | string) =>
@@ -253,6 +254,8 @@ export const API_ENDPOINTS = {
       fillPathParams(fromEnv("VITE_ADMIN_KNOWLEDGE_BASE_ARCHIVE_API"), {
         knowledgeBaseEntryId,
       }),
+    sourceFile: (knowledgeBaseEntryId: string) =>
+      `/api/v1/admin/knowledge-base/${encodeURIComponent(knowledgeBaseEntryId)}/source-file`,
   },
 
   contracts: {

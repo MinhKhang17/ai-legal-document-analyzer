@@ -15,6 +15,11 @@ import {
   publishKnowledgeBaseEntry,
   reviewKnowledgeBaseEntry,
   unpublishKnowledgeBaseEntry,
+  downloadKnowledgeBaseSourceFile,
+  getKnowledgeBaseSourceFile,
+  ingestKnowledgeBaseEntry,
+  ingestKnowledgeBaseFile,
+  failKnowledgeIngestionJob,
 } from "../../services/knowledgeBase.service";
 import { useI18n } from "../../hooks/useI18n";
 import { useToast } from "../../hooks/useToast";
@@ -22,11 +27,13 @@ import type { KnowledgeBaseEntry, KnowledgeBaseVersion } from "../../types/knowl
 import { formatDisplayDate } from "../../utils/format";
 import { canKnowledgeAction } from "../../utils/knowledgeLifecycle";
 import { downloadStaffDocument } from "../../services/legalTicket.service";
+import { useAppStore } from "../../store/AppStore";
 
 export function KnowledgeBaseDetailPage() {
   const { id = "" } = useParams();
   const { t, language } = useI18n();
   const toast = useToast();
+  const { user } = useAppStore();
   const locale = language === "vi" ? "vi-VN" : "en-US";
   const [entry, setEntry] = useState<KnowledgeBaseEntry | null>(null);
   const [versions, setVersions] = useState<KnowledgeBaseVersion[]>([]);
@@ -78,6 +85,28 @@ export function KnowledgeBaseDetailPage() {
     }
   };
 
+  const retryIngest = async () => {
+    if (!entry || !user?.id) return;
+    setSaving(true);
+    setError("");
+    let jobId: string | null = null;
+    try {
+      const file = await getKnowledgeBaseSourceFile(entry.id);
+      const job = await ingestKnowledgeBaseEntry(entry.id, { requestId: `kb-retry-${Date.now()}`, jobPayload: JSON.stringify({ filename: file.name, retry: true }) });
+      jobId = job.id;
+      await ingestKnowledgeBaseFile(file, entry.id, entry.title, user.id, job.id);
+      toast.success(language === "vi" ? "Đã bắt đầu ingest lại ở chế độ nền." : "Background retry started.");
+      await loadEntry();
+    } catch (retryError) {
+      const message = retryError instanceof Error ? retryError.message : "Unable to retry ingest";
+      if (jobId) { try { await failKnowledgeIngestionJob(jobId, message); } catch { /* keep original error */ } }
+      setError(message);
+      toast.error(message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const versionColumns: DataTableColumn<KnowledgeBaseVersion>[] = [
     { header: t("contracts.version"), cell: (version) => <span className="font-semibold">v{version.versionNo}</span> },
     { header: t("table.status"), cell: (version) => <Badge>{version.status || t("common.unknown")}</Badge> },
@@ -86,6 +115,7 @@ export function KnowledgeBaseDetailPage() {
     { header: t("knowledge.ingestedDocuments.active"), cell: (version) => version.active ? t("admin.active") : t("admin.inactive") },
     { header: t("knowledge.review"), cell: (version) => version.reviewDecision || "-" },
     { header: t("contracts.created"), cell: (version) => formatDisplayDate(version.createdAt, "-", locale) },
+    { header: language === "vi" ? "File đã upload" : "Uploaded file", cell: (version) => version.sourceFileAvailable ? <Button size="sm" variant="secondary" leftIcon={<Download className="h-4 w-4" />} onClick={async () => { try { await downloadKnowledgeBaseSourceFile(id); } catch (downloadError) { toast.error(downloadError instanceof Error ? downloadError.message : "Unable to download original file"); } }}>{language === "vi" ? "Tải file gốc" : "Download original"}</Button> : "-" },
     { header: t("table.actions"), cell: (version) => version.sourceDocumentId ? <Button size="sm" variant="secondary" leftIcon={<Download className="h-4 w-4" />} onClick={async () => { try { const url = await downloadStaffDocument(version.sourceDocumentId!); const anchor = document.createElement("a"); anchor.href = url; anchor.download = `${entry?.code ?? "knowledge"}-v${version.versionNo}`; anchor.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000); } catch (downloadError) { toast.error(downloadError instanceof Error ? downloadError.message : "Unable to download original file"); } }}>{language === "vi" ? "Tải file gốc" : "Download original"}</Button> : "-" },
   ];
 
@@ -126,6 +156,10 @@ export function KnowledgeBaseDetailPage() {
                 <div><dt className="label-uppercase">{t("contracts.version")}</dt><dd>{entry.currentVersionNo ?? "-"}</dd></div>
                 <div><dt className="label-uppercase">{t("knowledge.ingestedDocuments.active")}</dt><dd>{entry.active ? t("admin.active") : t("admin.inactive")}</dd></div>
                 <div><dt className="label-uppercase">{t("table.updated")}</dt><dd>{formatDisplayDate(entry.updatedAt, "-", locale)}</dd></div>
+                <div><dt className="label-uppercase">File name</dt><dd>{versions[0]?.fileName || "-"}</dd></div>
+                <div><dt className="label-uppercase">Content type</dt><dd>{versions[0]?.contentType || "-"}</dd></div>
+                <div><dt className="label-uppercase">Size</dt><dd>{versions[0]?.size != null ? `${(versions[0].size! / 1024 / 1024).toFixed(2)} MB` : "-"}</dd></div>
+                <div><dt className="label-uppercase">Uploaded at</dt><dd>{formatDisplayDate(versions[0]?.uploadedAt, "-", locale)}</dd></div>
               </dl>
             </Card>
 
@@ -151,6 +185,14 @@ export function KnowledgeBaseDetailPage() {
           <aside className="space-y-gutter">
             <Card title={t("knowledge.reviewPublishArchive")}>
               <div className="space-y-md">
+                {versions[0]?.ingestStatus === "FAILED" && (
+                  <div className="rounded-xl border border-error/40 bg-error/10 p-md text-sm text-error">
+                    <p className="font-semibold">Ingest thất bại</p>
+                    <p className="mt-xs">{versions[0].errorMessage || versions[0].failedReason || "Unknown ingest error"}</p>
+                    <Button className="mt-sm" variant="secondary" disabled={saving || !versions[0].sourceFileAvailable} onClick={() => void retryIngest()}>Retry ingest</Button>
+                  </div>
+                )}
+                {entry.currentStatus === "PUBLIC" ? <p className="rounded-lg bg-emerald-500/10 p-sm text-sm font-semibold text-emerald-600">Đang được AI sử dụng</p> : <p className="rounded-lg bg-slate-500/10 p-sm text-sm text-on-surface-variant">PRIVATE / inactive · Chưa đưa vào retrieval</p>}
                 <textarea className="form-field min-h-24" value={note} onChange={(event) => setNote(event.target.value)} placeholder={t("knowledge.noteReason")} />
                 <div className="flex flex-col gap-sm">
                   <Button

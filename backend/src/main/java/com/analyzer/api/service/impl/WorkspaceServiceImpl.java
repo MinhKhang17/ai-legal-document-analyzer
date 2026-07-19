@@ -132,7 +132,7 @@ public class WorkspaceServiceImpl implements WorkspaceService {
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Khong tim thay nguoi dung"));
-        subscriptionQuotaService.checkCanUploadOrAnalyzeContract(user, workspaceId);
+        subscriptionQuotaService.checkCanUploadOrAnalyzeContract(user, workspaceId, file.getSize());
 
         workspaceRepository.findByIdAndUserIdAndStatus(workspaceId, userId, STATUS_ACTIVE)
                 .orElseThrow(() -> new RuntimeException("Workspace khong ton tai hoac khong thuoc user hien tai"));

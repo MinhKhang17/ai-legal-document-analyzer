@@ -269,6 +269,10 @@ public class TicketCollaborationService {
         if (ids == null || ids.isEmpty()) return List.of();
         List<TicketAttachment> attachments = attachmentRepository.findByIdInAndUploadedBy_IdAndUploadStatus(ids, userId, TicketUploadStatus.UPLOADED);
         if (attachments.size() != ids.size()) throw new ForbiddenException("ATTACHMENT_ACCESS_DENIED");
+        boolean invalidOwner = attachments.stream().anyMatch(item ->
+                item.getOwnerType() != TicketAttachmentOwnerType.TICKET_DRAFT
+                        || (item.getTicketId() != null && !item.getTicketId().equals(ownerId)));
+        if (invalidOwner) throw new ConflictException("ATTACHMENT_ALREADY_ASSIGNED_OR_WRONG_TICKET");
         if (type != null) attachments.forEach(item -> { item.setOwnerType(type); item.setOwnerId(ownerId); item.setTicketId(ownerId); });
         return attachments;
     }

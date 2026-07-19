@@ -7,6 +7,7 @@ import com.analyzer.api.entity.LegalTicketMessage;
 import com.analyzer.api.entity.User;
 import com.analyzer.api.enums.LegalTicketMessageType;
 import com.analyzer.api.enums.LegalTicketStatus;
+import com.analyzer.api.enums.LegalTicketType;
 import com.analyzer.api.enums.RoleName;
 import com.analyzer.api.exception.common.ConflictException;
 import com.analyzer.api.exception.common.ResourceNotFoundException;
@@ -36,6 +37,7 @@ public class AdminTicketAssignmentServiceImpl implements AdminTicketAssignmentSe
         LegalTicket ticket = legalTicketRepository.findByIdAndDeletedFalse(ticketId)
                 .orElseThrow(() -> new ResourceNotFoundException("TICKET_NOT_FOUND"));
 
+        if (ticket.getTicketType() == LegalTicketType.REFUND_REQUEST) throw new ConflictException("REFUND_TICKET_ADMIN_ONLY");
         if (ticket.getStatus() != LegalTicketStatus.PENDING_ADMIN_REVIEW &&
             ticket.getStatus() != LegalTicketStatus.REOPENED &&
             ticket.getStatus() != LegalTicketStatus.ASSIGNED_TO_LAWYER) {
@@ -98,6 +100,7 @@ public class AdminTicketAssignmentServiceImpl implements AdminTicketAssignmentSe
         LegalTicket ticket = legalTicketRepository.findByIdAndDeletedFalse(ticketId)
                 .orElseThrow(() -> new ResourceNotFoundException("TICKET_NOT_FOUND"));
 
+        if (ticket.getTicketType() == LegalTicketType.REFUND_REQUEST) throw new ConflictException("REFUND_TICKET_ADMIN_ONLY");
         if (ticket.getStatus() == LegalTicketStatus.CLOSED || ticket.getStatus() == LegalTicketStatus.CANCELLED) {
             throw new ConflictException("INVALID_STATUS_TRANSITION");
         }

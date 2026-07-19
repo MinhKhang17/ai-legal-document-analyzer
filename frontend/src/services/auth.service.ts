@@ -208,6 +208,6 @@ export async function verifyEmail(token: string): Promise<void> {
   );
 }
 
-export async function resendVerificationEmail(email: string): Promise<void> {
-  await postJson<unknown>(API_ENDPOINTS.auth.resendVerification, { email }, "Unable to resend verification email.");
+export async function resendVerificationEmail(email: string): Promise<RegisterResponse> {
+  return postJson<RegisterResponse>(API_ENDPOINTS.auth.resendVerification, { email }, "Unable to resend verification email.");
 }

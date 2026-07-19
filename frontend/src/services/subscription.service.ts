@@ -13,6 +13,7 @@ import type {
   SubscriptionPlanRequest,
   SubscriptionPlan,
   UpdateRefundStatusPayload,
+  SubscriptionUsageSummary,
 } from '../types/subscription';
 
 type ParsedResponse<T> = {
@@ -311,6 +312,12 @@ export const getMySubscriptionUsage = async (
   );
 };
 
+export const getSubscriptionUsageSummary = async (): Promise<ApiResponse<SubscriptionUsageSummary>> =>
+  getJson<ApiResponse<SubscriptionUsageSummary>>(
+    API_ENDPOINTS.subscription.usageSummary,
+    'Unable to load subscription usage summary.',
+  );
+
 export const requestSubscriptionRefund = async (
   payload: RefundRequestPayload,
 ): Promise<ApiResponse<RefundRequestRecord>> =>
@@ -318,6 +325,12 @@ export const requestSubscriptionRefund = async (
     API_ENDPOINTS.subscription.refunds,
     payload,
     'Unable to submit refund request.',
+  );
+
+export const confirmSubscriptionRefundEmail = async (token: string): Promise<ApiResponse<RefundRequestRecord>> =>
+  getJson<ApiResponse<RefundRequestRecord>>(
+    `${API_ENDPOINTS.subscription.refunds}/confirm?${new URLSearchParams({ token }).toString()}`,
+    'Unable to confirm refund email.',
   );
 
 export const getSubscriptionRefund = async (

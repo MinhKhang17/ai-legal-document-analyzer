@@ -19,6 +19,9 @@ public class CustomerPlanResponseDTO {
     @Schema(description = "Subscription Plan Details")
     private SubscriptionPlanResponseDTO subscriptionPlan;
 
+    private SubscriptionPlanResponseDTO scheduledSubscriptionPlan;
+    private LocalDateTime planChangeEffectiveAt;
+
     @Schema(description = "Plan Status", example = "ACTIVE")
     private PlanStatus status;
 

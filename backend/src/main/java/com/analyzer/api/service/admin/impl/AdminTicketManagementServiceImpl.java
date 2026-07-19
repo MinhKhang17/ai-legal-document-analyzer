@@ -41,6 +41,9 @@ public class AdminTicketManagementServiceImpl implements AdminTicketManagementSe
         LegalTicket ticket = legalTicketRepository.findById(ticketId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy Yêu cầu tư vấn ID: " + ticketId));
 
+        if (ticket.getTicketType() == com.analyzer.api.enums.LegalTicketType.REFUND_REQUEST) {
+            throw new ConflictException("REFUND_TICKET_ADMIN_ONLY");
+        }
         if (ticket.getAssignedLawyer() != null && !Boolean.TRUE.equals(request.getForceReassign())) {
             throw new ConflictException("Ticket đã được phân công cho Luật sư ID: " + ticket.getAssignedLawyer().getId());
         }

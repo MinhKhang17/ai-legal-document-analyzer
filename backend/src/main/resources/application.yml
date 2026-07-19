@@ -96,3 +96,4 @@ app:
       curr-code: ${VNPAY_CURR_CODE:VND}
       order-type: ${VNPAY_ORDER_TYPE:other}
       locale: ${VNPAY_LOCALE:vn}
+      debug-log-credentials: ${VNPAY_DEBUG_LOG_CREDENTIALS:false}

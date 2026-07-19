@@ -3,201 +3,281 @@ package com.analyzer.api.service.subscription.impl;
 import com.analyzer.api.dto.subscription.RefundRequestDTO;
 import com.analyzer.api.dto.subscription.RefundResponseDTO;
 import com.analyzer.api.dto.subscription.UpdateRefundStatusRequest;
-import com.analyzer.api.entity.CustomerPlan;
-import com.analyzer.api.entity.PaymentTransaction;
-import com.analyzer.api.entity.RefundRequest;
-import com.analyzer.api.entity.User;
-import com.analyzer.api.enums.RefundStatus;
-import com.analyzer.api.enums.PaymentStatus;
-import com.analyzer.api.enums.PlanStatus;
+import com.analyzer.api.entity.*;
+import com.analyzer.api.enums.*;
 import com.analyzer.api.exception.common.ConflictException;
 import com.analyzer.api.exception.common.ForbiddenException;
 import com.analyzer.api.exception.common.ResourceNotFoundException;
-import com.analyzer.api.repository.CustomerPlanRepository;
-import com.analyzer.api.repository.PaymentTransactionRepository;
-import com.analyzer.api.repository.UserRepository;
+import com.analyzer.api.repository.*;
 import com.analyzer.api.repository.subscription.RefundRequestRepository;
 import com.analyzer.api.security.UserDetailsImpl;
+import com.analyzer.api.service.EmailService;
 import com.analyzer.api.service.subscription.RefundService;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.time.LocalDateTime;
 import java.util.EnumSet;
+import java.util.HexFormat;
 import java.util.List;
+import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 public class RefundServiceImpl implements RefundService {
 
     private static final EnumSet<RefundStatus> IN_PROGRESS_STATUSES = EnumSet.of(
-            RefundStatus.REQUESTED, RefundStatus.APPROVED, RefundStatus.PROCESSING);
+            RefundStatus.NEW, RefundStatus.ADMIN_REVIEWING, RefundStatus.WAITING_USER_BANK_INFO,
+            RefundStatus.WAITING_EMAIL_CONFIRMATION, RefundStatus.EMAIL_CONFIRMED,
+            RefundStatus.REFUND_REQUEST_CREATED, RefundStatus.REQUESTED, RefundStatus.APPROVED,
+            RefundStatus.PROCESSING);
 
     private final RefundRequestRepository refundRequestRepository;
     private final PaymentTransactionRepository paymentTransactionRepository;
     private final CustomerPlanRepository customerPlanRepository;
     private final UserRepository userRepository;
+    private final WorkspaceRepository workspaceRepository;
+    private final LegalTicketRepository legalTicketRepository;
+    private final LegalTicketMessageRepository legalTicketMessageRepository;
+    private final EmailService emailService;
+
+    @Autowired
+    public RefundServiceImpl(
+            RefundRequestRepository refundRequestRepository,
+            PaymentTransactionRepository paymentTransactionRepository,
+            CustomerPlanRepository customerPlanRepository,
+            UserRepository userRepository,
+            WorkspaceRepository workspaceRepository,
+            LegalTicketRepository legalTicketRepository,
+            LegalTicketMessageRepository legalTicketMessageRepository,
+            EmailService emailService) {
+        this.refundRequestRepository = refundRequestRepository;
+        this.paymentTransactionRepository = paymentTransactionRepository;
+        this.customerPlanRepository = customerPlanRepository;
+        this.userRepository = userRepository;
+        this.workspaceRepository = workspaceRepository;
+        this.legalTicketRepository = legalTicketRepository;
+        this.legalTicketMessageRepository = legalTicketMessageRepository;
+        this.emailService = emailService;
+    }
+
+    /** Backward-compatible constructor retained for existing unit tests and integrations. */
+    public RefundServiceImpl(
+            RefundRequestRepository refundRequestRepository,
+            PaymentTransactionRepository paymentTransactionRepository,
+            CustomerPlanRepository customerPlanRepository,
+            UserRepository userRepository) {
+        this(refundRequestRepository, paymentTransactionRepository, customerPlanRepository, userRepository,
+                null, null, null, null);
+    }
 
     @Override
     @Transactional
     public RefundResponseDTO requestRefund(Long customerId, RefundRequestDTO request) {
         User customer = userRepository.findById(customerId)
-                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay khach hang ID: " + customerId));
-        PaymentTransaction paymentTransaction = paymentTransactionRepository.findByIdForUpdate(request.getPaymentTransactionId())
-                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay giao dich thanh toan ID: " + request.getPaymentTransactionId()));
-        if (!paymentTransaction.getCustomer().getId().equals(customerId)) {
-            throw new ForbiddenException("Ban khong co quyen yeu cau hoan tien giao dich nay");
+                .orElseThrow(() -> new ResourceNotFoundException("CUSTOMER_NOT_FOUND"));
+        PaymentTransaction transaction = paymentTransactionRepository.findByIdForUpdate(request.getPaymentTransactionId())
+                .orElseThrow(() -> new ResourceNotFoundException("PAYMENT_TRANSACTION_NOT_FOUND"));
+        if (!transaction.getCustomer().getId().equals(customerId)) throw new ForbiddenException("REFUND_INVOICE_ACCESS_DENIED");
+        if (transaction.getPaymentStatus() != PaymentStatus.SUCCESS) throw new ConflictException("REFUND_REQUIRES_SUCCESSFUL_PAYMENT");
+        validateInvoiceReference(request, transaction);
+        if (refundRequestRepository.existsByPaymentTransactionIdAndStatusIn(transaction.getId(), IN_PROGRESS_STATUSES)) {
+            throw new ConflictException("REFUND_ALREADY_IN_PROGRESS");
         }
-        if (paymentTransaction.getPaymentStatus() != PaymentStatus.SUCCESS) {
-            throw new ConflictException("Chi giao dich thanh toan thanh cong moi co the yeu cau hoan tien");
-        }
-        if (refundRequestRepository.existsByPaymentTransactionIdAndStatusIn(
-                paymentTransaction.getId(), IN_PROGRESS_STATUSES)) {
-            throw new ConflictException("Giao dich dang co mot yeu cau hoan tien chua xu ly xong");
-        }
+        BigDecimal reserved = refundRequestRepository.sumReservedAmount(transaction.getId(), RefundStatus.REJECTED);
+        BigDecimal remaining = transaction.getAmount().subtract(reserved);
+        if (request.getAmount().compareTo(remaining) > 0) throw new ConflictException("REFUND_AMOUNT_EXCEEDS_REMAINING_PAYMENT");
+        CustomerPlan customerPlan = validateCustomerPlan(customerId, request.getCustomerPlanId(), transaction);
 
-        BigDecimal reservedAmount = refundRequestRepository.sumReservedAmount(
-                paymentTransaction.getId(), RefundStatus.REJECTED);
-        BigDecimal remainingAmount = paymentTransaction.getAmount().subtract(reservedAmount);
-        if (request.getAmount().compareTo(remainingAmount) > 0) {
-            throw new ConflictException("So tien hoan vuot qua so tien con co the hoan: " + remainingAmount);
-        }
+        Workspace workspace = workspaceRepository.findAllByUserIdAndStatusOrderByCreatedAtDesc(customerId, "ACTIVE")
+                .stream().findFirst().orElse(null);
+        String reason = request.getRefundReason() != null && !request.getRefundReason().isBlank()
+                ? request.getRefundReason().trim() : request.getReason().trim();
+        LegalTicket ticket = legalTicketRepository.save(LegalTicket.builder()
+                .requestId("refund_" + UUID.randomUUID().toString().replace("-", ""))
+                .ticketType(LegalTicketType.REFUND_REQUEST)
+                .recipientType(TicketRecipientType.ADMIN)
+                .title("Yeu cau hoan tien " + transaction.getTransactionCode())
+                .description(reason)
+                .createdBy(customer)
+                .workspace(workspace)
+                .question(reason)
+                .status(LegalTicketStatus.PENDING_ADMIN_REVIEW)
+                .lastCustomerMessageAt(LocalDateTime.now())
+                .build());
+        legalTicketMessageRepository.save(LegalTicketMessage.builder().ticket(ticket).sender(customer)
+                .senderRole(RoleName.CUSTOMER.name()).content(reason)
+                .messageType(LegalTicketMessageType.CUSTOMER_REPLY).internalOnly(false).build());
 
-        CustomerPlan customerPlan = paymentTransaction.getCustomerPlan();
-        if (request.getCustomerPlanId() != null) {
-            CustomerPlan requestedPlan = customerPlanRepository.findById(request.getCustomerPlanId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay goi khach hang ID: " + request.getCustomerPlanId()));
-            if (!requestedPlan.getCustomer().getId().equals(customerId)) {
-                throw new ForbiddenException("Ban khong co quyen yeu cau hoan tien goi nay");
-            }
-            if (customerPlan == null || !customerPlan.getId().equals(requestedPlan.getId())) {
-                throw new ConflictException("Goi dich vu khong thuoc giao dich thanh toan nay");
-            }
-        }
-
-        RefundRequest refundRequest = RefundRequest.builder()
-                .paymentTransaction(paymentTransaction)
-                .customerPlan(customerPlan)
-                .requestedBy(customer)
-                .reason(request.getReason().trim())
-                .status(RefundStatus.REQUESTED)
-                .amount(request.getAmount())
-                .adminNote("Yeu cau hoan tien dang duoc xem xet")
-                .build();
-        return toResponse(refundRequestRepository.save(refundRequest));
+        String rawToken = UUID.randomUUID() + "." + UUID.randomUUID();
+        boolean hasBankInfo = hasText(request.getBankName()) && hasText(request.getAccountNumber())
+                && hasText(request.getAccountHolderName());
+        RefundRequest refund = refundRequestRepository.save(RefundRequest.builder()
+                .paymentTransaction(transaction).customerPlan(customerPlan).requestedBy(customer).legalTicket(ticket)
+                .reason(reason).status(hasBankInfo ? RefundStatus.WAITING_EMAIL_CONFIRMATION : RefundStatus.WAITING_USER_BANK_INFO)
+                .amount(request.getAmount()).bankName(normalize(request.getBankName()))
+                .accountNumber(normalize(request.getAccountNumber())).accountHolderName(normalize(request.getAccountHolderName()))
+                .invoiceId(hasText(request.getInvoiceId()) ? request.getInvoiceId().trim() : transaction.getTransactionCode())
+                .confirmationTokenHash(hasBankInfo ? sha256(rawToken) : null)
+                .confirmationExpiresAt(hasBankInfo ? LocalDateTime.now().plusHours(24) : null)
+                .adminNote(hasBankInfo ? "Waiting for user email confirmation" : "Waiting for user bank information").build());
+        if (hasBankInfo) emailService.sendRefundConfirmationEmailAsync(customer.getEmail(), customer.getFirstName(), refund.getId(), rawToken);
+        return toResponse(refund);
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public RefundResponseDTO getRefund(Long refundId) {
-        RefundRequest refundRequest = refundRequestRepository.findById(refundId)
-                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay yeu cau hoan tien ID: " + refundId));
-        if (!canViewRefund(refundRequest)) {
-            throw new ForbiddenException("Ban khong co quyen xem yeu cau hoan tien nay");
-        }
-        return toResponse(refundRequest);
+    @Override @Transactional(readOnly = true)
+    public RefundResponseDTO getRefund(Long id) {
+        RefundRequest refund = requireRefund(id);
+        if (!canViewRefund(refund)) throw new ForbiddenException("REFUND_ACCESS_DENIED");
+        return toResponse(refund);
     }
 
-    @Override
-    @Transactional(readOnly = true)
+    @Override @Transactional(readOnly = true)
     public List<RefundResponseDTO> getMyRefunds(Long customerId) {
-        return refundRequestRepository.findByRequestedByIdOrderByCreatedAtDesc(customerId).stream()
-                .map(this::toResponse)
-                .toList();
+        return refundRequestRepository.findByRequestedByIdOrderByCreatedAtDesc(customerId).stream().map(this::toResponse).toList();
     }
 
-    @Override
-    @Transactional(readOnly = true)
+    @Override @Transactional(readOnly = true)
     public List<RefundResponseDTO> getRefunds(RefundStatus status) {
-        List<RefundRequest> refunds = status == null
-                ? refundRequestRepository.findAllByOrderByCreatedAtDesc()
-                : refundRequestRepository.findByStatusOrderByCreatedAtDesc(status);
-        return refunds.stream().map(this::toResponse).toList();
+        return (status == null ? refundRequestRepository.findAllByOrderByCreatedAtDesc()
+                : refundRequestRepository.findByStatusOrderByCreatedAtDesc(status)).stream().map(this::toResponse).toList();
     }
 
     @Override
     @Transactional
-    public RefundResponseDTO updateRefundStatus(Long refundId, UpdateRefundStatusRequest request) {
-        RefundRequest refund = refundRequestRepository.findById(refundId)
-                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay yeu cau hoan tien ID: " + refundId));
-        validateTransition(refund.getStatus(), request.status());
-        if (request.status() == RefundStatus.REJECTED
-                && (request.adminNote() == null || request.adminNote().isBlank())) {
-            throw new ConflictException("Can nhap ly do khi tu choi yeu cau hoan tien");
+    public RefundResponseDTO confirmRefundEmail(String token) {
+        RefundRequest refund = refundRequestRepository.findByConfirmationTokenHash(sha256(token))
+                .orElseThrow(() -> new ResourceNotFoundException("REFUND_CONFIRMATION_TOKEN_INVALID"));
+        if (refund.getConfirmationExpiresAt() == null || LocalDateTime.now().isAfter(refund.getConfirmationExpiresAt())) {
+            throw new ConflictException("REFUND_CONFIRMATION_TOKEN_EXPIRED");
         }
-
-        refund.setStatus(request.status());
-        refund.setAdminNote(normalizeNote(request.adminNote()));
-        RefundRequest savedRefund = refundRequestRepository.save(refund);
-
-        if (request.status() == RefundStatus.COMPLETED) {
-            completeRefund(savedRefund);
-        }
-        return toResponse(savedRefund);
+        if (refund.getStatus() == RefundStatus.EMAIL_CONFIRMED || refund.getEmailConfirmedAt() != null) return toResponse(refund);
+        if (refund.getStatus() != RefundStatus.WAITING_EMAIL_CONFIRMATION) throw new ConflictException("REFUND_CONFIRMATION_NOT_ALLOWED");
+        refund.setStatus(RefundStatus.EMAIL_CONFIRMED);
+        refund.setEmailConfirmedAt(LocalDateTime.now());
+        refund.setConfirmationTokenHash(null);
+        refund.setAdminNote("Email confirmed; admin can create refund order");
+        return toResponse(refundRequestRepository.save(refund));
     }
 
-    private void validateTransition(RefundStatus currentStatus, RefundStatus targetStatus) {
-        boolean valid = switch (currentStatus) {
-            case REQUESTED -> targetStatus == RefundStatus.APPROVED || targetStatus == RefundStatus.REJECTED;
-            case APPROVED -> targetStatus == RefundStatus.PROCESSING;
-            case PROCESSING -> targetStatus == RefundStatus.COMPLETED;
-            case REJECTED, COMPLETED -> false;
-        };
-        if (!valid) {
-            throw new ConflictException("Khong the chuyen trang thai hoan tien tu "
-                    + currentStatus + " sang " + targetStatus);
+    @Override
+    @Transactional
+    public RefundResponseDTO updateRefundStatus(Long id, UpdateRefundStatusRequest request) {
+        RefundRequest refund = requireRefund(id);
+        validateTransition(refund, request.status());
+        refund.setStatus(request.status());
+        refund.setAdminNote(normalize(request.adminNote()));
+        RefundRequest saved = refundRequestRepository.save(refund);
+        if (request.status() == RefundStatus.REFUNDED || request.status() == RefundStatus.COMPLETED) completeRefund(saved);
+        if (request.status() == RefundStatus.REFUNDED || request.status() == RefundStatus.REJECTED
+                || request.status() == RefundStatus.CLOSED || request.status() == RefundStatus.COMPLETED) {
+            LegalTicket ticket = saved.getLegalTicket();
+            if (ticket != null) {
+                ticket.setStatus(request.status() == RefundStatus.REJECTED ? LegalTicketStatus.REJECTED_BY_ADMIN : LegalTicketStatus.CLOSED);
+                ticket.setClosedAt(LocalDateTime.now());
+                legalTicketRepository.save(ticket);
+            }
         }
+        return toResponse(saved);
+    }
+
+    private void validateTransition(RefundRequest refund, RefundStatus target) {
+        RefundStatus current = refund.getStatus();
+        if (target == RefundStatus.REFUND_REQUEST_CREATED && refund.getEmailConfirmedAt() == null) {
+            throw new ConflictException("REFUND_EMAIL_CONFIRMATION_REQUIRED");
+        }
+        boolean valid = switch (current) {
+            case NEW -> target == RefundStatus.ADMIN_REVIEWING || target == RefundStatus.REJECTED;
+            case ADMIN_REVIEWING -> target == RefundStatus.WAITING_USER_BANK_INFO || target == RefundStatus.WAITING_EMAIL_CONFIRMATION || target == RefundStatus.REJECTED;
+            case WAITING_USER_BANK_INFO -> target == RefundStatus.WAITING_EMAIL_CONFIRMATION || target == RefundStatus.REJECTED;
+            case WAITING_EMAIL_CONFIRMATION -> target == RefundStatus.REJECTED;
+            case EMAIL_CONFIRMED -> target == RefundStatus.REFUND_REQUEST_CREATED || target == RefundStatus.REJECTED;
+            case REFUND_REQUEST_CREATED -> target == RefundStatus.REFUNDED || target == RefundStatus.REJECTED;
+            case REFUNDED -> target == RefundStatus.CLOSED;
+            case REQUESTED -> target == RefundStatus.APPROVED || target == RefundStatus.REJECTED;
+            case APPROVED -> target == RefundStatus.PROCESSING;
+            case PROCESSING -> target == RefundStatus.COMPLETED;
+            case REJECTED, CLOSED, COMPLETED -> false;
+        };
+        if (!valid) throw new ConflictException("INVALID_REFUND_STATUS_TRANSITION");
     }
 
     private void completeRefund(RefundRequest refund) {
-        PaymentTransaction transaction = paymentTransactionRepository.findByIdForUpdate(
-                        refund.getPaymentTransaction().getId())
-                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay giao dich thanh toan"));
-        BigDecimal completedAmount = refundRequestRepository.sumAmountByStatus(
-                transaction.getId(), RefundStatus.COMPLETED);
-        if (completedAmount.compareTo(transaction.getAmount()) == 0) {
-            transaction.setPaymentStatus(PaymentStatus.REFUNDED);
-            paymentTransactionRepository.save(transaction);
-
+        PaymentTransaction transaction = paymentTransactionRepository.findByIdForUpdate(refund.getPaymentTransaction().getId())
+                .orElseThrow(() -> new ResourceNotFoundException("PAYMENT_TRANSACTION_NOT_FOUND"));
+        BigDecimal completedAmount = refundRequestRepository.sumAmountByStatus(transaction.getId(), refund.getStatus());
+        if (completedAmount == null || completedAmount.compareTo(transaction.getAmount()) < 0) return;
+        transaction.setPaymentStatus(PaymentStatus.REFUNDED);
+        paymentTransactionRepository.save(transaction);
+        if (transaction.getCustomerPlan() != null) {
             CustomerPlan plan = transaction.getCustomerPlan();
-            if (plan != null) {
-                plan.setStatus(PlanStatus.CANCELLED);
-                plan.setAutoRenew(false);
-                plan.setCancelReason("Hoan tien toan bo giao dich " + transaction.getTransactionCode());
-                customerPlanRepository.save(plan);
-            }
+            plan.setStatus(PlanStatus.CANCELLED); plan.setAutoRenew(false);
+            plan.setCancelReason("Refund " + transaction.getTransactionCode());
+            customerPlanRepository.save(plan);
         }
     }
 
-    private String normalizeNote(String note) {
-        return note == null || note.isBlank() ? null : note.trim();
+    private CustomerPlan validateCustomerPlan(Long customerId, Long requestedId, PaymentTransaction transaction) {
+        CustomerPlan plan = transaction.getCustomerPlan();
+        if (requestedId == null) return plan;
+        CustomerPlan requested = customerPlanRepository.findById(requestedId)
+                .orElseThrow(() -> new ResourceNotFoundException("CUSTOMER_PLAN_NOT_FOUND"));
+        if (!requested.getCustomer().getId().equals(customerId)) throw new ForbiddenException("CUSTOMER_PLAN_ACCESS_DENIED");
+        if (plan == null || !plan.getId().equals(requested.getId())) throw new ConflictException("CUSTOMER_PLAN_PAYMENT_MISMATCH");
+        return requested;
     }
 
-    private RefundResponseDTO toResponse(RefundRequest refundRequest) {
-        return RefundResponseDTO.builder()
-                .id(refundRequest.getId())
-                .paymentTransactionId(refundRequest.getPaymentTransaction().getId())
-                .customerPlanId(refundRequest.getCustomerPlan() == null ? null : refundRequest.getCustomerPlan().getId())
-                .requestedById(refundRequest.getRequestedBy().getId())
-                .reason(refundRequest.getReason())
-                .status(refundRequest.getStatus())
-                .amount(refundRequest.getAmount())
-                .adminNote(refundRequest.getAdminNote())
-                .createdAt(refundRequest.getCreatedAt())
-                .updatedAt(refundRequest.getUpdatedAt())
-                .build();
-    }
-
-    private boolean canViewRefund(RefundRequest refundRequest) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !(authentication.getPrincipal() instanceof UserDetailsImpl userDetails)) {
-            return false;
+    private void validateInvoiceReference(RefundRequestDTO request, PaymentTransaction transaction) {
+        String code = transaction.getTransactionCode();
+        String id = String.valueOf(transaction.getId());
+        if (request.getInvoiceId() == null || request.getInvoiceId().isBlank()) return;
+        if (!request.getInvoiceId().equalsIgnoreCase(code) && !request.getInvoiceId().equals(id)) {
+            throw new ConflictException("REFUND_INVOICE_MISMATCH");
         }
-        boolean isAdmin = userDetails.getAuthorities().stream()
-                .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
-        return isAdmin || refundRequest.getRequestedBy().getId().equals(userDetails.getId());
+        if (request.getTransactionId() != null && !request.getTransactionId().isBlank()
+                && !request.getTransactionId().equalsIgnoreCase(code) && !request.getTransactionId().equals(id)) {
+            throw new ConflictException("REFUND_TRANSACTION_MISMATCH");
+        }
+    }
+
+    private RefundRequest requireRefund(Long id) {
+        return refundRequestRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("REFUND_NOT_FOUND"));
+    }
+
+    private RefundResponseDTO toResponse(RefundRequest refund) {
+        return RefundResponseDTO.builder().id(refund.getId()).paymentTransactionId(refund.getPaymentTransaction().getId())
+                .customerPlanId(refund.getCustomerPlan() == null ? null : refund.getCustomerPlan().getId())
+                .requestedById(refund.getRequestedBy().getId()).reason(refund.getReason()).status(refund.getStatus())
+                .amount(refund.getAmount()).adminNote(refund.getAdminNote())
+                .legalTicketId(refund.getLegalTicket() == null ? null : refund.getLegalTicket().getId())
+                .bankName(refund.getBankName()).accountNumber(refund.getAccountNumber())
+                .accountHolderName(refund.getAccountHolderName()).invoiceId(refund.getInvoiceId())
+                .confirmationExpiresAt(refund.getConfirmationExpiresAt()).emailConfirmedAt(refund.getEmailConfirmedAt())
+                .emailConfirmed(refund.getEmailConfirmedAt() != null)
+                .createdAt(refund.getCreatedAt()).updatedAt(refund.getUpdatedAt()).build();
+    }
+
+    private boolean canViewRefund(RefundRequest refund) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof UserDetailsImpl details)) return false;
+        boolean admin = details.getAuthorities().stream().anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+        return admin || refund.getRequestedBy().getId().equals(details.getId());
+    }
+
+    private String normalize(String value) { return value == null || value.isBlank() ? null : value.trim(); }
+    private boolean hasText(String value) { return value != null && !value.isBlank(); }
+
+    private String sha256(String value) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                    .digest(value.getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception exception) {
+            throw new IllegalStateException(exception);
+        }
     }
 }

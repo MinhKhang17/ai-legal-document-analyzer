@@ -1,6 +1,6 @@
 import type { LegalTicketStatus } from "./legalTicketStatus";
 
-export type LegalTicketType = "SYSTEM_ERROR" | "QUERY_ERROR" | "CONTACT_EXPERT";
+export type LegalTicketType = "SYSTEM_ERROR" | "QUERY_ERROR" | "CONTACT_EXPERT" | "REFUND_REQUEST";
 export type TicketRecipientType = "EXPERT" | "ADMIN";
 export type TicketPriority = "LOW" | "NORMAL" | "HIGH" | "URGENT";
 export type ConversationScope = "SELECTED_RESPONSE" | "RELATED_MESSAGES" | "FULL_CONVERSATION" | "TICKET_CONTEXT_ONLY";

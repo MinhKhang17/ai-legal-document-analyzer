@@ -27,7 +27,14 @@ export interface RegisterRequest {
   acceptedTerms: boolean;
 }
 
-export type RegisterResponse = ApiResponse<CurrentUser>;
+export interface RegistrationResult {
+  registrationStatus: "PENDING_VERIFICATION";
+  emailDeliveryStatus: "SENT" | "FAILED";
+  maskedEmail: string;
+  resendAvailableInSeconds: number;
+}
+
+export type RegisterResponse = ApiResponse<RegistrationResult>;
 
 export interface LoginRequest {
   email: string;

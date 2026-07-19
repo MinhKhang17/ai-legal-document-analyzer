@@ -1,4 +1,5 @@
 import { Bell, LogOut, Menu, Search, Shield, UserRound } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '../components/common/Button';
 import { Dropdown } from '../components/common/Dropdown';
@@ -6,6 +7,7 @@ import { LanguageToggle } from '../components/common/LanguageToggle';
 import { ThemeToggle } from '../components/common/ThemeToggle';
 import { useI18n } from '../hooks/useI18n';
 import { useAppStore } from '../store/AppStore';
+import { getMyCustomerPlan } from '../services/subscription.service';
 
 const routeLabels: Array<{ prefix: string; key: string }> = [
   { prefix: '/dashboard', key: 'nav.dashboard' },
@@ -32,6 +34,12 @@ export function Topbar() {
   const navigate = useNavigate();
   const current = routeLabels.find((route) => location.pathname.startsWith(route.prefix));
   const isAdmin = user?.role === 'ADMIN';
+  const isCustomer = user?.role === 'CUSTOMER';
+  const [planName, setPlanName] = useState('FREE');
+  useEffect(() => {
+    if (!isCustomer) return;
+    void getMyCustomerPlan().then((response) => setPlanName(response.data?.subscriptionPlan.displayName ?? response.data?.subscriptionPlan.planName ?? 'FREE')).catch(() => setPlanName('FREE'));
+  }, [isCustomer]);
   const profileWorkspacePath = isAdmin ? '/admin' : '/dashboard';
   const displayName = user
     ? `${user.firstName} ${user.lastName}`.trim() || user.email
@@ -92,6 +100,7 @@ export function Topbar() {
           <Dropdown
             label={
               <span className="flex items-center gap-sm">
+                {isCustomer && <span className="hidden rounded-full bg-primary/10 px-sm py-xs text-[10px] font-bold uppercase text-primary md:inline">{planName}</span>}
                 <span className="hidden text-sm font-semibold md:inline">{displayName}</span>
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">{avatarInitials}</span>
               </span>
@@ -105,6 +114,12 @@ export function Topbar() {
               <UserRound className="h-4 w-4" aria-hidden="true" />
               {t('topbar.profileWorkspace')}
             </button>
+            {isCustomer && (
+              <button className="flex w-full items-center gap-sm rounded-lg px-sm py-sm text-left text-sm hover:bg-surface-container-low dark:hover:bg-slate-800" type="button" onClick={() => navigate('/billing')}>
+                <Shield className="h-4 w-4" aria-hidden="true" />
+                Billing · {planName}
+              </button>
+            )}
             <button
               className="flex w-full items-center gap-sm rounded-lg px-sm py-sm text-left text-sm text-error hover:bg-error-container dark:hover:bg-red-950/40"
               type="button"

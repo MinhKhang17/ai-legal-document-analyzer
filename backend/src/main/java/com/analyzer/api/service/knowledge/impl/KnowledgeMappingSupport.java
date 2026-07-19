@@ -54,6 +54,12 @@ final class KnowledgeMappingSupport {
                 .failedReason(version.getFailedReason())
                 .createdAt(version.getCreatedAt())
                 .updatedAt(version.getUpdatedAt())
+                .description(version.getDescription())
+                .fileName(version.getOriginalFileName())
+                .contentType(version.getSourceContentType())
+                .size(version.getSourceFileSize())
+                .uploadedAt(version.getSourceUploadedAt())
+                .sourceFileAvailable(version.getSourceStoragePath() != null)
                 .build();
     }
 

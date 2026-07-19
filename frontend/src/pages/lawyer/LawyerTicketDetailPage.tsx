@@ -27,16 +27,14 @@ import {
   downloadLawyerTicketFile,
   getLawyerTicketDetail,
   getLawyerTicketFiles,
-  getLawyerTicketMessages,
   requestMoreInfoLawyerTicket,
   resolveLawyerTicket,
-  sendLawyerTicketMessage,
   startReviewLawyerTicket,
   type LawyerTicketDetail,
   type LawyerTicketFile,
-  type LawyerTicketMessage,
-  uploadLawyerTicketFile,
 } from "../../api/lawyerTicketApi";
+import { getAttachmentPolicy, getTicketConversation, sendTicketConversationMessage, uploadTicketAttachment, downloadTicketAttachment } from "../../services/legalTicket.service";
+import type { AttachmentPolicy, LegalTicketMessage } from "../../types/legalTicket";
 import { Badge } from "../../components/common/Badge";
 import { Button } from "../../components/common/Button";
 import { Card } from "../../components/common/Card";
@@ -70,19 +68,6 @@ const canRequestMoreInfo = (status?: string | null) =>
 const canResolveTicket = (status?: string | null) =>
   Boolean(status && ['ASSIGNED_TO_LAWYER', 'IN_REVIEW', 'CUSTOMER_RESPONDED', 'REOPENED'].includes(status));
 
-const fileToBase64 = (file: File): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-
-    reader.onload = () => {
-      const result = String(reader.result);
-      resolve(result.split(",")[1] ?? "");
-    };
-
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-
 export function LawyerTicketDetailPage() {
   const { t } = useI18n();
   const toast = useToast();
@@ -92,14 +77,15 @@ export function LawyerTicketDetailPage() {
   const [loading, setLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
 
-  const [messages, setMessages] = useState<LawyerTicketMessage[]>([]);
+  const [messages, setMessages] = useState<LegalTicketMessage[]>([]);
+  const [attachmentPolicy, setAttachmentPolicy] = useState<AttachmentPolicy | null>(null);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [messageValue, setMessageValue] = useState("");
   const [sendingMessage, setSendingMessage] = useState(false);
 
   const [files, setFiles] = useState<LawyerTicketFile[]>([]);
   const [filesLoading, setFilesLoading] = useState(false);
-  const [uploadingFile, setUploadingFile] = useState(false);
+  const [uploadingFile] = useState(false);
   const [selectedUploadFile, setSelectedUploadFile] = useState<File | null>(null);
   const [uploadValidationError, setUploadValidationError] = useState("");
   const [openingDocumentId, setOpeningDocumentId] = useState("");
@@ -139,8 +125,8 @@ export function LawyerTicketDetailPage() {
 
     try {
       setMessagesLoading(true);
-      const data = await getLawyerTicketMessages(ticketId);
-      setMessages(data ?? []);
+      const data = await getTicketConversation(ticketId);
+      setMessages(data.items ?? []);
     } catch {
       toast.error(t("lawyerTickets.messages.loadError"));
     } finally {
@@ -175,15 +161,19 @@ export function LawyerTicketDetailPage() {
   }, [loadTicket, loadMessages, loadFiles]);
 
   const handleSendMessage = useCallback(async () => {
-    if (!ticketId || !messageValue.trim()) return;
+    if (!ticketId || (!messageValue.trim() && !selectedUploadFile)) return;
 
     try {
       setSendingMessage(true);
-      await sendLawyerTicketMessage(ticketId, {
-        message: messageValue.trim(),
-      });
+      const attachmentIds: string[] = [];
+      if (selectedUploadFile) {
+        const uploaded = await uploadTicketAttachment(selectedUploadFile, `draft_${crypto.randomUUID()}`, () => undefined);
+        attachmentIds.push(uploaded.id);
+      }
+      await sendTicketConversationMessage(ticketId, messageValue.trim(), attachmentIds);
 
       setMessageValue("");
+      setSelectedUploadFile(null);
       toast.success(t("lawyerTickets.messages.sendSuccess"));
       await loadMessages();
     } catch (error) {
@@ -192,7 +182,7 @@ export function LawyerTicketDetailPage() {
     } finally {
       setSendingMessage(false);
     }
-  }, [ticketId, messageValue, toast, t, loadMessages, refreshAll]);
+  }, [ticketId, messageValue, selectedUploadFile, toast, t, loadMessages, refreshAll]);
 
   const handleUploadFile = useCallback(
     async (event: ChangeEvent<HTMLInputElement>) => {
@@ -211,35 +201,12 @@ export function LawyerTicketDetailPage() {
       setSelectedUploadFile(file);
       setUploadValidationError("");
 
-      if (!ticket.assigned_lawyer_id) {
-        toast.error(t("lawyerTickets.files.uploadError"));
-        return;
-      }
-
-      try {
-        setUploadingFile(true);
-
-        const contentBase64 = await fileToBase64(file);
-
-        await uploadLawyerTicketFile(ticketId, {
-          uploadedById: ticket.assigned_lawyer_id,
-          originalFileName: file.name,
-          fileType: file.type || "application/octet-stream",
-          contentBase64,
-          visibilityScope: "CUSTOMER",
-        });
-
-        toast.success(t("lawyerTickets.files.uploadSuccess"));
+      if (attachmentPolicy && file.size > attachmentPolicy.maxAttachmentSizeKb * 1024) {
         setSelectedUploadFile(null);
-        await loadFiles();
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : t("lawyerTickets.files.uploadError"));
-        if (error instanceof ApiRequestError && error.status === 409) await refreshAll();
-      } finally {
-        setUploadingFile(false);
+        setUploadValidationError(`Tệp ${file.name} có dung lượng ${Math.ceil(file.size / 1024)} KB. Dung lượng tối đa là ${attachmentPolicy.maxAttachmentSizeKb} KB.`);
       }
     },
-    [ticketId, ticket, loadFiles, refreshAll, toast, t],
+    [ticketId, ticket, attachmentPolicy, t],
   );
 
   const handleStartReview = useCallback(async () => {
@@ -336,11 +303,12 @@ export function LawyerTicketDetailPage() {
 
   useEffect(() => {
     void refreshAll();
+    void getAttachmentPolicy().then(setAttachmentPolicy).catch(() => undefined);
     const intervalId = window.setInterval(() => {
       if (!ticketId) return;
       void Promise.allSettled([
         getLawyerTicketDetail(ticketId).then(setTicket),
-        getLawyerTicketMessages(ticketId).then((items) => setMessages(items ?? [])),
+        getTicketConversation(ticketId).then((page) => setMessages(page.items ?? [])),
         getLawyerTicketFiles(ticketId).then((items) => setFiles(items ?? [])),
       ]);
     }, 4000);
@@ -430,6 +398,8 @@ export function LawyerTicketDetailPage() {
               />
             </div>
           </Card>
+
+          {ticket.contextSnapshot && <Card className="p-6"><h3 className="font-semibold">Context bất biến được chia sẻ</h3><div className="mt-md grid gap-md lg:grid-cols-2"><div><p className="text-xs font-semibold uppercase">Câu hỏi người dùng</p><p className="mt-xs whitespace-pre-line text-sm">{ticket.contextSnapshot.userQuestion}</p></div><div><p className="text-xs font-semibold uppercase">Câu trả lời AI bị báo cáo</p><p className="mt-xs whitespace-pre-line text-sm">{ticket.contextSnapshot.assistantAnswer || "—"}</p></div><pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-lg bg-surface-container-low p-sm text-xs">{ticket.contextSnapshot.documentSnapshotJson || "[]"}</pre><pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-lg bg-surface-container-low p-sm text-xs">{ticket.contextSnapshot.citationSnapshotJson || "[]"}</pre></div></Card>}
 
           <Card className="p-6">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -640,6 +610,7 @@ export function LawyerTicketDetailPage() {
                     <p className="mt-3 whitespace-pre-line text-sm">
                       {getValue(message.content)}
                     </p>
+                    {message.attachments?.map((attachment) => <button type="button" key={attachment.id} className="mt-2 mr-2 rounded-lg border px-3 py-2 text-xs font-semibold text-primary" onClick={async () => { const url = await downloadTicketAttachment(attachment.id); const anchor = document.createElement("a"); anchor.href = url; anchor.download = attachment.originalFileName; anchor.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000); }}><Paperclip className="mr-1 inline h-3 w-3" />{attachment.originalFileName}</button>)}
                   </div>
                 ))}
               </div>
@@ -654,7 +625,7 @@ export function LawyerTicketDetailPage() {
               />
               <Button
                 onClick={handleSendMessage}
-                disabled={sendingMessage || !messageValue.trim()}
+                disabled={sendingMessage || (!messageValue.trim() && !selectedUploadFile)}
               >
                 <Send className="mr-2 h-4 w-4" />
                 {t("lawyerTickets.messages.send")}

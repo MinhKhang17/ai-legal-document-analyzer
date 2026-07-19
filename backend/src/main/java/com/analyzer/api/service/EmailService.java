@@ -8,6 +8,8 @@ public interface EmailService {
      */
     void sendVerificationEmailAsync(String toEmail, String recipientName, String token);
 
+    boolean sendVerificationEmail(String toEmail, String recipientName, String token);
+
     /**
      * Notifies the document owner that AI ingestion finished successfully. Fire-and-forget,
      * same failure-handling contract as {@link #sendVerificationEmailAsync}.
@@ -24,4 +26,9 @@ public interface EmailService {
     void sendTicketNotificationAsync(String toEmail, String recipientName, String ticketId,
                                      String ticketType, String ticketStatus, String relativePath,
                                      String detail);
+
+    void sendRefundConfirmationEmailAsync(String toEmail, String recipientName, Long refundId, String token);
+
+    void sendKnowledgeIngestedEmailAsync(String toEmail, String recipientName, String title,
+                                         String code, String versionId, String jobId, String ingestedAt);
 }

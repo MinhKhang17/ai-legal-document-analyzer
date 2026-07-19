@@ -19,6 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
@@ -40,6 +41,9 @@ public class DataInitializer implements CommandLineRunner {
         private final PaymentTransactionRepository paymentTransactionRepository;
         private final PasswordEncoder passwordEncoder;
         private final JdbcTemplate jdbcTemplate;
+
+        @Value("${app.admin.email:admin@123}")
+        private String adminEmail;
 
         @Override
         public void run(String... args) {
@@ -75,7 +79,7 @@ public class DataInitializer implements CommandLineRunner {
                 Role expertRole = roleRepository.findByName(RoleName.EXPERT)
                                 .orElseThrow(() -> new RuntimeException("EXPERT role not found in database"));
 
-                seedUser("admin", "admin", "admin@123", "pass@123" +
+                seedUser("admin", "admin", adminEmail, "pass@123" +
                                 "", adminRole);
                 seedUser("user", "user", "user@123", "pass@123", customerRole);
                 seedUser("expert", "expert", "expert@123", "pass@123", expertRole);
@@ -136,7 +140,31 @@ public class DataInitializer implements CommandLineRunner {
                 plan.setMaxWorkspaces(maxWorkspaces);
                 plan.setMaxContractsPerWorkspace(maxContractsPerWorkspace);
                 plan.setMaxDraftContracts(maxDraftContracts);
-                plan.setFeatureLimitsJson(null);
+                if ("FREE".equals(planType)) {
+                        plan.setStorageLimitMb(50);
+                        plan.setMaxFileSizeMb(10);
+                        plan.setMaxAttachedDocumentsPerSession(1);
+                        plan.setAllowSystemErrorTicket(true);
+                        plan.setAllowQueryErrorTicket(true);
+                        plan.setAllowContactExpertTicket(false);
+                        plan.setFeatureLimitsJson("[\"5 analyses\",\"50,000 AI tokens\",\"1 workspace\",\"System and query error support\"]");
+                } else if ("STANDARD".equals(planType)) {
+                        plan.setStorageLimitMb(1024);
+                        plan.setMaxFileSizeMb(25);
+                        plan.setMaxAttachedDocumentsPerSession(5);
+                        plan.setAllowSystemErrorTicket(true);
+                        plan.setAllowQueryErrorTicket(true);
+                        plan.setAllowContactExpertTicket(false);
+                        plan.setFeatureLimitsJson("[\"50 analyses\",\"1,500,000 AI tokens\",\"5 workspaces\",\"System and query error support\"]");
+                } else {
+                        plan.setStorageLimitMb(5120);
+                        plan.setMaxFileSizeMb(50);
+                        plan.setMaxAttachedDocumentsPerSession(15);
+                        plan.setAllowSystemErrorTicket(true);
+                        plan.setAllowQueryErrorTicket(true);
+                        plan.setAllowContactExpertTicket(true);
+                        plan.setFeatureLimitsJson("[\"200 analyses\",\"8,500,000 AI tokens\",\"20 workspaces\",\"1 expert ticket per month\"]");
+                }
                 plan.setActive(true);
 
                 subscriptionPlanRepository.save(plan);

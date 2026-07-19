@@ -94,6 +94,27 @@ public class KnowledgeBaseVersion {
     @Column(name = "failed_reason", columnDefinition = "TEXT")
     private String failedReason;
 
+    @Column(columnDefinition = "TEXT")
+    private String description;
+
+    @Column(name = "original_file_name")
+    private String originalFileName;
+
+    @Column(name = "source_content_type")
+    private String sourceContentType;
+
+    @Column(name = "source_file_size")
+    private Long sourceFileSize;
+
+    @Column(name = "source_storage_path", columnDefinition = "TEXT")
+    private String sourceStoragePath;
+
+    @Column(name = "source_uploaded_at")
+    private LocalDateTime sourceUploadedAt;
+
+    @Column(name = "ingest_notified_at")
+    private LocalDateTime ingestNotifiedAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

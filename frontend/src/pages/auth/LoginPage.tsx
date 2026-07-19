@@ -49,6 +49,7 @@ export function LoginPage() {
     getStringStateValue(location.state, "message");
   const [error, setError] = useState(initialError);
   const [notice, setNotice] = useState(initialNotice);
+  const [emailNotVerified, setEmailNotVerified] = useState(false);
 
   return (
     <div>
@@ -67,6 +68,7 @@ export function LoginPage() {
           event.preventDefault();
 
           setError("");
+          setEmailNotVerified(false);
           setNotice("");
           setLoading(true);
 
@@ -110,7 +112,9 @@ export function LoginPage() {
           } catch (error) {
             clearAccessToken();
             void signOut({ remote: false });
-            setError(error instanceof Error ? error.message : t("auth.loginFailed"));
+            const message = error instanceof Error ? error.message : t("auth.loginFailed");
+            setEmailNotVerified(message.includes("EMAIL_NOT_VERIFIED"));
+            setError(message === "EMAIL_NOT_VERIFIED" ? "Tài khoản chưa xác thực email." : message);
           } finally {
             setLoading(false);
           }
@@ -199,6 +203,7 @@ export function LoginPage() {
             {error}
           </p>
         )}
+        {emailNotVerified && <Button type="button" variant="secondary" className="w-full" onClick={() => navigate("/auth/check-email", { state: { email: email.trim(), maskedEmail: email.trim() } })}>Gửi lại email xác thực</Button>}
         {notice && !error && (
           <p className="rounded-md bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700">
             {notice}
