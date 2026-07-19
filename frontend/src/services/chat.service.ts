@@ -413,6 +413,30 @@ export async function shareChatSession(accessToken: string, chatSessionId: strin
   return response.data;
 }
 
+export async function exportChatSessionMarkdown(accessToken: string, chatSessionId: string): Promise<void> {
+  const response = await fetch(buildApiUrl(API_ENDPOINTS.chat.exportMarkdown(chatSessionId)), {
+    method: "GET",
+    headers: getAuthHeaders(accessToken),
+    credentials: "include",
+  });
+  if (!response.ok) {
+    const { data, rawText } = await readResponseBody<ApiErrorResponse>(response);
+    throw new Error(getApiErrorMessage(data, rawText, "Không thể xuất Markdown"));
+  }
+  const disposition = response.headers.get("content-disposition") ?? "";
+  const utf8Name = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+  const fallbackName = disposition.match(/filename="?([^";]+)"?/i)?.[1];
+  const fileName = utf8Name ? decodeURIComponent(utf8Name) : fallbackName || `phan-tich-${chatSessionId}.md`;
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 export async function getSharedChatSession(accessToken: string, shareToken: string): Promise<SharedChatSession> {
   const response = await getJson<ApiResponse<SharedChatSession>>(API_ENDPOINTS.chat.shared(shareToken), "Không thể tải phiên chat được chia sẻ", accessToken);
   return { ...response.data, messages: response.data.messages.map(mapMessage) };

@@ -10,6 +10,7 @@ import com.analyzer.api.entity.User;
 import com.analyzer.api.entity.UserContract;
 import com.analyzer.api.entity.Workspace;
 import com.analyzer.api.enums.ContractStatus;
+import com.analyzer.api.enums.SupportedContractType;
 import com.analyzer.api.exception.common.ResourceNotFoundException;
 import com.analyzer.api.repository.DocumentRepository;
 import com.analyzer.api.repository.UserRepository;
@@ -72,7 +73,7 @@ public class UserContractServiceImpl implements UserContractService {
                 .generationJob(job)
                 .sourceDocument(sourceDocument)
                 .title(request.getTitle().trim())
-                .contractType(request.getContractType().trim())
+                .contractType(SupportedContractType.requireSupported(request.getContractType()).name())
                 .status(ContractStatus.DRAFT)
                 .currentVersionNo(1)
                 .currentContentHash(sha256(request.getContent()))

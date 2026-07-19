@@ -4,6 +4,7 @@ import com.analyzer.api.dto.contract.ContractTemplateResponse;
 import com.analyzer.api.dto.contract.CreateContractTemplateRequest;
 import com.analyzer.api.dto.contract.UpdateContractTemplateRequest;
 import com.analyzer.api.entity.ContractTemplate;
+import com.analyzer.api.enums.SupportedContractType;
 import com.analyzer.api.enums.ContractTemplateStatus;
 import com.analyzer.api.repository.contract.ContractTemplateRepository;
 import com.analyzer.api.service.contract.ContractTemplateService;
@@ -30,7 +31,7 @@ public class ContractTemplateServiceImpl implements ContractTemplateService {
                 .templateCode(request.getTemplateCode())
                 .name(request.getName())
                 .description(request.getDescription())
-                .category(request.getCategory())
+                .category(SupportedContractType.requireSupported(request.getCategory()).name())
                 .jurisdiction(request.getJurisdiction())
                 .content(request.getContent())
                 .status(ContractTemplateStatus.ACTIVE)
@@ -49,7 +50,7 @@ public class ContractTemplateServiceImpl implements ContractTemplateService {
 
         template.setName(request.getName());
         template.setDescription(request.getDescription());
-        template.setCategory(request.getCategory());
+        template.setCategory(SupportedContractType.requireSupported(request.getCategory()).name());
         template.setJurisdiction(request.getJurisdiction());
         template.setContent(request.getContent());
         template.setVersion(template.getVersion() + 1);

@@ -26,6 +26,7 @@ import type {
 } from "../../types/contract";
 import type { Workspace } from "../../types/workspace";
 import { formatDisplayDate } from "../../utils/format";
+import { SUPPORTED_CONTRACT_TYPES, getSupportedContractTypeLabel } from "../../config/supportedContractTypes";
 import { normalizeWorkspaceId } from "../../utils/workspaceId";
 
 const getStatusTone = (status?: string) => {
@@ -40,6 +41,7 @@ const initialGenerationForm = () => ({
   workspaceId: "",
   templateId: "",
   sourceDocumentId: "",
+  contractType: "",
   inputJson: "{}",
 });
 
@@ -96,7 +98,9 @@ export function MyContractsPage() {
       toast.error(message);
     }
 
-    setTemplates(templatesResult.status === "fulfilled" ? templatesResult.value : []);
+    setTemplates(templatesResult.status === "fulfilled"
+      ? templatesResult.value.filter((template) => SUPPORTED_CONTRACT_TYPES.some((type) => type.value === template.category))
+      : []);
     setWorkspaces(workspacesResult.status === "fulfilled" ? workspacesResult.value : []);
     setLoading(false);
   }, [page, toast, t]);
@@ -126,7 +130,7 @@ export function MyContractsPage() {
     const workspaceId = parseWorkspaceId(generationForm.workspaceId);
     if (workspaceId === null) return;
 
-    if (!generationForm.requestId.trim() || !generationForm.inputJson.trim()) {
+    if (!generationForm.requestId.trim() || !generationForm.inputJson.trim() || !generationForm.contractType) {
       toast.warning(t("contracts.requestAndInputRequired"));
       return;
     }
@@ -140,6 +144,7 @@ export function MyContractsPage() {
         workspaceId,
         templateId: parseOptionalNumber(generationForm.templateId),
         sourceDocumentId: generationForm.sourceDocumentId.trim() || null,
+        contractType: generationForm.contractType,
         inputJson: generationForm.inputJson,
       });
       setLatestJob(job);
@@ -208,7 +213,7 @@ export function MyContractsPage() {
         </Link>
       ),
     },
-    { header: t("contracts.type"), cell: (contract) => contract.contractType },
+    { header: t("contracts.type"), cell: (contract) => getSupportedContractTypeLabel(contract.contractType, language) ?? (language === "vi" ? "Ngoài phạm vi hỗ trợ" : "Outside supported scope") },
     {
       header: t("table.status"),
       cell: (contract) => <Badge tone={getStatusTone(contract.status)}>{contract.status}</Badge>,
@@ -360,6 +365,14 @@ export function MyContractsPage() {
               </label>
 
               <label className="block text-sm font-semibold">
+                {language === "vi" ? "Loại hợp đồng cần soạn" : "Contract type to draft"}
+                <select className="form-field mt-xs" value={generationForm.contractType} onChange={(event) => setGenerationForm((current) => ({ ...current, contractType: event.target.value }))}>
+                  <option value="">{language === "vi" ? "Chọn và xác nhận loại hợp đồng" : "Select and confirm contract type"}</option>
+                  {SUPPORTED_CONTRACT_TYPES.map((item) => <option key={item.value} value={item.value}>{language === "vi" ? item.vi : item.en}</option>)}
+                </select>
+              </label>
+
+              <label className="block text-sm font-semibold">
                 {t("contracts.sourceDocumentId")}
                 <input
                   className="form-field mt-xs"
@@ -390,7 +403,7 @@ export function MyContractsPage() {
               <Button
                 leftIcon={<PlayCircle className="h-4 w-4" />}
                 onClick={() => void handleGenerate()}
-                disabled={generating || !generationForm.workspaceId.trim()}
+                disabled={generating || !generationForm.workspaceId.trim() || !generationForm.contractType}
               >
                 {generating ? t("contracts.generating") : t("contracts.generate")}
               </Button>
@@ -431,7 +444,7 @@ export function MyContractsPage() {
               <div className="grid gap-md sm:grid-cols-2">
                 <label className="block text-sm font-semibold">
                   {t("contracts.type")}
-                  <input
+                  <select
                     className="form-field mt-xs"
                     value={saveForm.contractType}
                     onChange={(event) =>
@@ -440,7 +453,10 @@ export function MyContractsPage() {
                         contractType: event.target.value,
                       }))
                     }
-                  />
+                  >
+                    <option value="">{t("contracts.type")}</option>
+                    {SUPPORTED_CONTRACT_TYPES.map((item) => <option key={item.value} value={item.value}>{language === "vi" ? item.vi : item.en}</option>)}
+                  </select>
                 </label>
                 <label className="block text-sm font-semibold">
                   {t("contracts.template")}

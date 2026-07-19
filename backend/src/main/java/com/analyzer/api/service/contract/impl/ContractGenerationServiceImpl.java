@@ -8,6 +8,7 @@ import com.analyzer.api.entity.Document;
 import com.analyzer.api.entity.User;
 import com.analyzer.api.entity.Workspace;
 import com.analyzer.api.enums.ContractGenerationStatus;
+import com.analyzer.api.enums.SupportedContractType;
 import com.analyzer.api.exception.common.ResourceNotFoundException;
 import com.analyzer.api.repository.DocumentRepository;
 import com.analyzer.api.repository.UserRepository;
@@ -47,6 +48,7 @@ public class ContractGenerationServiceImpl implements ContractGenerationService 
     }
 
     private ContractGenerationResponse createGenerationJob(GenerateContractRequest request) {
+        SupportedContractType.requireSupported(request.getContractType());
         Long userId = CurrentUserSupport.currentUserId();
         User requester = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay nguoi dung ID: " + userId));

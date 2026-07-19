@@ -5,6 +5,7 @@ import type {
   Document,
   Workspace,
 } from "../types/workspace";
+import type { SupportedContractType } from "../config/supportedContractTypes";
 
 // interface ApiResponse<T> {
 //   code: number;
@@ -80,9 +81,11 @@ export async function uploadDocument(
   accessToken: string,
   workspaceId: string,
   file: File,
+  contractType: SupportedContractType,
 ): Promise<Document> {
   const formData = new FormData();
   formData.append("file", file);
+  formData.append("contractType", contractType);
 
   const data = await requestApiData<DocumentResponse>(
     API_ENDPOINTS.workspaces.documents(workspaceId),
@@ -113,6 +116,25 @@ export async function getWorkspaceDocuments(
   );
 
   return data.map((document) => normalizeStatus(document) as Document);
+}
+
+export async function confirmDocumentContractType(
+  accessToken: string,
+  workspaceId: string,
+  documentId: string,
+  contractType: SupportedContractType,
+): Promise<Document> {
+  const data = await requestApiData<DocumentResponse>(
+    `${API_ENDPOINTS.workspaces.documents(workspaceId)}/${documentId}/contract-type`,
+    {
+      method: "PATCH",
+      headers: buildBearerHeaders(accessToken, { "Content-Type": "application/json" }),
+      credentials: "include",
+      body: JSON.stringify({ contractType }),
+    },
+    "Không thể xác nhận loại hợp đồng",
+  );
+  return normalizeStatus(data) as Document;
 }
 
 export async function downloadWorkspaceDocument(accessToken: string, workspaceId: string, documentId: string): Promise<string> {

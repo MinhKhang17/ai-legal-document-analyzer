@@ -4,6 +4,7 @@ import com.analyzer.api.dto.chatsession.ChatSessionDocumentResponse;
 import com.analyzer.api.entity.ChatSession;
 import com.analyzer.api.entity.ChatSessionDocument;
 import com.analyzer.api.entity.Document;
+import com.analyzer.api.enums.SupportedContractType;
 import com.analyzer.api.exception.common.ForbiddenException;
 import com.analyzer.api.exception.common.ResourceNotFoundException;
 import com.analyzer.api.repository.ChatSessionDocumentRepository;
@@ -55,6 +56,7 @@ public class ChatSessionDocumentServiceImpl implements ChatSessionDocumentServic
         if ("DELETED".equalsIgnoreCase(document.getStatus())) {
             throw new ResourceNotFoundException("DOCUMENT_NOT_FOUND");
         }
+        requireConfirmedSupportedType(document);
         ChatSessionDocument mapping = mappingRepository
                 .findByChatSessionIdAndDocumentIdAndUserId(sessionId, documentId, userId)
                 .orElseGet(() -> ChatSessionDocument.builder()
@@ -63,6 +65,14 @@ public class ChatSessionDocumentServiceImpl implements ChatSessionDocumentServic
         ChatSessionDocument saved = mappingRepository.save(mapping);
         syncActiveDocumentState(session, userId);
         return toResponse(saved);
+    }
+
+    private void requireConfirmedSupportedType(Document document) {
+        SupportedContractType type = document.getContractType();
+        if (!Boolean.TRUE.equals(document.getContractTypeConfirmed()) || type == null || !type.isSupported()) {
+            throw new IllegalArgumentException(
+                    "CONTRACT_TYPE_CONFIRMATION_REQUIRED: " + SupportedContractType.supportedValues());
+        }
     }
 
     @Override

@@ -4,8 +4,9 @@ from functools import lru_cache
 import json
 from typing import Any
 
-from fastapi import APIRouter, File, Form, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, ConfigDict, Field
+from app.models.intent_enums import ContractType
 
 from app.services.legal_rag.pipeline import (
     ClauseFinding,
@@ -66,6 +67,7 @@ class ContractAnalysisResponse(BaseModel):
     clauses: list[ClauseFindingResponse]
     summary: SummaryResponse
     knowledge_source_files: list[str]
+    contract_type: str | None = None
 
 
 router = APIRouter(prefix="/v2/contracts", tags=["contracts-v2"])
@@ -106,7 +108,25 @@ def supported_formats() -> list[str]:
 async def upload_contract(
     file: UploadFile = File(...),
     title: str | None = Form(default=None),
+    contract_type: str | None = Form(default=None),
 ) -> ContractAnalysisResponse:
+    supported = {
+        ContractType.RENTAL, ContractType.PART_TIME_EMPLOYMENT, ContractType.INTERNSHIP,
+        ContractType.COLLABORATOR, ContractType.FREELANCE_SERVICE,
+        ContractType.SMALL_ASSET_SALE, ContractType.PERSONAL_LOAN,
+    }
+    try:
+        selected_type = ContractType(contract_type) if contract_type else ContractType.UNKNOWN
+    except ValueError as exception:
+        raise HTTPException(status_code=422, detail="UNSUPPORTED_CONTRACT_TYPE") from exception
+    if selected_type not in supported:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "CONTRACT_TYPE_CONFIRMATION_REQUIRED" if not contract_type else "UNSUPPORTED_CONTRACT_TYPE",
+                "supportedContractTypes": sorted(item.value for item in supported),
+            },
+        )
     report: ContractAnalysisReport = await get_service().analyze_upload(file=file, title=title)
     return ContractAnalysisResponse(
         document_id=report.document_id,
@@ -118,6 +138,7 @@ async def upload_contract(
         clauses=[_map_clause_finding(clause) for clause in report.clauses],
         summary=SummaryResponse.model_validate(report.summary),
         knowledge_source_files=list(report.knowledge_source_files),
+        contract_type=selected_type.value,
     )
 
 
@@ -125,6 +146,7 @@ class GenerateContractApiRequest(BaseModel):
     requestId: str
     templateContent: str | None = None
     inputJson: str
+    contractType: str
 
 
 class GenerateContractApiResponse(BaseModel):
@@ -136,6 +158,17 @@ class GenerateContractApiResponse(BaseModel):
 
 @router.post("/generate", response_model=GenerateContractApiResponse)
 def generate_contract(payload: GenerateContractApiRequest) -> GenerateContractApiResponse:
+    supported = {
+        ContractType.RENTAL, ContractType.PART_TIME_EMPLOYMENT, ContractType.INTERNSHIP,
+        ContractType.COLLABORATOR, ContractType.FREELANCE_SERVICE,
+        ContractType.SMALL_ASSET_SALE, ContractType.PERSONAL_LOAN,
+    }
+    try:
+        selected_type = ContractType(payload.contractType)
+    except ValueError as exception:
+        raise HTTPException(status_code=422, detail="UNSUPPORTED_CONTRACT_TYPE") from exception
+    if selected_type not in supported:
+        raise HTTPException(status_code=422, detail="UNSUPPORTED_CONTRACT_TYPE")
     try:
         inputs = json.loads(payload.inputJson)
     except Exception as e:
@@ -157,10 +190,12 @@ def generate_contract(payload: GenerateContractApiRequest) -> GenerateContractAp
         documents_text = "[No reference documents found in knowledge base]"
 
     template = payload.templateContent
+    uses_default_template = not template or not template.strip()
     if not template or not template.strip():
         template = """# ROLE
 
-You are an experienced legal professional specializing in residential lease agreements.
+You are an AI drafting assistant limited to simple personal residential rental agreements.
+You do not replace a lawyer and must not guarantee legality, compliance, or accuracy.
 
 Your responsibility is to generate a brand-new residential lease agreement based on legal reference documents retrieved from a knowledge base.
 
@@ -317,8 +352,20 @@ Do not use Markdown.
 
 Generate a document that is ready for export as DOCX or PDF."""
 
+    if uses_default_template and selected_type != ContractType.RENTAL:
+        template = """Draft a simple Vietnamese personal contract of confirmed type: {contractType}.
+Use only the user requirements below. Include parties, subject, obligations, payment (if applicable), term, termination, dispute handling, and signatures.
+Do not invent missing personal data; use square-bracket placeholders. Do not claim guaranteed legality or compliance.
+
+USER REQUIREMENTS:
+{requirements}
+
+Return only the contract text."""
+
     placeholders = {
         "documents": documents_text,
+        "contractType": selected_type.value,
+        "requirements": json.dumps(inputs, ensure_ascii=False),
         "landlord": inputs.get("landlord", "[Landlord]"),
         "tenant": inputs.get("tenant", "[Tenant]"),
         "address": inputs.get("address", "[Property Address]"),
@@ -338,7 +385,11 @@ Generate a document that is ready for export as DOCX or PDF."""
     for key, value in placeholders.items():
         user_prompt = user_prompt.replace(f"{{{key}}}", str(value))
 
-    system_prompt = "You are a professional legal draft assistant."
+    system_prompt = (
+        "You are an AI drafting assistant for simple personal contracts only. "
+        f"The user confirmed contract type {selected_type.value}. "
+        "Do not act as a lawyer or guarantee legality, compliance, or accuracy."
+    )
 
     llm_client = build_default_llm_client()
     try:

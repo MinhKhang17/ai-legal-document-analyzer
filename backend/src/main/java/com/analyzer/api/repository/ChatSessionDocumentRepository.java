@@ -12,5 +12,8 @@ public interface ChatSessionDocumentRepository extends JpaRepository<ChatSession
     List<ChatSessionDocument> findByChatSessionIdAndUserIdAndActiveTrueOrderByAttachedAtAsc(String sessionId, Long userId);
 
     @EntityGraph(attributePaths = {"document", "chatSession", "user"})
+    List<ChatSessionDocument> findByChatSessionIdAndUserIdOrderByAttachedAtAsc(String sessionId, Long userId);
+
+    @EntityGraph(attributePaths = {"document", "chatSession", "user"})
     Optional<ChatSessionDocument> findByChatSessionIdAndDocumentIdAndUserId(String sessionId, String documentId, Long userId);
 }

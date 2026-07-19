@@ -12,9 +12,7 @@ import { PageHeader } from "../../components/common/PageHeader";
 import {
   getKnowledgeBaseEntries,
   getKnowledgeIngestionJob,
-  failKnowledgeIngestionJob,
   ingestKnowledgeBaseEntry,
-  ingestKnowledgeBaseFile,
   uploadKnowledgeBaseEntry,
   uploadKnowledgeBaseSourceFile,
 } from "../../services/knowledgeBase.service";
@@ -110,8 +108,6 @@ export function KnowledgeBasePage() {
 
     setSaving(true);
     setError("");
-    let createdJob: KnowledgeIngestionJob | null = null;
-
     try {
       const payload: UploadKnowledgeRequest = {
         code: form.code.trim(),
@@ -135,15 +131,7 @@ export function KnowledgeBasePage() {
           requestId: `kb-file-${Date.now()}-${selectedFile.name}`,
           jobPayload: JSON.stringify({ filename: selectedFile.name }),
         });
-        createdJob = job;
         setActiveJob(job);
-        await ingestKnowledgeBaseFile(
-          selectedFile,
-          uploadedVersion.knowledgeBaseEntryId,
-          payload.title,
-          user.id,
-          job.id,
-        );
       }
       toast.success(startIngest ? t("knowledge.backgroundIngestStarted") : (language === "vi" ? "Đã lưu bản nháp riêng tư." : "Private draft saved."));
       setForm(emptyForm);
@@ -152,13 +140,6 @@ export function KnowledgeBasePage() {
       await loadEntries();
     } catch (uploadError) {
       const message = uploadError instanceof Error ? uploadError.message : t("knowledge.uploadError");
-      if (createdJob) {
-        try {
-          await failKnowledgeIngestionJob(createdJob.id, message);
-        } catch {
-          // Preserve the original upload error; polling can recover if AI accepted the job.
-        }
-      }
       setActiveJob(null);
       setError(message);
       toast.error(message);
@@ -306,9 +287,9 @@ export function KnowledgeBasePage() {
             )}
             <div className="flex flex-wrap justify-end gap-sm border-t border-legal-border pt-md dark:border-slate-700">
               <Button variant="secondary" onClick={() => { setForm(emptyForm); setSelectedFile(null); setSelectedFileName(""); }} disabled={saving}>Hủy</Button>
-              <Button variant="secondary" onClick={() => void handleUpload(false)} disabled={saving}>{saving ? t("knowledge.uploading") : "Lưu nháp"}</Button>
+              <Button variant="secondary" onClick={() => void handleUpload(false)} disabled={saving}>{saving ? (language === "vi" ? "Đang gửi tới backend..." : "Submitting to backend...") : "Lưu nháp"}</Button>
               <Button leftIcon={<Upload className="h-4 w-4" />} onClick={() => void handleUpload(true)} disabled={saving || !selectedFile}>
-                {saving ? t("knowledge.uploading") : "Bắt đầu ingest"}
+                {saving ? (language === "vi" ? "Đang gửi tới backend..." : "Submitting to backend...") : "Bắt đầu ingest"}
               </Button>
             </div>
 

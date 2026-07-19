@@ -9,6 +9,7 @@ import com.analyzer.api.entity.Document;
 import com.analyzer.api.entity.User;
 import com.analyzer.api.entity.Workspace;
 import com.analyzer.api.enums.RoleName;
+import com.analyzer.api.enums.SupportedContractType;
 import com.analyzer.api.exception.common.ForbiddenException;
 import com.analyzer.api.exception.common.ResourceNotFoundException;
 import com.analyzer.api.exception.workspace.DocumentProcessingDispatchException;
@@ -125,10 +126,12 @@ public class WorkspaceServiceImpl implements WorkspaceService {
 
     @Override
     @Transactional(noRollbackFor = DocumentProcessingDispatchException.class)
-    public DocumentResponseDTO uploadDocument(Long userId, String workspaceId, MultipartFile file) throws IOException {
+    public DocumentResponseDTO uploadDocument(Long userId, String workspaceId, MultipartFile file, String contractTypeValue) throws IOException {
         if (file == null || file.isEmpty()) {
             throw new RuntimeException("File khong duoc de trong");
         }
+
+        SupportedContractType contractType = SupportedContractType.requireSupported(contractTypeValue);
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Khong tim thay nguoi dung"));
@@ -161,6 +164,8 @@ public class WorkspaceServiceImpl implements WorkspaceService {
                 .fileType(file.getContentType())
                 .fileSize(file.getSize())
                 .sourceType(SOURCE_TYPE_USER_DOCUMENT)
+                .contractType(contractType)
+                .contractTypeConfirmed(true)
                 .status(STATUS_UPLOADED)
                 .chunkCount(0)
                 .build();
@@ -195,6 +200,29 @@ public class WorkspaceServiceImpl implements WorkspaceService {
         return toDocumentResponse(documentRepository.save(document));
     }
 
+    @Override
+    @Transactional(noRollbackFor = DocumentProcessingDispatchException.class)
+    public DocumentResponseDTO confirmDocumentContractType(
+            Long userId, String workspaceId, String documentId, String contractTypeValue) {
+        SupportedContractType contractType = SupportedContractType.requireSupported(contractTypeValue);
+        workspaceRepository.findByIdAndUserIdAndStatus(workspaceId, userId, STATUS_ACTIVE)
+                .orElseThrow(() -> new ResourceNotFoundException("WORKSPACE_NOT_FOUND"));
+        Document document = documentRepository.findById(documentId)
+                .orElseThrow(() -> new ResourceNotFoundException("DOCUMENT_NOT_FOUND"));
+        if (document.getUser() == null || !userId.equals(document.getUser().getId())
+                || document.getWorkspace() == null || !workspaceId.equals(document.getWorkspace().getId())) {
+            throw new ForbiddenException("DOCUMENT_ACCESS_DENIED");
+        }
+        document.setContractType(contractType);
+        document.setContractTypeConfirmed(true);
+        document.setErrorMessage(null);
+        Document saved = documentRepository.save(document);
+        if (STATUS_FAILED.equalsIgnoreCase(saved.getStatus()) || STATUS_UPLOADED.equalsIgnoreCase(saved.getStatus())) {
+            return toDocumentResponse(sendProcessingRequest(saved));
+        }
+        return toDocumentResponse(saved);
+    }
+
     private Document sendProcessingRequest(Document document) {
         String jobId = "job_" + UUID.randomUUID().toString().replace("-", "");
         ProcessDocumentRequestDTO request = ProcessDocumentRequestDTO.builder()
@@ -207,6 +235,8 @@ public class WorkspaceServiceImpl implements WorkspaceService {
                 .fileType(resolveDocumentFileType(document.getOriginalFileName(), document.getFileType()))
                 .filePath(document.getFilePath())
                 .callbackUrl(callbackBaseUrl + "/api/internal/documents/" + document.getId() + "/processing-result")
+                .contractType(document.getContractType() == null ? SupportedContractType.UNKNOWN.name() : document.getContractType().name())
+                .contractTypeConfirmed(Boolean.TRUE.equals(document.getContractTypeConfirmed()))
                 .build();
 
         try {
@@ -321,7 +351,10 @@ public class WorkspaceServiceImpl implements WorkspaceService {
                 document.getFileType(),
                 document.getFileSize(),
                 document.getStatus(),
-                document.getUploadedAt()
+                document.getUploadedAt(),
+                document.getErrorMessage(),
+                document.getContractType() == null ? null : document.getContractType().name(),
+                document.getContractTypeConfirmed()
         );
     }
 

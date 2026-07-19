@@ -18,6 +18,7 @@ import com.analyzer.api.security.UserDetailsImpl;
 import com.analyzer.api.service.AiClient;
 import com.analyzer.api.service.SubscriptionQuotaService;
 import com.analyzer.api.service.contract.ContractGenerationService;
+import com.analyzer.api.enums.SupportedContractType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Primary;
 import org.springframework.security.core.Authentication;
@@ -74,6 +75,9 @@ public class ContractGenerationServiceImpl implements ContractGenerationService 
             template = templateRepository.findById(request.getTemplateId())
                     .orElseThrow(() -> new RuntimeException("Contract template not found with id: " + request.getTemplateId()));
         }
+        String contractType = SupportedContractType.requireSupported(
+                request.getContractType() != null ? request.getContractType()
+                        : template == null ? null : template.getCategory()).name();
 
         Document sourceDocument = null;
         if (request.getSourceDocumentId() != null) {
@@ -102,6 +106,7 @@ public class ContractGenerationServiceImpl implements ContractGenerationService 
                     .requestId(request.getRequestId())
                     .templateContent(template != null ? template.getContent() : null)
                     .inputJson(request.getInputJson())
+                    .contractType(contractType)
                     .build();
 
             GenerateContractApiResponse apiResponse = aiClient.generateContract(apiRequest);
@@ -122,8 +127,6 @@ public class ContractGenerationServiceImpl implements ContractGenerationService 
             // Create UserContract
             String contractId = "contract_" + UUID.randomUUID().toString().replace("-", "");
             String title = template != null ? "Hợp đồng - " + template.getName() : "Hợp đồng thuê nhà";
-            String contractType = template != null ? template.getCategory() : "LEASE";
-
             UserContract contract = UserContract.builder()
                     .id(contractId)
                     .owner(requester)

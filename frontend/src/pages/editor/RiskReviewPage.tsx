@@ -20,6 +20,7 @@ import { useI18n } from '../../hooks/useI18n';
 import { useToast } from '../../hooks/useToast';
 import type { AiContractAnalysisResponse, AiContractClauseFinding, AiIngestionResult, AiKnowledgeQueryResponse } from '../../types/ai';
 import type { RiskFinding, RiskLevel } from '../../types/risk';
+import { SUPPORTED_CONTRACT_TYPES, supportedContractScopeText, type SupportedContractType } from '../../config/supportedContractTypes';
 
 type RiskKnowledgeVersion = 'v1' | 'v2';
 
@@ -45,7 +46,7 @@ const toRiskFinding = (clause: AiContractClauseFinding): RiskFinding => ({
 });
 
 export function RiskReviewPage() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const toast = useToast();
   const riskImportInputRef = useRef<HTMLInputElement | null>(null);
   const [contractFormats, setContractFormats] = useState<string[]>([]);
@@ -60,6 +61,7 @@ export function RiskReviewPage() {
   const [uploadingRiskKnowledge, setUploadingRiskKnowledge] = useState(false);
   const [queryingRisk, setQueryingRisk] = useState(false);
   const [error, setError] = useState('');
+  const [contractType, setContractType] = useState<SupportedContractType | ''>('');
 
   const loadFormats = useCallback(async () => {
     setLoadingFormats(true);
@@ -103,12 +105,18 @@ export function RiskReviewPage() {
     Boolean(error) && !loadingFormats && contractFormats.length === 0 && riskFormats.length === 0;
 
   const handleContractUpload = async (file: File) => {
+    if (!contractType) {
+      const message = language === 'vi' ? 'Vui lòng chọn và xác nhận loại hợp đồng được hỗ trợ.' : 'Select and confirm a supported contract type.';
+      setError(message);
+      toast.warning(message, t('toast.warningTitle'));
+      return;
+    }
     setUploadingContract(true);
     setError('');
     setContractReport(null);
 
     try {
-      const result = await uploadContractForAnalysis(file, file.name);
+      const result = await uploadContractForAnalysis(file, contractType, file.name);
       setContractReport(result);
       toast.success(t('risk.contractUploadSuccess'), t('toast.successTitle'));
     } catch (err) {
@@ -216,9 +224,14 @@ export function RiskReviewPage() {
           subtitle={t('risk.contractAnalysisSubtitle')}
           actions={<Badge tone="amber">{t('risk.directAiService')}</Badge>}
         >
+          <select className="form-field mb-md" value={contractType} onChange={(event) => setContractType(event.target.value as SupportedContractType | '')}>
+            <option value="">{language === 'vi' ? 'Chọn và xác nhận loại hợp đồng' : 'Select and confirm contract type'}</option>
+            {SUPPORTED_CONTRACT_TYPES.map((item) => <option key={item.value} value={item.value}>{language === 'vi' ? item.vi : item.en}</option>)}
+          </select>
+          <p className="mb-md text-xs text-on-surface-variant dark:text-slate-400">{supportedContractScopeText(language)}</p>
           <FileUploadZone
             onUpload={handleContractUpload}
-            disabled={uploadingContract || loadingFormats || aiServiceUnavailable}
+            disabled={!contractType || uploadingContract || loadingFormats || aiServiceUnavailable}
             compact
           />
           {loadingFormats && (

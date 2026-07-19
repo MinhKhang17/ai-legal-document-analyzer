@@ -82,6 +82,8 @@ class DocumentProcessingTests(unittest.TestCase):
                 fileType="pdf",
                 filePath=str(file_path),
                 callbackUrl="http://localhost/callback",
+                contractType="RENTAL",
+                contractTypeConfirmed=True,
             )
             result = processor.process(request)
 
@@ -110,6 +112,8 @@ class DocumentProcessingTests(unittest.TestCase):
                         "fileType": "pdf",
                         "filePath": str(file_path),
                         "callbackUrl": "http://localhost/callback",
+                        "contractType": "RENTAL",
+                        "contractTypeConfirmed": True,
                     },
                 )
 

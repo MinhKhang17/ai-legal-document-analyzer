@@ -19,6 +19,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -75,15 +76,28 @@ public class WorkspaceController {
 
     @PostMapping("/{workspaceId}/documents")
     @PreAuthorize("hasRole('CUSTOMER')")
-    @Operation(summary = "Upload workspace document", description = "Upload a user document, save it, and request Python AI Service processing.")
+    @Operation(summary = "Upload a supported simple personal contract", description = "The customer must confirm one supported contract type. The original file is retained if analysis later identifies it as unsupported or mismatched.")
     public ResponseEntity<ApiResponseDTO<DocumentResponseDTO>> uploadDocument(
             @PathVariable String workspaceId,
-            @RequestPart("file") MultipartFile file) throws IOException {
-        DocumentResponseDTO response = workspaceService.uploadDocument(getCurrentUserId(), workspaceId, file);
+            @RequestPart("file") MultipartFile file,
+            @RequestPart(value = "contractType", required = false) String contractType) throws IOException {
+        DocumentResponseDTO response = workspaceService.uploadDocument(getCurrentUserId(), workspaceId, file, contractType);
         return new ResponseEntity<>(
                 ApiResponseDTO.accepted("Upload document thành công, đang gửi yêu cầu xử lý", response),
                 HttpStatus.ACCEPTED
         );
+    }
+
+    @PatchMapping("/{workspaceId}/documents/{documentId}/contract-type")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    @Operation(summary = "Confirm a supported contract type", description = "Confirms a manual or detected type. A failed preserved file is retried without uploading it again.")
+    public ResponseEntity<ApiResponseDTO<DocumentResponseDTO>> confirmDocumentContractType(
+            @PathVariable String workspaceId,
+            @PathVariable String documentId,
+            @Valid @RequestBody com.analyzer.api.dto.document.ConfirmDocumentContractTypeRequest request) {
+        DocumentResponseDTO response = workspaceService.confirmDocumentContractType(
+                getCurrentUserId(), workspaceId, documentId, request.contractType());
+        return ResponseEntity.ok(ApiResponseDTO.success("Contract type confirmed", response));
     }
 
     @GetMapping("/{workspaceId}/documents/{documentId}/download")

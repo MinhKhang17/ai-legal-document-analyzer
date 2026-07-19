@@ -25,6 +25,15 @@ public record DocumentResponseDTO(
         String status,
 
         @Schema(description = "Upload date time")
-        LocalDateTime uploadedAt
+        LocalDateTime uploadedAt,
+
+        @Schema(description = "Processing validation/error message", nullable = true)
+        String errorMessage,
+
+        @Schema(description = "Confirmed supported contract type", example = "RENTAL", nullable = true)
+        String contractType,
+
+        @Schema(description = "Whether the user confirmed the contract type")
+        Boolean contractTypeConfirmed
 ) {
 }

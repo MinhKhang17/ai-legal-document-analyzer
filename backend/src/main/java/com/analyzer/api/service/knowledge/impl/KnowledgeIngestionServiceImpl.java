@@ -14,6 +14,8 @@ import com.analyzer.api.repository.knowledge.KnowledgeBaseVersionRepository;
 import com.analyzer.api.repository.knowledge.KnowledgeIngestionJobRepository;
 import com.analyzer.api.repository.UserRepository;
 import com.analyzer.api.service.knowledge.KnowledgeIngestNotificationService;
+import com.analyzer.api.service.knowledge.event.KnowledgeIngestionDispatchRequested;
+import org.springframework.context.ApplicationEventPublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.analyzer.api.service.knowledge.KnowledgeIngestionService;
@@ -35,6 +37,7 @@ public class KnowledgeIngestionServiceImpl implements KnowledgeIngestionService 
     private final KnowledgeIngestionJobRepository jobRepository;
     private final UserRepository userRepository;
     private final KnowledgeIngestNotificationService notificationService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional
@@ -140,6 +143,9 @@ public class KnowledgeIngestionServiceImpl implements KnowledgeIngestionService 
 
         versionRepository.save(version);
         entryRepository.save(entry);
-        return KnowledgeMappingSupport.toJobResponse(jobRepository.save(job));
+        KnowledgeIngestionJob savedJob = jobRepository.save(job);
+        eventPublisher.publishEvent(new KnowledgeIngestionDispatchRequested(
+                knowledgeBaseEntryId, savedJob.getId(), admin == null ? null : admin.getId()));
+        return KnowledgeMappingSupport.toJobResponse(savedJob);
     }
 }

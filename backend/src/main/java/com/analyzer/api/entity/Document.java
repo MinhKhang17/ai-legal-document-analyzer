@@ -47,6 +47,14 @@ public class Document {
     @Column(name = "source_type", nullable = false)
     private String sourceType;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "contract_type")
+    private com.analyzer.api.enums.SupportedContractType contractType;
+
+    @Column(name = "contract_type_confirmed", nullable = false)
+    @Builder.Default
+    private Boolean contractTypeConfirmed = false;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "legal_ticket_id")
     private LegalTicket legalTicket;

@@ -20,10 +20,11 @@ import {
   getChatSessionDocuments,
   attachChatSessionDocument,
   detachChatSessionDocument,
+  exportChatSessionMarkdown,
 } from "../../api/chatApi";
 import { getChatMessageAiCitations } from "../../api/aiFeatureApi";
 import { createLegalTicket } from "../../api/legalTicketApi";
-import { downloadWorkspaceDocument, getWorkspaceDocuments, getWorkspaces, uploadDocument } from "../../api/workspaceApi";
+import { confirmDocumentContractType, downloadWorkspaceDocument, getWorkspaceDocuments, getWorkspaces, uploadDocument } from "../../api/workspaceApi";
 import { useI18n } from "../../hooks/useI18n";
 import { useToast } from "../../hooks/useToast";
 import { ChatMessageContent } from "../../components/chat/ChatMessageContent";
@@ -36,6 +37,7 @@ import type { WorkspaceChatMessage, WorkspaceChatSession } from "../../types/cha
 import type { AiCitation } from "../../types/aiFeature";
 import { formatDisplayDateTime } from "../../utils/format";
 import { simulateStreaming } from "../../utils/simulateStreaming";
+import { SUPPORTED_CONTRACT_TYPES, getSupportedContractTypeLabel, supportedContractScopeText, type SupportedContractType } from "../../config/supportedContractTypes";
 
 import { getAccessToken as getSessionAccessToken } from "../../services/authSession";
 const getAccessToken = () => getSessionAccessToken() ?? "";
@@ -129,6 +131,7 @@ export function LegalChatPage() {
   const [messageDetail, setMessageDetail] = useState<WorkspaceChatMessage | null>(null);
   const [messageDetailLoading, setMessageDetailLoading] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [exportingMarkdown, setExportingMarkdown] = useState(false);
   const [shareUrl, setShareUrl] = useState("");
   const [attachedDocuments, setAttachedDocuments] = useState<ChatSessionDocument[]>([]);
   const [documentModalOpen, setDocumentModalOpen] = useState(false);
@@ -136,6 +139,8 @@ export function LegalChatPage() {
   const [openingDocumentModal, setOpeningDocumentModal] = useState(false);
   const [documentActionError, setDocumentActionError] = useState("");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadContractType, setUploadContractType] = useState<SupportedContractType | "">("");
+  const [documentTypeSelections, setDocumentTypeSelections] = useState<Record<string, SupportedContractType | "">>({});
   const [messageCitations, setMessageCitations] = useState<AiCitation[]>([]);
   const chatScrollContainerRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
@@ -165,6 +170,9 @@ export function LegalChatPage() {
   const selectedSession = useMemo(
     () => chatSessions.find((session) => session.chatSessionId === selectedSessionId),
     [chatSessions, selectedSessionId],
+  );
+  const canExportMarkdown = Boolean(selectedSessionId) && messages.some(
+    (message) => message.role === "assistant" && message.status === "completed" && message.content.trim(),
   );
 
   useEffect(() => {
@@ -610,16 +618,35 @@ export function LegalChatPage() {
     }
   };
 
-  const handleUploadAndAttach = async () => {
-    if (!uploadFile || !selectedWorkspaceId || !selectedSessionId) return;
+  const handleConfirmDocumentType = async (documentId: string) => {
+    const selectedType = documentTypeSelections[documentId];
+    if (!selectedType || !selectedWorkspaceId) return;
     setDocumentActionBusy(true);
     setDocumentActionError("");
     try {
-      const uploaded = await uploadDocument(getAccessToken(), selectedWorkspaceId, uploadFile);
+      const updated = await confirmDocumentContractType(getAccessToken(), selectedWorkspaceId, documentId, selectedType);
+      setWorkspaceDocuments((current) => current.map((item) => item.documentId === documentId ? updated : item));
+      toast.success(language === "vi" ? "Đã xác nhận loại hợp đồng. File lỗi sẽ được xử lý lại." : "Contract type confirmed. Failed files will be retried.");
+    } catch (confirmError) {
+      const message = confirmError instanceof Error ? confirmError.message : "Unable to confirm contract type";
+      setDocumentActionError(message);
+      toast.error(message);
+    } finally {
+      setDocumentActionBusy(false);
+    }
+  };
+
+  const handleUploadAndAttach = async () => {
+    if (!uploadFile || !selectedWorkspaceId || !selectedSessionId || !uploadContractType) return;
+    setDocumentActionBusy(true);
+    setDocumentActionError("");
+    try {
+      const uploaded = await uploadDocument(getAccessToken(), selectedWorkspaceId, uploadFile, uploadContractType);
       setWorkspaceDocuments((current) => [uploaded, ...current.filter((item) => item.documentId !== uploaded.documentId)]);
       await attachChatSessionDocument(getAccessToken(), selectedSessionId, uploaded.documentId);
       await refreshAttachedDocuments();
       setUploadFile(null);
+      setUploadContractType("");
       toast.success(language === "vi" ? "Da upload va them tai lieu. He thong dang xu ly file." : "Uploaded and attached. Processing started.");
     } catch (err) {
       const raw = err instanceof Error ? err.message : "Upload that bai";
@@ -786,6 +813,27 @@ export function LegalChatPage() {
         subtitle={`${language === "vi" ? "Dự án" : "Workspace"}: ${selectedWorkspace?.name ?? "—"}`}
         actions={
           <>
+            {selectedSessionId && (
+              <Button
+                variant="secondary"
+                leftIcon={<Download className="h-4 w-4" />}
+                disabled={!canExportMarkdown || exportingMarkdown}
+                title={!canExportMarkdown ? (language === "vi" ? "Phiên chưa có kết quả phân tích để xuất" : "No analysis content to export") : undefined}
+                onClick={async () => {
+                  setExportingMarkdown(true);
+                  try {
+                    await exportChatSessionMarkdown(getAccessToken(), selectedSessionId);
+                    toast.success(language === "vi" ? "Đã tải bản phân tích Markdown." : "Markdown analysis downloaded.");
+                  } catch (exportError) {
+                    toast.error(exportError instanceof Error ? exportError.message : "Unable to export Markdown.");
+                  } finally {
+                    setExportingMarkdown(false);
+                  }
+                }}
+              >
+                {exportingMarkdown ? (language === "vi" ? "Đang xuất…" : "Exporting…") : "Export Markdown"}
+              </Button>
+            )}
             {selectedSessionId && (
               <Button
                 variant="secondary"
@@ -1345,9 +1393,16 @@ export function LegalChatPage() {
           <section>
             <p className="font-semibold">{language === "vi" ? "Upload tài liệu mới" : "Upload new document"}</p>
             <p className="mt-xs text-xs text-on-surface-variant">{language === "vi" ? "File được lưu vào workspace và tự động gắn vào phiên chat. Quota được kiểm tra trước khi upload." : "The file is saved to the workspace and attached to this session."}</p>
-            <div className="mt-sm flex flex-col gap-sm sm:flex-row">
-              <input className="form-field" type="file" onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)} />
-              <Button disabled={!uploadFile || documentActionBusy} onClick={() => void handleUploadAndAttach()}>{documentActionBusy ? (language === "vi" ? "Đang xử lý…" : "Processing…") : (language === "vi" ? "Upload và thêm" : "Upload & attach")}</Button>
+            <div className="mt-sm space-y-sm">
+              <select className="form-field" value={uploadContractType} onChange={(event) => setUploadContractType(event.target.value as SupportedContractType | "")}>
+                <option value="">{language === "vi" ? "Chọn và xác nhận loại hợp đồng" : "Select and confirm contract type"}</option>
+                {SUPPORTED_CONTRACT_TYPES.map((item) => <option key={item.value} value={item.value}>{language === "vi" ? item.vi : item.en}</option>)}
+              </select>
+              <p className="text-xs text-on-surface-variant">{supportedContractScopeText(language)}</p>
+              <div className="flex flex-col gap-sm sm:flex-row">
+                <input className="form-field" type="file" onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)} />
+                <Button disabled={!uploadFile || !uploadContractType || documentActionBusy} onClick={() => void handleUploadAndAttach()}>{documentActionBusy ? (language === "vi" ? "Đang xử lý…" : "Processing…") : (language === "vi" ? "Upload và thêm" : "Upload & attach")}</Button>
+              </div>
             </div>
           </section>
           <section>
@@ -1355,14 +1410,29 @@ export function LegalChatPage() {
             <div className="mt-sm max-h-72 space-y-sm overflow-y-auto">
               {workspaceDocuments.length === 0 ? <p className="text-sm text-on-surface-variant">{t("chat.noDocuments")}</p> : workspaceDocuments.map((document) => {
                 const attached = attachedDocuments.some((item) => item.documentId === document.documentId);
+                const contractTypeLabel = getSupportedContractTypeLabel(document.contractType, language);
                 return <div key={document.documentId} className="flex items-center justify-between gap-md rounded-lg border border-legal-border p-sm dark:border-slate-700">
-                  <div className="min-w-0"><p className="truncate font-semibold" title={document.originalFileName}>{document.originalFileName}</p><div className="mt-xs"><StatusBadge status={document.status} /></div></div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold" title={document.originalFileName}>{document.originalFileName}</p>
+                    <p className="mt-xs text-xs text-on-surface-variant">{contractTypeLabel ?? (language === "vi" ? "Cần xác nhận loại hợp đồng trước khi phân tích" : "Contract type confirmation required")}</p>
+                    <div className="mt-xs"><StatusBadge status={document.status} /></div>
+                    {document.errorMessage && <p className="mt-xs text-xs text-error">{document.errorMessage}</p>}
+                    {(!contractTypeLabel || !document.contractTypeConfirmed || document.status === "failed") && (
+                      <div className="mt-sm flex gap-xs">
+                        <select className="form-field py-1 text-xs" value={documentTypeSelections[document.documentId] ?? ""} onChange={(event) => setDocumentTypeSelections((current) => ({ ...current, [document.documentId]: event.target.value as SupportedContractType | "" }))}>
+                          <option value="">{language === "vi" ? "Xác nhận loại" : "Confirm type"}</option>
+                          {SUPPORTED_CONTRACT_TYPES.map((item) => <option key={item.value} value={item.value}>{language === "vi" ? item.vi : item.en}</option>)}
+                        </select>
+                        <Button size="sm" disabled={!documentTypeSelections[document.documentId] || documentActionBusy} onClick={() => void handleConfirmDocumentType(document.documentId)}>{language === "vi" ? "Xác nhận" : "Confirm"}</Button>
+                      </div>
+                    )}
+                  </div>
                   <div className="flex gap-xs">
                     <Button size="icon" variant="ghost" aria-label="Download" onClick={() => void handleDownloadWorkspaceDocument(document)}><Download className="h-4 w-4" /></Button>
                     {attached ? (
                       <Button size="sm" variant="danger" leftIcon={<Trash2 className="h-4 w-4" />} disabled={documentActionBusy} onClick={() => void handleDetachDocument(document.documentId)}>{language === "vi" ? "Bỏ khỏi chat" : "Remove"}</Button>
                     ) : (
-                      <Button size="sm" variant="secondary" disabled={documentActionBusy} onClick={() => void handleAttachDocument(document.documentId)}>{language === "vi" ? "Thêm" : "Attach"}</Button>
+                      <Button size="sm" variant="secondary" disabled={documentActionBusy || !contractTypeLabel || !document.contractTypeConfirmed} onClick={() => void handleAttachDocument(document.documentId)}>{language === "vi" ? "Thêm" : "Attach"}</Button>
                     )}
                   </div>
                 </div>;

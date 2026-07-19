@@ -46,6 +46,7 @@ export interface GenerateContractRequest {
   workspaceId: string;
   templateId?: number | null;
   sourceDocumentId?: string | null;
+  contractType: string;
   inputJson: string;
 }
 

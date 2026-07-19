@@ -14,7 +14,9 @@ public interface WorkspaceService {
     List<WorkspaceResponseDTO> getWorkspaces(Long userId);
     WorkspaceResponseDTO getWorkspaceById(Long userId, String workspaceId);
     List<DocumentResponseDTO> getDocuments(Long userId, String workspaceId);
-    DocumentResponseDTO uploadDocument(Long userId, String workspaceId, MultipartFile file) throws IOException;
+    DocumentResponseDTO uploadDocument(Long userId, String workspaceId, MultipartFile file, String contractType) throws IOException;
+
+    DocumentResponseDTO confirmDocumentContractType(Long userId, String workspaceId, String documentId, String contractType);
     DocumentResponseDTO updateProcessingResult(String documentId, ProcessingResultRequestDTO request);
     org.springframework.core.io.Resource downloadDocumentFile(Long userId, String workspaceId, String documentId);
     org.springframework.core.io.Resource downloadDocumentFilePublic(String workspaceId, String documentId);

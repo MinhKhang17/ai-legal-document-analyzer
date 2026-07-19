@@ -5,10 +5,12 @@ from pathlib import Path
 
 from app.models.knowledge_models import ExtractedDocument
 from app.schemas import ChunkRecord, DocumentProcessRequest, DocumentProcessResult, ExtractedPage, PageDebugInfo
+from app.models.intent_enums import ContractType
 from app.services.callback_client import CallbackClient
 from app.services.extraction_cache import ExtractionCache
 from app.services.loader.document_loaders import build_default_loader_registry
 from app.services.vector_store import VectorStoreService
+from app.services.intent_detector import detect_contract_type
 
 
 logger = logging.getLogger(__name__)
@@ -54,6 +56,18 @@ class DocumentProcessor:
                         request.filePath,
                     )
 
+            detected_type = detect_contract_type("\n".join(page.text for page in pages))
+            selected_type = ContractType(request.contractType)
+            if detected_type == ContractType.UNSUPPORTED:
+                raise ValueError(
+                    "UNSUPPORTED_CONTRACT_TYPE: only rental, part-time employment, internship, "
+                    "collaborator, small freelance/service, small personal asset sale, and simple personal loan contracts are supported"
+                )
+            if detected_type not in {ContractType.UNKNOWN, selected_type}:
+                raise ValueError(
+                    f"CONTRACT_TYPE_CONFIRMATION_MISMATCH: selected={selected_type.value}, detected={detected_type.value}"
+                )
+
             chunk_records = self._chunk_pages_fixed(pages)
             self.vector_store.save_mock_vector_records(request, file_hash, chunk_records)
 
@@ -85,6 +99,19 @@ class DocumentProcessor:
             return result
 
     def _validate_request(self, request: DocumentProcessRequest, file_path: Path) -> None:
+        supported_contract_types = {
+            ContractType.RENTAL.value,
+            ContractType.PART_TIME_EMPLOYMENT.value,
+            ContractType.INTERNSHIP.value,
+            ContractType.COLLABORATOR.value,
+            ContractType.FREELANCE_SERVICE.value,
+            ContractType.SMALL_ASSET_SALE.value,
+            ContractType.PERSONAL_LOAN.value,
+        }
+        if not request.contractTypeConfirmed:
+            raise ValueError("CONTRACT_TYPE_CONFIRMATION_REQUIRED")
+        if request.contractType not in supported_contract_types:
+            raise ValueError("UNSUPPORTED_CONTRACT_TYPE")
         if not request.jobId.strip():
             raise ValueError("jobId is required")
         if not request.documentId.strip():

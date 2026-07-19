@@ -836,7 +836,7 @@ class RagQueryService:
             LegalQueryIntent.INVALID_OR_MEANINGLESS_QUERY: "Mình chưa hiểu yêu cầu hiện tại. Bạn hãy mô tả rõ câu hỏi về hợp đồng hoặc tải tài liệu cần kiểm tra.",
             LegalQueryIntent.UNDER_SPECIFIED_LEGAL_QUERY: "Câu hỏi hiện còn quá thiếu ngữ cảnh để kết luận. Bạn cho mình biết loại hợp đồng, vai trò của bạn và điều khoản hoặc vấn đề cần kiểm tra.",
             LegalQueryIntent.LEGAL_BUT_NOT_CONTRACT_SCOPE: "Nội dung này là vấn đề pháp lý nhưng không thuộc scope chatbot hợp đồng sinh viên. Mình chỉ hỗ trợ các hợp đồng đơn giản trong phạm vi sinh viên.",
-            LegalQueryIntent.CONTRACT_TYPE_OUT_OF_STUDENT_SCOPE: "Loại hợp đồng này vượt ngoài phạm vi hợp đồng đơn giản dành cho sinh viên. Bạn nên trao đổi với luật sư để được đánh giá chính xác hơn.",
+            LegalQueryIntent.CONTRACT_TYPE_OUT_OF_STUDENT_SCOPE: "Loại hợp đồng này nằm ngoài phạm vi hợp đồng cá nhân đơn giản được hỗ trợ. Bạn nên trao đổi với luật sư phù hợp.",
             LegalQueryIntent.FOREIGN_LAW_QUERY: "Hiện hệ thống không đủ căn cứ để tư vấn theo pháp luật nước ngoài. Nếu đây là hợp đồng chịu luật nước ngoài, bạn nên dùng nguồn chuyên biệt hoặc hỏi luật sư tại nước đó.",
             LegalQueryIntent.PROMPT_INJECTION_OR_POLICY_BYPASS: "Mình không thể bỏ qua quy tắc an toàn hoặc tạo kết luận pháp lý sai lệch. Nếu bạn muốn, mình có thể hỗ trợ phân tích hợp đồng theo hướng hợp pháp và minh bạch.",
             LegalQueryIntent.UNSAFE_LEGAL_REQUEST: "Mình không thể hỗ trợ yêu cầu có tính gian dối hoặc lách luật. Nếu muốn, mình có thể giúp bạn soạn điều khoản minh bạch và đúng hướng hợp pháp.",
@@ -876,11 +876,13 @@ class RagQueryService:
 
     def _default_legal_domain(self, contract_type: ContractType) -> str | None:
         mapping = {
-            ContractType.STUDENT_RENTAL: "student_rental",
-            ContractType.PART_TIME_OR_INTERNSHIP: "employment",
-            ContractType.SMALL_SERVICE_OR_FREELANCE: "service",
+            ContractType.RENTAL: "rental",
+            ContractType.PART_TIME_EMPLOYMENT: "employment",
+            ContractType.INTERNSHIP: "employment",
+            ContractType.COLLABORATOR: "employment",
+            ContractType.FREELANCE_SERVICE: "service",
             ContractType.SMALL_ASSET_SALE: "sale",
-            ContractType.PERSONAL_LOAN_SIMPLE: "loan",
+            ContractType.PERSONAL_LOAN: "loan",
         }
         return mapping.get(contract_type)
 

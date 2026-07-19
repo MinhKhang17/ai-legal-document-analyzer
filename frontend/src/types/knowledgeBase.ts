@@ -5,7 +5,6 @@ export interface PageResponse<T> {
   totalItems: number;
   totalPages: number;
 }
-
 export interface UploadKnowledgeRequest {
   code: string;
   title: string;
@@ -131,10 +130,4 @@ export interface KnowledgeIngestionJob {
   completedAt: string | null;
   ingestedById?: number | null;
   createdAt: string;
-}
-
-export interface AsyncKnowledgeIngestAccepted {
-  jobId: string;
-  status: "PROCESSING";
-  progressPercent: number;
 }

@@ -25,6 +25,7 @@ backend/.env.*
 
 # --- Python / AI service ---
 ai-service/__pycache__/
+ai-service/**/__pycache__/
 ai-service/*.py[cod]
 ai-service/.pytest_cache/
 ai-service/.mypy_cache/

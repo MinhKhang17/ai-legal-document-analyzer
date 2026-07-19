@@ -4,6 +4,7 @@ import com.analyzer.api.dto.contract.ContractTemplateResponse;
 import com.analyzer.api.dto.contract.CreateContractTemplateRequest;
 import com.analyzer.api.dto.contract.UpdateContractTemplateRequest;
 import com.analyzer.api.entity.ContractTemplate;
+import com.analyzer.api.enums.SupportedContractType;
 import com.analyzer.api.enums.ContractTemplateStatus;
 import com.analyzer.api.exception.common.ConflictException;
 import com.analyzer.api.exception.common.ResourceNotFoundException;
@@ -35,7 +36,7 @@ public class ContractTemplateServiceImpl implements ContractTemplateService {
                 .templateCode(request.getTemplateCode().trim())
                 .name(request.getName().trim())
                 .description(request.getDescription())
-                .category(request.getCategory().trim())
+                .category(SupportedContractType.requireSupported(request.getCategory()).name())
                 .jurisdiction(request.getJurisdiction())
                 .content(request.getContent())
                 .status(ContractTemplateStatus.ACTIVE)
@@ -52,7 +53,7 @@ public class ContractTemplateServiceImpl implements ContractTemplateService {
 
         template.setName(request.getName().trim());
         template.setDescription(request.getDescription());
-        template.setCategory(request.getCategory().trim());
+        template.setCategory(SupportedContractType.requireSupported(request.getCategory()).name());
         template.setJurisdiction(request.getJurisdiction());
         template.setContent(request.getContent());
         template.setVersion((template.getVersion() == null ? 1 : template.getVersion()) + 1);

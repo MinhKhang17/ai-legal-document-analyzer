@@ -21,8 +21,8 @@ class _FakeRetrievalService:
     def __init__(self):
         self.document_id = None
 
-    def search_user_chunks(self, question: str, user_id: str, workspace_id: str, top_k: int, document_id: str | None = None):
-        self.document_id = document_id
+    def search_user_chunks(self, question: str, user_id: str, workspace_id: str, top_k: int, document_id: str | None = None, document_ids: list[str] | None = None):
+        self.document_id = document_id or (document_ids[0] if document_ids else None)
         return [
             RagChunkHit(
                 citationId="USER-1",
@@ -290,7 +290,7 @@ class RagQueryTests(unittest.TestCase):
         )
 
         self.assertEqual(response.intent, "CLAUSE_ANALYSIS")
-        self.assertEqual(response.contractType, "STUDENT_RENTAL")
+        self.assertEqual(response.contractType, "RENTAL")
         self.assertEqual(response.userRole, "PARTY_B")
         self.assertTrue(response.inputComplete)
         self.assertEqual(response.usedKnowledgeCitationIds, ["KB-1"])

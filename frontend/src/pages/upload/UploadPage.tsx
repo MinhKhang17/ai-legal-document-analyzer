@@ -6,6 +6,7 @@ import {
   getWorkspaceDocuments,
   getWorkspaces,
   uploadDocument,
+  confirmDocumentContractType,
 } from "../../api/workspaceApi";
 import type { Document, Workspace } from "../../api/workspaceApi";
 import { Badge } from "../../components/common/Badge";
@@ -19,10 +20,11 @@ import { useI18n } from "../../hooks/useI18n";
 import { useToast } from "../../hooks/useToast";
 
 import { getAccessToken as getSessionAccessToken } from "../../services/authSession";
+import { SUPPORTED_CONTRACT_TYPES, supportedContractScopeText, type SupportedContractType } from "../../config/supportedContractTypes";
 const getAccessToken = () => getSessionAccessToken() ?? "";
 
 export function UploadPage() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const toast = useToast();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -41,6 +43,7 @@ export function UploadPage() {
   const [loadingWorkspaces, setLoadingWorkspaces] = useState(false);
   const [loadingDocuments, setLoadingDocuments] = useState(false);
   const [error, setError] = useState("");
+  const [contractType, setContractType] = useState<SupportedContractType | "">("");
 
   const hasProcessingDocument = documents.some(
     (document) => document.status === "processing",
@@ -134,7 +137,6 @@ export function UploadPage() {
       toast.warning(t("upload.workspaceNameRequired"), t("toast.warningTitle"));
       return;
     }
-
     try {
       setCreatingWorkspace(true);
 
@@ -167,6 +169,13 @@ export function UploadPage() {
       toast.warning(t("upload.selectWorkspaceRequired"), t("toast.warningTitle"));
       return;
     }
+    if (!contractType) {
+      const message = language === "vi" ? "Vui lòng chọn và xác nhận loại hợp đồng được hỗ trợ trước khi phân tích." : "Select and confirm a supported contract type before analysis.";
+      setError(message);
+      toast.warning(message, t("toast.warningTitle"));
+      return;
+    }
+    const confirmedContractType: SupportedContractType = contractType;
 
     try {
       setUploading(true);
@@ -175,6 +184,7 @@ export function UploadPage() {
         getAccessToken(),
         selectedWorkspaceId,
         file,
+        confirmedContractType,
       );
 
       setDocuments((previous) => [uploadedDocument, ...previous]);
@@ -185,6 +195,23 @@ export function UploadPage() {
         err instanceof Error ? err.message : t("workspace.uploadDocumentError");
       setError(message);
       toast.error(message, t("toast.errorTitle"));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleConfirmAndRetry = async (documentId: string) => {
+    if (!selectedWorkspaceId || !contractType) return;
+    setUploading(true);
+    setError("");
+    try {
+      const updated = await confirmDocumentContractType(getAccessToken(), selectedWorkspaceId, documentId, contractType);
+      setDocuments((current) => current.map((item) => item.documentId === documentId ? updated : item));
+      toast.success(language === "vi" ? "Đã xác nhận loại hợp đồng và gửi xử lý lại." : "Contract type confirmed and processing retried.");
+    } catch (retryError) {
+      const message = retryError instanceof Error ? retryError.message : "Unable to retry processing";
+      setError(message);
+      toast.error(message);
     } finally {
       setUploading(false);
     }
@@ -298,9 +325,27 @@ export function UploadPage() {
                 </div>
               )}
 
+              <div>
+                <label className="label-uppercase" htmlFor="contractType">
+                  {language === "vi" ? "Loại hợp đồng (bắt buộc xác nhận)" : "Contract type (confirmation required)"}
+                </label>
+                <select
+                  id="contractType"
+                  className="form-field mt-xs"
+                  value={contractType}
+                  onChange={(event) => setContractType(event.target.value as SupportedContractType | "")}
+                >
+                  <option value="">{language === "vi" ? "Chọn loại hợp đồng" : "Select contract type"}</option>
+                  {SUPPORTED_CONTRACT_TYPES.map((item) => (
+                    <option key={item.value} value={item.value}>{language === "vi" ? item.vi : item.en}</option>
+                  ))}
+                </select>
+                <p className="mt-xs text-xs text-on-surface-variant dark:text-slate-400">{supportedContractScopeText(language)}</p>
+              </div>
+
               <FileUploadZone
                 onUpload={handleUploadFile}
-                disabled={uploading || !selectedWorkspaceId}
+                disabled={uploading || !selectedWorkspaceId || !contractType}
               />
 
               {!selectedWorkspaceId && (
@@ -366,6 +411,14 @@ export function UploadPage() {
                   {document.status === "processing" && (
                     <div className="mt-md rounded-lg bg-surface-container-low p-sm text-sm text-on-surface-variant dark:bg-slate-800 dark:text-slate-400">
                       {t("upload.processingStatusDescription")}
+                    </div>
+                  )}
+                  {document.errorMessage && <p className="mt-sm text-sm text-error">{document.errorMessage}</p>}
+                  {document.status === "failed" && (
+                    <div className="mt-sm">
+                      <Button size="sm" variant="secondary" disabled={!contractType || uploading} onClick={() => void handleConfirmAndRetry(document.documentId)}>
+                        {language === "vi" ? "Xác nhận loại đã chọn và xử lý lại" : "Confirm selected type and retry"}
+                      </Button>
                     </div>
                   )}
                 </div>

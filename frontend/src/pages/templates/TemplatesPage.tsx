@@ -18,6 +18,7 @@ import {
 } from "../../services/contract.service";
 import { useAppStore } from "../../store/AppStore";
 import type { ContractTemplate, CreateContractTemplateRequest } from "../../types/contract";
+import { SUPPORTED_CONTRACT_TYPES } from "../../config/supportedContractTypes";
 import { formatDisplayDate } from "../../utils/format";
 
 const emptyTemplateForm: CreateContractTemplateRequest = {
@@ -58,7 +59,7 @@ export function TemplatesPage() {
 
     try {
       const response = await getContractTemplates(page, 20);
-      setTemplates(response.items ?? []);
+      setTemplates((response.items ?? []).filter((template) => SUPPORTED_CONTRACT_TYPES.some((type) => type.value === template.category)));
       setTotalPages(response.totalPages ?? 0);
       setTotalItems(response.totalItems ?? 0);
     } catch (loadError) {
@@ -310,7 +311,7 @@ export function TemplatesPage() {
                 <div className="grid gap-md sm:grid-cols-2">
                   <label className="block text-sm font-semibold">
                     {t("templates.category")}
-                    <input
+                    <select
                       className="form-field mt-xs"
                       value={form.category}
                       onChange={(event) =>
@@ -319,7 +320,10 @@ export function TemplatesPage() {
                           category: event.target.value,
                         }))
                       }
-                    />
+                    >
+                      <option value="">{t("templates.category")}</option>
+                      {SUPPORTED_CONTRACT_TYPES.map((item) => <option key={item.value} value={item.value}>{language === "vi" ? item.vi : item.en}</option>)}
+                    </select>
                   </label>
                   <label className="block text-sm font-semibold">
                     {t("templates.jurisdiction")}
