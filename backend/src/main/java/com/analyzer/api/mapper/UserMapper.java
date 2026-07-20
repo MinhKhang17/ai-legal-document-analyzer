@@ -25,6 +25,9 @@ public interface UserMapper {
     @Mapping(target = "description", ignore = true)
     @Mapping(target = "mustChangePassword", ignore = true)
     @Mapping(target = "passwordResetDeadline", ignore = true)
+    @Mapping(target = "forgotPasswordToken", ignore = true)
+    @Mapping(target = "forgotPasswordTokenExpiry", ignore = true)
+    @Mapping(target = "forgotPasswordRequestedAt", ignore = true)
     User toEntity(UserRequestDTO requestDTO);
 
     @Mapping(target = "role", source = "role.name")

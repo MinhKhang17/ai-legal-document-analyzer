@@ -21,6 +21,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     Optional<User> findByEmailVerificationLastUsedToken(String emailVerificationLastUsedToken);
 
+    Optional<User> findByForgotPasswordToken(String forgotPasswordToken);
+
     List<User> findAllByRole_NameAndActiveTrue(RoleName roleName);
 
     List<User> findAllByMustChangePasswordTrueAndActiveTrueAndPasswordResetDeadlineBefore(LocalDateTime now);

@@ -1260,7 +1260,7 @@ export function LegalChatPage() {
                           <>
                             <ChatMessageContent
                               content={message.content}
-                              className={assistant ? "text-on-surface dark:text-slate-100" : "text-white"}
+                              className="text-on-surface dark:text-slate-100"
                             />
                             {message.status === "streaming" && <span className="ml-1 inline-block h-4 w-0.5 bg-primary motion-safe:animate-pulse" aria-hidden="true" />}
                             {message.status === "cancelled" && <p className="mt-sm text-xs font-medium text-on-surface-variant">{message.statusMessage ?? (language === "vi" ? "Đã dừng trả lời." : "Response stopped.")}</p>}

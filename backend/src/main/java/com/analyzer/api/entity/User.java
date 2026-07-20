@@ -71,6 +71,15 @@ public class User {
     @Column(name = "password_reset_deadline")
     private java.time.LocalDateTime passwordResetDeadline;
 
+    @Column(name = "forgot_password_token", length = 64)
+    private String forgotPasswordToken;
+
+    @Column(name = "forgot_password_token_expiry")
+    private java.time.LocalDateTime forgotPasswordTokenExpiry;
+
+    @Column(name = "forgot_password_requested_at")
+    private java.time.LocalDateTime forgotPasswordRequestedAt;
+
     private String specialty;
 
     @Column(name = "legal_domain")

@@ -15,7 +15,6 @@ import {
   TicketCheck,
   UploadCloud,
   UsersRound,
-  Wrench,
   X,
   type LucideIcon,
 } from 'lucide-react';
@@ -128,12 +127,6 @@ const navItems: NavItem[] = [
     icon: Activity,
     section: 'system',
     allowedRoles: ['ADMIN'],
-  },
-  {
-    to: '/templates',
-    labelKey: 'nav.templates',
-    icon: Wrench,
-    section: 'system',
   },
   {
     to: '/settings',

@@ -115,7 +115,8 @@ public class JwtTokenProvider {
     public Cookie createRefreshTokenCookie(String refreshToken) {
         Cookie cookie = new Cookie(refreshCookieName, refreshToken);
         cookie.setHttpOnly(true);
-        cookie.setSecure(false); // TODO: Set to true in production with HTTPS
+        cookie.setSecure(true);
+        cookie.setAttribute("SameSite", "None");
         cookie.setPath("/api/v1/auth");
         cookie.setMaxAge((int) (refreshTokenExpirationMs / 1000));
         return cookie;
@@ -127,7 +128,8 @@ public class JwtTokenProvider {
     public Cookie createDeleteRefreshTokenCookie() {
         Cookie cookie = new Cookie(refreshCookieName, "");
         cookie.setHttpOnly(true);
-        cookie.setSecure(false);
+        cookie.setSecure(true);
+        cookie.setAttribute("SameSite", "None");
         cookie.setPath("/api/v1/auth");
         cookie.setMaxAge(0);
         return cookie;

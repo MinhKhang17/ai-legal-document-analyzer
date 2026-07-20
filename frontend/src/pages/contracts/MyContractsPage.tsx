@@ -13,7 +13,6 @@ import { useI18n } from "../../hooks/useI18n";
 import { useToast } from "../../hooks/useToast";
 import {
   generateContract,
-  getAllContractTemplates,
   getMyContracts,
   saveContract,
 } from "../../services/contract.service";
@@ -21,7 +20,6 @@ import { getStoredAccessToken } from "../../services/http";
 import { getWorkspaces } from "../../services/workspace.service";
 import type {
   ContractGenerationJob,
-  ContractTemplate,
   UserContract,
 } from "../../types/contract";
 import type { Workspace } from "../../types/workspace";
@@ -38,14 +36,12 @@ const getStatusTone = (status?: string) => {
 const initialGenerationForm = () => ({
   requestId: `contract-${Date.now()}`,
   workspaceId: "",
-  templateId: "",
   sourceDocumentId: "",
   inputJson: "{}",
 });
 
 const initialSaveForm = {
   workspaceId: "",
-  templateId: "",
   generationJobId: "",
   sourceDocumentId: "",
   title: "",
@@ -62,7 +58,6 @@ export function MyContractsPage() {
   const [page, setPage] = useState(() => parsePageParam(searchParams.get("page")));
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
-  const [templates, setTemplates] = useState<ContractTemplate[]>([]);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [latestJob, setLatestJob] = useState<ContractGenerationJob | null>(null);
   const [generationForm, setGenerationForm] = useState(initialGenerationForm);
@@ -77,9 +72,8 @@ export function MyContractsPage() {
     setError("");
 
     const token = getStoredAccessToken();
-    const [contractsResult, templatesResult, workspacesResult] = await Promise.allSettled([
+    const [contractsResult, workspacesResult] = await Promise.allSettled([
       getMyContracts(page, 20),
-      getAllContractTemplates(),
       token ? getWorkspaces(token) : Promise.resolve([]),
     ]);
 
@@ -96,7 +90,6 @@ export function MyContractsPage() {
       toast.error(message);
     }
 
-    setTemplates(templatesResult.status === "fulfilled" ? templatesResult.value : []);
     setWorkspaces(workspacesResult.status === "fulfilled" ? workspacesResult.value : []);
     setLoading(false);
   }, [page, toast, t]);
@@ -116,12 +109,6 @@ export function MyContractsPage() {
     return normalizedValue;
   };
 
-  const parseOptionalNumber = (value: string) => {
-    if (!value.trim()) return null;
-    const parsed = Number(value);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-  };
-
   const handleGenerate = async () => {
     const workspaceId = parseWorkspaceId(generationForm.workspaceId);
     if (workspaceId === null) return;
@@ -138,7 +125,6 @@ export function MyContractsPage() {
       const job = await generateContract({
         requestId: generationForm.requestId.trim(),
         workspaceId,
-        templateId: parseOptionalNumber(generationForm.templateId),
         sourceDocumentId: generationForm.sourceDocumentId.trim() || null,
         inputJson: generationForm.inputJson,
       });
@@ -146,7 +132,6 @@ export function MyContractsPage() {
       setSaveForm((current) => ({
         ...current,
         workspaceId: String(job.workspaceId),
-        templateId: job.templateId ? String(job.templateId) : current.templateId,
         generationJobId: job.id,
         sourceDocumentId: job.sourceDocumentId ?? current.sourceDocumentId,
         content: job.outputDraft ?? current.content,
@@ -177,7 +162,6 @@ export function MyContractsPage() {
     try {
       await saveContract({
         workspaceId,
-        templateId: parseOptionalNumber(saveForm.templateId),
         generationJobId: saveForm.generationJobId.trim() || null,
         sourceDocumentId: saveForm.sourceDocumentId.trim() || null,
         title: saveForm.title.trim(),
@@ -283,10 +267,6 @@ export function MyContractsPage() {
                   <dd className="mt-xs break-all">{latestJob.requestId}</dd>
                 </div>
                 <div>
-                  <dt className="label-uppercase">{t("contracts.template")}</dt>
-                  <dd className="mt-xs">{latestJob.templateId ?? "-"}</dd>
-                </div>
-                <div>
                   <dt className="label-uppercase">{t("contracts.created")}</dt>
                   <dd className="mt-xs">{formatDisplayDate(latestJob.createdAt, "-", locale)}</dd>
                 </div>
@@ -333,27 +313,6 @@ export function MyContractsPage() {
                   {workspaces.map((workspace) => (
                     <option key={workspace.workspaceId} value={workspace.workspaceId}>
                       {workspace.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="block text-sm font-semibold">
-                {t("contracts.template")}
-                <select
-                  className="form-field mt-xs"
-                  value={generationForm.templateId}
-                  onChange={(event) =>
-                    setGenerationForm((current) => ({
-                      ...current,
-                      templateId: event.target.value,
-                    }))
-                  }
-                >
-                  <option value="">{t("contracts.noTemplate")}</option>
-                  {templates.map((template) => (
-                    <option key={template.id} value={template.id}>
-                      {template.name}
                     </option>
                   ))}
                 </select>
@@ -428,41 +387,19 @@ export function MyContractsPage() {
                 />
               </label>
 
-              <div className="grid gap-md sm:grid-cols-2">
-                <label className="block text-sm font-semibold">
-                  {t("contracts.type")}
-                  <input
-                    className="form-field mt-xs"
-                    value={saveForm.contractType}
-                    onChange={(event) =>
-                      setSaveForm((current) => ({
-                        ...current,
-                        contractType: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label className="block text-sm font-semibold">
-                  {t("contracts.template")}
-                  <select
-                    className="form-field mt-xs"
-                    value={saveForm.templateId}
-                    onChange={(event) =>
-                      setSaveForm((current) => ({
-                        ...current,
-                        templateId: event.target.value,
-                      }))
-                    }
-                  >
-                    <option value="">{t("contracts.none")}</option>
-                    {templates.map((template) => (
-                      <option key={template.id} value={template.id}>
-                        {template.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
+              <label className="block text-sm font-semibold">
+                {t("contracts.type")}
+                <input
+                  className="form-field mt-xs"
+                  value={saveForm.contractType}
+                  onChange={(event) =>
+                    setSaveForm((current) => ({
+                      ...current,
+                      contractType: event.target.value,
+                    }))
+                  }
+                />
+              </label>
 
               <label className="block text-sm font-semibold">
                 {t("contracts.generationJobId")}
