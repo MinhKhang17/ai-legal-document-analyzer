@@ -1042,3 +1042,5 @@ BUILD SUCCESS
 - Chuyen toan bo implementation sang `service/impl/TicketCollaborationServiceImpl`.
 - Controller va cac service khac tiep tuc phu thuoc interface; khong thay doi API hay business logic.
 - Cap nhat unit test de khoi tao implementation truc tiep.
+- Tach `KnowledgeIngestNotificationService` thanh interface va chuyen logic sang
+  `service/knowledge/impl/KnowledgeIngestNotificationServiceImpl`; khong thay doi luong notification/email.
