@@ -126,7 +126,9 @@ public class KnowledgeIngestedDocumentsServiceImpl implements KnowledgeIngestedD
         Document sourceDocument = version.getSourceDocument();
         String sourceFileId = sourceDocument != null ? sourceDocument.getId() : null;
         AiDocumentSnapshot aiSnapshot = sourceFileId == null ? null : aiSnapshots.get(sourceFileId);
-        Integer chunkCount = sourceDocument != null && sourceDocument.getChunkCount() != null
+        Integer chunkCount = version.getChunkCount() != null
+                ? version.getChunkCount()
+                : sourceDocument != null && sourceDocument.getChunkCount() != null
                 ? sourceDocument.getChunkCount()
                 : aiSnapshot != null && aiSnapshot.version().getChunkCount() != null
                     ? aiSnapshot.version().getChunkCount()
@@ -157,8 +159,9 @@ public class KnowledgeIngestedDocumentsServiceImpl implements KnowledgeIngestedD
                 .ingestStatus(resolveIngestStatus(version, aiSnapshot))
                 .chunkCount(chunkCount)
                 .embeddedCount(embeddedCount)
-                .sourceFileId(sourceFileId)
-                .contentHash(aiSnapshot != null ? aiSnapshot.version().getContentHash() : null)
+                .sourceFileId(version.getNeo4jDocumentId() != null ? version.getNeo4jDocumentId() : sourceFileId)
+                .contentHash(version.getSourceFileHash() != null ? version.getSourceFileHash()
+                        : aiSnapshot != null ? aiSnapshot.version().getContentHash() : null)
                 .ingestedAt(ingestedAt)
                 .publishedAt(version.getPublishedAt())
                 .ingestedById(version.getIngestedBy() == null ? null : version.getIngestedBy().getId())

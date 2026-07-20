@@ -164,6 +164,7 @@ def _run_admin_ingest_job(
             "status": "INGESTED",
             "progressPercent": 100,
             "chunkCount": result.total_chunks,
+            "neo4jDocumentId": result.document_id,
             "errorMessage": None,
         })
     except Exception as exc:

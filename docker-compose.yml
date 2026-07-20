@@ -30,6 +30,7 @@ services:
       - postgres
     volumes:
       - shared_uploads:/app/uploads
+      - ./data:/app/data
 
   ngrok:
     image: ngrok/ngrok:latest
@@ -89,6 +90,7 @@ services:
     volumes:
       - neo4j_data:/data
       - neo4j_logs:/logs
+      - ./backups:/backups
     healthcheck:
       test: ["CMD-SHELL", "cypher-shell -u neo4j -p password 'RETURN 1;'"]
       interval: 20s

@@ -89,16 +89,30 @@ public class KnowledgeUploadServiceImpl implements KnowledgeUploadService {
     @Override
     @Transactional
     public KnowledgeBaseVersionResponse storeSourceFile(String entryId, MultipartFile file) throws IOException {
+        return storeSourceFile(entryId, file.getInputStream(), file.getOriginalFilename(), file.getContentType(), file.getSize());
+    }
+
+    @Override
+    @Transactional
+    public KnowledgeBaseVersionResponse storeSourceFile(
+            String entryId, Path sourcePath, String originalFileName, String contentType) throws IOException {
+        return storeSourceFile(entryId, Files.newInputStream(sourcePath), originalFileName, contentType, Files.size(sourcePath));
+    }
+
+    private KnowledgeBaseVersionResponse storeSourceFile(
+            String entryId, java.io.InputStream inputStream, String originalFileName, String contentType, long size) throws IOException {
         KnowledgeBaseVersion version = currentVersion(entryId);
-        String fileName = safeSourceFileName(file.getOriginalFilename());
+        String fileName = safeSourceFileName(originalFileName);
         Path directory = Path.of(uploadRoot, "knowledge-source", entryId, version.getId()).toAbsolutePath().normalize();
         Files.createDirectories(directory);
         Path target = directory.resolve(fileName).normalize();
         if (!target.startsWith(directory)) throw new IllegalArgumentException("INVALID_SOURCE_FILE_PATH");
-        Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+        try (inputStream) {
+            Files.copy(inputStream, target, StandardCopyOption.REPLACE_EXISTING);
+        }
         version.setOriginalFileName(fileName);
-        version.setSourceContentType(file.getContentType());
-        version.setSourceFileSize(file.getSize());
+        version.setSourceContentType(contentType);
+        version.setSourceFileSize(size);
         version.setSourceStoragePath(target.toString());
         version.setSourceUploadedAt(LocalDateTime.now());
         return KnowledgeMappingSupport.toVersionResponse(versionRepository.save(version));

@@ -14,4 +14,10 @@ public interface KnowledgeBaseVersionRepository extends JpaRepository<KnowledgeB
     Optional<KnowledgeBaseVersion> findByKnowledgeBaseEntryIdAndVersionNo(String knowledgeBaseEntryId, Integer versionNo);
 
     List<KnowledgeBaseVersion> findByStatus(KnowledgeStatus status);
+
+    Optional<KnowledgeBaseVersion> findFirstBySourceFileHashOrderByCreatedAtDesc(String sourceFileHash);
+
+    Optional<KnowledgeBaseVersion> findFirstByNeo4jDocumentId(String neo4jDocumentId);
+
+    Optional<KnowledgeBaseVersion> findFirstByOriginalFileNameIgnoreCaseOrderByCreatedAtDesc(String originalFileName);
 }

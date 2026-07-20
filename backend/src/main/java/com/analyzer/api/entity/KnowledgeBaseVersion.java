@@ -112,6 +112,27 @@ public class KnowledgeBaseVersion {
     @Column(name = "source_uploaded_at")
     private LocalDateTime sourceUploadedAt;
 
+    @Column(name = "source_relative_path", columnDefinition = "TEXT")
+    private String sourceRelativePath;
+
+    @Column(name = "source_file_hash", length = 64)
+    private String sourceFileHash;
+
+    @Column(name = "ingest_source", length = 100)
+    private String ingestSource;
+
+    @Column(name = "neo4j_document_id")
+    private String neo4jDocumentId;
+
+    @Column(name = "chunk_count")
+    private Integer chunkCount;
+
+    @Column(name = "source_version_label")
+    private String sourceVersionLabel;
+
+    @Column(name = "effective_date")
+    private String effectiveDate;
+
     @Column(name = "ingest_notified_at")
     private LocalDateTime ingestNotifiedAt;
 

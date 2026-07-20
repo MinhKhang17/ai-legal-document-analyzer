@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import hashlib
 import json
 from pathlib import Path
-from types import SimpleNamespace
 
 from scripts.bulk_ingest_legal_docs import run_bulk_ingest, scan_files
 
@@ -21,7 +19,7 @@ def test_scan_is_recursive_sorted_and_excludes_control_files(tmp_path: Path) -> 
     ]
 
 
-def test_ingest_is_sequential_and_duplicate_hash_is_skipped(tmp_path: Path) -> None:
+def test_ingest_is_sequential_and_uses_backend_status(tmp_path: Path) -> None:
     (tmp_path / "1.txt").write_text("first", encoding="utf-8")
     (tmp_path / "2.txt").write_text("duplicate", encoding="utf-8")
     (tmp_path / "3.txt").write_text("third", encoding="utf-8")
@@ -29,45 +27,39 @@ def test_ingest_is_sequential_and_duplicate_hash_is_skipped(tmp_path: Path) -> N
         json.dumps({"1.txt": {"title": "First law", "code": "LAW-1"}}),
         encoding="utf-8",
     )
-    duplicate_hash = hashlib.sha256(b"duplicate").hexdigest()
     events: list[str] = []
 
-    class FakeService:
-        def __init__(self, document_metadata: dict) -> None:
-            self.metadata = document_metadata
-
-        def ingest_file(self, path: str, **_: object) -> SimpleNamespace:
-            name = Path(path).name
-            events.append(f"ingest:{name}")
-            return SimpleNamespace(document_id=f"doc-{name}", total_chunks=2)
-
-    def service_factory(document_metadata: dict) -> FakeService:
-        if document_metadata["original_file_name"] == "1.txt":
-            assert document_metadata["title"] == "First law"
-            assert document_metadata["code"] == "LAW-1"
-            assert document_metadata["visibility"] == "PRIVATE"
-            assert document_metadata["active"] is False
-        return FakeService(document_metadata)
-
-    def status_updater(_repository: object, document_id: str, status: str, **_: object) -> None:
-        events.append(f"status:{document_id}:{status}")
+    def backend_call(payload: dict) -> dict:
+        relative_path = payload["relativePath"]
+        events.append(f"start:{relative_path}")
+        if relative_path == "1.txt":
+            assert payload["title"] == "First law"
+            assert payload["code"] == "LAW-1"
+        events.append(f"finish:{relative_path}")
+        if relative_path == "2.txt":
+            return {
+                "status": "SKIPPED", "backendMetadataStatus": "EXISTS",
+                "postgresStatus": "INGESTED", "neo4jStatus": "COMPLETED",
+                "chunkCount": 2, "errorMessage": "duplicate_hash",
+            }
+        return {
+            "status": "COMPLETED", "backendMetadataStatus": "CREATED",
+            "postgresStatus": "INGESTED", "neo4jStatus": "COMPLETED",
+            "chunkCount": 2,
+        }
 
     report = run_bulk_ingest(
         input_dir=tmp_path,
         dry_run=False,
         force=False,
         stop_on_error=False,
-        service_factory=service_factory,
-        repository=object(),
-        completed_hash_loader=lambda _: {duplicate_hash},
-        status_updater=status_updater,
+        backend_call=backend_call,
     )
 
     assert events == [
-        "ingest:1.txt",
-        "status:doc-1.txt:COMPLETED",
-        "ingest:3.txt",
-        "status:doc-3.txt:COMPLETED",
+        "start:1.txt", "finish:1.txt",
+        "start:2.txt", "finish:2.txt",
+        "start:3.txt", "finish:3.txt",
     ]
     assert report["completed"] == 2
     assert report["skipped"] == 1

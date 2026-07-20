@@ -80,6 +80,10 @@ public class KnowledgePublicationServiceImpl implements KnowledgePublicationServ
     }
 
     private boolean syncAiLifecycle(KnowledgeBaseEntry entry, KnowledgeBaseVersion version, boolean makePublic) {
+        if (version.getNeo4jDocumentId() != null
+                && aiClient.updateLifecycle(entry.getId(), version.getNeo4jDocumentId(), makePublic)) {
+            return true;
+        }
         if (aiClient.updateLifecycle(entry.getId(), entry.getId(), makePublic)) {
             return true;
         }

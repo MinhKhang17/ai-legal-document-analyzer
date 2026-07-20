@@ -7,5 +7,6 @@ public class KnowledgeIngestionProgressRequest {
     private String status;
     private Integer progressPercent;
     private Integer chunkCount;
+    private String neo4jDocumentId;
     private String errorMessage;
 }

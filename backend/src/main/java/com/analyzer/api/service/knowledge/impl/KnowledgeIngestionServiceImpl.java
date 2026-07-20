@@ -80,6 +80,10 @@ public class KnowledgeIngestionServiceImpl implements KnowledgeIngestionService 
             version.setIngestStatus(KnowledgeStatus.INGESTED);
             version.setIngestedAt(now);
             version.setIngestedBy(job.getIngestedBy());
+            if (request.getChunkCount() != null) version.setChunkCount(request.getChunkCount());
+            if (request.getNeo4jDocumentId() != null && !request.getNeo4jDocumentId().isBlank()) {
+                version.setNeo4jDocumentId(request.getNeo4jDocumentId().trim());
+            }
             version.setErrorMessage(null);
             entry.setCurrentStatus(KnowledgeStatus.INGESTED);
             if (firstSuccessfulCallback) {

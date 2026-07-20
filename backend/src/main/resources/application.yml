@@ -66,6 +66,11 @@ app:
   storage:
     upload-root: ${APP_STORAGE_UPLOAD_ROOT:uploads}
 
+  knowledge:
+    bulk-input-dir: ${KNOWLEDGE_BULK_INPUT_DIR:/app/data/legal-bulk-input}
+    bulk-internal-key: ${KNOWLEDGE_BULK_INTERNAL_KEY:}
+    bulk-admin-id: ${KNOWLEDGE_BULK_ADMIN_ID:}
+
   frontend:
     base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
 

@@ -81,6 +81,13 @@ export interface KnowledgeBaseVersion {
   size?: number | null;
   uploadedAt?: string | null;
   sourceFileAvailable?: boolean;
+  sourceRelativePath?: string | null;
+  sourceFileHash?: string | null;
+  ingestSource?: string | null;
+  neo4jDocumentId?: string | null;
+  chunkCount?: number | null;
+  sourceVersionLabel?: string | null;
+  effectiveDate?: string | null;
   reviewDecision: KnowledgeReviewDecision | null;
   reviewedById: number | null;
   reviewedAt: string | null;
