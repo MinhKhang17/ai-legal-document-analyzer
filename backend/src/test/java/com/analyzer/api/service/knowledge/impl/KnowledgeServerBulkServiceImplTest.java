@@ -5,7 +5,9 @@ import com.analyzer.api.dto.knowledge.ServerBulkIngestFileRequest;
 import com.analyzer.api.dto.knowledge.ServerBulkIngestFileResponse;
 import com.analyzer.api.entity.KnowledgeBaseEntry;
 import com.analyzer.api.entity.KnowledgeBaseVersion;
+import com.analyzer.api.entity.User;
 import com.analyzer.api.enums.KnowledgeStatus;
+import com.analyzer.api.enums.KnowledgeVisibility;
 import com.analyzer.api.repository.UserRepository;
 import com.analyzer.api.repository.knowledge.KnowledgeBaseEntryRepository;
 import com.analyzer.api.repository.knowledge.KnowledgeBaseVersionRepository;
@@ -22,6 +24,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -64,6 +67,7 @@ class KnowledgeServerBulkServiceImplTest {
         KnowledgeBaseEntry entry = KnowledgeBaseEntry.builder().id("kb-1").code("LAW").build();
         KnowledgeBaseVersion version = KnowledgeBaseVersion.builder()
                 .id("kbv-1").knowledgeBaseEntry(entry).ingestStatus(KnowledgeStatus.INGESTED)
+                .status(KnowledgeStatus.PUBLIC).visibility(KnowledgeVisibility.PUBLIC).active(true)
                 .neo4jDocumentId("neo-1").chunkCount(4).build();
         when(versionRepository.findFirstBySourceFileHashOrderByCreatedAtDesc(anyString())).thenReturn(Optional.of(version));
 
@@ -74,6 +78,46 @@ class KnowledgeServerBulkServiceImplTest {
 
         assertEquals("SKIPPED", response.getStatus());
         assertEquals("duplicate_hash", response.getErrorMessage());
+        verify(uploadService, never()).upload(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void completedPrivateDuplicateIsPublishedBeforeItIsSkipped() throws Exception {
+        KnowledgeUploadService uploadService = mock(KnowledgeUploadService.class);
+        KnowledgeIngestionService ingestionService = mock(KnowledgeIngestionService.class);
+        KnowledgeBaseVersionRepository versionRepository = mock(KnowledgeBaseVersionRepository.class);
+        KnowledgeBaseEntryRepository entryRepository = mock(KnowledgeBaseEntryRepository.class);
+        UserRepository userRepository = mock(UserRepository.class);
+        KnowledgeBaseAiClient aiClient = mock(KnowledgeBaseAiClient.class);
+        KnowledgeServerBulkServiceImpl service = new KnowledgeServerBulkServiceImpl(
+                uploadService, ingestionService, entryRepository, versionRepository, userRepository, aiClient);
+        ReflectionTestUtils.setField(service, "configuredBulkInputDir", inputDir.toString());
+        Files.writeString(inputDir.resolve("law.txt"), "legal content");
+        User admin = User.builder().id(1L).build();
+        KnowledgeBaseEntry entry = KnowledgeBaseEntry.builder().id("kb-1").code("LAW").active(false).build();
+        KnowledgeBaseVersion version = KnowledgeBaseVersion.builder()
+                .id("kbv-1").knowledgeBaseEntry(entry).status(KnowledgeStatus.INGESTED)
+                .ingestStatus(KnowledgeStatus.INGESTED).visibility(KnowledgeVisibility.PRIVATE).active(false)
+                .neo4jDocumentId("neo-1").chunkCount(4).build();
+        when(versionRepository.findFirstBySourceFileHashOrderByCreatedAtDesc(anyString()))
+                .thenReturn(Optional.of(version));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(admin));
+        when(aiClient.updateLifecycle("kb-1", "neo-1", true)).thenReturn(true);
+        when(versionRepository.save(any(KnowledgeBaseVersion.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ServerBulkIngestFileRequest request = new ServerBulkIngestFileRequest();
+        request.setRelativePath("law.txt");
+
+        ServerBulkIngestFileResponse response = service.ingestFile(request, 1L);
+
+        assertEquals("SKIPPED", response.getStatus());
+        assertEquals("PUBLIC", response.getPostgresStatus());
+        assertEquals(KnowledgeStatus.PUBLIC, version.getStatus());
+        assertEquals(KnowledgeVisibility.PUBLIC, version.getVisibility());
+        assertEquals(true, version.getActive());
+        assertEquals(true, entry.getActive());
+        verify(aiClient).updateLifecycle("kb-1", "neo-1", true);
+        verify(entryRepository).save(entry);
         verify(uploadService, never()).upload(org.mockito.ArgumentMatchers.any());
     }
 

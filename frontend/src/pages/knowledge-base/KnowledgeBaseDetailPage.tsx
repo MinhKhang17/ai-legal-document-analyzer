@@ -12,7 +12,6 @@ import {
   archiveKnowledgeBaseEntry,
   getKnowledgeBaseEntry,
   getKnowledgeBaseVersions,
-  publishKnowledgeBaseEntry,
   reviewKnowledgeBaseEntry,
   unpublishKnowledgeBaseEntry,
   downloadKnowledgeBaseSourceFile,
@@ -198,15 +197,6 @@ export function KnowledgeBaseDetailPage() {
                     )}
                   >
                     {t("knowledge.approve")}
-                  </Button>
-                  <Button
-                    disabled={saving || !note.trim() || !canKnowledgeAction(entry.currentStatus, 'PUBLISH')}
-                    onClick={() => void runAction(
-                      () => publishKnowledgeBaseEntry(id, { note: note.trim() }),
-                      t("knowledge.publishSuccess"),
-                    )}
-                  >
-                    {t("knowledge.publish")}
                   </Button>
                   <Button
                     variant="secondary"

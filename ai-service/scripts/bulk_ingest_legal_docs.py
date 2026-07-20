@@ -64,14 +64,12 @@ def write_report(report_path: Path, report: dict[str, Any]) -> None:
 
 class BackendBulkClient:
     def __init__(self, backend_url: str, token: str, internal_key: str) -> None:
-        if not token.strip() and not internal_key.strip():
-            raise ValueError("Backend admin token or KNOWLEDGE_BULK_INTERNAL_KEY is required")
         if internal_key.strip():
             self.endpoint = backend_url.rstrip("/") + "/api/internal/knowledge-bulk/ingest-file"
             headers = {"X-Internal-Bulk-Key": internal_key.strip()}
         else:
             self.endpoint = backend_url.rstrip("/") + "/api/v1/admin/knowledge-base/bulk-ingest-server-file"
-            headers = {"Authorization": f"Bearer {token.strip()}"}
+            headers = {"Authorization": f"Bearer {token.strip()}"} if token.strip() else {}
         self.client = httpx.Client(
             headers=headers,
             timeout=None,

@@ -315,14 +315,12 @@ export function KnowledgeBasePage() {
               </div>
             )}
 
-            <div className="grid grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] items-center gap-xs text-center text-xs text-on-surface-variant dark:text-slate-400">
+            <div className="grid grid-cols-[1fr_auto_1fr_auto_1fr] items-center gap-xs text-center text-xs text-on-surface-variant dark:text-slate-400">
               <div><FileText className="mx-auto mb-xs h-4 w-4" /><span>{t("knowledge.lifecycleUpload")}</span></div>
               <ArrowRight className="h-4 w-4" />
               <div><span className="font-semibold text-on-surface dark:text-slate-200">2</span><br />{t("knowledge.ingest")}</div>
               <ArrowRight className="h-4 w-4" />
-              <div><span className="font-semibold text-on-surface dark:text-slate-200">3</span><br />{t("knowledge.review")}</div>
-              <ArrowRight className="h-4 w-4" />
-              <div><span className="font-semibold text-on-surface dark:text-slate-200">4</span><br />{t("knowledge.publish")}</div>
+              <div><span className="font-semibold text-on-surface dark:text-slate-200">3</span><br />{language === "vi" ? "Duyệt & công khai" : "Approve & publish"}</div>
             </div>
           </div>
         </Card>
@@ -333,7 +331,7 @@ export function KnowledgeBasePage() {
             <ul className="space-y-xs text-sm text-on-surface-variant dark:text-slate-300">
               <li>✓ PDF, DOC, DOCX, TXT, Markdown, CSV, JSON</li>
               <li>✓ AI xử lý nền; bạn có thể rời trang</li>
-              <li>✓ Cần Review và Publish trước khi dùng cho RAG</li>
+              <li>✓ Khi admin duyệt, tài liệu được công khai và dùng cho RAG ngay</li>
               <li>✓ Có thể tải lại file gốc sau khi upload</li>
             </ul>
             <div className="flex flex-wrap gap-xs"><Badge tone="amber">PENDING</Badge><Badge tone="amber">PROCESSING</Badge><Badge tone="green">INGESTED</Badge><Badge tone="purple">REVIEWING</Badge><Badge tone="green">PUBLIC</Badge><Badge tone="red">FAILED</Badge></div>

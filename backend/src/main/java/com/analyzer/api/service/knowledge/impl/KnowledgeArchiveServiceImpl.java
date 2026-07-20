@@ -54,6 +54,10 @@ public class KnowledgeArchiveServiceImpl implements KnowledgeArchiveService {
     }
 
     private boolean syncAiLifecycle(KnowledgeBaseEntry entry, KnowledgeBaseVersion version) {
+        if (version.getNeo4jDocumentId() != null
+                && aiClient.updateLifecycle(entry.getId(), version.getNeo4jDocumentId(), false)) {
+            return true;
+        }
         if (aiClient.updateLifecycle(entry.getId(), entry.getId(), false)) {
             return true;
         }

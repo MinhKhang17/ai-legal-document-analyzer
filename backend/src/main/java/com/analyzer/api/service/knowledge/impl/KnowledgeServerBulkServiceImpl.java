@@ -68,8 +68,16 @@ public class KnowledgeServerBulkServiceImpl implements KnowledgeServerBulkServic
                 .orElse(false);
         if (alreadyIngested && !request.isForce()) {
             KnowledgeBaseVersion existing = duplicate.get();
+            if (existing.getStatus() != KnowledgeStatus.PUBLIC) {
+                User admin = findAdmin(adminId);
+                if (!autoPublish(existing, admin)) {
+                    return response(request.getRelativePath(), fileHash, "FAILED", "EXISTS",
+                            existing.getStatus(), "FAILED", existing, null,
+                            "neo4j_lifecycle_update_failed");
+                }
+            }
             return response(request.getRelativePath(), fileHash, "SKIPPED", "EXISTS",
-                    existing.getIngestStatus(), existing.getNeo4jDocumentId() == null ? "UNKNOWN" : "COMPLETED",
+                    existing.getStatus(), "COMPLETED",
                     existing, null, "duplicate_hash");
         }
         if (request.isDryRun()) {
@@ -79,8 +87,7 @@ public class KnowledgeServerBulkServiceImpl implements KnowledgeServerBulkServic
                     .neo4jStatus("NOT_WRITTEN").chunkCount(0).build();
         }
 
-        User admin = userRepository.findById(adminId)
-                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay admin ID: " + adminId));
+        User admin = findAdmin(adminId);
         String title = StringUtils.hasText(request.getTitle())
                 ? request.getTitle().trim() : stripExtension(sourcePath.getFileName().toString());
         String code = duplicate.map(version -> version.getKnowledgeBaseEntry().getCode())
@@ -118,9 +125,12 @@ public class KnowledgeServerBulkServiceImpl implements KnowledgeServerBulkServic
             KnowledgeBaseVersion completedVersion = versionRepository.findById(uploaded.getId())
                     .orElseThrow(() -> new ResourceNotFoundException("KNOWLEDGE_BASE_VERSION_NOT_FOUND"));
             boolean completed = completedJob.getStatus() == KnowledgeStatus.INGESTED;
-            return response(request.getRelativePath(), fileHash, completed ? "COMPLETED" : "FAILED", "CREATED",
-                    completedVersion.getIngestStatus(), completed ? "COMPLETED" : "FAILED",
-                    completedVersion, completedJob.getId(), completedJob.getErrorMessage());
+            boolean published = completed && autoPublish(completedVersion, admin);
+            String errorMessage = completed && !published
+                    ? "neo4j_lifecycle_update_failed" : completedJob.getErrorMessage();
+            return response(request.getRelativePath(), fileHash, published ? "COMPLETED" : "FAILED", "CREATED",
+                    completedVersion.getStatus(), published ? "COMPLETED" : "FAILED",
+                    completedVersion, completedJob.getId(), errorMessage);
         } catch (Exception exception) {
             if (uploaded != null) {
                 markVersionFailed(uploaded.getId(), exception);
@@ -160,8 +170,7 @@ public class KnowledgeServerBulkServiceImpl implements KnowledgeServerBulkServic
                     .chunkCount(request.getChunkCount()).build();
         }
 
-        User admin = userRepository.findById(adminId)
-                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay admin ID: " + adminId));
+        User admin = findAdmin(adminId);
         String title = StringUtils.hasText(request.getTitle()) ? request.getTitle().trim()
                 : StringUtils.hasText(request.getFileName()) ? stripExtension(request.getFileName()) : request.getNeo4jDocumentId();
         String hashSeed = StringUtils.hasText(request.getFileHash()) ? request.getFileHash() : request.getNeo4jDocumentId();
@@ -193,23 +202,9 @@ public class KnowledgeServerBulkServiceImpl implements KnowledgeServerBulkServic
         versionRepository.save(version);
         entryRepository.save(entry);
 
-        boolean lifecycleUpdated = aiClient.updateLifecycle(entry.getId(), request.getNeo4jDocumentId(), true);
-        if (lifecycleUpdated) {
-            version.setStatus(KnowledgeStatus.PUBLIC);
-            version.setVisibility(KnowledgeVisibility.PUBLIC);
-            version.setActive(true);
-            version.setReviewDecision(KnowledgeReviewDecision.APPROVE);
-            version.setReviewedBy(admin);
-            version.setReviewedAt(LocalDateTime.now());
-            version.setPublishedBy(admin);
-            version.setPublishedAt(LocalDateTime.now());
-            entry.setCurrentStatus(KnowledgeStatus.PUBLIC);
-            entry.setActive(true);
-            versionRepository.save(version);
-            entryRepository.save(entry);
-        }
+        boolean lifecycleUpdated = autoPublish(version, admin);
         return response(request.getFileName(), request.getFileHash(), lifecycleUpdated ? "COMPLETED" : "FAILED",
-                "CREATED", version.getIngestStatus(), lifecycleUpdated ? "COMPLETED" : "FAILED", version, null,
+                "CREATED", version.getStatus(), lifecycleUpdated ? "COMPLETED" : "FAILED", version, null,
                 lifecycleUpdated ? null : "neo4j_lifecycle_update_failed");
     }
 
@@ -226,6 +221,45 @@ public class KnowledgeServerBulkServiceImpl implements KnowledgeServerBulkServic
                 throw new IllegalStateException("Bulk ingest interrupted while waiting for AI worker", exception);
             }
         }
+    }
+
+    private User findAdmin(Long adminId) {
+        return userRepository.findById(adminId)
+                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay admin ID: " + adminId));
+    }
+
+    private boolean autoPublish(KnowledgeBaseVersion version, User admin) {
+        KnowledgeBaseEntry entry = version.getKnowledgeBaseEntry();
+        if (!syncAiLifecycle(entry, version)) {
+            return false;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        version.setStatus(KnowledgeStatus.PUBLIC);
+        version.setVisibility(KnowledgeVisibility.PUBLIC);
+        version.setActive(true);
+        version.setReviewDecision(KnowledgeReviewDecision.APPROVE);
+        version.setReviewedBy(admin);
+        version.setReviewedAt(now);
+        version.setPublishedBy(admin);
+        version.setPublishedAt(now);
+        version.setErrorMessage(null);
+        entry.setCurrentStatus(KnowledgeStatus.PUBLIC);
+        entry.setActive(true);
+        versionRepository.save(version);
+        entryRepository.save(entry);
+        return true;
+    }
+
+    private boolean syncAiLifecycle(KnowledgeBaseEntry entry, KnowledgeBaseVersion version) {
+        if (StringUtils.hasText(version.getNeo4jDocumentId())
+                && aiClient.updateLifecycle(entry.getId(), version.getNeo4jDocumentId(), true)) {
+            return true;
+        }
+        if (aiClient.updateLifecycle(entry.getId(), entry.getId(), true)) {
+            return true;
+        }
+        return version.getSourceDocument() != null
+                && aiClient.updateLifecycle(entry.getId(), version.getSourceDocument().getId(), true);
     }
 
     private Path resolveSourcePath(String relativePath) {

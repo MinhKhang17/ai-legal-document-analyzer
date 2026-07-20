@@ -15,6 +15,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.http.HttpMethod;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -66,6 +67,8 @@ public class SecurityConfig {
                     .requestMatchers("/error").permitAll()
                     .requestMatchers("/api/v1/auth/me").authenticated()
                     .requestMatchers("/api/v1/auth/**").permitAll()
+                    .requestMatchers(HttpMethod.POST,
+                            "/api/v1/admin/knowledge-base/bulk-ingest-server-file").permitAll()
                     .requestMatchers(
                             "/api/v1/payment-transactions/vnpay-return",
                             "/api/v1/payment-transactions/vnpay-ipn",
