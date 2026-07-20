@@ -83,6 +83,12 @@ public class KnowledgeIngestionServiceImpl implements KnowledgeIngestionService 
             if (request.getChunkCount() != null) version.setChunkCount(request.getChunkCount());
             if (request.getNeo4jDocumentId() != null && !request.getNeo4jDocumentId().isBlank()) {
                 version.setNeo4jDocumentId(request.getNeo4jDocumentId().trim());
+                logger.info("AI ingest completed jobId={} aiDocumentId={}", job.getId(), version.getNeo4jDocumentId());
+                logger.info("Stored aiDocumentId in Postgres versionId={} aiDocumentId={}",
+                        version.getId(), version.getNeo4jDocumentId());
+            } else {
+                logger.warn("AI ingest callback completed without aiDocumentId jobId={} versionId={}",
+                        job.getId(), version.getId());
             }
             version.setErrorMessage(null);
             entry.setCurrentStatus(KnowledgeStatus.INGESTED);

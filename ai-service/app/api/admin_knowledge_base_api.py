@@ -213,6 +213,7 @@ def update_document_lifecycle(
     try:
         updated = repo.update_document_lifecycle(
             document_id,
+            knowledge_base_id=kb_id,
             visibility=visibility,
             active=request.public,
             published_at=published_at,

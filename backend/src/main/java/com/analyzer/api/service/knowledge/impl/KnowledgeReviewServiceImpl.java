@@ -18,6 +18,7 @@ import com.analyzer.api.service.knowledge.KnowledgeReviewService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 
@@ -84,14 +85,9 @@ public class KnowledgeReviewServiceImpl implements KnowledgeReviewService {
     }
 
     private boolean syncAiLifecycle(KnowledgeBaseEntry entry, KnowledgeBaseVersion version, boolean makePublic) {
-        if (version.getNeo4jDocumentId() != null
-                && aiClient.updateLifecycle(entry.getId(), version.getNeo4jDocumentId(), makePublic)) {
-            return true;
+        if (!StringUtils.hasText(version.getNeo4jDocumentId())) {
+            return false;
         }
-        if (aiClient.updateLifecycle(entry.getId(), entry.getId(), makePublic)) {
-            return true;
-        }
-        return version.getSourceDocument() != null
-                && aiClient.updateLifecycle(entry.getId(), version.getSourceDocument().getId(), makePublic);
+        return aiClient.updateLifecycle(entry.getId(), version.getNeo4jDocumentId().trim(), makePublic);
     }
 }

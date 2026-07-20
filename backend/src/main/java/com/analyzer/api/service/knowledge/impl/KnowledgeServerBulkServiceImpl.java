@@ -251,15 +251,10 @@ public class KnowledgeServerBulkServiceImpl implements KnowledgeServerBulkServic
     }
 
     private boolean syncAiLifecycle(KnowledgeBaseEntry entry, KnowledgeBaseVersion version) {
-        if (StringUtils.hasText(version.getNeo4jDocumentId())
-                && aiClient.updateLifecycle(entry.getId(), version.getNeo4jDocumentId(), true)) {
-            return true;
+        if (!StringUtils.hasText(version.getNeo4jDocumentId())) {
+            return false;
         }
-        if (aiClient.updateLifecycle(entry.getId(), entry.getId(), true)) {
-            return true;
-        }
-        return version.getSourceDocument() != null
-                && aiClient.updateLifecycle(entry.getId(), version.getSourceDocument().getId(), true);
+        return aiClient.updateLifecycle(entry.getId(), version.getNeo4jDocumentId().trim(), true);
     }
 
     private Path resolveSourcePath(String relativePath) {

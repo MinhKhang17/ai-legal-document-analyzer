@@ -48,10 +48,11 @@ class KnowledgeReviewServiceImplTest {
     void approveDoesNotPublishPostgresWhenNeo4jLifecycleCannotBeUpdated() {
         Fixture fixture = fixture();
         when(fixture.aiClient.updateLifecycle("kb-1", "neo-doc-1", true)).thenReturn(false);
-        when(fixture.aiClient.updateLifecycle("kb-1", "kb-1", true)).thenReturn(false);
 
         assertThrows(ConflictException.class, () -> fixture.service.review("kb-1", approveRequest()));
 
+        verify(fixture.aiClient).updateLifecycle("kb-1", "neo-doc-1", true);
+        verify(fixture.aiClient, never()).updateLifecycle("kb-1", "kb-1", true);
         verify(fixture.versionRepository, never()).save(fixture.version);
         verify(fixture.entryRepository, never()).save(fixture.entry);
     }

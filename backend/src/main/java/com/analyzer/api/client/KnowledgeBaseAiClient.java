@@ -101,6 +101,7 @@ public class KnowledgeBaseAiClient {
     }
 
     public boolean updateLifecycle(String kbId, String documentId, boolean makePublic) {
+        log.info("Lifecycle sync target kbId={} aiDocumentId={} public={}", kbId, documentId, makePublic);
         try {
             URI uri = UriComponentsBuilder.fromUriString(aiServiceBaseUrl)
                     .path("/ai/admin/knowledge-bases/{kbId}/ingested-documents/{documentId}/lifecycle")
@@ -114,9 +115,12 @@ public class KnowledgeBaseAiClient {
                     new HttpEntity<>(Map.of("public", makePublic), headers),
                     String.class
             );
-            return response.getStatusCode().is2xxSuccessful();
+            boolean succeeded = response.getStatusCode().is2xxSuccessful();
+            log.info("Lifecycle sync {} kbId={} aiDocumentId={} status={}",
+                    succeeded ? "success" : "failure", kbId, documentId, response.getStatusCode().value());
+            return succeeded;
         } catch (RestClientException ex) {
-            log.warn("Unable to update AI KB lifecycle kbId={} documentId={}: {}", kbId, documentId, ex.getMessage());
+            log.warn("Lifecycle sync failure kbId={} aiDocumentId={}: {}", kbId, documentId, ex.getMessage());
             return false;
         }
     }

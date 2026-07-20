@@ -98,6 +98,7 @@ class KnowledgeServerBulkServiceImplTest {
         KnowledgeBaseVersion version = KnowledgeBaseVersion.builder()
                 .id("kbv-1").knowledgeBaseEntry(entry).status(KnowledgeStatus.INGESTED)
                 .ingestStatus(KnowledgeStatus.INGESTED).visibility(KnowledgeVisibility.PRIVATE).active(false)
+                .sourceFileHash("file-hash-must-not-be-used-as-document-id")
                 .neo4jDocumentId("neo-1").chunkCount(4).build();
         when(versionRepository.findFirstBySourceFileHashOrderByCreatedAtDesc(anyString()))
                 .thenReturn(Optional.of(version));
@@ -117,8 +118,49 @@ class KnowledgeServerBulkServiceImplTest {
         assertEquals(true, version.getActive());
         assertEquals(true, entry.getActive());
         verify(aiClient).updateLifecycle("kb-1", "neo-1", true);
+        verify(aiClient, never()).updateLifecycle("kb-1", "kb-1", true);
+        verify(aiClient, never()).updateLifecycle("kb-1", "file-hash-must-not-be-used-as-document-id", true);
         verify(entryRepository).save(entry);
         verify(uploadService, never()).upload(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void completedDuplicateWithoutActualAiDocumentIdFailsAndStaysPrivate() throws Exception {
+        KnowledgeUploadService uploadService = mock(KnowledgeUploadService.class);
+        KnowledgeIngestionService ingestionService = mock(KnowledgeIngestionService.class);
+        KnowledgeBaseVersionRepository versionRepository = mock(KnowledgeBaseVersionRepository.class);
+        KnowledgeBaseEntryRepository entryRepository = mock(KnowledgeBaseEntryRepository.class);
+        UserRepository userRepository = mock(UserRepository.class);
+        KnowledgeBaseAiClient aiClient = mock(KnowledgeBaseAiClient.class);
+        KnowledgeServerBulkServiceImpl service = new KnowledgeServerBulkServiceImpl(
+                uploadService, ingestionService, entryRepository, versionRepository, userRepository, aiClient);
+        ReflectionTestUtils.setField(service, "configuredBulkInputDir", inputDir.toString());
+        Files.writeString(inputDir.resolve("missing-id.txt"), "legal content");
+        User admin = User.builder().id(1L).build();
+        KnowledgeBaseEntry entry = KnowledgeBaseEntry.builder().id("kb-2").code("LAW2").active(false).build();
+        KnowledgeBaseVersion version = KnowledgeBaseVersion.builder()
+                .id("kbv-2").knowledgeBaseEntry(entry).status(KnowledgeStatus.INGESTED)
+                .ingestStatus(KnowledgeStatus.INGESTED).visibility(KnowledgeVisibility.PRIVATE).active(false)
+                .sourceFileHash("legacy-file-hash").build();
+        when(versionRepository.findFirstBySourceFileHashOrderByCreatedAtDesc(anyString()))
+                .thenReturn(Optional.of(version));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(admin));
+
+        ServerBulkIngestFileRequest request = new ServerBulkIngestFileRequest();
+        request.setRelativePath("missing-id.txt");
+
+        ServerBulkIngestFileResponse response = service.ingestFile(request, 1L);
+
+        assertEquals("FAILED", response.getStatus());
+        assertEquals("neo4j_lifecycle_update_failed", response.getErrorMessage());
+        assertEquals(KnowledgeStatus.INGESTED, version.getStatus());
+        assertEquals(KnowledgeVisibility.PRIVATE, version.getVisibility());
+        assertEquals(false, version.getActive());
+        assertEquals(false, entry.getActive());
+        verify(aiClient, never()).updateLifecycle(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyBoolean());
+        verify(versionRepository, never()).save(version);
+        verify(entryRepository, never()).save(entry);
     }
 
     @Test
