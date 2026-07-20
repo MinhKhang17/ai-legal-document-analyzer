@@ -12,6 +12,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Entity
@@ -198,6 +199,18 @@ public class LegalTicket {
 
     @Column(name = "last_lawyer_message_at")
     private LocalDateTime lastLawyerMessageAt;
+
+    @Column(name = "consultation_fee", precision = 19, scale = 2)
+    @Builder.Default
+    private BigDecimal consultationFee = BigDecimal.ZERO;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "expert_payment_status", nullable = false)
+    @Builder.Default
+    private com.analyzer.api.enums.ExpertPaymentStatus expertPaymentStatus = com.analyzer.api.enums.ExpertPaymentStatus.UNPAID;
+
+    @Column(name = "expert_paid_at")
+    private LocalDateTime expertPaidAt;
 
     @Column(nullable = false)
     @Builder.Default
