@@ -20,4 +20,8 @@ public interface UserService {
      * locked for missing the password-change deadline, and resends the account-info email.
      */
     void resendExpertActivation(String email);
+
+    void requestPasswordReset(String email);
+
+    void resetPassword(com.analyzer.api.dto.auth.ResetPasswordRequestDTO request);
 }
