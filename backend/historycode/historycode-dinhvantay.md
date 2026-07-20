@@ -1033,3 +1033,12 @@ BUILD SUCCESS
 - Bo sung `ChatSessionSharingServiceImplTest`, `ExpertRevenueServiceImplTest` va `UserServicePasswordResetTest`.
 - Surefire: `Tests run: 36, Failures: 0, Errors: 0, Skipped: 0`.
 - Ket qua: `BUILD SUCCESS` khi dung temp directory nam trong workspace.
+
+---
+
+# Update History - 2026-07-20 - Service Layer Structure Correction
+
+- Tach `TicketCollaborationService` thanh interface dung quy uoc cua tang service.
+- Chuyen toan bo implementation sang `service/impl/TicketCollaborationServiceImpl`.
+- Controller va cac service khac tiep tuc phu thuoc interface; khong thay doi API hay business logic.
+- Cap nhat unit test de khoi tao implementation truc tiep.

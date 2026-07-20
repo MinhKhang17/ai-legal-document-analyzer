@@ -7,6 +7,7 @@ import com.analyzer.api.enums.TicketUploadStatus;
 import com.analyzer.api.exception.common.ConflictException;
 import com.analyzer.api.mapper.LegalTicketMapper;
 import com.analyzer.api.repository.*;
+import com.analyzer.api.service.impl.TicketCollaborationServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -36,11 +37,11 @@ class TicketCollaborationServiceTest {
     @Mock UserRepository userRepository;
     @Mock LegalTicketMapper mapper;
     @TempDir Path tempDir;
-    TicketCollaborationService service;
+    TicketCollaborationServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new TicketCollaborationService(ticketRepository, messageRepository, attachmentRepository,
+        service = new TicketCollaborationServiceImpl(ticketRepository, messageRepository, attachmentRepository,
                 shareRepository, auditRepository, snapshotRepository, userRepository, mapper);
         ReflectionTestUtils.setField(service, "maxSizeKb", 500L);
         ReflectionTestUtils.setField(service, "maxPerMessage", 5);
