@@ -22,7 +22,6 @@ import { useToast } from "../../hooks/useToast";
 import type { KnowledgeBaseEntry, KnowledgeBaseVersion } from "../../types/knowledgeBase";
 import { formatDisplayDate } from "../../utils/format";
 import { canKnowledgeAction } from "../../utils/knowledgeLifecycle";
-import { downloadStaffDocument } from "../../services/legalTicket.service";
 
 export function KnowledgeBaseDetailPage() {
   const { id = "" } = useParams();
@@ -108,7 +107,6 @@ export function KnowledgeBaseDetailPage() {
     { header: t("knowledge.review"), cell: (version) => version.reviewDecision || "-" },
     { header: t("contracts.created"), cell: (version) => formatDisplayDate(version.createdAt, "-", locale) },
     { header: language === "vi" ? "File đã upload" : "Uploaded file", cell: (version) => version.sourceFileAvailable ? <Button size="sm" variant="secondary" leftIcon={<Download className="h-4 w-4" />} onClick={async () => { try { await downloadKnowledgeBaseSourceFile(id); } catch (downloadError) { toast.error(downloadError instanceof Error ? downloadError.message : "Unable to download original file"); } }}>{language === "vi" ? "Tải file gốc" : "Download original"}</Button> : "-" },
-    { header: t("table.actions"), cell: (version) => version.sourceDocumentId ? <Button size="sm" variant="secondary" leftIcon={<Download className="h-4 w-4" />} onClick={async () => { try { const url = await downloadStaffDocument(version.sourceDocumentId!); const anchor = document.createElement("a"); anchor.href = url; anchor.download = `${entry?.code ?? "knowledge"}-v${version.versionNo}`; anchor.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000); } catch (downloadError) { toast.error(downloadError instanceof Error ? downloadError.message : "Unable to download original file"); } }}>{language === "vi" ? "Tải file gốc" : "Download original"}</Button> : "-" },
   ];
 
   return (

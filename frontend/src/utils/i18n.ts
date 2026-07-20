@@ -23,7 +23,6 @@ const en: TranslationDictionary = {
   "nav.jobs": "Jobs",
   "nav.admin": "Admin Console",
   "nav.adminTickets": "Legal Tickets",
-  "nav.auditLogs": "Audit Logs",
   "nav.systemHealth": "System Health",
   "nav.feedback": "Feedback",
   "nav.settings": "Settings",

@@ -214,10 +214,10 @@ export function KnowledgeBasePage() {
         </div>
       )}
 
-      <section className="mb-xl grid gap-gutter xl:grid-cols-[1.35fr_0.65fr]">
+      <section className="mb-xl grid grid-cols-1 items-start gap-gutter xl:grid-cols-[minmax(420px,0.85fr)_minmax(0,1.65fr)] [&>*]:min-w-0">
         <Card title={t("knowledge.uploadEntry")} subtitle={t("knowledge.uploadEntrySubtitle")}>
-          <div className="space-y-md">
-            <div className="rounded-2xl border border-primary/20 bg-primary/5 p-md dark:border-indigo-400/20 dark:bg-indigo-950/20">
+          <div className="space-y-lg">
+            <div className="rounded-2xl border border-primary/20 bg-primary/5 p-lg dark:border-indigo-400/20 dark:bg-indigo-950/20">
               <div className="flex items-start gap-md">
                 <span className="rounded-xl bg-primary/10 p-sm text-primary dark:bg-indigo-400/10 dark:text-indigo-300">
                   <ShieldCheck className="h-5 w-5" />
@@ -236,7 +236,7 @@ export function KnowledgeBasePage() {
               </div>
             </div>
 
-            <label className="block cursor-pointer rounded-2xl border-2 border-dashed border-legal-border bg-surface-container-low p-lg text-center transition hover:border-primary/60 hover:bg-primary/5 dark:border-slate-700 dark:bg-slate-900/60">
+            <label className="block cursor-pointer rounded-2xl border-2 border-dashed border-legal-border bg-surface-container-low px-lg py-xl text-center transition hover:border-primary/60 hover:bg-primary/5 dark:border-slate-700 dark:bg-slate-900/60">
               <input
                 className="sr-only"
                 type="file"
@@ -285,7 +285,7 @@ export function KnowledgeBasePage() {
                 <p><span className="text-on-surface-variant">Uploaded at:</span> {new Date().toLocaleString(locale)}</p>
               </div>
             )}
-            <div className="flex flex-wrap justify-end gap-sm border-t border-legal-border pt-md dark:border-slate-700">
+            <div className="flex flex-wrap justify-end gap-sm border-t border-legal-border pt-lg dark:border-slate-700">
               <Button variant="secondary" onClick={() => { setForm(emptyForm); setSelectedFile(null); setSelectedFileName(""); }} disabled={saving}>Hủy</Button>
               <Button variant="secondary" onClick={() => void handleUpload(false)} disabled={saving}>{saving ? (language === "vi" ? "Đang gửi tới backend..." : "Submitting to backend...") : "Lưu nháp"}</Button>
               <Button leftIcon={<Upload className="h-4 w-4" />} onClick={() => void handleUpload(true)} disabled={saving || !selectedFile}>
@@ -325,10 +325,10 @@ export function KnowledgeBasePage() {
           </div>
         </Card>
 
-        <Card title={t("knowledge.entries")} actions={<Badge tone="blue">{totalItems}</Badge>}>
-          <div className="mb-md space-y-md rounded-2xl border border-primary/20 bg-primary/5 p-md dark:border-indigo-400/20 dark:bg-indigo-950/20">
+        <Card title={t("knowledge.entries")}>
+          <div className="mb-lg space-y-sm rounded-2xl border border-primary/20 bg-primary/5 p-lg dark:border-indigo-400/20 dark:bg-indigo-950/20">
             <h3 className="font-semibold">Hướng dẫn nhập tài liệu</h3>
-            <ul className="space-y-xs text-sm text-on-surface-variant dark:text-slate-300">
+            <ul className="grid gap-xs text-sm text-on-surface-variant dark:text-slate-300 2xl:grid-cols-2">
               <li>✓ PDF, DOC, DOCX, TXT, Markdown, CSV, JSON</li>
               <li>✓ AI xử lý nền; bạn có thể rời trang</li>
               <li>✓ Khi admin duyệt, tài liệu được công khai và dùng cho RAG ngay</li>
