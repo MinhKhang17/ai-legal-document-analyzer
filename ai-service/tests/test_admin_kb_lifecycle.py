@@ -1,7 +1,7 @@
 import json
 from types import SimpleNamespace
 
-from app.api import knowledge_api
+from app.api import admin_knowledge_base_api, knowledge_api
 from app.graph.repository import GraphRepository
 from app.models.knowledge_models import RetrievedChunk
 from app.services.knowledge_service import KnowledgeServiceV2
@@ -148,3 +148,25 @@ def test_lifecycle_lookup_uses_actual_document_metadata_not_knowledge_base_id() 
         visibility="PUBLIC", active=True, published_at="now"
     ) == 0
     assert len(calls) == 1
+
+
+def test_ingested_document_list_uses_authoritative_ai_document_id(monkeypatch) -> None:
+    metadata = {
+        "knowledge_document_id": "actual-ai-document-id",
+        "knowledge_base_id": "kb-1",
+        "ingest_status": "INGESTED",
+        "embedding_text": "embedded",
+    }
+    repository = SimpleNamespace(list_chunks=lambda: [{
+        "chunk_id": "chunk-1",
+        "title": "Law",
+        "text": "content",
+        "source_path": "/tmp/job.pdf",
+        "metadata_json": json.dumps(metadata),
+    }])
+    monkeypatch.setattr(admin_knowledge_base_api, "GraphRepository", lambda: repository)
+
+    response = admin_knowledge_base_api.get_ingested_documents("kb-1", page=0, size=100)
+
+    assert response.items[0].legalDocumentId == "actual-ai-document-id"
+    assert response.items[0].versions[0].sourceFileId == "actual-ai-document-id"
