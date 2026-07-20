@@ -120,7 +120,9 @@ def get_ingested_documents(
 
     for row in chunk_rows:
         metadata = _parse_metadata(row.get("metadata_json"))
-        stored_kb_id = _safe_str(metadata.get("knowledge_base_id"))
+        source_metadata = metadata.get("source_metadata")
+        legacy_metadata = source_metadata if isinstance(source_metadata, dict) else {}
+        stored_kb_id = _safe_str(metadata.get("knowledge_base_id")) or _safe_str(legacy_metadata.get("knowledge_base_id"))
         if stored_kb_id and stored_kb_id != kb_id:
             continue
         document_id = (

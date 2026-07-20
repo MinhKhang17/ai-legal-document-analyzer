@@ -70,6 +70,7 @@ class KnowledgeService:
                 metadata = dict(node.metadata)
                 if node.label == "Chunk":
                     metadata.setdefault("knowledge_document_id", chunked.document_id)
+                    metadata.setdefault("knowledge_base_id", self.document_metadata.get("knowledge_base_id"))
                     metadata.setdefault("law_name", chunked.title)
                     metadata.setdefault("law_code", None)
                     metadata.setdefault("legal_domain", self.document_metadata.get("legal_domain") or None)

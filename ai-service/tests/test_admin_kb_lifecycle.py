@@ -135,7 +135,7 @@ def test_lifecycle_lookup_uses_actual_document_metadata_not_knowledge_base_id() 
         "chunk_id": "chunk-1",
         "metadata_json": json.dumps({
             "knowledge_document_id": "actual-ai-document-id",
-            "knowledge_base_id": "kb-1",
+            "source_metadata": {"knowledge_base_id": "kb-1"},
         }),
     }]
 
@@ -148,6 +148,8 @@ def test_lifecycle_lookup_uses_actual_document_metadata_not_knowledge_base_id() 
         visibility="PUBLIC", active=True, published_at="now"
     ) == 0
     assert len(calls) == 1
+    updated_metadata = json.loads(calls[0][1]["metadata_json"])
+    assert updated_metadata["knowledge_base_id"] == "kb-1"
 
 
 def test_ingested_document_list_uses_authoritative_ai_document_id(monkeypatch) -> None:
@@ -166,7 +168,9 @@ def test_ingested_document_list_uses_authoritative_ai_document_id(monkeypatch) -
     }])
     monkeypatch.setattr(admin_knowledge_base_api, "GraphRepository", lambda: repository)
 
-    response = admin_knowledge_base_api.get_ingested_documents("kb-1", page=0, size=100)
+    response = admin_knowledge_base_api.get_ingested_documents(
+        "kb-1", keyword=None, ingest_status=None, visibility=None, page=0, size=100
+    )
 
     assert response.items[0].legalDocumentId == "actual-ai-document-id"
     assert response.items[0].versions[0].sourceFileId == "actual-ai-document-id"

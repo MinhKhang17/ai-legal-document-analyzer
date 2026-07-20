@@ -242,7 +242,14 @@ class GraphRepository:
         updates: list[tuple[str, str]] = []
         for row in rows:
             metadata = self._parse_metadata(row.get("metadata_json"))
-            if knowledge_base_id and str(metadata.get("knowledge_base_id") or "") != knowledge_base_id:
+            source_metadata = metadata.get("source_metadata")
+            legacy_metadata = source_metadata if isinstance(source_metadata, dict) else {}
+            stored_knowledge_base_id = str(
+                metadata.get("knowledge_base_id")
+                or legacy_metadata.get("knowledge_base_id")
+                or ""
+            )
+            if knowledge_base_id and stored_knowledge_base_id != knowledge_base_id:
                 continue
             candidate_ids = {
                 str(metadata.get("document_id") or ""),
@@ -251,6 +258,7 @@ class GraphRepository:
             if document_id not in candidate_ids:
                 continue
             metadata.update({
+                "knowledge_base_id": knowledge_base_id or stored_knowledge_base_id or None,
                 "visibility": visibility,
                 "active": active,
                 "effective_status": "ACTIVE" if active and visibility == "PUBLIC" else "INACTIVE",
