@@ -23,11 +23,51 @@ import type { KnowledgeBaseEntry, KnowledgeBaseVersion } from "../../types/knowl
 import { formatDisplayDate } from "../../utils/format";
 import { canKnowledgeAction } from "../../utils/knowledgeLifecycle";
 
+const knowledgeStatusKeys: Record<string, string> = {
+  PENDING: "knowledge.status.PENDING",
+  UPLOADED: "knowledge.status.PENDING",
+  PROCESSING: "knowledge.status.PROCESSING",
+  INGESTED: "knowledge.status.INGESTED",
+  REVIEWING: "knowledge.status.REVIEWING",
+  PUBLIC: "knowledge.status.PUBLIC",
+  ARCHIVED: "knowledge.status.ARCHIVED",
+  FAILED: "knowledge.status.FAILED",
+};
+
+const knowledgeVisibilityKeys: Record<string, string> = {
+  PRIVATE: "knowledge.visibility.PRIVATE",
+  PUBLIC: "knowledge.visibility.PUBLIC",
+};
+
+const knowledgeScopeKeys: Record<string, string> = {
+  GLOBAL: "knowledge.scopeValue.GLOBAL",
+  WORKSPACE: "knowledge.scopeValue.WORKSPACE",
+};
+
+const knowledgeCategoryKeys: Record<string, string> = {
+  LEGAL_SOURCE: "knowledge.categoryValue.LEGAL_SOURCE",
+};
+
+const knowledgeReviewDecisionKeys: Record<string, string> = {
+  APPROVE: "knowledge.reviewDecision.APPROVE",
+  REQUEST_CHANGES: "knowledge.reviewDecision.REQUEST_CHANGES",
+  REJECT: "knowledge.reviewDecision.REJECT",
+};
+
 export function KnowledgeBaseDetailPage() {
   const { id = "" } = useParams();
   const { t, language } = useI18n();
   const toast = useToast();
   const locale = language === "vi" ? "vi-VN" : "en-US";
+  const fileSizeFormatter = new Intl.NumberFormat(locale, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  const translateEnum = (value: string | null | undefined, keys: Record<string, string>, fallback = "-") => {
+    if (!value) return fallback;
+    const key = keys[value];
+    return key ? t(key) : value;
+  };
   const [entry, setEntry] = useState<KnowledgeBaseEntry | null>(null);
   const [versions, setVersions] = useState<KnowledgeBaseVersion[]>([]);
   const [note, setNote] = useState("");
@@ -47,8 +87,8 @@ export function KnowledgeBaseDetailPage() {
       ]);
       setEntry(entryData);
       setVersions(versionData);
-    } catch (loadError) {
-      const message = loadError instanceof Error ? loadError.message : t("knowledge.loadError");
+    } catch {
+      const message = t("knowledge.loadError");
       setError(message);
       setEntry(null);
       setVersions([]);
@@ -69,8 +109,8 @@ export function KnowledgeBaseDetailPage() {
       await action();
       toast.success(successMessage);
       await loadEntry();
-    } catch (actionError) {
-      const message = actionError instanceof Error ? actionError.message : t("knowledge.updateError");
+    } catch {
+      const message = t("knowledge.updateError");
       setError(message);
       toast.error(message);
     } finally {
@@ -87,10 +127,10 @@ export function KnowledgeBaseDetailPage() {
         requestId: `kb-retry-${Date.now()}`,
         jobPayload: JSON.stringify({ filename: versions[0]?.fileName ?? null, retry: true }),
       });
-      toast.success(language === "vi" ? "Đã bắt đầu ingest lại ở chế độ nền." : "Background retry started.");
+      toast.success(t("knowledge.retryIngestStarted"));
       await loadEntry();
-    } catch (retryError) {
-      const message = retryError instanceof Error ? retryError.message : "Unable to retry ingest";
+    } catch {
+      const message = t("knowledge.retryIngestError");
       setError(message);
       toast.error(message);
     } finally {
@@ -100,13 +140,13 @@ export function KnowledgeBaseDetailPage() {
 
   const versionColumns: DataTableColumn<KnowledgeBaseVersion>[] = [
     { header: t("contracts.version"), cell: (version) => <span className="font-semibold">v{version.versionNo}</span> },
-    { header: t("table.status"), cell: (version) => <Badge>{version.status || t("common.unknown")}</Badge> },
-    { header: t("knowledge.ingestedDocuments.ingestStatus"), cell: (version) => <Badge>{version.ingestStatus || "-"}</Badge> },
-    { header: t("knowledge.ingestedDocuments.visibility"), cell: (version) => <Badge>{version.visibility || "-"}</Badge> },
+    { header: t("table.status"), cell: (version) => <Badge>{translateEnum(version.status, knowledgeStatusKeys, t("common.unknown"))}</Badge> },
+    { header: t("knowledge.ingestedDocuments.ingestStatus"), cell: (version) => <Badge>{translateEnum(version.ingestStatus, knowledgeStatusKeys)}</Badge> },
+    { header: t("knowledge.ingestedDocuments.visibility"), cell: (version) => <Badge>{translateEnum(version.visibility, knowledgeVisibilityKeys)}</Badge> },
     { header: t("knowledge.ingestedDocuments.active"), cell: (version) => version.active ? t("admin.active") : t("admin.inactive") },
-    { header: t("knowledge.review"), cell: (version) => version.reviewDecision || "-" },
+    { header: t("knowledge.review"), cell: (version) => translateEnum(version.reviewDecision, knowledgeReviewDecisionKeys) },
     { header: t("contracts.created"), cell: (version) => formatDisplayDate(version.createdAt, "-", locale) },
-    { header: language === "vi" ? "File đã upload" : "Uploaded file", cell: (version) => version.sourceFileAvailable ? <Button size="sm" variant="secondary" leftIcon={<Download className="h-4 w-4" />} onClick={async () => { try { await downloadKnowledgeBaseSourceFile(id); } catch (downloadError) { toast.error(downloadError instanceof Error ? downloadError.message : "Unable to download original file"); } }}>{language === "vi" ? "Tải file gốc" : "Download original"}</Button> : "-" },
+    { header: t("knowledge.uploadedFile"), cell: (version) => version.sourceFileAvailable ? <Button size="sm" variant="secondary" leftIcon={<Download className="h-4 w-4" />} onClick={async () => { try { await downloadKnowledgeBaseSourceFile(id); } catch { toast.error(t("knowledge.downloadOriginalError"), t("toast.errorTitle")); } }}>{t("knowledge.downloadOriginal")}</Button> : "-" },
   ];
 
   return (
@@ -139,17 +179,17 @@ export function KnowledgeBaseDetailPage() {
       ) : (
         <div className="grid gap-gutter xl:grid-cols-[minmax(0,1fr)_360px]">
           <main className="space-y-gutter">
-            <Card title={entry.title} subtitle={entry.code} actions={<Badge>{entry.currentStatus || t("common.unknown")}</Badge>}>
+            <Card title={entry.title} subtitle={entry.code} actions={<Badge>{translateEnum(entry.currentStatus, knowledgeStatusKeys, t("common.unknown"))}</Badge>}>
               <dl className="grid gap-md text-sm md:grid-cols-2">
-                <div><dt className="label-uppercase">{t("knowledge.category")}</dt><dd>{entry.category}</dd></div>
-                <div><dt className="label-uppercase">{t("knowledge.scope")}</dt><dd>{entry.scope}</dd></div>
+                <div><dt className="label-uppercase">{t("knowledge.category")}</dt><dd>{translateEnum(entry.category, knowledgeCategoryKeys)}</dd></div>
+                <div><dt className="label-uppercase">{t("knowledge.scope")}</dt><dd>{translateEnum(entry.scope, knowledgeScopeKeys)}</dd></div>
                 <div><dt className="label-uppercase">{t("contracts.version")}</dt><dd>{entry.currentVersionNo ?? "-"}</dd></div>
                 <div><dt className="label-uppercase">{t("knowledge.ingestedDocuments.active")}</dt><dd>{entry.active ? t("admin.active") : t("admin.inactive")}</dd></div>
                 <div><dt className="label-uppercase">{t("table.updated")}</dt><dd>{formatDisplayDate(entry.updatedAt, "-", locale)}</dd></div>
-                <div><dt className="label-uppercase">File name</dt><dd>{versions[0]?.fileName || "-"}</dd></div>
-                <div><dt className="label-uppercase">Content type</dt><dd>{versions[0]?.contentType || "-"}</dd></div>
-                <div><dt className="label-uppercase">Size</dt><dd>{versions[0]?.size != null ? `${(versions[0].size! / 1024 / 1024).toFixed(2)} MB` : "-"}</dd></div>
-                <div><dt className="label-uppercase">Uploaded at</dt><dd>{formatDisplayDate(versions[0]?.uploadedAt, "-", locale)}</dd></div>
+                <div><dt className="label-uppercase">{t("knowledge.fileName")}</dt><dd>{versions[0]?.fileName || "-"}</dd></div>
+                <div><dt className="label-uppercase">{t("knowledge.contentType")}</dt><dd>{versions[0]?.contentType || "-"}</dd></div>
+                <div><dt className="label-uppercase">{t("knowledge.fileSize")}</dt><dd>{versions[0]?.size != null ? `${fileSizeFormatter.format(versions[0].size / 1024 / 1024)} MB` : "-"}</dd></div>
+                <div><dt className="label-uppercase">{t("documents.uploadedAt")}</dt><dd>{formatDisplayDate(versions[0]?.uploadedAt, "-", locale)}</dd></div>
               </dl>
             </Card>
 
@@ -177,12 +217,12 @@ export function KnowledgeBaseDetailPage() {
               <div className="space-y-md">
                 {versions[0]?.ingestStatus === "FAILED" && (
                   <div className="rounded-xl border border-error/40 bg-error/10 p-md text-sm text-error">
-                    <p className="font-semibold">Ingest thất bại</p>
-                    <p className="mt-xs">{versions[0].errorMessage || versions[0].failedReason || "Unknown ingest error"}</p>
-                    <Button className="mt-sm" variant="secondary" disabled={saving || !versions[0].sourceFileAvailable} onClick={() => void retryIngest()}>Retry ingest</Button>
+                    <p className="font-semibold">{t("knowledge.ingestFailed")}</p>
+                    <p className="mt-xs">{t("knowledge.unknownIngestError")}</p>
+                    <Button className="mt-sm" variant="secondary" disabled={saving || !versions[0].sourceFileAvailable} onClick={() => void retryIngest()}>{t("knowledge.retryIngest")}</Button>
                   </div>
                 )}
-                {entry.currentStatus === "PUBLIC" ? <p className="rounded-lg bg-emerald-500/10 p-sm text-sm font-semibold text-emerald-600">Đang được AI sử dụng</p> : <p className="rounded-lg bg-slate-500/10 p-sm text-sm text-on-surface-variant">PRIVATE / inactive · Chưa đưa vào retrieval</p>}
+                {entry.currentStatus === "PUBLIC" ? <p className="rounded-lg bg-emerald-500/10 p-sm text-sm font-semibold text-emerald-600">{t("knowledge.activeForAi")}</p> : <p className="rounded-lg bg-slate-500/10 p-sm text-sm text-on-surface-variant">{t("knowledge.privateInactiveForAi")}</p>}
                 <textarea className="form-field min-h-24" value={note} onChange={(event) => setNote(event.target.value)} placeholder={t("knowledge.noteReason")} />
                 <div className="flex flex-col gap-sm">
                   <Button

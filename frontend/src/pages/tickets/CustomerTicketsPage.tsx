@@ -283,6 +283,7 @@ export function CustomerTicketsPage() {
 
             <select
               className="form-field max-w-48"
+              aria-label={t("legalTickets.filterStatus")}
               value={statusFilter}
               onChange={(event) => {
                 const nextStatus = toLegalTicketFilter(event.target.value);
@@ -314,11 +315,11 @@ export function CustomerTicketsPage() {
       <Card title={t("legalTickets.createTitle")} subtitle={t("legalTickets.createSubtitle")} className="mb-xl">
         <div className="grid gap-md lg:grid-cols-3">
           <div className="space-y-sm">
-            <label className="label-uppercase" htmlFor="ticket-type">{language === "vi" ? "Lý do" : "Reason"}</label>
+            <label className="label-uppercase" htmlFor="ticket-type">{t("legalTickets.typeLabel")}</label>
             <select id="ticket-type" className="form-field" value={ticketType} onChange={(event) => setTicketType(event.target.value as LegalTicketType)}>
-              <option value="CONTACT_EXPERT">{language === "vi" ? "Liên hệ chuyên gia" : "Contact expert"}</option>
-              <option value="QUERY_ERROR">{language === "vi" ? "Câu trả lời AI sai/thiếu" : "AI answer issue"}</option>
-              <option value="SYSTEM_ERROR">{language === "vi" ? "Lỗi hệ thống" : "System error"}</option>
+              <option value="CONTACT_EXPERT">{t("legalTickets.type.CONTACT_EXPERT")}</option>
+              <option value="QUERY_ERROR">{t("legalTickets.type.QUERY_ERROR")}</option>
+              <option value="SYSTEM_ERROR">{t("legalTickets.type.SYSTEM_ERROR")}</option>
             </select>
           </div>
           <div className="space-y-sm">

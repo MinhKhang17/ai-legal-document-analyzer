@@ -25,7 +25,7 @@ import {
 } from '../../services/subscription.service';
 import type { PaymentTransaction } from '../../types/paymentTransaction';
 import type { CustomerPlan, SubscriptionPlan, SubscriptionUsage, SubscriptionUsageSummary } from '../../types/subscription';
-import { formatDisplayDate, formatNumber, formatVndCurrency } from '../../utils/format';
+import { formatDisplayDate } from '../../utils/format';
 
 interface BillingMetricCardProps {
   label: string;
@@ -79,6 +79,16 @@ const getPaymentStatusTone = (status: string): BadgeTone => {
   }
 };
 
+const PAYMENT_STATUSES = ['PENDING', 'SUCCESS', 'FAILED', 'CANCELLED', 'REFUNDED'] as const;
+const USAGE_TYPES = ['AI_QUERY', 'CONTRACT_GENERATION', 'TICKET_CREATE', 'KNOWLEDGE_SEARCH', 'CHAT_MESSAGE'] as const;
+const PLAN_TYPES = ['FREE', 'STANDARD', 'PREMIUM'] as const;
+const CUSTOMER_PLAN_STATUS_KEYS: Record<string, string> = {
+  PENDING: 'billing.status.pending',
+  ACTIVE: 'billing.status.active',
+  EXPIRED: 'billing.status.expired',
+  CANCELLED: 'billing.status.cancelled',
+};
+
 export function BillingPage() {
   const { t, language } = useI18n();
   const toast = useToast();
@@ -100,6 +110,33 @@ export function BillingPage() {
   const [usageSummary, setUsageSummary] = useState<SubscriptionUsageSummary | null>(null);
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const locale = language === 'vi' ? 'vi-VN' : 'en-US';
+  const numberFormatter = useMemo(
+    () => new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }),
+    [locale],
+  );
+  const currencyFormatter = useMemo(
+    () => new Intl.NumberFormat(locale, { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }),
+    [locale],
+  );
+  const formatPrice = (value: number) => value <= 0 ? t('billing.free') : currencyFormatter.format(value);
+  const getPaymentStatusLabel = (status: string) => {
+    const normalized = status.toUpperCase();
+    return PAYMENT_STATUSES.includes(normalized as (typeof PAYMENT_STATUSES)[number])
+      ? t(`billing.paymentStatus.${normalized}`)
+      : t('billing.paymentStatus.UNKNOWN');
+  };
+  const getUsageTypeLabel = (usageType: string) => {
+    const normalized = usageType.toUpperCase();
+    return USAGE_TYPES.includes(normalized as (typeof USAGE_TYPES)[number])
+      ? t(`billing.usageType.${normalized}`)
+      : t('billing.usageType.UNKNOWN');
+  };
+  const getPlanTypeLabel = (planType: string) => {
+    const normalized = planType.toUpperCase();
+    return PLAN_TYPES.includes(normalized as (typeof PLAN_TYPES)[number])
+      ? t(`billing.planType.${normalized}`)
+      : t('billing.planType.UNKNOWN');
+  };
 
   const loadCustomerPlan = useCallback(async () => {
     setIsLoadingPlan(true);
@@ -141,7 +178,7 @@ export function BillingPage() {
     } catch (error) {
       console.error('Failed to load payment transactions:', error);
       setPaymentTransactions([]);
-      setTransactionError(error instanceof Error ? error.message : t('billing.errors.loadTransactions'));
+      setTransactionError(t('billing.errors.loadTransactions'));
     } finally {
       setIsLoadingTransactions(false);
     }
@@ -194,7 +231,8 @@ export function BillingPage() {
       setTransactionError(t('billing.paymentUrlMissing'));
       toast.warning(t('billing.paymentUrlMissing'), t('toast.warningTitle'));
     } catch (error) {
-      const message = error instanceof Error ? error.message : t('billing.paymentUrlError');
+      console.error('Failed to create VNPAY payment URL:', error);
+      const message = t('billing.paymentUrlError');
       setTransactionError(message);
       toast.error(message, t('toast.errorTitle'));
     } finally {
@@ -225,7 +263,8 @@ export function BillingPage() {
       toast.success(message, t('toast.successTitle'));
       await loadPaymentTransactions();
     } catch (error) {
-      const message = error instanceof Error ? error.message : t('billing.cancelError');
+      console.error('Failed to cancel customer plan:', error);
+      const message = t('billing.cancelError');
       setErrorMessage(message);
       toast.error(message, t('toast.errorTitle'));
     } finally {
@@ -266,7 +305,8 @@ export function BillingPage() {
         toast.warning(t('common.partialDataError'), t('toast.warningTitle'));
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : t('billing.refundError');
+      console.error('Failed to request subscription refund:', error);
+      const message = t('billing.refundError');
       setTransactionError(message);
       toast.error(message, t('toast.errorTitle'));
     } finally {
@@ -289,7 +329,7 @@ export function BillingPage() {
     },
     {
       header: t('billing.amount'),
-      cell: (transaction) => formatVndCurrency(transaction.amount, t('billing.free')),
+      cell: (transaction) => formatPrice(transaction.amount),
     },
     {
       header: t('billing.paymentMethod'),
@@ -299,7 +339,7 @@ export function BillingPage() {
       header: t('table.status'),
       cell: (transaction) => (
         <Badge tone={getPaymentStatusTone(transaction.paymentStatus)}>
-          {transaction.paymentStatus}
+          {getPaymentStatusLabel(transaction.paymentStatus)}
         </Badge>
       ),
     },
@@ -336,9 +376,9 @@ export function BillingPage() {
   ];
 
   const usageColumns: DataTableColumn<SubscriptionUsage>[] = [
-    { header: t('billing.usage'), cell: (usage) => <span className="font-semibold">{usage.usageType}</span> },
+    { header: t('billing.usage'), cell: (usage) => <span className="font-semibold">{getUsageTypeLabel(usage.usageType)}</span> },
     { header: t('billing.reference'), cell: (usage) => usage.referenceId ?? '-' },
-    { header: t('billing.units'), cell: (usage) => formatNumber(usage.consumedUnits) },
+    { header: t('billing.units'), cell: (usage) => numberFormatter.format(usage.consumedUnits) },
     { header: t('table.date'), cell: (usage) => formatDisplayDate(usage.createdAt, '-', locale) },
   ];
 
@@ -447,19 +487,19 @@ export function BillingPage() {
         <section className="grid gap-gutter md:grid-cols-2 xl:grid-cols-4">
           <BillingMetricCard
             label={t('billing.usedQuota')}
-            value={formatNumber(customerPlan.usedQuota)}
-            detail={`${t('billing.maxQuota')}: ${formatNumber(customerPlan.subscriptionPlan.maxQuota)} ${t('billing.analyses')}`}
+            value={numberFormatter.format(customerPlan.usedQuota)}
+            detail={`${t('billing.maxQuota')}: ${numberFormatter.format(customerPlan.subscriptionPlan.maxQuota)} ${t('billing.analyses')}`}
             progressValue={quotaPercent}
           />
           <BillingMetricCard
             label={t('billing.remainingQuota')}
-            value={formatNumber(customerPlan.remainingQuota)}
-            detail={`${t('billing.maxQuota')}: ${formatNumber(customerPlan.subscriptionPlan.maxQuota)} ${t('billing.analyses')}`}
+            value={numberFormatter.format(customerPlan.remainingQuota)}
+            detail={`${t('billing.maxQuota')}: ${numberFormatter.format(customerPlan.subscriptionPlan.maxQuota)} ${t('billing.analyses')}`}
           />
           <BillingMetricCard
             label={t('billing.maxQuota')}
-            value={formatNumber(customerPlan.subscriptionPlan.maxQuota)}
-            detail={customerPlan.subscriptionPlan.planType}
+            value={numberFormatter.format(customerPlan.subscriptionPlan.maxQuota)}
+            detail={getPlanTypeLabel(customerPlan.subscriptionPlan.planType)}
           />
           <Card>
             <div className="flex items-start justify-between gap-md">
@@ -469,7 +509,7 @@ export function BillingPage() {
                   <SubscriptionStatusBadge status={customerPlan.status} />
                 </div>
                 <p className="mt-xs text-sm text-on-surface-variant dark:text-slate-400">
-                  {customerPlan.status === 'PENDING' ? t('billing.status.pending') : customerPlan.status}
+                  {t(CUSTOMER_PLAN_STATUS_KEYS[customerPlan.status.toUpperCase()] ?? 'billing.status.unknown')}
                 </p>
               </div>
               <Sparkles className="h-5 w-5 text-primary dark:text-inverse-primary" aria-hidden="true" />
@@ -479,18 +519,18 @@ export function BillingPage() {
 
         {usageSummary && (
           <section className="mt-xl">
-            <h2 className="mb-md text-title-lg font-semibold">Mức sử dụng gói hiện tại</h2>
+            <h2 className="mb-md text-title-lg font-semibold">{t('billing.usageSummary.title')}</h2>
             <div className="grid gap-gutter md:grid-cols-2 xl:grid-cols-4">
               {[
-                ['AI tokens', usageSummary.aiTokensUsed, usageSummary.aiTokensLimit],
-                ['Phân tích hợp đồng', usageSummary.contractAnalysisUsed, usageSummary.contractAnalysisLimit],
-                ['Workspace', usageSummary.workspacesUsed, usageSummary.workspacesLimit],
-                ['Tài liệu', usageSummary.documentsUsed, usageSummary.documentsLimit],
-                ['Lưu trữ (MB)', Math.round(usageSummary.storageUsedBytes / 1024 / 1024), Math.round(usageSummary.storageLimitBytes / 1024 / 1024)],
-                ['Bản nháp hợp đồng', usageSummary.draftContractsUsed, usageSummary.draftContractsLimit],
-                ['Ticket chuyên gia', usageSummary.expertTicketsUsed, usageSummary.expertTicketsLimit],
+                [t('billing.limit.aiTokens'), usageSummary.aiTokensUsed, usageSummary.aiTokensLimit],
+                [t('billing.limit.contractAnalyses'), usageSummary.contractAnalysisUsed, usageSummary.contractAnalysisLimit],
+                [t('billing.limit.workspaces'), usageSummary.workspacesUsed, usageSummary.workspacesLimit],
+                [t('billing.limit.documents'), usageSummary.documentsUsed, usageSummary.documentsLimit],
+                [t('billing.limit.storageMb'), Math.round(usageSummary.storageUsedBytes / 1024 / 1024), Math.round(usageSummary.storageLimitBytes / 1024 / 1024)],
+                [t('billing.limit.draftContracts'), usageSummary.draftContractsUsed, usageSummary.draftContractsLimit],
+                [t('billing.limit.expertTickets'), usageSummary.expertTicketsUsed, usageSummary.expertTicketsLimit],
               ].map(([label, used, limit]) => (
-                <BillingMetricCard key={String(label)} label={String(label)} value={`${formatNumber(Number(used))} / ${formatNumber(Number(limit))}`} progressValue={usagePercent(Number(used), Number(limit))} />
+                <BillingMetricCard key={String(label)} label={String(label)} value={`${numberFormatter.format(Number(used))} / ${numberFormatter.format(Number(limit))}`} progressValue={usagePercent(Number(used), Number(limit))} />
               ))}
             </div>
           </section>
@@ -522,15 +562,15 @@ export function BillingPage() {
               </p>
               <div className="rounded-xl bg-white/10 p-md">
                 <p className="text-4xl font-bold">
-                  {formatVndCurrency(customerPlan.subscriptionPlan.price, t('billing.free'))}
+                  {formatPrice(customerPlan.subscriptionPlan.price)}
                 </p>
                 <p className="text-sm text-surface-container">
-                  {customerPlan.subscriptionPlan.durationDays} {t('billing.days')} · {customerPlan.subscriptionPlan.planType}
+                  {customerPlan.subscriptionPlan.durationDays} {t('billing.days')} · {getPlanTypeLabel(customerPlan.subscriptionPlan.planType)}
                 </p>
               </div>
               <div className="flex flex-wrap gap-xs">
-                <Badge tone="gold"><ShieldCheck className="h-3 w-3" /> {t('billing.planType')}: {customerPlan.subscriptionPlan.planType}</Badge>
-                <Badge tone="gold"><Sparkles className="h-3 w-3" /> {t('billing.maxQuota')}: {formatNumber(customerPlan.subscriptionPlan.maxQuota)}</Badge>
+                <Badge tone="gold"><ShieldCheck className="h-3 w-3" /> {t('billing.planType')}: {getPlanTypeLabel(customerPlan.subscriptionPlan.planType)}</Badge>
+                <Badge tone="gold"><Sparkles className="h-3 w-3" /> {t('billing.maxQuota')}: {numberFormatter.format(customerPlan.subscriptionPlan.maxQuota)}</Badge>
               </div>
               <dl className="grid gap-sm rounded-xl bg-white/10 p-md text-sm md:grid-cols-2">
                 <div>
@@ -552,7 +592,7 @@ export function BillingPage() {
                 <div>
                   <dt className="text-surface-container">{t('billing.quotaUsage')}</dt>
                   <dd className="font-semibold">
-                    {formatNumber(customerPlan.usedQuota)} / {formatNumber(customerPlan.subscriptionPlan.maxQuota)}
+                    {numberFormatter.format(customerPlan.usedQuota)} / {numberFormatter.format(customerPlan.subscriptionPlan.maxQuota)}
                   </dd>
                 </div>
               </dl>
@@ -565,22 +605,22 @@ export function BillingPage() {
         {renderUsageCard()}
 
         {plans.length > 0 && (
-          <Card className="mt-xl" title="So sánh gói Free · Standard · Premium" subtitle="Nâng cấp áp dụng ngay; hạ gói được lên lịch khi gói hiện tại hết hạn.">
+          <Card className="mt-xl" title={t('billing.comparison.title')} subtitle={t('billing.comparison.subtitle')}>
             <div className="grid gap-md md:grid-cols-3">
               {plans.map((plan) => {
                 const current = plan.id === customerPlan.subscriptionPlan.id;
                 return <div key={plan.id} className={`rounded-xl border p-md ${current ? 'border-primary bg-primary/5' : 'border-legal-border dark:border-slate-700'}`}>
-                  <div className="flex items-center justify-between gap-sm"><h3 className="font-bold">{plan.displayName ?? plan.planName}</h3>{current && <Badge tone="green">Gói hiện tại</Badge>}</div>
-                  <p className="mt-sm text-2xl font-bold text-primary">{formatVndCurrency(plan.priceVnd ?? plan.price, t('billing.free'))}</p>
+                  <div className="flex items-center justify-between gap-sm"><h3 className="font-bold">{plan.displayName ?? plan.planName}</h3>{current && <Badge tone="green">{t('billing.currentPlan')}</Badge>}</div>
+                  <p className="mt-sm text-2xl font-bold text-primary">{formatPrice(plan.priceVnd ?? plan.price)}</p>
                   <ul className="mt-md space-y-xs text-sm text-on-surface-variant dark:text-slate-300">
-                    <li>{formatNumber(plan.contractAnalysisLimit ?? plan.maxQuota)} lượt phân tích</li>
-                    <li>{formatNumber(plan.aiTokenLimit ?? 0)} AI tokens</li>
-                    <li>{plan.workspaceLimit ?? 0} workspace · {plan.documentPerWorkspaceLimit ?? 0} tài liệu/workspace</li>
-                    <li>{plan.storageLimitMb ?? 0} MB lưu trữ · {plan.maxFileSizeMb ?? 0} MB/file</li>
-                    <li>{plan.maxAttachedDocumentsPerSession ?? 0} tài liệu attach/phiên</li>
-                    <li>CONTACT_EXPERT: {plan.allowContactExpertTicket ? `${plan.expertTicketLimit ?? 0}/tháng` : 'Premium only'}</li>
+                    <li>{t('billing.comparison.analysisCount', { count: numberFormatter.format(plan.contractAnalysisLimit ?? plan.maxQuota) })}</li>
+                    <li>{t('billing.comparison.aiTokenCount', { count: numberFormatter.format(plan.aiTokenLimit ?? 0) })}</li>
+                    <li>{t('billing.comparison.workspaceDocuments', { workspaces: numberFormatter.format(plan.workspaceLimit ?? 0), documents: numberFormatter.format(plan.documentPerWorkspaceLimit ?? 0) })}</li>
+                    <li>{t('billing.comparison.storageFiles', { storage: numberFormatter.format(plan.storageLimitMb ?? 0), fileSize: numberFormatter.format(plan.maxFileSizeMb ?? 0) })}</li>
+                    <li>{t('billing.comparison.attachmentsPerSession', { count: numberFormatter.format(plan.maxAttachedDocumentsPerSession ?? 0) })}</li>
+                    <li>{t('billing.limit.contactExpert')}: {plan.allowContactExpertTicket ? t('billing.comparison.expertTicketsPerMonth', { count: numberFormatter.format(plan.expertTicketLimit ?? 0) }) : t('billing.comparison.premiumOnly')}</li>
                   </ul>
-                  <Button className="mt-md w-full" disabled={current || !plan.active} onClick={() => navigate('/billing/subscribe')}>{current ? 'Đang sử dụng' : 'Chọn gói'}</Button>
+                  <Button className="mt-md w-full" disabled={current || !plan.active} onClick={() => navigate('/billing/subscribe')}>{current ? t('billing.comparison.inUse') : t('billing.choosePlan')}</Button>
                 </div>;
               })}
             </div>

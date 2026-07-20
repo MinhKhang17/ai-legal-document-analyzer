@@ -11,7 +11,7 @@ import { StatusBadge } from "../../components/common/StatusBadge";
 import { getWorkspaceDetail, getWorkspaceDocuments } from "../../api/workspaceApi";
 import { useI18n } from "../../hooks/useI18n";
 import type { Document, Workspace } from "../../types/workspace";
-import { formatDisplayDateTime } from "../../utils/format";
+import { formatDisplayDateTime, localeForLanguage } from "../../utils/format";
 
 import { getAccessToken as getSessionAccessToken } from "../../services/authSession";
 const getAccessToken = () => getSessionAccessToken() ?? "";
@@ -19,6 +19,7 @@ const getAccessToken = () => getSessionAccessToken() ?? "";
 export function ProjectDetailPage() {
   const { id = "" } = useParams();
   const { t, language } = useI18n();
+  const locale = localeForLanguage(language);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,9 +39,9 @@ export function ProjectDetailPage() {
         if (!active) return;
         setWorkspace(workspaceData);
         setDocuments(documentData);
-      } catch (err) {
+      } catch {
         if (active) {
-          setError(err instanceof Error ? err.message : t("workspace.loadError"));
+          setError(t("workspace.loadError"));
         }
       } finally {
         if (active) {
@@ -77,7 +78,7 @@ export function ProjectDetailPage() {
     {
       header: t("table.date"),
       cell: (document) =>
-        formatDisplayDateTime(document.uploadedAt, "-", language === "vi" ? "vi-VN" : "en-US"),
+        formatDisplayDateTime(document.uploadedAt, "-", locale),
     },
   ];
 
@@ -89,7 +90,7 @@ export function ProjectDetailPage() {
       <PageHeader
         title={workspace?.name ?? t("workspace.detailsTitle")}
         subtitle={workspace?.description ?? t("workspace.detailsSubtitle")}
-        eyebrow={workspace ? `${workspace.workspaceId} · ${workspace.status}` : t("workspace.title")}
+        eyebrow={workspace ? `${workspace.workspaceId} · ${t(`status.${workspace.status}`)}` : t("workspace.title")}
         actions={
           <>
             <Link to={workspaceUploadUrl}>
@@ -107,7 +108,7 @@ export function ProjectDetailPage() {
       />
 
       {error && (
-        <div className="mb-lg rounded-xl border border-error/40 bg-error/10 p-md text-sm text-error">
+        <div role="alert" className="mb-lg rounded-xl border border-error/40 bg-error/10 p-md text-sm text-error">
           {error}
         </div>
       )}
@@ -229,7 +230,7 @@ export function ProjectDetailPage() {
                 <div>
                   <p className="label-uppercase">{t("workspace.createdAt")}</p>
                   <p className="mt-xs text-sm">
-                    {formatDisplayDateTime(workspace.createdAt, "-", language === "vi" ? "vi-VN" : "en-US")}
+                    {formatDisplayDateTime(workspace.createdAt, "-", locale)}
                   </p>
                 </div>
                 <div>

@@ -7,9 +7,9 @@ import { EmptyState } from '../../components/common/EmptyState';
 import { PageHeader } from '../../components/common/PageHeader';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { getAiHealthStatus, getAiRootStatus, getAiTechnologies } from '../../services/aiService.service';
-import { AI_SERVICE_UNAVAILABLE_MESSAGE, getUniqueErrorMessages } from '../../services/http';
 import { useI18n } from '../../hooks/useI18n';
 import type { AiHealthStatus, AiRootStatus, AiTechnologiesResponse } from '../../types/ai';
+import { localeForLanguage } from '../../utils/format';
 
 const stringifyTechnologyValue = (value: unknown): string => {
   if (typeof value === 'string') return value;
@@ -20,7 +20,9 @@ const stringifyTechnologyValue = (value: unknown): string => {
 };
 
 export function SystemHealthPage() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
+  const locale = localeForLanguage(language);
+  const numberFormatter = new Intl.NumberFormat(locale);
   const [aiRootStatus, setAiRootStatus] = useState<AiRootStatus | null>(null);
   const [aiHealthStatus, setAiHealthStatus] = useState<AiHealthStatus | null>(null);
   const [technologies, setTechnologies] = useState<AiTechnologiesResponse | null>(null);
@@ -41,13 +43,12 @@ export function SystemHealthPage() {
     setAiHealthStatus(healthResult.status === 'fulfilled' ? healthResult.value : null);
     setTechnologies(technologiesResult.status === 'fulfilled' ? technologiesResult.value : null);
 
-    const errors = [rootResult, healthResult, technologiesResult]
-      .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
-      .map((result) => result.reason);
+    const hasError = [rootResult, healthResult, technologiesResult]
+      .some((result) => result.status === 'rejected');
 
-    setAiError(errors.length > 0 ? getUniqueErrorMessages(errors, AI_SERVICE_UNAVAILABLE_MESSAGE) : '');
+    setAiError(hasError ? t('system.aiServiceUnavailableMessage') : '');
     setAiLoading(false);
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void loadAiServiceStatus();
@@ -60,11 +61,15 @@ export function SystemHealthPage() {
         if (typeof technology === 'string') {
           return technology;
         }
-        return stringifyTechnologyValue(technology.name ?? technology.status ?? technology.version ?? `Technology ${index + 1}`);
+        return stringifyTechnologyValue(technology.name ?? technology.status ?? technology.version ?? t('system.technologyFallback', { index: numberFormatter.format(index + 1) }));
       });
     }
     return Object.entries(technologies).map(([key, value]) => `${key}: ${stringifyTechnologyValue(value)}`);
-  }, [technologies]);
+  }, [numberFormatter, t, technologies]);
+
+  const rootStatusLabel = aiRootStatus?.status === 'running'
+    ? t('system.status.running')
+    : (aiLoading ? t('common.loading') : t('status.offline'));
 
   return (
     <div>
@@ -86,7 +91,7 @@ export function SystemHealthPage() {
       <section className="grid gap-gutter md:grid-cols-3">
         <Card
           title={t('system.aiRoot')}
-          actions={<Badge tone={aiRootStatus?.status === 'running' ? 'green' : 'amber'}>{aiRootStatus?.status ?? (aiLoading ? t('common.loading') : t('status.offline'))}</Badge>}
+          actions={<Badge tone={aiRootStatus?.status === 'running' ? 'green' : 'amber'}>{rootStatusLabel}</Badge>}
         >
           <p className="text-sm font-semibold">{aiRootStatus?.service ?? t('system.noAiRootData')}</p>
           <p className="mt-xs text-sm text-on-surface-variant dark:text-slate-400">
@@ -104,7 +109,7 @@ export function SystemHealthPage() {
           <p className="mt-xs font-semibold">{aiHealthStatus?.service ?? '-'}</p>
         </Card>
 
-        <Card title={t('system.neo4jTechnologies')} actions={<Badge tone="blue">{technologyLabels.length}</Badge>}>
+        <Card title={t('system.neo4jTechnologies')} actions={<Badge tone="blue">{numberFormatter.format(technologyLabels.length)}</Badge>}>
           {technologyLabels.length > 0 ? (
             <div className="flex flex-wrap gap-xs">
               {technologyLabels.slice(0, 8).map((technology) => (

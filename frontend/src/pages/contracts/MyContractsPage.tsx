@@ -23,8 +23,9 @@ import type {
   UserContract,
 } from "../../types/contract";
 import type { Workspace } from "../../types/workspace";
-import { formatDisplayDate } from "../../utils/format";
+import { formatDisplayDate, localeForLanguage } from "../../utils/format";
 import { normalizeWorkspaceId } from "../../utils/workspaceId";
+import { getSupportedContractTypeLabel } from "../../config/supportedContractTypes";
 
 const getStatusTone = (status?: string) => {
   if (status === "ACTIVE" || status === "COMPLETED" || status === "GENERATED") return "green";
@@ -53,7 +54,7 @@ export function MyContractsPage() {
   const { t, language } = useI18n();
   const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
-  const locale = language === "vi" ? "vi-VN" : "en-US";
+  const locale = localeForLanguage(language);
   const [contracts, setContracts] = useState<UserContract[]>([]);
   const [page, setPage] = useState(() => parsePageParam(searchParams.get("page")));
   const [totalItems, setTotalItems] = useState(0);
@@ -82,10 +83,7 @@ export function MyContractsPage() {
       setTotalItems(contractsResult.value.totalItems ?? 0);
       setTotalPages(contractsResult.value.totalPages ?? 0);
     } else {
-      const message =
-        contractsResult.reason instanceof Error
-          ? contractsResult.reason.message
-          : t("contracts.loadError");
+      const message = t("contracts.loadError");
       setError(message);
       toast.error(message);
     }
@@ -137,9 +135,8 @@ export function MyContractsPage() {
         content: job.outputDraft ?? current.content,
       }));
       toast.success(t("contracts.generateSuccess"));
-    } catch (generateError) {
-      const message =
-        generateError instanceof Error ? generateError.message : t("contracts.generateError");
+    } catch {
+      const message = t("contracts.generateError");
       setError(message);
       toast.error(message);
     } finally {
@@ -171,8 +168,8 @@ export function MyContractsPage() {
       toast.success(t("contracts.saveSuccess"));
       setSaveForm(initialSaveForm);
       await loadContracts();
-    } catch (saveError) {
-      const message = saveError instanceof Error ? saveError.message : t("contracts.saveError");
+    } catch {
+      const message = t("contracts.saveError");
       setError(message);
       toast.error(message);
     } finally {
@@ -192,10 +189,10 @@ export function MyContractsPage() {
         </Link>
       ),
     },
-    { header: t("contracts.type"), cell: (contract) => contract.contractType },
+    { header: t("contracts.type"), cell: (contract) => getSupportedContractTypeLabel(contract.contractType, language) ?? t("contracts.outsideSupportedScope") },
     {
       header: t("table.status"),
-      cell: (contract) => <Badge tone={getStatusTone(contract.status)}>{contract.status}</Badge>,
+      cell: (contract) => <Badge tone={getStatusTone(contract.status)}>{t(`contracts.status.${contract.status || "UNKNOWN"}`)}</Badge>,
     },
     { header: t("contracts.version"), cell: (contract) => contract.currentVersionNo ?? "-" },
     {
@@ -222,7 +219,7 @@ export function MyContractsPage() {
       />
 
       {error && (
-        <div className="mb-lg rounded-xl border border-error/40 bg-error/10 p-md text-sm text-error">
+        <div role="alert" className="mb-lg rounded-xl border border-error/40 bg-error/10 p-md text-sm text-error">
           {error}
         </div>
       )}
@@ -255,7 +252,7 @@ export function MyContractsPage() {
           {latestJob && (
             <Card
               title={t("contracts.latestGenerationJob")}
-              actions={<Badge tone={getStatusTone(latestJob.status)}>{latestJob.status}</Badge>}
+              actions={<Badge tone={getStatusTone(latestJob.status)}>{t(`contracts.status.${latestJob.status || "UNKNOWN"}`)}</Badge>}
             >
               <dl className="grid gap-md text-sm md:grid-cols-2">
                 <div>
@@ -273,7 +270,7 @@ export function MyContractsPage() {
               </dl>
               {latestJob.errorMessage && (
                 <p className="mt-md rounded-lg bg-error/10 p-md text-sm text-error">
-                  {latestJob.errorMessage}
+                  {t("contracts.generationJobFailed")}
                 </p>
               )}
             </Card>

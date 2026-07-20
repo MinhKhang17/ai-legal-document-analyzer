@@ -50,6 +50,13 @@ const getStatusTone = (status?: string | null) => {
   }
 };
 
+const ticketTypeKeys: Record<string, string> = {
+  SYSTEM_ERROR: "legalTickets.type.SYSTEM_ERROR",
+  QUERY_ERROR: "legalTickets.type.QUERY_ERROR",
+  CONTACT_EXPERT: "legalTickets.type.CONTACT_EXPERT",
+  REFUND_REQUEST: "legalTickets.type.REFUND_REQUEST",
+};
+
 export function AdminTicketsPage() {
   const { t, language } = useI18n();
   const toast = useToast();
@@ -65,6 +72,12 @@ export function AdminTicketsPage() {
   const [error, setError] = useState("");
   const filterOptions = useMemo(() => getLegalTicketFilterOptions(t), [t]);
   const locale = language === "vi" ? "vi-VN" : "en-US";
+  const numberFormatter = new Intl.NumberFormat(locale);
+  const getTicketTypeLabel = (ticketTypeValue?: string | null) => {
+    const value = ticketTypeValue || "CONTACT_EXPERT";
+    const key = ticketTypeKeys[value];
+    return key ? t(key) : value;
+  };
 
   const loadTickets = useCallback(async () => {
     setLoading(true);
@@ -104,8 +117,8 @@ export function AdminTicketsPage() {
 
   const columns: DataTableColumn<LegalTicket>[] = [
     {
-      header: language === "vi" ? "Loại" : "Type",
-      cell: (ticket) => <Badge tone="blue">{ticket.ticket_type ?? "CONTACT_EXPERT"}</Badge>,
+      header: t("legalTickets.ticketType"),
+      cell: (ticket) => <Badge tone="blue">{getTicketTypeLabel(ticket.ticket_type)}</Badge>,
     },
     {
       header: t("legalTickets.table.ticket"),
@@ -155,10 +168,11 @@ export function AdminTicketsPage() {
         subtitle={t("legalTickets.adminSubtitle")}
         actions={
           <>
-            <select className="form-field max-w-52" value={ticketType} onChange={(event) => { const value = event.target.value as LegalTicketType | ""; setTicketType(value); setPage(0); const next = new URLSearchParams(searchParams); next.set("page", "1"); value ? next.set("type", value) : next.delete("type"); setSearchParams(next); }}>
-              <option value="">Tất cả loại ticket</option><option value="SYSTEM_ERROR">Lỗi hệ thống</option><option value="QUERY_ERROR">Lỗi câu trả lời AI</option><option value="CONTACT_EXPERT">Liên hệ chuyên gia</option>
+            <select aria-label={t("legalTickets.filters.ticketType")} className="form-field max-w-52" value={ticketType} onChange={(event) => { const value = event.target.value as LegalTicketType | ""; setTicketType(value); setPage(0); const next = new URLSearchParams(searchParams); next.set("page", "1"); value ? next.set("type", value) : next.delete("type"); setSearchParams(next); }}>
+              <option value="">{t("legalTickets.type.all")}</option><option value="SYSTEM_ERROR">{t("legalTickets.type.SYSTEM_ERROR")}</option><option value="QUERY_ERROR">{t("legalTickets.type.QUERY_ERROR")}</option><option value="CONTACT_EXPERT">{t("legalTickets.type.CONTACT_EXPERT")}</option><option value="REFUND_REQUEST">{t("legalTickets.type.REFUND_REQUEST")}</option>
             </select>
             <select
+              aria-label={t("legalTickets.filters.status")}
               className="form-field max-w-48"
               value={statusFilter}
               onChange={(event) => { const value = toLegalTicketFilter(event.target.value); setStatusFilter(value); setPage(0); const next = new URLSearchParams(searchParams); next.set("page", "1"); value === "ALL" ? next.delete("status") : next.set("status", value); setSearchParams(next); }}
@@ -170,6 +184,7 @@ export function AdminTicketsPage() {
               ))}
             </select>
             <select
+              aria-label={t("legalTickets.filters.risk")}
               className="form-field max-w-44"
               value={riskLevel}
               onChange={(event) => { const value = event.target.value; setRiskLevel(value); setPage(0); const next = new URLSearchParams(searchParams); next.set("page", "1"); value ? next.set("risk", value) : next.delete("risk"); setSearchParams(next); }}
@@ -199,10 +214,10 @@ export function AdminTicketsPage() {
 
       <section className="mb-xl grid gap-gutter md:grid-cols-3">
         <Card title={t("legalTickets.totalTickets")}>
-          <p className="text-3xl font-bold">{totalItems}</p>
+          <p className="text-3xl font-bold">{numberFormatter.format(totalItems)}</p>
         </Card>
         <Card title={t("legalTickets.openTicketsCurrentPage")}>
-          <p className="text-3xl font-bold">{openCount}</p>
+          <p className="text-3xl font-bold">{numberFormatter.format(openCount)}</p>
         </Card>
         <Card title={t("legalTickets.currentFilter")}>
           <p className="break-words text-2xl font-bold">
@@ -211,7 +226,7 @@ export function AdminTicketsPage() {
         </Card>
       </section>
 
-      <Card title={t("legalTickets.title")} actions={<Badge tone="blue">{tickets.length}</Badge>}>
+      <Card title={t("legalTickets.title")} actions={<Badge tone="blue">{numberFormatter.format(tickets.length)}</Badge>}>
         {error ? (
           <div role="alert" className="text-sm text-error">{error} <Button variant="secondary" onClick={() => void loadTickets()}>{t("common.retry")}</Button></div>
         ) : loading && tickets.length === 0 ? (

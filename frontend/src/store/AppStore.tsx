@@ -16,6 +16,7 @@ import {
 } from "../services/auth.service";
 import type { CurrentUser } from "../types/auth";
 import { clearAccessToken, getAccessToken, migrateLegacyAccessToken, setAccessToken } from "../services/authSession";
+import { translate } from "../utils/i18n";
 
 export type ThemeMode = "light" | "dark" | "system";
 export type Language = "en" | "vi";
@@ -213,6 +214,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     if (typeof window === "undefined") return;
     window.localStorage.setItem(STORAGE_KEYS.language, language);
     document.documentElement.lang = language;
+    document.title = translate(language, "app.documentTitle");
+    document
+      .querySelector('meta[name="description"]')
+      ?.setAttribute("content", translate(language, "app.metaDescription"));
   }, [language]);
 
   useEffect(() => {

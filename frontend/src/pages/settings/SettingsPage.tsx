@@ -30,17 +30,17 @@ export function SettingsPage() {
 
   const handleChangePassword = async () => {
     if (!passwordForm.oldPassword.trim() || passwordForm.newPassword.length < 8 || passwordForm.newPassword !== passwordForm.confirmNewPassword) {
-      toast.warning(language === 'vi' ? 'Mật khẩu mới phải có ít nhất 8 ký tự và phần xác nhận phải trùng khớp.' : 'New password must have at least 8 characters and confirmation must match.');
+      toast.warning(t('settings.password.validation'));
       return;
     }
     setChangingPassword(true);
     try {
       await changePassword(passwordForm);
       setPasswordForm({ oldPassword: '', newPassword: '', confirmNewPassword: '' });
-      toast.success(language === 'vi' ? 'Đổi mật khẩu thành công.' : 'Password changed successfully.');
+      toast.success(t('settings.password.success'));
       window.setTimeout(() => window.location.reload(), 600);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Unable to change password.');
+    } catch {
+      toast.error(t('settings.password.error'), t('toast.errorTitle'));
     } finally { setChangingPassword(false); }
   };
 
@@ -139,13 +139,13 @@ export function SettingsPage() {
         </Card>
       </div>
 
-      <Card className="mt-gutter" title={language === 'vi' ? 'Đổi mật khẩu' : 'Change password'} subtitle={language === 'vi' ? 'Tài khoản Expert phải đổi mật khẩu tạm trước thời hạn 7 ngày.' : 'Expert accounts must replace the temporary password within 7 days.'} actions={<KeyRound className="h-5 w-5 text-primary" />}>
+      <Card className="mt-gutter" title={t('settings.password.title')} subtitle={t('settings.password.subtitle')} actions={<KeyRound className="h-5 w-5 text-primary" />}>
         <div className="grid gap-md md:grid-cols-3">
-          <label className="text-sm font-semibold">{language === 'vi' ? 'Mật khẩu hiện tại' : 'Current password'}<input className="form-field mt-xs" type="password" autoComplete="current-password" value={passwordForm.oldPassword} onChange={(e) => setPasswordForm((v) => ({ ...v, oldPassword: e.target.value }))} /></label>
-          <label className="text-sm font-semibold">{language === 'vi' ? 'Mật khẩu mới' : 'New password'}<input className="form-field mt-xs" type="password" autoComplete="new-password" value={passwordForm.newPassword} onChange={(e) => setPasswordForm((v) => ({ ...v, newPassword: e.target.value }))} /></label>
-          <label className="text-sm font-semibold">{language === 'vi' ? 'Xác nhận mật khẩu mới' : 'Confirm new password'}<input className="form-field mt-xs" type="password" autoComplete="new-password" value={passwordForm.confirmNewPassword} onChange={(e) => setPasswordForm((v) => ({ ...v, confirmNewPassword: e.target.value }))} /></label>
+          <label className="text-sm font-semibold">{t('settings.password.current')}<input className="form-field mt-xs" type="password" autoComplete="current-password" value={passwordForm.oldPassword} onChange={(e) => setPasswordForm((v) => ({ ...v, oldPassword: e.target.value }))} /></label>
+          <label className="text-sm font-semibold">{t('settings.password.new')}<input className="form-field mt-xs" type="password" autoComplete="new-password" value={passwordForm.newPassword} onChange={(e) => setPasswordForm((v) => ({ ...v, newPassword: e.target.value }))} /></label>
+          <label className="text-sm font-semibold">{t('settings.password.confirm')}<input className="form-field mt-xs" type="password" autoComplete="new-password" value={passwordForm.confirmNewPassword} onChange={(e) => setPasswordForm((v) => ({ ...v, confirmNewPassword: e.target.value }))} /></label>
         </div>
-        <Button className="mt-md" onClick={() => void handleChangePassword()} disabled={changingPassword}>{changingPassword ? (language === 'vi' ? 'Đang đổi…' : 'Changing…') : (language === 'vi' ? 'Đổi mật khẩu' : 'Change password')}</Button>
+        <Button className="mt-md" onClick={() => void handleChangePassword()} disabled={changingPassword}>{changingPassword ? t('settings.password.changing') : t('settings.password.submit')}</Button>
       </Card>
     </div>
   );
