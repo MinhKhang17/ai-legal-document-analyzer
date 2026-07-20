@@ -14,12 +14,10 @@ import { createVnPayPaymentUrl } from '../../services/paymentTransaction.service
 import {
   getMyCustomerPlan,
   getSubscriptionPlans,
-  isSubscriptionRequestError,
   isSubscriptionUnauthorizedError,
   subscribeCustomerPlan,
 } from '../../services/subscription.service';
 import type { CustomerPlan, PaymentMethod, SubscriptionPlan } from '../../types/subscription';
-import { formatNumber, formatVndCurrency } from '../../utils/format';
 import { cn } from '../../utils/cn';
 
 const PAYMENT_METHODS: PaymentMethod[] = [
@@ -40,15 +38,13 @@ const getSubscriptionErrorMessage = (
     return unauthorizedMessage;
   }
 
-  if (isSubscriptionRequestError(error) && error.message.trim().length > 0) {
-    return error.message;
-  }
-
   return fallback;
 };
 
+const PLAN_TYPES = ['FREE', 'STANDARD', 'PREMIUM'] as const;
+
 export function SubscribePlanPage() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const toast = useToast();
   const navigate = useNavigate();
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
@@ -61,6 +57,22 @@ export function SubscribePlanPage() {
   const [subscribedPlan, setSubscribedPlan] = useState<CustomerPlan | null>(null);
   const [refreshedCurrentPlan, setRefreshedCurrentPlan] = useState<CustomerPlan | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const locale = language === 'vi' ? 'vi-VN' : 'en-US';
+  const numberFormatter = useMemo(
+    () => new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }),
+    [locale],
+  );
+  const currencyFormatter = useMemo(
+    () => new Intl.NumberFormat(locale, { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }),
+    [locale],
+  );
+  const formatPrice = (value: number) => value <= 0 ? t('billing.free') : currencyFormatter.format(value);
+  const getPlanTypeLabel = (planType: string) => {
+    const normalized = planType.toUpperCase();
+    return PLAN_TYPES.includes(normalized as (typeof PLAN_TYPES)[number])
+      ? t(`billing.planType.${normalized}`)
+      : t('billing.planType.UNKNOWN');
+  };
 
   const selectedPlan = useMemo(
     () => plans.find((plan) => plan.id === selectedPlanId) ?? null,
@@ -152,10 +164,7 @@ export function SubscribePlanPage() {
             toast.warning(t('billing.subscribe.vnPayMissingUrl'), t('toast.warningTitle'));
           } catch (paymentUrlError) {
             console.error('Subscription succeeded but VNPAY URL creation failed:', paymentUrlError);
-            const message =
-              paymentUrlError instanceof Error
-                ? paymentUrlError.message
-                : t('billing.subscribe.vnPayUrlError');
+            const message = t('billing.subscribe.vnPayUrlError');
             setErrorMessage(message);
             toast.error(message, t('toast.errorTitle'));
           }
@@ -305,34 +314,34 @@ export function SubscribePlanPage() {
                         </p>
                       </div>
                       <Badge tone={isCurrent ? 'blue' : plan.active ? 'green' : 'slate'}>
-                        {isCurrent ? 'Gói hiện tại' : plan.active ? t('billing.activePlan') : t('billing.inactivePlan')}
+                        {isCurrent ? t('billing.currentPlan') : plan.active ? t('billing.activePlan') : t('billing.inactivePlan')}
                       </Badge>
                     </div>
                     <div className="mt-lg rounded-xl bg-surface-container-low p-md dark:bg-slate-800">
                       <p className="text-3xl font-bold text-primary dark:text-inverse-primary">
-                        {formatVndCurrency(plan.price, t('billing.free'))}
+                        {formatPrice(plan.price)}
                       </p>
                       <p className="mt-xs text-sm text-on-surface-variant dark:text-slate-400">
-                        {plan.durationDays} {t('billing.days')} · {plan.planType}
+                        {plan.durationDays} {t('billing.days')} · {getPlanTypeLabel(plan.planType)}
                       </p>
                     </div>
                     <dl className="mt-md grid gap-sm text-sm">
                       <div className="flex items-center justify-between gap-md">
                         <dt className="text-on-surface-variant dark:text-slate-400">{t('billing.maxQuota')}</dt>
                         <dd className="font-semibold text-on-surface dark:text-slate-100">
-                          {formatNumber(plan.maxQuota)} {t('billing.analyses')}
+                          {numberFormatter.format(plan.maxQuota)} {t('billing.analyses')}
                         </dd>
                       </div>
-                      <div className="flex items-center justify-between gap-md"><dt className="text-on-surface-variant">AI tokens</dt><dd className="font-semibold">{formatNumber(plan.aiTokenLimit ?? 0)}</dd></div>
-                      <div className="flex items-center justify-between gap-md"><dt className="text-on-surface-variant">Workspace</dt><dd className="font-semibold">{plan.workspaceLimit ?? 0}</dd></div>
-                      <div className="flex items-center justify-between gap-md"><dt className="text-on-surface-variant">Tài liệu/workspace</dt><dd className="font-semibold">{plan.documentPerWorkspaceLimit ?? 0}</dd></div>
-                      <div className="flex items-center justify-between gap-md"><dt className="text-on-surface-variant">Storage / file</dt><dd className="font-semibold">{plan.storageLimitMb ?? 0} / {plan.maxFileSizeMb ?? 0} MB</dd></div>
-                      <div className="flex items-center justify-between gap-md"><dt className="text-on-surface-variant">Attach/phiên</dt><dd className="font-semibold">{plan.maxAttachedDocumentsPerSession ?? 0}</dd></div>
-                      <div className="flex items-center justify-between gap-md"><dt className="text-on-surface-variant">Bản nháp</dt><dd className="font-semibold">{plan.contractDraftLimit ?? 0}</dd></div>
-                      <div className="flex items-center justify-between gap-md"><dt className="text-on-surface-variant">CONTACT_EXPERT</dt><dd className="font-semibold">{plan.allowContactExpertTicket ? `${plan.expertTicketLimit ?? 0}/tháng` : 'Premium only'}</dd></div>
+                      <div className="flex items-center justify-between gap-md"><dt className="text-on-surface-variant">{t('billing.limit.aiTokens')}</dt><dd className="font-semibold">{numberFormatter.format(plan.aiTokenLimit ?? 0)}</dd></div>
+                      <div className="flex items-center justify-between gap-md"><dt className="text-on-surface-variant">{t('billing.limit.workspaces')}</dt><dd className="font-semibold">{numberFormatter.format(plan.workspaceLimit ?? 0)}</dd></div>
+                      <div className="flex items-center justify-between gap-md"><dt className="text-on-surface-variant">{t('billing.limit.documentsPerWorkspace')}</dt><dd className="font-semibold">{numberFormatter.format(plan.documentPerWorkspaceLimit ?? 0)}</dd></div>
+                      <div className="flex items-center justify-between gap-md"><dt className="text-on-surface-variant">{t('billing.limit.storagePerFile')}</dt><dd className="font-semibold">{numberFormatter.format(plan.storageLimitMb ?? 0)} / {numberFormatter.format(plan.maxFileSizeMb ?? 0)} MB</dd></div>
+                      <div className="flex items-center justify-between gap-md"><dt className="text-on-surface-variant">{t('billing.limit.attachmentsPerSession')}</dt><dd className="font-semibold">{numberFormatter.format(plan.maxAttachedDocumentsPerSession ?? 0)}</dd></div>
+                      <div className="flex items-center justify-between gap-md"><dt className="text-on-surface-variant">{t('billing.limit.draftContracts')}</dt><dd className="font-semibold">{numberFormatter.format(plan.contractDraftLimit ?? 0)}</dd></div>
+                      <div className="flex items-center justify-between gap-md"><dt className="text-on-surface-variant">{t('billing.limit.contactExpert')}</dt><dd className="font-semibold">{plan.allowContactExpertTicket ? t('billing.comparison.expertTicketsPerMonth', { count: numberFormatter.format(plan.expertTicketLimit ?? 0) }) : t('billing.comparison.premiumOnly')}</dd></div>
                       <div className="flex items-center justify-between gap-md">
                         <dt className="text-on-surface-variant dark:text-slate-400">{t('billing.planType')}</dt>
-                        <dd className="font-semibold text-on-surface dark:text-slate-100">{plan.planType}</dd>
+                        <dd className="font-semibold text-on-surface dark:text-slate-100">{getPlanTypeLabel(plan.planType)}</dd>
                       </div>
                     </dl>
                     {isSelected && (
@@ -342,7 +351,7 @@ export function SubscribePlanPage() {
                       </div>
                     )}
                     <div className="mt-md rounded-lg bg-primary/10 px-sm py-sm text-center text-sm font-semibold text-primary dark:text-inverse-primary">
-                      {isCurrent ? 'Gói hiện tại' : refreshedCurrentPlan && planRank(plan) < planRank(refreshedCurrentPlan.subscriptionPlan) ? 'Hạ gói khi gói hiện tại hết hạn' : 'Nâng cấp áp dụng ngay'}
+                      {isCurrent ? t('billing.currentPlan') : refreshedCurrentPlan && planRank(plan) < planRank(refreshedCurrentPlan.subscriptionPlan) ? t('billing.comparison.downgradeScheduled') : t('billing.comparison.upgradeImmediate')}
                     </div>
                   </Card>
                 </button>
@@ -350,21 +359,21 @@ export function SubscribePlanPage() {
             })}
           </section>
 
-          <Card className="mt-xl" title="Bảng so sánh giới hạn gói">
+          <Card className="mt-xl" title={t('billing.comparison.limitTableTitle')}>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[720px] text-sm">
-                <thead><tr className="border-b border-legal-border text-left dark:border-slate-700"><th className="p-sm">Giới hạn</th>{plans.map((plan) => <th key={plan.id} className="p-sm">{plan.displayName ?? plan.planName}{refreshedCurrentPlan?.subscriptionPlan.id === plan.id ? ' · Hiện tại' : ''}</th>)}</tr></thead>
+                <thead><tr className="border-b border-legal-border text-left dark:border-slate-700"><th className="p-sm">{t('billing.comparison.limits')}</th>{plans.map((plan) => <th key={plan.id} className="p-sm">{plan.displayName ?? plan.planName}{refreshedCurrentPlan?.subscriptionPlan.id === plan.id ? ` · ${t('billing.comparison.current')}` : ''}</th>)}</tr></thead>
                 <tbody>
                   {[
-                    ['Phân tích hợp đồng', (plan: SubscriptionPlan) => formatNumber(plan.contractAnalysisLimit ?? plan.maxQuota)],
-                    ['AI tokens', (plan: SubscriptionPlan) => formatNumber(plan.aiTokenLimit ?? 0)],
-                    ['Workspace', (plan: SubscriptionPlan) => String(plan.workspaceLimit ?? 0)],
-                    ['Tài liệu / workspace', (plan: SubscriptionPlan) => String(plan.documentPerWorkspaceLimit ?? 0)],
-                    ['Storage', (plan: SubscriptionPlan) => `${plan.storageLimitMb ?? 0} MB`],
-                    ['Max file', (plan: SubscriptionPlan) => `${plan.maxFileSizeMb ?? 0} MB`],
-                    ['Attach / session', (plan: SubscriptionPlan) => String(plan.maxAttachedDocumentsPerSession ?? 0)],
-                    ['Contract drafts', (plan: SubscriptionPlan) => String(plan.contractDraftLimit ?? 0)],
-                    ['CONTACT_EXPERT', (plan: SubscriptionPlan) => plan.allowContactExpertTicket ? `${plan.expertTicketLimit ?? 0}/tháng` : 'Premium only'],
+                    [t('billing.limit.contractAnalyses'), (plan: SubscriptionPlan) => numberFormatter.format(plan.contractAnalysisLimit ?? plan.maxQuota)],
+                    [t('billing.limit.aiTokens'), (plan: SubscriptionPlan) => numberFormatter.format(plan.aiTokenLimit ?? 0)],
+                    [t('billing.limit.workspaces'), (plan: SubscriptionPlan) => numberFormatter.format(plan.workspaceLimit ?? 0)],
+                    [t('billing.limit.documentsPerWorkspace'), (plan: SubscriptionPlan) => numberFormatter.format(plan.documentPerWorkspaceLimit ?? 0)],
+                    [t('billing.limit.storage'), (plan: SubscriptionPlan) => `${numberFormatter.format(plan.storageLimitMb ?? 0)} MB`],
+                    [t('billing.limit.maxFileSize'), (plan: SubscriptionPlan) => `${numberFormatter.format(plan.maxFileSizeMb ?? 0)} MB`],
+                    [t('billing.limit.attachmentsPerSession'), (plan: SubscriptionPlan) => numberFormatter.format(plan.maxAttachedDocumentsPerSession ?? 0)],
+                    [t('billing.limit.draftContracts'), (plan: SubscriptionPlan) => numberFormatter.format(plan.contractDraftLimit ?? 0)],
+                    [t('billing.limit.contactExpert'), (plan: SubscriptionPlan) => plan.allowContactExpertTicket ? t('billing.comparison.expertTicketsPerMonth', { count: numberFormatter.format(plan.expertTicketLimit ?? 0) }) : t('billing.comparison.premiumOnly')],
                   ].map(([label, render]) => <tr key={String(label)} className="border-b border-legal-border/60 dark:border-slate-800"><td className="p-sm font-semibold">{String(label)}</td>{plans.map((plan) => <td key={plan.id} className="p-sm text-on-surface-variant dark:text-slate-300">{(render as (value: SubscriptionPlan) => string)(plan)}</td>)}</tr>)}
                 </tbody>
               </table>
@@ -400,7 +409,7 @@ export function SubscribePlanPage() {
                 </p>
                 <p className="mt-xs text-sm text-on-surface-variant dark:text-slate-400">
                   {selectedPlan
-                    ? `${formatVndCurrency(selectedPlan.price, t('billing.free'))} · ${selectedPlan.durationDays} ${t('billing.days')}`
+                    ? `${formatPrice(selectedPlan.price)} · ${selectedPlan.durationDays} ${t('billing.days')}`
                     : t('billing.subscribe.selectPlanHint')}
                 </p>
                 <Button
@@ -450,7 +459,7 @@ export function SubscribePlanPage() {
                 <div className="flex justify-between gap-md">
                   <dt className="text-on-surface-variant dark:text-slate-400">{t('billing.price')}</dt>
                   <dd className="font-semibold text-on-surface dark:text-slate-100">
-                    {formatVndCurrency(selectedPlan.price, t('billing.free'))}
+                    {formatPrice(selectedPlan.price)}
                   </dd>
                 </div>
                 <div className="flex justify-between gap-md">

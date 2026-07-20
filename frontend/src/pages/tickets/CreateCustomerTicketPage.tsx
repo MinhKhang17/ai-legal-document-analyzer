@@ -158,7 +158,7 @@ export function CreateCustomerTicketPage() {
               variant="secondary"
               leftIcon={<ArrowLeft className="h-4 w-4" />}
             >
-              {t("common.back")}
+              {t("actions.back")}
             </Button>
           </Link>
         }
@@ -167,18 +167,19 @@ export function CreateCustomerTicketPage() {
       <Card title={t("legalTickets.create.formTitle")}>
         <form className="space-y-lg" onSubmit={handleSubmit}>
           <div>
-            <label className="mb-2 block text-sm font-medium">Lý do tạo ticket</label>
-            <select className="form-field" value={ticketType} onChange={(event) => setTicketType(event.target.value as LegalTicketType)} disabled={submitting}>
-              <option value="CONTACT_EXPERT">Liên hệ chuyên gia / luật sư</option>
-              <option value="QUERY_ERROR">Câu trả lời AI sai hoặc thiếu</option>
-              <option value="SYSTEM_ERROR">Lỗi hệ thống / kỹ thuật</option>
+            <label className="mb-2 block text-sm font-medium" htmlFor="create-ticket-type">{t("legalTickets.typeLabel")}</label>
+            <select id="create-ticket-type" className="form-field" value={ticketType} onChange={(event) => setTicketType(event.target.value as LegalTicketType)} disabled={submitting}>
+              <option value="CONTACT_EXPERT">{t("legalTickets.type.CONTACT_EXPERT")}</option>
+              <option value="QUERY_ERROR">{t("legalTickets.type.QUERY_ERROR")}</option>
+              <option value="SYSTEM_ERROR">{t("legalTickets.type.SYSTEM_ERROR")}</option>
             </select>
           </div>
           <div>
-            <label className="mb-2 block text-sm font-medium">
+            <label className="mb-2 block text-sm font-medium" htmlFor="create-ticket-workspace">
               {t("legalTickets.create.workspace")}
             </label>
             <select
+              id="create-ticket-workspace"
               className="form-field"
               value={selectedWorkspaceId}
               onChange={(event) => setSelectedWorkspaceId(event.target.value)}
@@ -203,10 +204,11 @@ export function CreateCustomerTicketPage() {
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-medium">
+            <label className="mb-2 block text-sm font-medium" htmlFor="create-ticket-document">
               {t("legalTickets.create.document")}
             </label>
             <select
+              id="create-ticket-document"
               className="form-field"
               value={selectedDocumentId}
               onChange={(event) => setSelectedDocumentId(event.target.value)}
@@ -227,11 +229,12 @@ export function CreateCustomerTicketPage() {
             </select>
           </div>
           <div>
-            <label className="mb-2 block text-sm font-medium">
+            <label className="mb-2 block text-sm font-medium" htmlFor="create-ticket-question">
               {t("legalTickets.create.question")}
             </label>
 
             <textarea
+              id="create-ticket-question"
               className="form-field min-h-24"
               value={question}
               onChange={(event) => setQuestion(event.target.value)}
@@ -241,10 +244,11 @@ export function CreateCustomerTicketPage() {
             />
           </div>
           <div>
-            <label className="mb-2 block text-sm font-medium">
+            <label className="mb-2 block text-sm font-medium" htmlFor="create-ticket-fingerprint">
               {t("legalTickets.create.issueFingerprint")}
             </label>
             <input
+              id="create-ticket-fingerprint"
               className="form-field"
               value={issueFingerprint}
               onChange={(event) => setIssueFingerprint(event.target.value)}
@@ -255,10 +259,11 @@ export function CreateCustomerTicketPage() {
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-medium">
+            <label className="mb-2 block text-sm font-medium" htmlFor="create-ticket-note">
               {t("legalTickets.create.customerNote")}
             </label>
             <textarea
+              id="create-ticket-note"
               className="form-field min-h-32"
               value={customerNote}
               onChange={(event) => setCustomerNote(event.target.value)}

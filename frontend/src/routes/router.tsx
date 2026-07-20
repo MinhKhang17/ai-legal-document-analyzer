@@ -36,9 +36,7 @@ import { AdminTicketsPage } from "../pages/admin/AdminTicketsPage";
 import { AdminTicketDetailPage } from "../pages/admin/AdminTicketDetailPage";
 import { AdminRefundsPage } from "../pages/admin/AdminRefundsPage";
 import { AdminRefundDetailPage } from "../pages/admin/AdminRefundDetailPage";
-import { AuditLogsPage } from "../pages/admin/AuditLogsPage";
 import { SystemHealthPage } from "../pages/admin/SystemHealthPage";
-import { JobsPage } from "../pages/jobs/JobsPage";
 import { ContractDetailPage } from "../pages/contracts/ContractDetailPage";
 import { SettingsPage } from "../pages/settings/SettingsPage";
 import { PaymentResultRedirect } from "../pages/billing/PaymentResultRedirect";
@@ -244,14 +242,6 @@ export const router = createBrowserRouter([
         element: <Navigate to="/dashboard" replace />,
       },
       {
-        path: "/jobs",
-        element: (
-          <AdminRoute>
-            <JobsPage />
-          </AdminRoute>
-        ),
-      },
-      {
         path: "/contracts",
         element: (
           <CustomerRoute>
@@ -302,14 +292,6 @@ export const router = createBrowserRouter([
       },
       { path: "/admin/refunds", element: <AdminRoute><AdminRefundsPage /></AdminRoute> },
       { path: "/admin/refunds/:id", element: <AdminRoute><AdminRefundDetailPage /></AdminRoute> },
-      {
-        path: "/admin/audit-logs",
-        element: (
-          <AdminRoute>
-            <AuditLogsPage />
-          </AdminRoute>
-        ),
-      },
       {
         path: "/admin/system-health",
         element: (
