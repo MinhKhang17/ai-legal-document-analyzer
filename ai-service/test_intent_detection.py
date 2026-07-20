@@ -1,7 +1,7 @@
 """Intent detection and completeness checker evaluation script.
 
 Loads the comprehensive dataset from data/intent_training_data.json and evaluates
-the accuracy of the keyword-based classifier.
+the accuracy and F1-score of the keyword-based classifier.
 """
 import sys
 import json
@@ -32,6 +32,10 @@ def run_evaluation():
 
     passed = 0
     failed_cases = []
+    
+    # Khởi tạo list để lưu nhãn thực tế và nhãn dự đoán để tính toán F1
+    y_true = []
+    y_pred = []
 
     for idx, ex in enumerate(examples, start=1):
         question = ex["question"]
@@ -40,6 +44,9 @@ def run_evaluation():
         
         result = detect_intent(question, has_user_chunks=has_chunks, has_knowledge_chunks=True)
         predicted = result.intent.value
+        
+        y_true.append(expected)
+        y_pred.append(predicted)
 
         if predicted == expected:
             passed += 1
@@ -55,18 +62,57 @@ def run_evaluation():
                 "notes": ex.get("notes", "")
             })
 
-        # print status of first few and failed ones
+        # In ra 15 trường hợp đầu tiên hoặc các trường hợp đoán sai để phân tích nhanh
         if idx <= 15 or predicted != expected:
             print(f"  {status} [{idx:3d}] '{question[:45]:45s}' -> {predicted:30s} (expected: {expected})")
 
     total = len(examples)
     accuracy = (passed / total) * 100
+    
+    # ─── PHẦN TÍNH TOÁN F1-SCORE THỦ CÔNG KHÔNG DÙNG THƯ VIỆN NGOÀI ─────────
+    all_classes = sorted(list(set(y_true + y_pred)))
+    class_metrics = {}
+
+    for c in all_classes:
+        # Tính True Positive, False Positive, False Negative cho từng class (intent)
+        tp = sum(1 for t, p in zip(y_true, y_pred) if t == c and p == c)
+        fp = sum(1 for t, p in zip(y_true, y_pred) if t != c and p == c)
+        fn = sum(1 for t, p in zip(y_true, y_pred) if t == c and p != c)
+        
+        precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+        recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+        f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0.0
+        
+        class_metrics[c] = {
+            "precision": precision,
+            "recall": recall,
+            "f1": f1,
+            "support": sum(1 for t in y_true if t == c)
+        }
+
+    # Tính toán chỉ số trung bình (Macro average)
+    macro_precision = sum(m["precision"] for m in class_metrics.values()) / len(all_classes) if all_classes else 0.0
+    macro_recall = sum(m["recall"] for m in class_metrics.values()) / len(all_classes) if all_classes else 0.0
+    macro_f1 = sum(m["f1"] for m in class_metrics.values()) / len(all_classes) if all_classes else 0.0
+
     print("-" * 80)
-    print(f"📊 SUMMARY: Passed {passed}/{total} cases ({accuracy:.2f}% accuracy)")
+    print("📊 BÁO CÁO KẾT QUẢ ĐÁNH GIÁ CHẤT LƯỢNG:")
+    print(f"  - Accuracy (Độ chính xác tổng quan): {accuracy:.2f}%")
+    print(f"  - Macro Precision (Độ chuẩn xác trung bình): {macro_precision * 100:.2f}%")
+    print(f"  - Macro Recall (Độ bao phủ trung bình): {macro_recall * 100:.2f}%")
+    print(f"  - Macro F1-Score (F1 trung bình): {macro_f1 * 100:.2f}%  👈 (Độ đo chính)")
+    print("-" * 80)
+    
+    # In bảng thống kê chi tiết cho từng loại ý định (Intent Class)
+    print("📝 CHI TIẾT ĐỘ ĐO CHO TỪNG LOẠI Ý ĐỊNH:")
+    print(f"{'Intent Class':<35} | {'Precision':<10} | {'Recall':<10} | {'F1-Score':<10} | {'Support':<8}")
+    print("-" * 79)
+    for cls, m in class_metrics.items():
+        print(f"{cls[:35]:<35} | {m['precision']*100:8.2f}% | {m['recall']*100:8.2f}% | {m['f1']*100:8.2f}% | {m['support']:<8}")
     print("-" * 80)
 
     if failed_cases:
-        print(f"\n❌ FAILED CASES ({len(failed_cases)}):")
+        print(f"\n❌ CÁC TRƯỜNG HỢP PHÂN LOẠI SAI ({len(failed_cases)}):")
         for fc in failed_cases:
             print(f"  - Case #{fc['idx']}: \"{fc['question']}\"")
             print(f"    Expected : {fc['expected']}")
@@ -74,11 +120,11 @@ def run_evaluation():
             print(f"    Chunks   : {fc['has_chunks']}")
             print(f"    Notes    : {fc['notes']}\n")
     else:
-        print("\n🎉 ALL CASES PASSED PERFECTLY!")
+        print("\n🎉 TẤT CẢ CÁC CASE ĐỀU PHÂN LOẠI CHÍNH XÁC!")
 
     # ─── completeness checker test suite ─────────────────────────────────────
     print("\n" + "=" * 80)
-    print("📋 COMPLETENESS CHECK TEST")
+    print("📋 COMPLETENESS CHECK TEST (KIỂM TRA ĐỘ ĐẦY ĐỦ THÔNG TIN)")
     print("=" * 80)
 
     comp_tests = [
