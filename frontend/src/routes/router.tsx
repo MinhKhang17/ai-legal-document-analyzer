@@ -53,7 +53,6 @@ const ContractAssistantPage = lazy(() => import("../pages/chat/ContractAssistant
 const LegalChatPage = lazy(() => import("../pages/chat/LegalChatPage").then((module) => ({ default: module.LegalChatPage })));
 const ChatHistoryPage = lazy(() => import("../pages/chat/ChatHistoryPage").then((module) => ({ default: module.ChatHistoryPage })));
 const AdminConsolePage = lazy(() => import("../pages/admin/AdminConsolePage").then((module) => ({ default: module.AdminConsolePage })));
-const TemplatesPage = lazy(() => import("../pages/templates/TemplatesPage").then((module) => ({ default: module.TemplatesPage })));
 const MyContractsPage = lazy(() => import("../pages/contracts/MyContractsPage").then((module) => ({ default: module.MyContractsPage })));
 
 export const router = createBrowserRouter([
@@ -252,7 +251,6 @@ export const router = createBrowserRouter([
           </AdminRoute>
         ),
       },
-      { path: "/templates", element: <TemplatesPage /> },
       {
         path: "/contracts",
         element: (

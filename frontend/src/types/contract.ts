@@ -6,45 +6,12 @@ export interface PageResponse<T> {
   totalPages: number;
 }
 
-export type ContractTemplateStatus = "ACTIVE" | "INACTIVE" | "ARCHIVED";
 export type ContractGenerationStatus = "QUEUED" | "PROCESSING" | "COMPLETED" | "FAILED";
 export type ContractStatus = "DRAFT" | "GENERATED" | "ACTIVE" | "ARCHIVED";
-
-export interface ContractTemplate {
-  id: number;
-  templateCode: string;
-  name: string;
-  description?: string | null;
-  category: string;
-  jurisdiction?: string | null;
-  content: string;
-  status: ContractTemplateStatus;
-  version: number;
-  createdAt?: string | null;
-  updatedAt?: string | null;
-}
-
-export interface CreateContractTemplateRequest {
-  templateCode: string;
-  name: string;
-  description?: string | null;
-  category: string;
-  jurisdiction?: string | null;
-  content: string;
-}
-
-export interface UpdateContractTemplateRequest {
-  name: string;
-  description?: string | null;
-  category: string;
-  jurisdiction?: string | null;
-  content: string;
-}
 
 export interface GenerateContractRequest {
   requestId: string;
   workspaceId: string;
-  templateId?: number | null;
   sourceDocumentId?: string | null;
   inputJson: string;
 }
@@ -54,7 +21,6 @@ export interface ContractGenerationJob {
   requestId: string;
   requesterId: number;
   workspaceId: string;
-  templateId?: number | null;
   sourceDocumentId?: string | null;
   inputJson: string;
   promptSnapshot?: string | null;
@@ -67,7 +33,6 @@ export interface ContractGenerationJob {
 
 export interface SaveContractRequest {
   workspaceId: string;
-  templateId?: number | null;
   generationJobId?: string | null;
   sourceDocumentId?: string | null;
   title: string;
@@ -79,7 +44,6 @@ export interface UserContract {
   id: string;
   ownerId: number;
   workspaceId: string;
-  templateId?: number | null;
   generationJobId?: string | null;
   sourceDocumentId?: string | null;
   title: string;

@@ -261,11 +261,6 @@ export const API_ENDPOINTS = {
   },
 
   contracts: {
-    templates: fromEnv("VITE_CONTRACT_TEMPLATES_API"),
-    templateDetail: (templateId: number | string) =>
-      fillPathParams(fromEnv("VITE_CONTRACT_TEMPLATE_DETAIL_API"), {
-        templateId,
-      }),
     generate: fromEnv("VITE_CONTRACT_GENERATE_API"),
     base: fromEnv("VITE_CONTRACTS_API"),
     my: fromEnv("VITE_MY_CONTRACTS_API"),
