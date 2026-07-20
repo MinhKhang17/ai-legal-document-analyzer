@@ -7,6 +7,7 @@ import { useAppStore } from "../../store/AppStore";
 import { getCurrentUser, login } from "../../api/authApi";
 import type { CurrentUser } from "../../types/auth";
 import { clearAccessToken, setAccessToken } from "../../services/authSession";
+import { getSafeAuthReturnPath } from "../../utils/authReturnPath";
 
 const getStringStateValue = (state: unknown, key: string): string => {
   if (typeof state === "object" && state !== null) {
@@ -102,7 +103,14 @@ export function LoginPage() {
 
             signIn(accessToken, currentUser);
 
-            if (currentUser.role === "ADMIN") {
+            const returnPath = getSafeAuthReturnPath(
+              getStringStateValue(location.state, "from"),
+              currentUser.role,
+            );
+
+            if (returnPath) {
+              navigate(returnPath, { replace: true });
+            } else if (currentUser.role === "ADMIN") {
               navigate("/admin", { replace: true });
             } else if (currentUser.role === "EXPERT") {
               navigate("/lawyer/tickets", { replace: true });
