@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.7
 FROM python:3.11-slim
 
 WORKDIR /app
@@ -11,7 +12,9 @@ ENV PATH="/usr/lib/ccache:${PATH}"
 
 ARG PADDLEPADDLE_VERSION=3.3.0
 
-RUN apt-get update \
+RUN --mount=type=cache,id=lexiguard-ai-apt-lists,target=/var/lib/apt/lists,sharing=locked \
+    --mount=type=cache,id=lexiguard-ai-apt-cache,target=/var/cache/apt,sharing=locked \
+    apt-get update \
     && apt-get install -y --no-install-recommends \
         build-essential \
         curl \
@@ -23,15 +26,15 @@ RUN apt-get update \
         libsm6 \
         libxext6 \
         libxrender1 \
-        poppler-utils \
-    && rm -rf /var/lib/apt/lists/*
+        poppler-utils
 
 COPY requirements.txt .
 
-RUN pip install --upgrade pip \
-    && pip install --no-cache-dir paddlepaddle==${PADDLEPADDLE_VERSION} \
-    && pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu \
-    && pip install --no-cache-dir -r requirements.txt
+RUN --mount=type=cache,id=lexiguard-ai-pip-cache,target=/root/.cache/pip,sharing=locked \
+    pip install --upgrade pip \
+    && pip install paddlepaddle==${PADDLEPADDLE_VERSION} \
+    && pip install torch --index-url https://download.pytorch.org/whl/cpu \
+    && pip install -r requirements.txt
 
 COPY . .
 

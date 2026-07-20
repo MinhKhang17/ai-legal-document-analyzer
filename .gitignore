@@ -59,6 +59,8 @@ analysis-history/
 models/
 !ai-service/app/models/
 !ai-service/app/models/**
+data/ai-cache/
+data/paddleocr/
 checkpoints/
 *.ckpt
 *.pt
