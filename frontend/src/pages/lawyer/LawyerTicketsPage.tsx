@@ -147,11 +147,11 @@ export function LawyerTicketsPage() {
               <Link
                 key={ticket.id}
                 to={`/lawyer/tickets/${ticket.id}`}
-                className="rounded-2xl border bg-surface p-lg transition hover:border-primary hover:shadow-sm"
+                className="rounded-2xl border border-legal-border bg-surface p-lg transition hover:border-primary hover:shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:hover:border-inverse-primary dark:hover:bg-slate-700"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-primary dark:text-inverse-primary">
                       {ticket.workspace_name || t("lawyerTickets.workspace")} ·{" "}
                       {ticket.document_name || t("lawyerTickets.document")}
                     </p>
@@ -162,14 +162,14 @@ export function LawyerTicketsPage() {
                         `${t("legalTickets.table.ticket")} #${ticket.id}`}
                     </h3>
 
-                    <p className="mt-2 line-clamp-2 text-sm text-on-surface-variant">
+                    <p className="mt-2 line-clamp-2 text-sm text-on-surface-variant dark:text-slate-300">
                       {ticket.issue_summary ||
                         ticket.customer_note ||
                         ticket.suggestion_reason ||
                         t("common.noData")}
                     </p>
 
-                    <p className="mt-3 text-xs text-on-surface-variant">
+                    <p className="mt-3 text-xs text-on-surface-variant dark:text-slate-400">
                       {t("lawyerTickets.createdBy")}{" "}
                       {ticket.created_by_name || "-"} ·{" "}
                       {formatDisplayDate(ticket.created_at, "-", locale)}

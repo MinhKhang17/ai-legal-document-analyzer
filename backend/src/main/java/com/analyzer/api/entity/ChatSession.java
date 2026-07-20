@@ -38,11 +38,35 @@ public class ChatSession {
     @Column(name = "summary_updated_at")
     private LocalDateTime summaryUpdatedAt;
 
+    @Column(name = "conversation_summary_json", columnDefinition = "TEXT")
+    private String conversationSummaryJson;
+
+    @Column(name = "summary_through_message_id")
+    private String summaryThroughMessageId;
+
     @Column(name = "memory_json", columnDefinition = "TEXT")
     private String memoryJson;
 
     @Column(name = "context_json", columnDefinition = "TEXT")
     private String contextJson;
+
+    @Column(name = "active_document_ids_json", columnDefinition = "TEXT")
+    private String activeDocumentIdsJson;
+
+    @Column(name = "focused_document_id")
+    private String focusedDocumentId;
+
+    @Column(name = "message_attached_document_ids_json", columnDefinition = "TEXT")
+    private String messageAttachedDocumentIdsJson;
+
+    @Column(name = "conversation_user_role")
+    private String conversationUserRole;
+
+    @Column(name = "conversation_mode")
+    private String conversationMode;
+
+    @Column(name = "memory_updated_at")
+    private LocalDateTime memoryUpdatedAt;
 
     @Column(name = "context_version")
     @Builder.Default
@@ -55,6 +79,16 @@ public class ChatSession {
     @Column(name = "is_default", nullable = false)
     @Builder.Default
     private Boolean isDefault = false;
+
+    @Column(name = "is_shared", nullable = false)
+    @Builder.Default
+    private Boolean isShared = false;
+
+    @Column(name = "share_token", unique = true)
+    private String shareToken;
+
+    @Column(name = "shared_at")
+    private LocalDateTime sharedAt;
 
     @Column(name = "last_message_at")
     private LocalDateTime lastMessageAt;

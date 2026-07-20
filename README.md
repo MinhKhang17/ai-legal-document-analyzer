@@ -83,12 +83,46 @@ legal-rag-platform/
 ### Quick Start
 
 1. Clone the repository.
-2. Create environment files from service examples when available.
-3. Start local dependencies and service placeholders:
+2. Create one environment file for each service:
+
+```bash
+cp backend/.env.example backend/.env
+cp ai-service/.env.example ai-service/.env
+cp frontend/.env.example frontend/.env
+```
+
+The root Compose file loads `backend/.env` and `ai-service/.env` as runtime environment files. The frontend is a static Vite build, so its Docker image reads `frontend/.env` while building. Rebuild the frontend image after changing a `VITE_*` value.
+
+ngrok and VNPay settings also live in `backend/.env`; no separate root `.env` is required.
+
+3. Start the complete stack:
 
 ```bash
 docker compose up --build
 ```
+
+### VNPAY Sandbox Through ngrok
+
+1. Fill in the ngrok credentials and static development domain in `backend/.env`:
+
+```bash
+cp backend/.env.example backend/.env
+```
+
+```dotenv
+NGROK_AUTHTOKEN=your_ngrok_authtoken
+NGROK_URL=https://your-assigned-domain.ngrok-free.app
+```
+
+2. Start the regular stack. ngrok is started automatically:
+
+```bash
+docker compose up -d --build
+```
+
+The public VNPAY return endpoint will be `${NGROK_URL}/api/v1/payment-transactions/vnpay-return`.
+The IPN endpoint to register in the VNPAY sandbox portal is `${NGROK_URL}/api/v1/payment-transactions/vnpay-ipn`.
+ngrok's local traffic inspector is available at `http://localhost:4040`.
 
 4. Start services independently during development:
    - Frontend only:

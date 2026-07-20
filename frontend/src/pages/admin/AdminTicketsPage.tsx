@@ -12,7 +12,7 @@ import { PageHeader } from "../../components/common/PageHeader";
 import { useI18n } from "../../hooks/useI18n";
 import { useToast } from "../../hooks/useToast";
 import { getAdminLegalTickets } from "../../services/legalTicket.service";
-import type { LegalTicket } from "../../types/legalTicket";
+import type { LegalTicket, LegalTicketType } from "../../types/legalTicket";
 import type { LegalTicketFilter } from "../../types/legalTicketStatus";
 import {
   getLegalTicketFilterLabel,
@@ -60,6 +60,7 @@ export function AdminTicketsPage() {
   const [page, setPage] = useState(() => parsePageParam(searchParams.get("page")));
   const [statusFilter, setStatusFilter] = useState<LegalTicketFilter>(() => toLegalTicketFilter(searchParams.get("status") ?? "ALL"));
   const [riskLevel, setRiskLevel] = useState(searchParams.get("risk") ?? "");
+  const [ticketType, setTicketType] = useState<LegalTicketType | "">((searchParams.get("type") as LegalTicketType) ?? "");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const filterOptions = useMemo(() => getLegalTicketFilterOptions(t), [t]);
@@ -75,6 +76,7 @@ export function AdminTicketsPage() {
         20,
         statusFilter === "ALL" ? undefined : statusFilter,
         riskLevel || undefined,
+        ticketType || undefined,
       );
       setTickets(response.items ?? []);
       setTotalItems(response.totalItems ?? 0);
@@ -86,7 +88,7 @@ export function AdminTicketsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, riskLevel, statusFilter, t, toast]);
+  }, [page, riskLevel, statusFilter, ticketType, t, toast]);
 
   useEffect(() => {
     void loadTickets();
@@ -101,6 +103,10 @@ export function AdminTicketsPage() {
   );
 
   const columns: DataTableColumn<LegalTicket>[] = [
+    {
+      header: language === "vi" ? "Loại" : "Type",
+      cell: (ticket) => <Badge tone="blue">{ticket.ticket_type ?? "CONTACT_EXPERT"}</Badge>,
+    },
     {
       header: t("legalTickets.table.ticket"),
       cell: (ticket) => (
@@ -149,6 +155,9 @@ export function AdminTicketsPage() {
         subtitle={t("legalTickets.adminSubtitle")}
         actions={
           <>
+            <select className="form-field max-w-52" value={ticketType} onChange={(event) => { const value = event.target.value as LegalTicketType | ""; setTicketType(value); setPage(0); const next = new URLSearchParams(searchParams); next.set("page", "1"); value ? next.set("type", value) : next.delete("type"); setSearchParams(next); }}>
+              <option value="">Tất cả loại ticket</option><option value="SYSTEM_ERROR">Lỗi hệ thống</option><option value="QUERY_ERROR">Lỗi câu trả lời AI</option><option value="CONTACT_EXPERT">Liên hệ chuyên gia</option>
+            </select>
             <select
               className="form-field max-w-48"
               value={statusFilter}

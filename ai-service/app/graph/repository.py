@@ -94,13 +94,16 @@ class GraphRepository:
         *,
         query_text: str | None = None,
         document_id: str | None = None,
+        document_ids: list[str] | None = None,
     ) -> list[RetrievedChunk]:
         metadata_filter: dict[str, Any] = {
             "source_type": "USER_DOCUMENT",
             "user_id": user_id,
             "workspace_id": workspace_id,
         }
-        if document_id:
+        if document_ids:
+            metadata_filter["document_id"] = set(document_ids)
+        elif document_id:
             metadata_filter["document_id"] = document_id
         return self._search_chunks_with_filter(
             query_embedding=embedding,
@@ -123,7 +126,10 @@ class GraphRepository:
             metadata_filter={
                 "source_type": "SYSTEM_KB",
                 "ingest_source": "INGEST_V2",
-                "effective_status": {"ACTIVE", "UNKNOWN"},
+                "effective_status": "ACTIVE",
+                "visibility": {"PUBLIC", None},
+                "active": {True, None},
+                "ingested_by_role": "ADMIN",
             },
         )
 
@@ -231,6 +237,55 @@ class GraphRepository:
                 for record in result
             ]
 
+    def update_document_lifecycle(
+        self,
+        document_id: str,
+        *,
+        knowledge_base_id: str | None = None,
+        visibility: str,
+        active: bool,
+        published_at: str | None,
+    ) -> int:
+        """Update existing JSON metadata only; vector nodes/index/schema stay unchanged."""
+        rows = self.list_chunks()
+        updates: list[tuple[str, str]] = []
+        for row in rows:
+            metadata = self._parse_metadata(row.get("metadata_json"))
+            source_metadata = metadata.get("source_metadata")
+            legacy_metadata = source_metadata if isinstance(source_metadata, dict) else {}
+            stored_knowledge_base_id = str(
+                metadata.get("knowledge_base_id")
+                or legacy_metadata.get("knowledge_base_id")
+                or ""
+            )
+            if knowledge_base_id and stored_knowledge_base_id != knowledge_base_id:
+                continue
+            candidate_ids = {
+                str(metadata.get("document_id") or ""),
+                str(metadata.get("knowledge_document_id") or ""),
+            }
+            if document_id not in candidate_ids:
+                continue
+            metadata.update({
+                "knowledge_base_id": knowledge_base_id or stored_knowledge_base_id or None,
+                "visibility": visibility,
+                "active": active,
+                "effective_status": "ACTIVE" if active and visibility == "PUBLIC" else "INACTIVE",
+                "published_at": published_at,
+            })
+            updates.append((str(row["chunk_id"]), json.dumps(metadata, ensure_ascii=False)))
+
+        if not updates:
+            return 0
+        with self.driver.session() as session:
+            for chunk_id, metadata_json in updates:
+                session.run(
+                    "MATCH (chunk:Chunk {node_id: $chunk_id}) SET chunk.metadata_json = $metadata_json",
+                    chunk_id=chunk_id,
+                    metadata_json=metadata_json,
+                ).consume()
+        return len(updates)
+
     def _search_chunks_by_text(
         self,
         query_text: str,
@@ -303,6 +358,15 @@ class GraphRepository:
         if not query_tokens:
             return []
 
+        def token_weight(token: str) -> float:
+            if token.isdigit():
+                return 8.0
+            if len(token) >= 6:
+                return 1.5
+            return 1.0
+
+        total_query_weight = sum(token_weight(token) for token in query_tokens)
+
         chunks = self.list_chunks()
         scored: list[tuple[float, dict[str, Any]]] = []
         for chunk in chunks:
@@ -322,10 +386,11 @@ class GraphRepository:
             chunk_tokens = set(self._tokenize(search_text))
             if not chunk_tokens:
                 continue
-            overlap = len(query_tokens & chunk_tokens)
-            if overlap == 0:
+            overlapping_tokens = query_tokens & chunk_tokens
+            if not overlapping_tokens:
                 continue
-            score = overlap / max(1, len(query_tokens))
+            overlap_weight = sum(token_weight(token) for token in overlapping_tokens)
+            score = overlap_weight / max(1.0, total_query_weight)
             scored.append((score, chunk))
 
         scored.sort(key=lambda item: item[0], reverse=True)
@@ -349,15 +414,20 @@ class GraphRepository:
         text_hits: list[RetrievedChunk],
         top_k: int,
     ) -> list[RetrievedChunk]:
-        merged_by_id: dict[str, RetrievedChunk] = {}
-
-        for hit in [*vector_hits, *text_hits]:
-            existing = merged_by_id.get(hit.chunk_id)
-            if existing is None or hit.score > existing.score:
-                merged_by_id[hit.chunk_id] = hit
-
-        merged = sorted(merged_by_id.values(), key=lambda item: item.score, reverse=True)
-        return merged[:top_k]
+        # Lexical query expansion can identify an exact article number or legal
+        # phrase that cosine similarity misses. Preserve the two strongest text
+        # matches, then fill the remaining slots with semantic vector results.
+        ordered_candidates = [*text_hits[:2], *vector_hits, *text_hits[2:]]
+        merged: list[RetrievedChunk] = []
+        seen_ids: set[str] = set()
+        for hit in ordered_candidates:
+            if hit.chunk_id in seen_ids:
+                continue
+            seen_ids.add(hit.chunk_id)
+            merged.append(hit)
+            if len(merged) >= top_k:
+                break
+        return merged
 
     def _record_matches_metadata(self, record: Any, metadata_filter: dict[str, Any] | None) -> bool:
         if not metadata_filter:

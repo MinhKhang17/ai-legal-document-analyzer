@@ -35,8 +35,10 @@ public class UploadKnowledgeRequest {
 
     private Long workspaceId;
 
-    @NotBlank
     private String extractedContent;
 
     private String rawContent;
+
+    @Size(max = 500)
+    private String description;
 }

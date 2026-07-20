@@ -1,4 +1,4 @@
-import { API_ENDPOINTS } from "../config/api";
+import { API_ENDPOINTS, buildApiUrl } from "../config/api";
 import type {
   ArchiveKnowledgeRequest,
   IngestKnowledgeRequest,
@@ -104,6 +104,43 @@ export const uploadKnowledgeBaseEntry = async (
     "Không thể upload knowledge base",
   );
 
+export const uploadKnowledgeBaseSourceFile = async (entryId: string, file: File): Promise<KnowledgeBaseVersion> => {
+  const formData = new FormData();
+  formData.append("file", file);
+  return requestApiData<KnowledgeBaseVersion>(
+    API_ENDPOINTS.knowledgeBase.sourceFile(entryId),
+    { method: "POST", headers: buildAuthHeaders({ Accept: "application/json" }), credentials: "include", body: formData },
+    "Không thể lưu file gốc knowledge base",
+  );
+};
+
+export const downloadKnowledgeBaseSourceFile = async (entryId: string): Promise<void> => {
+  const response = await fetch(buildApiUrl(API_ENDPOINTS.knowledgeBase.sourceFile(entryId)), {
+    headers: buildAuthHeaders(), credentials: "include",
+  });
+  if (!response.ok) throw new Error("Không thể tải file gốc knowledge base");
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = "knowledge-source";
+  anchor.click();
+  URL.revokeObjectURL(url);
+};
+
+export const getKnowledgeBaseSourceFile = async (entryId: string): Promise<File> => {
+  const response = await fetch(buildApiUrl(API_ENDPOINTS.knowledgeBase.sourceFile(entryId)), {
+    headers: buildAuthHeaders(), credentials: "include",
+  });
+  if (!response.ok) throw new Error("Không thể tải file gốc knowledge base");
+  const blob = await response.blob();
+  const disposition = response.headers.get("content-disposition") ?? "";
+  const encodedName = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+  const plainName = disposition.match(/filename="?([^";]+)"?/i)?.[1];
+  const fileName = encodedName ? decodeURIComponent(encodedName) : plainName || "knowledge-source";
+  return new File([blob], fileName, { type: blob.type || "application/octet-stream" });
+};
+
 export const ingestKnowledgeBaseEntry = async (
   entryId: string,
   payload: IngestKnowledgeRequest,
@@ -140,6 +177,33 @@ export const publishKnowledgeBaseEntry = async (
     API_ENDPOINTS.knowledgeBase.publish(entryId),
     payload,
     "Không thể publish knowledge base",
+  );
+
+export const getKnowledgeIngestionJob = async (
+  jobId: string,
+): Promise<KnowledgeIngestionJob> =>
+  getJson<KnowledgeIngestionJob>(
+    API_ENDPOINTS.knowledgeBase.ingestionJob(jobId),
+    "Không thể tải tiến độ ingest",
+  );
+
+export const failKnowledgeIngestionJob = async (
+  jobId: string,
+  errorMessage: string,
+): Promise<KnowledgeIngestionJob> =>
+  postJson<KnowledgeIngestionJob>(
+    API_ENDPOINTS.knowledgeBase.failIngestionJob(jobId),
+    { errorMessage },
+    "Không thể cập nhật trạng thái ingest thất bại",
+  );
+
+export const unpublishKnowledgeBaseEntry = async (
+  entryId: string,
+): Promise<KnowledgeBaseVersion> =>
+  postJson<KnowledgeBaseVersion>(
+    API_ENDPOINTS.knowledgeBase.unpublish(entryId),
+    {},
+    "Không thể unpublish knowledge base",
   );
 
 export const archiveKnowledgeBaseEntry = async (

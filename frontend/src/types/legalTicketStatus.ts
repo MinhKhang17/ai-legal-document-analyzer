@@ -1,4 +1,8 @@
 export const VALID_LEGAL_TICKET_STATUSES = [
+  "OPEN",
+  "ASSIGNED",
+  "WAITING_FOR_USER",
+  "WAITING_FOR_EXPERT",
   "DRAFT",
   "PENDING_ADMIN_REVIEW",
   "REJECTED_BY_ADMIN",
@@ -17,6 +21,10 @@ export type LegalTicketFilter = "ALL" | LegalTicketStatus;
 export type TranslateFn = (key: string) => string;
 
 export const LEGAL_TICKET_STATUS_LABEL_KEYS: Record<LegalTicketStatus, string> = {
+  OPEN: "legalTickets.filters.PENDING_ADMIN_REVIEW",
+  ASSIGNED: "legalTickets.filters.ASSIGNED_TO_LAWYER",
+  WAITING_FOR_USER: "legalTickets.filters.NEED_MORE_INFO",
+  WAITING_FOR_EXPERT: "legalTickets.filters.CUSTOMER_RESPONDED",
   DRAFT: "legalTickets.filters.DRAFT",
   PENDING_ADMIN_REVIEW: "legalTickets.filters.PENDING_ADMIN_REVIEW",
   REJECTED_BY_ADMIN: "legalTickets.filters.REJECTED_BY_ADMIN",

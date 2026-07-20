@@ -23,6 +23,9 @@ import type {
   FeedbackSurveyType,
 } from "../../types/feedback";
 import { formatDisplayDate } from "../../utils/format";
+import { getAdminChatFeedback } from "../../api/chatApi";
+import { getAccessToken } from "../../services/authSession";
+import type { ChatMessageFeedback } from "../../types/chat";
 
 const surveyTypes: FeedbackSurveyType[] = ["SATISFACTION", "PRODUCT", "BUG", "USABILITY"];
 const surveyStatuses: FeedbackSurveyStatus[] = ["DRAFT", "ACTIVE", "CLOSED", "ARCHIVED"];
@@ -72,6 +75,7 @@ export function AdminFeedbackPage() {
   const locale = language === "vi" ? "vi-VN" : "en-US";
   const [surveys, setSurveys] = useState<FeedbackSurvey[]>([]);
   const [reports, setReports] = useState<AiReport[]>([]);
+  const [chatRatings, setChatRatings] = useState<ChatMessageFeedback[]>([]);
   const [selectedSurvey, setSelectedSurvey] = useState<FeedbackSurvey | null>(null);
   const [surveyForm, setSurveyForm] = useState(emptySurveyForm);
   const [reportForm, setReportForm] = useState(emptyReportForm);
@@ -84,9 +88,10 @@ export function AdminFeedbackPage() {
     setLoading(true);
     setError("");
 
-    const [surveysResult, reportsResult] = await Promise.allSettled([
+    const [surveysResult, reportsResult, chatRatingsResult] = await Promise.allSettled([
       getAdminFeedbackSurveys(0, 50),
       getAdminAiFeedbackReports(0, 50),
+      getAdminChatFeedback(getAccessToken() ?? '', 0, 50),
     ]);
 
     if (surveysResult.status === "fulfilled") {
@@ -102,6 +107,7 @@ export function AdminFeedbackPage() {
     }
 
     setReports(reportsResult.status === "fulfilled" ? reportsResult.value.items ?? [] : []);
+    setChatRatings(chatRatingsResult.status === "fulfilled" ? chatRatingsResult.value.items ?? [] : []);
     setLoading(false);
   }, [toast, t]);
 
@@ -283,6 +289,14 @@ export function AdminFeedbackPage() {
     },
   ];
 
+  const ratingColumns: DataTableColumn<ChatMessageFeedback>[] = [
+    { header: language === 'vi' ? 'Khách hàng' : 'Customer', cell: (item) => item.submittedByName || `#${item.submittedById}` },
+    { header: language === 'vi' ? 'Đánh giá' : 'Rating', cell: (item) => <Badge tone={item.rating === 'THUMBS_UP' ? 'green' : 'red'}>{item.rating}</Badge> },
+    { header: language === 'vi' ? 'Câu trả lời AI' : 'AI answer', cell: (item) => <p className="max-w-md line-clamp-3">{item.messageContent}</p> },
+    { header: language === 'vi' ? 'Lý do / góp ý' : 'Reasons / comment', cell: (item) => <span>{[...(item.reasons ?? []), item.comment].filter(Boolean).join(', ') || '-'}</span> },
+    { header: t('table.date'), cell: (item) => formatDisplayDate(item.createdAt, '-', locale) },
+  ];
+
   return (
     <div>
       <PageHeader
@@ -317,6 +331,9 @@ export function AdminFeedbackPage() {
 
       <div className="grid gap-gutter xl:grid-cols-[minmax(0,1fr)_420px]">
         <main className="space-y-gutter">
+          <Card title={language === 'vi' ? 'Đánh giá câu trả lời AI' : 'AI answer ratings'} actions={<Badge tone="blue">{chatRatings.length}</Badge>}>
+            <DataTable columns={ratingColumns} data={chatRatings} getRowKey={(item) => item.id} emptyMessage={language === 'vi' ? 'Chưa có đánh giá.' : 'No ratings yet.'} />
+          </Card>
           <Card title={t("feedback.surveys")} actions={<Badge tone="blue">{surveys.length}</Badge>}>
             {loading ? (
               <p className="text-sm text-on-surface-variant dark:text-slate-400">

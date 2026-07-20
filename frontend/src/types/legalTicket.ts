@@ -1,5 +1,10 @@
 import type { LegalTicketStatus } from "./legalTicketStatus";
 
+export type LegalTicketType = "SYSTEM_ERROR" | "QUERY_ERROR" | "CONTACT_EXPERT" | "REFUND_REQUEST";
+export type TicketRecipientType = "EXPERT" | "ADMIN";
+export type TicketPriority = "LOW" | "NORMAL" | "HIGH" | "URGENT";
+export type ConversationScope = "SELECTED_RESPONSE" | "RELATED_MESSAGES" | "FULL_CONVERSATION" | "TICKET_CONTEXT_ONLY";
+
 export interface PageResponse<T> {
   items: T[];
   page: number;
@@ -9,6 +14,20 @@ export interface PageResponse<T> {
 }
 
 export interface CreateLegalTicketRequest {
+  title?: string;
+  description?: string;
+  recipientType?: TicketRecipientType;
+  priority?: TicketPriority;
+  conversationScope?: ConversationScope;
+  userMessageId?: string | null;
+  assistantMessageId?: string | null;
+  focusedDocumentId?: string | null;
+  documentIds?: string[];
+  citationIds?: string[];
+  attachmentIds?: string[];
+  ticket_type?: LegalTicketType;
+  chat_session_id?: string | null;
+  chat_message_id?: string | null;
   request_id?: string | null;
   workspace_id: string;
   document_id?: string | null;
@@ -44,7 +63,21 @@ export interface ReopenLegalTicketRequest {
 }
 
 export interface LegalTicket {
+  ticketCode?: string | null;
+  title?: string | null;
+  description?: string | null;
+  recipientType?: TicketRecipientType | null;
+  priority?: TicketPriority | null;
+  conversationScope?: ConversationScope | null;
+  sourceUserMessageId?: string | null;
+  sourceAssistantMessageId?: string | null;
+  focusedDocumentId?: string | null;
+  sharedDocumentIds?: string[];
+  contextSnapshot?: TicketContextSnapshot | null;
   id: string;
+  ticket_type?: LegalTicketType | null;
+  chat_session_id?: string | null;
+  chat_message_id?: string | null;
 
   request_id: string | null;
 
@@ -119,6 +152,50 @@ export interface LegalTicketMessage {
   created_at: string;
 
   internal_only: boolean;
+  replyToMessageId?: string | null;
+  editedAt?: string | null;
+  attachments?: TicketAttachment[];
+}
+
+export interface TicketContextSnapshot {
+  id: string;
+  userQuestion: string;
+  assistantAnswer?: string | null;
+  conversationTitle?: string | null;
+  citationSnapshotJson?: string | null;
+  documentSnapshotJson?: string | null;
+  selectedMessageSnapshotJson?: string | null;
+  contentHash: string;
+  createdAt: string;
+}
+
+export interface TicketAttachment {
+  id: string;
+  originalFileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  scanStatus: string;
+  uploadStatus: string;
+  createdAt: string;
+  downloadUrl?: string;
+}
+
+export interface AttachmentPolicy {
+  maxAttachmentSizeKb: number;
+  maxAttachmentsPerMessage: number;
+  maxAttachmentsPerTicket: number;
+  allowedMimeTypes: string[];
+}
+
+export interface ConversationShare {
+  id: string;
+  ticketId: string;
+  shareUrl: string;
+  scope: ConversationScope;
+  accessMode: string;
+  expiresAt: string;
+  revokedAt?: string | null;
+  createdAt: string;
 }
 
 export interface TicketSummary {

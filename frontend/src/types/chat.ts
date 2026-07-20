@@ -3,7 +3,8 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
-  status?: 'thinking' | 'streaming' | 'done' | 'error';
+  status?: 'queued' | 'thinking' | 'streaming' | 'completed' | 'error' | 'cancelled';
+  statusMessage?: string;
   errorMessage?: string;
   citations?: string[];
   requestId?: string | null;
@@ -94,3 +95,33 @@ export interface ChatSessionMemory {
   contextJson: string | null;
   updatedAt: string | null;
 }
+
+export interface ChatSessionDocument {
+  mappingId: string;
+  chatSessionId: string;
+  documentId: string;
+  originalFileName: string;
+  contentType: string | null;
+  size: number;
+  uploadStatus: string;
+  attachedAt: string;
+  active: boolean;
+}
+
+export type ChatFeedbackRating = 'THUMBS_UP' | 'THUMBS_DOWN';
+export type ChatFeedbackReason = 'INCORRECT' | 'WRONG_CITATION' | 'INCOMPLETE' | 'NOT_HELPFUL' | 'POOR_PHRASING' | 'OTHER';
+
+export interface ChatMessageFeedback {
+  id: string;
+  chatMessageId: string;
+  messageContent: string;
+  rating: ChatFeedbackRating;
+  reasons: ChatFeedbackReason[];
+  comment: string | null;
+  submittedById: number;
+  submittedByName: string;
+  createdAt: string;
+}
+
+export interface ShareChatSessionResponse { chatSessionId: string; shareToken: string; shareUrl: string; sharedAt: string; }
+export interface SharedChatSession { chatSessionId: string; title: string; ownerName: string; createdAt: string; sharedAt: string; messages: WorkspaceChatMessage[]; }

@@ -6,4 +6,6 @@ import com.analyzer.api.dto.knowledge.PublishKnowledgeRequest;
 public interface KnowledgePublicationService {
 
     KnowledgeBaseVersionResponse publish(String knowledgeBaseEntryId, PublishKnowledgeRequest request);
+
+    KnowledgeBaseVersionResponse unpublish(String knowledgeBaseEntryId);
 }

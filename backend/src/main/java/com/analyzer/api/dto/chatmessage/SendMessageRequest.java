@@ -7,6 +7,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -19,4 +21,12 @@ public class SendMessageRequest {
 
     @Size(max = 100, message = "Document ID must not exceed 100 characters")
     private String documentId;
+
+    private String focusedDocumentId;
+
+    private List<String> messageAttachedDocumentIds;
+
+    private String userRole;
+
+    private String conversationMode;
 }

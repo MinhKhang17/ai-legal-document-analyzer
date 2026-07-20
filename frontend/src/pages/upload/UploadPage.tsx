@@ -19,10 +19,11 @@ import { useI18n } from "../../hooks/useI18n";
 import { useToast } from "../../hooks/useToast";
 
 import { getAccessToken as getSessionAccessToken } from "../../services/authSession";
+import { supportedContractScopeText } from "../../config/supportedContractTypes";
 const getAccessToken = () => getSessionAccessToken() ?? "";
 
 export function UploadPage() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const toast = useToast();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -134,7 +135,6 @@ export function UploadPage() {
       toast.warning(t("upload.workspaceNameRequired"), t("toast.warningTitle"));
       return;
     }
-
     try {
       setCreatingWorkspace(true);
 
@@ -167,7 +167,6 @@ export function UploadPage() {
       toast.warning(t("upload.selectWorkspaceRequired"), t("toast.warningTitle"));
       return;
     }
-
     try {
       setUploading(true);
 
@@ -298,6 +297,10 @@ export function UploadPage() {
                 </div>
               )}
 
+              <p className="rounded-xl bg-surface-container-low p-sm text-xs text-on-surface-variant dark:bg-slate-800 dark:text-slate-400">
+                {supportedContractScopeText(language)} {language === "vi" ? "Bạn chỉ cần chọn tài liệu; hệ thống sẽ tự nhận diện nội dung khi xử lý." : "Just choose a document; the system detects its content during processing."}
+              </p>
+
               <FileUploadZone
                 onUpload={handleUploadFile}
                 disabled={uploading || !selectedWorkspaceId}
@@ -368,6 +371,7 @@ export function UploadPage() {
                       {t("upload.processingStatusDescription")}
                     </div>
                   )}
+                  {document.errorMessage && <p className="mt-sm text-sm text-error">{document.errorMessage}</p>}
                 </div>
               ))}
             </div>

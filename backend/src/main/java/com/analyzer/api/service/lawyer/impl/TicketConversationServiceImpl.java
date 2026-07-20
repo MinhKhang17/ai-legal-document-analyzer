@@ -8,6 +8,8 @@ import com.analyzer.api.entity.LegalTicket;
 import com.analyzer.api.entity.LegalTicketMessage;
 import com.analyzer.api.entity.User;
 import com.analyzer.api.enums.LegalTicketMessageType;
+import com.analyzer.api.enums.LegalTicketStatus;
+import com.analyzer.api.exception.common.ConflictException;
 import com.analyzer.api.exception.common.ForbiddenException;
 import com.analyzer.api.exception.common.ResourceNotFoundException;
 import com.analyzer.api.mapper.LegalTicketMapper;
@@ -15,6 +17,7 @@ import com.analyzer.api.repository.LegalTicketMessageRepository;
 import com.analyzer.api.repository.LegalTicketRepository;
 import com.analyzer.api.repository.UserRepository;
 import com.analyzer.api.service.lawyer.TicketConversationService;
+import com.analyzer.api.service.EmailService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,10 +29,18 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TicketConversationServiceImpl implements TicketConversationService {
 
+    private static final List<LegalTicketStatus> CHATABLE_STATUSES = List.of(
+            LegalTicketStatus.ASSIGNED_TO_LAWYER,
+            LegalTicketStatus.IN_REVIEW,
+            LegalTicketStatus.NEED_MORE_INFO,
+            LegalTicketStatus.CUSTOMER_RESPONDED,
+            LegalTicketStatus.REOPENED);
+
     private final LegalTicketRepository legalTicketRepository;
     private final LegalTicketMessageRepository legalTicketMessageRepository;
     private final UserRepository userRepository;
     private final LegalTicketMapper legalTicketMapper;
+    private final EmailService emailService;
 
     @Override
     @Transactional
@@ -39,6 +50,10 @@ public class TicketConversationServiceImpl implements TicketConversationService 
 
         if (ticket.getAssignedLawyer() == null || !ticket.getAssignedLawyer().getId().equals(lawyerId)) {
             throw new ForbiddenException("Bạn không phải là Luật sư được phân công xử lý yêu cầu này");
+        }
+
+        if (!CHATABLE_STATUSES.contains(ticket.getStatus())) {
+            throw new ConflictException("INVALID_STATUS_TRANSITION");
         }
 
         User lawyer = userRepository.findById(lawyerId)
@@ -54,9 +69,15 @@ public class TicketConversationServiceImpl implements TicketConversationService 
 
         LegalTicketMessage savedMessage = legalTicketMessageRepository.save(message);
 
-        ticket.setStatus(com.analyzer.api.enums.LegalTicketStatus.IN_REVIEW);
+        if (ticket.getStatus() != LegalTicketStatus.NEED_MORE_INFO) {
+            ticket.setStatus(LegalTicketStatus.IN_REVIEW);
+        }
         ticket.setLastLawyerMessageAt(LocalDateTime.now());
         legalTicketRepository.save(ticket);
+
+        emailService.sendTicketNotificationAsync(ticket.getCreatedBy().getEmail(), ticket.getCreatedBy().getFirstName(),
+                ticket.getId(), ticket.getTicketType() != null ? ticket.getTicketType().name() : "CONTACT_EXPERT",
+                ticket.getStatus().name(), "/tickets/" + ticket.getId(), "Chuyen gia vua phan hoi ticket.");
 
         return ChatWithUserResponse.builder()
                 .ticketId(ticket.getId())

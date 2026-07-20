@@ -32,6 +32,10 @@ public class RefundRequest {
     @JoinColumn(name = "requested_by_id", nullable = false)
     private User requestedBy;
 
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "legal_ticket_id")
+    private LegalTicket legalTicket;
+
     @Column(columnDefinition = "TEXT", nullable = false)
     private String reason;
 
@@ -44,6 +48,27 @@ public class RefundRequest {
 
     @Column(name = "admin_note", columnDefinition = "TEXT")
     private String adminNote;
+
+    @Column(name = "bank_name")
+    private String bankName;
+
+    @Column(name = "account_number")
+    private String accountNumber;
+
+    @Column(name = "account_holder_name")
+    private String accountHolderName;
+
+    @Column(name = "invoice_id")
+    private String invoiceId;
+
+    @Column(name = "confirmation_token_hash", length = 64)
+    private String confirmationTokenHash;
+
+    @Column(name = "confirmation_expires_at")
+    private LocalDateTime confirmationExpiresAt;
+
+    @Column(name = "email_confirmed_at")
+    private LocalDateTime emailConfirmedAt;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

@@ -57,6 +57,27 @@ public class SubscriptionPlan {
     @Column(name = "max_draft_contracts")
     private Integer maxDraftContracts;
 
+    @Column(name = "storage_limit_mb")
+    private Integer storageLimitMb;
+
+    @Column(name = "max_file_size_mb")
+    private Integer maxFileSizeMb;
+
+    @Column(name = "max_attached_documents_per_session")
+    private Integer maxAttachedDocumentsPerSession;
+
+    @Column(name = "allow_system_error_ticket")
+    @Builder.Default
+    private Boolean allowSystemErrorTicket = true;
+
+    @Column(name = "allow_query_error_ticket")
+    @Builder.Default
+    private Boolean allowQueryErrorTicket = true;
+
+    @Column(name = "allow_contact_expert_ticket")
+    @Builder.Default
+    private Boolean allowContactExpertTicket = false;
+
     @Column(name = "feature_limits_json", columnDefinition = "TEXT")
     private String featureLimitsJson;
 

@@ -2,6 +2,8 @@ package com.analyzer.api.controller;
 
 import com.analyzer.api.dto.ApiResponseDTO;
 import com.analyzer.api.dto.PageResponse;
+import com.analyzer.api.dto.chatmessage.ChatMessageFeedbackRequest;
+import com.analyzer.api.dto.chatmessage.ChatMessageFeedbackResponse;
 import com.analyzer.api.dto.chatmessage.ChatMessageResponse;
 import com.analyzer.api.dto.chatmessage.SendMessageRequest;
 import com.analyzer.api.dto.chatmessage.SendMessageResponse;
@@ -63,6 +65,16 @@ public class ChatMessageController {
             @PathVariable String messageId) {
         ChatMessageResponse data = chatMessageService.getMessageDetail(getCurrentUserId(), messageId);
         return ResponseEntity.ok(ApiResponseDTO.success("Message retrieved successfully", data));
+    }
+
+    @PostMapping("/chat-messages/{messageId}/feedback")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    @Operation(summary = "Rate an AI assistant message", description = "Submit or update a rating/comment for an AI assistant chat message.")
+    public ResponseEntity<ApiResponseDTO<ChatMessageFeedbackResponse>> submitFeedback(
+            @PathVariable String messageId,
+            @Valid @RequestBody ChatMessageFeedbackRequest request) {
+        ChatMessageFeedbackResponse data = chatMessageService.submitFeedback(getCurrentUserId(), messageId, request);
+        return ResponseEntity.ok(ApiResponseDTO.success("Feedback submitted successfully", data));
     }
 
     private Long getCurrentUserId() {

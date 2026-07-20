@@ -10,6 +10,14 @@ export {
   sendChatSessionMessage,
   sendWorkspaceMessage,
   updateChatSession,
+  submitChatMessageFeedback,
+  shareChatSession,
+  getSharedChatSession,
+  getAdminChatFeedback,
+  getChatSessionDocuments,
+  attachChatSessionDocument,
+  detachChatSessionDocument,
+  exportChatSessionMarkdown,
 } from "../services/chat.service";
 
 export type {
@@ -17,4 +25,10 @@ export type {
   WorkspaceChatConversation,
   WorkspaceChatMessage,
   WorkspaceChatSession,
+  ChatMessageFeedback,
+  ChatFeedbackRating,
+  ChatFeedbackReason,
+  ShareChatSessionResponse,
+  SharedChatSession,
+  ChatSessionDocument,
 } from "../types/chat";

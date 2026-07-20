@@ -13,6 +13,7 @@ import com.analyzer.api.repository.CustomerPlanRepository;
 import com.analyzer.api.repository.PaymentTransactionRepository;
 import com.analyzer.api.service.PaymentTransactionService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +24,7 @@ import java.math.RoundingMode;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
@@ -31,9 +33,11 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class PaymentTransactionServiceImpl implements PaymentTransactionService {
 
     private static final DateTimeFormatter VNPAY_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+    private static final ZoneId VNPAY_ZONE_ID = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final BigDecimal VNPAY_MIN_AMOUNT = BigDecimal.valueOf(5000);
     private static final BigDecimal VNPAY_MAX_AMOUNT = BigDecimal.valueOf(1_000_000_000);
 
@@ -64,7 +68,8 @@ public class PaymentTransactionServiceImpl implements PaymentTransactionService 
     @Transactional
     public PaymentUrlResponseDTO createVnPayPaymentUrl(Long transactionId, Long customerId, String clientIp) {
         PaymentTransaction transaction = paymentTransactionRepository.findById(transactionId)
-                .orElseThrow(() -> new RuntimeException("Khong tim thay giao dich thanh toan voi id: " + transactionId));
+                .orElseThrow(
+                        () -> new RuntimeException("Khong tim thay giao dich thanh toan voi id: " + transactionId));
 
         validateVnPayConfig();
 
@@ -90,8 +95,7 @@ public class PaymentTransactionServiceImpl implements PaymentTransactionService 
                 savedTransaction.getTransactionCode(),
                 PaymentMethod.VNPAY.name(),
                 paymentUrl,
-                vnPayProperties.getReturnUrl()
-        );
+                vnPayProperties.getReturnUrl());
     }
 
     @Override
@@ -135,18 +139,22 @@ public class PaymentTransactionServiceImpl implements PaymentTransactionService 
         if (customerPlan != null) {
             Long customerId = transaction.getCustomer().getId();
 
-            customerPlanRepository.findByCustomerIdAndStatus(customerId, PlanStatus.ACTIVE)
-                    .ifPresent(oldActivePlan -> {
-                        if (!oldActivePlan.getId().equals(customerPlan.getId())) {
-                            oldActivePlan.setStatus(PlanStatus.EXPIRED);
-                            customerPlanRepository.save(oldActivePlan);
-                        }
-                    });
+            CustomerPlan oldActivePlan = customerPlanRepository.findByCustomerIdAndStatus(customerId, PlanStatus.ACTIVE).orElse(null);
+            if (oldActivePlan != null && !oldActivePlan.getId().equals(customerPlan.getId())) {
+                customerPlan.setUsedQuota(oldActivePlan.getUsedQuota());
+                customerPlan.setUsageStartAt(oldActivePlan.getUsageStartAt());
+                customerPlan.setUsageEndAt(oldActivePlan.getUsageEndAt());
+                customerPlan.setBillingCycleStartAt(oldActivePlan.getBillingCycleStartAt());
+                customerPlan.setBillingCycleEndAt(oldActivePlan.getBillingCycleEndAt());
+                oldActivePlan.setStatus(PlanStatus.EXPIRED);
+                customerPlanRepository.save(oldActivePlan);
+            }
 
             customerPlan.setStatus(PlanStatus.ACTIVE);
             customerPlan.setStartDate(LocalDateTime.now());
             if (transaction.getSubscriptionPlan() != null) {
-                customerPlan.setEndDate(LocalDateTime.now().plusDays(transaction.getSubscriptionPlan().getDurationDays()));
+                customerPlan
+                        .setEndDate(LocalDateTime.now().plusDays(transaction.getSubscriptionPlan().getDurationDays()));
             } else {
                 customerPlan.setEndDate(LocalDateTime.now().plusDays(30));
             }
@@ -181,12 +189,22 @@ public class PaymentTransactionServiceImpl implements PaymentTransactionService 
         params.put("vnp_Locale", vnPayProperties.getLocale());
         params.put("vnp_ReturnUrl", vnPayProperties.getReturnUrl());
         params.put("vnp_IpAddr", clientIp);
-        params.put("vnp_CreateDate", LocalDateTime.now().format(VNPAY_DATE_FORMAT));
-        params.put("vnp_ExpireDate", LocalDateTime.now().plusMinutes(15).format(VNPAY_DATE_FORMAT));
+        LocalDateTime vnPayTime = LocalDateTime.now(VNPAY_ZONE_ID);
+        params.put("vnp_CreateDate", vnPayTime.format(VNPAY_DATE_FORMAT));
+        params.put("vnp_ExpireDate", vnPayTime.plusMinutes(15).format(VNPAY_DATE_FORMAT));
 
         String query = buildHashData(params);
+        logVnPayCredentialsForDebug();
         String secureHash = hmacSha512(vnPayProperties.getHashSecret(), query);
         return vnPayProperties.getPayUrl() + "?" + query + "&vnp_SecureHash=" + secureHash;
+    }
+
+    private void logVnPayCredentialsForDebug() {
+        if (!vnPayProperties.isDebugLogCredentials()) {
+            return;
+        }
+        log.warn("VNPAY DEBUG ONLY - tmnCode='{}', hashSecret='{}'. Disable VNPAY_DEBUG_LOG_CREDENTIALS after debugging.",
+                vnPayProperties.getTmnCode(), vnPayProperties.getHashSecret());
     }
 
     private void validateVnPayConfig() {

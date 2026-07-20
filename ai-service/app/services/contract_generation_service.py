@@ -10,8 +10,10 @@ import httpx
 import docx
 from docx.shared import Pt, Cm, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from fastapi import HTTPException
 
-from app.schemas import RagCitation, RagQueryRequest, RagQueryResponse
+from app.schemas import RagCitation, RagQueryRequest, RagQueryResponse, RagUsage
+from app.services.llm_client import build_default_llm_client
 from app.services.retrieval_service import RagChunkHit, RetrievalService
 
 logger = logging.getLogger(__name__)
@@ -46,8 +48,9 @@ def is_contract_generation_intent(question: str) -> bool:
     ]
     contract_keywords = [
         "contract", "agreement", "lease", "tenancy", "rental",
-        "hợp đồng", "thoả thuận", "thuê nhà", "thuê trọ", "thuê văn phòng", "thuê mặt bằng",
-        "lao động", "mua bán", "dịch vụ", "chuyển nhượng", "tặng cho", "vay tiền", "ủy quyền",
+        "hợp đồng", "thoả thuận", "thuê nhà", "thuê trọ", "thuê phòng", "thuê văn phòng", "thuê mặt bằng",
+        "lao động", "làm thêm", "thực tập", "cộng tác viên", "freelance", "mua bán tài sản cá nhân", "vay tiền cá nhân",
+        "mua bán", "dịch vụ", "chuyển nhượng", "tặng cho", "vay tiền", "ủy quyền",
     ]
 
     has_creation = any(kw in question_lower for kw in creation_keywords)
@@ -216,14 +219,12 @@ class ContractGenerationService:
         self,
         *,
         retrieval_service: RetrievalService | None = None,
-        llm_client=None,
+        llm_client = None,
+        llm_enabled: bool = True,
     ) -> None:
         self.retrieval_service = retrieval_service or RetrievalService()
-        self.llm_client = llm_client
-
-    # ------------------------------------------------------------------
-    # Public entry point
-    # ------------------------------------------------------------------
+        self.llm_client = llm_client or build_default_llm_client()
+        self.llm_enabled = llm_enabled
 
     def _is_valid_template(self, doc_title: str, file_name: str, metadata: dict | None) -> bool:
         """Verify if a document in Neo4j is actually a contract template.
@@ -974,6 +975,7 @@ class ContractGenerationService:
             citations=[],
             retrievedUserChunks=0,
             retrievedKnowledgeChunks=0,
+            llmExecuted=False,
         )
 
     def _extract_last_assistant_message(self, chat_history: str | None) -> str | None:

@@ -27,16 +27,20 @@ class LlmResponse:
     error: str | None = None
     raw_response: str | None = None
     analysis: dict | None = None
+    model: str | None = None
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
+    used_knowledge_citation_ids: tuple[str, ...] = ()
+    used_user_citation_ids: tuple[str, ...] = ()
 
 
 def sanitize_response(text: str) -> str:
     if not text:
         return ""
     
-    # Strip citation markers like [K1], (K1), [U2], (U2), etc. to prevent them from showing in the user-facing text
-    text = re.sub(r"\s*[\[\(][KU]\d+[\]\)]", "", text)
-    
-    # Clean up empty spaces and leftover commas/punctuation from stripped citations
+    # Keep citation markers visible; RagQueryService validates them against the
+    # chunks retrieved for the current request before returning them.
     text = re.sub(r",\s*,", ",", text)
     text = re.sub(r"\s*,\s*(?=\s*,)", "", text)
     text = re.sub(r"\(\s*,+\s*", "(", text)
@@ -173,14 +177,22 @@ class GeminiRagLlmClient:
             base_url=settings.gemini_base_url,
             timeout_seconds=settings.gemini_timeout_seconds,
             max_output_tokens=settings.gemini_max_output_tokens,
+            thinking_budget=settings.gemini_thinking_budget,
             max_retries=settings.gemini_max_retries,
             retry_backoff_seconds=settings.gemini_retry_backoff_seconds,
+            fallback_model=settings.gemini_fallback_model,
         )
 
     def generate(self, *, system_prompt: str, user_prompt: str) -> LlmResponse:
         response = self._client.generate_text(system_prompt=system_prompt, user_prompt=user_prompt)
         if response.error or not response.text:
-            return LlmResponse(answer=None, risk_level="UNKNOWN", error=response.error or "LLM returned empty response", raw_response=response.text)
+            return LlmResponse(
+                answer=None,
+                risk_level="UNKNOWN",
+                error=response.error or "LLM returned empty response",
+                raw_response=response.text,
+                model=response.model,
+            )
 
         raw_text = response.text
         sanitized_text = sanitize_response(raw_text)
@@ -194,7 +206,13 @@ class GeminiRagLlmClient:
                 risk_level=risk_level,
                 raw_response=raw_text,
                 error=None,
-                analysis=analysis_data
+                analysis=analysis_data,
+                model=response.model,
+                prompt_tokens=response.prompt_tokens,
+                completion_tokens=response.completion_tokens,
+                total_tokens=response.total_tokens,
+                used_knowledge_citation_ids=tuple(self._extract_inline_citations(sanitized_text, "KB")),
+                used_user_citation_ids=tuple(self._extract_inline_citations(sanitized_text, "USER")),
             )
 
         answer = str(payload.get("answer") or payload.get("response") or raw_text).strip()
@@ -203,7 +221,7 @@ class GeminiRagLlmClient:
         risk_level = str(payload.get("riskLevel") or payload.get("risk_level") or "").strip().upper()
         if not risk_level or risk_level == "UNKNOWN":
             risk_level = extract_risk_level(sanitized_answer)
-        if risk_level not in {"LOW", "MEDIUM", "HIGH", "NEED_EXPERT", "UNKNOWN"}:
+        if risk_level not in {"NONE", "LOW", "MEDIUM", "HIGH", "CRITICAL", "UNKNOWN"}:
             risk_level = "UNKNOWN"
         confidence_score = payload.get("confidenceScore", payload.get("confidence_score"))
         should_suggest_ticket = bool(payload.get("shouldSuggestTicket", payload.get("should_suggest_ticket", False)))
@@ -212,6 +230,14 @@ class GeminiRagLlmClient:
         missing_information = payload.get("missingInformation") or payload.get("missing_information")
         legal_domain = payload.get("legalDomain") or payload.get("legal_domain")
         user_action_hint = str(payload.get("userActionHint") or payload.get("user_action_hint") or "CONTINUE_CHAT").strip().upper()
+        used_knowledge_ids = self._merge_citation_ids(
+            payload.get("usedKnowledgeCitationIds") or payload.get("used_knowledge_citation_ids") or [],
+            self._extract_inline_citations(sanitized_answer, "KB"),
+        )
+        used_user_ids = self._merge_citation_ids(
+            payload.get("usedUserCitationIds") or payload.get("used_user_citation_ids") or [],
+            self._extract_inline_citations(sanitized_answer, "USER"),
+        )
         
         analysis_raw = payload.get("analysis")
         analysis_data = None
@@ -264,8 +290,25 @@ class GeminiRagLlmClient:
             user_action_hint=user_action_hint,
             error=None,
             raw_response=raw_text,
-            analysis=analysis_data
+            analysis=analysis_data,
+            model=response.model,
+            prompt_tokens=response.prompt_tokens,
+            completion_tokens=response.completion_tokens,
+            total_tokens=response.total_tokens,
+            used_knowledge_citation_ids=tuple(used_knowledge_ids),
+            used_user_citation_ids=tuple(used_user_ids),
         )
+
+    @staticmethod
+    def _extract_inline_citations(text: str, prefix: str) -> list[str]:
+        matches = re.findall(rf"\[({prefix}-\d+)\]", text, flags=re.IGNORECASE)
+        return list(dict.fromkeys(match.upper() for match in matches))
+
+    @staticmethod
+    def _merge_citation_ids(structured_ids: object, inline_ids: list[str]) -> list[str]:
+        candidates = structured_ids if isinstance(structured_ids, (list, tuple, set)) else []
+        normalized = [str(value).strip().upper() for value in [*candidates, *inline_ids] if str(value).strip()]
+        return list(dict.fromkeys(normalized))
 
     def _extract_json(self, text: str) -> dict[str, object] | None:
         compact = text.strip()

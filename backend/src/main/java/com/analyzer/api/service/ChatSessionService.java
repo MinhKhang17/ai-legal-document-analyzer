@@ -3,6 +3,8 @@ package com.analyzer.api.service;
 import com.analyzer.api.dto.PageResponse;
 import com.analyzer.api.dto.chatsession.CreateChatSessionRequest;
 import com.analyzer.api.dto.chatsession.ChatSessionResponse;
+import com.analyzer.api.dto.chatsession.ShareChatSessionResponse;
+import com.analyzer.api.dto.chatsession.SharedChatSessionResponse;
 import com.analyzer.api.dto.chatsession.UpdateChatSessionRequest;
 import com.analyzer.api.dto.chatsession.DeleteChatSessionResponse;
 import com.analyzer.api.enums.ChatSessionStatus;
@@ -13,4 +15,6 @@ public interface ChatSessionService {
     ChatSessionResponse getChatSessionDetail(Long userId, String chatSessionId);
     ChatSessionResponse updateChatSession(Long userId, String chatSessionId, UpdateChatSessionRequest request);
     DeleteChatSessionResponse deleteChatSession(Long userId, String chatSessionId);
+    ShareChatSessionResponse shareChatSession(Long userId, String chatSessionId);
+    SharedChatSessionResponse getSharedChatSession(String shareToken);
 }

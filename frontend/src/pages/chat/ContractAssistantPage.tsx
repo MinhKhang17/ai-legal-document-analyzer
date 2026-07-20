@@ -22,6 +22,8 @@ import { getWorkspaces, createWorkspace } from "../../api/workspaceApi";
 import { useI18n } from "../../hooks/useI18n";
 import { useToast } from "../../hooks/useToast";
 import { ChatMessageContent } from "../../components/chat/ChatMessageContent";
+import { CreateTicketModal } from "../../components/tickets/CreateTicketModal";
+import type { CreateLegalTicketRequest } from "../../types/legalTicket";
 import type { ChatMessage } from "../../types/chat";
 import type { WorkspaceChatMessage, WorkspaceChatSession } from "../../types/chat";
 import { useRef } from "react";
@@ -51,8 +53,8 @@ const toDisplayMessage = (
   status: message.status.toLowerCase() === "failed"
     ? "error"
     : message.status.toLowerCase() === "processing"
-      ? "done"
-      : "done",
+      ? "completed"
+      : "completed",
   errorMessage: message.errorMessage ?? undefined,
   requestId: message.requestId,
   confidenceScore: message.confidenceScore,
@@ -70,7 +72,7 @@ const createOptimisticUserMessage = (message: string, language: "en" | "vi"): Ch
   role: "user",
   content: message,
   timestamp: formatTimestamp(null, language),
-  status: "done",
+  status: "completed",
 });
 
 type DisplayMessage = ChatMessage;
@@ -97,6 +99,7 @@ export function ContractAssistantPage() {
   const [sessionActionBusyId, setSessionActionBusyId] = useState("");
   const [creatingTicketMessageId, setCreatingTicketMessageId] = useState("");
   const [ticketNotices, setTicketNotices] = useState<Record<string, string>>({});
+  const [ticketDraft, setTicketDraft] = useState<{ assistant: DisplayMessage; user?: DisplayMessage } | null>(null);
   const [messageDetailOpen, setMessageDetailOpen] = useState(false);
   const [messageDetail, setMessageDetail] = useState<WorkspaceChatMessage | null>(null);
   const [messageDetailLoading, setMessageDetailLoading] = useState(false);
@@ -349,33 +352,35 @@ export function ContractAssistantPage() {
     }
   };
 
-  const handleCreateTicket = async (assistantMessage: DisplayMessage, question: string) => {
+  const handleCreateTicket = (assistantMessage: DisplayMessage, userMessage?: DisplayMessage) => {
     if (!sandboxWorkspaceId) {
       setError(t("chat.ticketSelectWorkspace"));
       toast.warning(t("chat.ticketSelectWorkspace"), t("toast.warningTitle"));
       return;
     }
+    setTicketDraft({ assistant: assistantMessage, user: userMessage });
+  };
 
+  const submitTicket = async (request: CreateLegalTicketRequest) => {
+    if (!ticketDraft) return;
+    const assistantMessage = ticketDraft.assistant;
     setCreatingTicketMessageId(assistantMessage.id);
     setError("");
 
     try {
-      const ticket = await createLegalTicket({
-        request_id: assistantMessage.requestId,
-        workspace_id: sandboxWorkspaceId,
-        document_id: null,
-        question,
-      });
+      const ticket = await createLegalTicket(request);
 
       setTicketNotices((previous) => ({
         ...previous,
         [assistantMessage.id]: `${t("chat.ticketCreated")} ${ticket.id}.`,
       }));
       toast.success(`${t("chat.ticketCreated")} ${ticket.id}.`, t("toast.successTitle"));
+      setTicketDraft(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : t("chat.ticketCreateError");
       setError(message);
       toast.error(message, t("toast.errorTitle"));
+      throw err;
     } finally {
       setCreatingTicketMessageId("");
     }
@@ -660,16 +665,7 @@ export function ContractAssistantPage() {
                         .reverse()
                         .find((item) => item.role === "user")
                     : undefined;
-                  const shouldShowTicketAction =
-                    assistant &&
-                    !isError &&
-                    Boolean(
-                      message.shouldSuggestTicket ||
-                        message.userActionHint ||
-                        message.suggestionType ||
-                        message.riskLevel ||
-                        typeof message.confidenceScore === "number",
-                    );
+                  const shouldShowTicketAction = assistant && !isError && !message.id.startsWith("local-");
                   return (
                     <article
                       key={message.id}
@@ -740,12 +736,7 @@ export function ContractAssistantPage() {
                                     variant="secondary"
                                     size="sm"
                                     leftIcon={<ClipboardCheck className="h-4 w-4" />}
-                                    onClick={() =>
-                                      void handleCreateTicket(
-                                        message,
-                                        previousUserMessage?.content ?? "",
-                                      )
-                                    }
+                                    onClick={() => handleCreateTicket(message, previousUserMessage)}
                                     disabled={creatingTicketMessageId === message.id}
                                   >
                                     {creatingTicketMessageId === message.id
@@ -818,6 +809,22 @@ export function ContractAssistantPage() {
           </Card>
         </section>
       </div>
+
+      {ticketDraft && <CreateTicketModal
+        open
+        workspaceId={sandboxWorkspaceId}
+        sessionId={selectedSessionId}
+        userMessageId={ticketDraft.user?.id}
+        assistantMessageId={ticketDraft.assistant.id}
+        requestId={ticketDraft.assistant.requestId ?? undefined}
+        question={ticketDraft.user?.content ?? ticketDraft.assistant.suggestionReason ?? "Cần hỗ trợ xác minh câu trả lời AI"}
+        answer={ticketDraft.assistant.content}
+        documents={[]}
+        citationIds={Array.from(ticketDraft.assistant.content.matchAll(/\[((?:KB|USER)-\d+)]/gi), (match) => match[1].toUpperCase())}
+        submitting={creatingTicketMessageId === ticketDraft.assistant.id}
+        onClose={() => setTicketDraft(null)}
+        onSubmit={submitTicket}
+      />}
 
       <Modal
         open={messageDetailOpen}

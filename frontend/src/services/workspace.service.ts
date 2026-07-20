@@ -1,4 +1,4 @@
-import { API_ENDPOINTS } from "../config/api";
+import { API_ENDPOINTS, buildApiUrl } from "../config/api";
 import { buildBearerHeaders, requestApiData } from "./http";
 import type {
   CreateWorkspaceRequest,
@@ -113,4 +113,15 @@ export async function getWorkspaceDocuments(
   );
 
   return data.map((document) => normalizeStatus(document) as Document);
+}
+
+
+export async function downloadWorkspaceDocument(accessToken: string, workspaceId: string, documentId: string): Promise<string> {
+  const response = await fetch(buildApiUrl(API_ENDPOINTS.workspaces.documentDownload(workspaceId, documentId)), {
+    method: "GET",
+    headers: buildBearerHeaders(accessToken),
+    credentials: "include",
+  });
+  if (!response.ok) throw new Error("Khong the tai tai lieu");
+  return URL.createObjectURL(await response.blob());
 }

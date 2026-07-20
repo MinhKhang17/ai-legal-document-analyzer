@@ -34,6 +34,8 @@ export const API_ENDPOINTS = {
     refresh: fromEnv("VITE_AUTH_REFRESH_API"),
     me: fromEnv("VITE_AUTH_ME_API"),
     logout: fromEnv("VITE_AUTH_LOGOUT_API"),
+    verifyEmail: fromEnvOrDefault("VITE_AUTH_VERIFY_EMAIL_API", "/api/v1/auth/verify-email"),
+    resendVerification: fromEnvOrDefault("VITE_AUTH_RESEND_VERIFICATION_API", "/api/v1/auth/resend-verification"),
   },
 
   workspaces: {
@@ -41,8 +43,10 @@ export const API_ENDPOINTS = {
     create: fromEnv("VITE_WORKSPACES_API"),
     detail: (workspaceId: string) =>
       fillPathParams(fromEnv("VITE_WORKSPACE_DETAIL_API"), { workspaceId }),
-    documents: (workspaceId: string) =>
-      fillPathParams(fromEnv("VITE_WORKSPACE_DOCUMENTS_API"), { workspaceId }),
+      documents: (workspaceId: string) =>
+        fillPathParams(fromEnv("VITE_WORKSPACE_DOCUMENTS_API"), { workspaceId }),
+      documentDownload: (workspaceId: string, documentId: string) =>
+        `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/documents/${encodeURIComponent(documentId)}/download`,
   },
 
   chat: {
@@ -57,10 +61,14 @@ export const API_ENDPOINTS = {
       fillPathParams(fromEnv("VITE_CHAT_SESSION_DETAIL_API"), {
         chatSessionId,
       }),
-    sessionMessages: (chatSessionId: string) =>
+      sessionMessages: (chatSessionId: string) =>
       fillPathParams(fromEnv("VITE_CHAT_SESSION_MESSAGES_API"), {
         chatSessionId,
-      }),
+        }),
+      sessionDocuments: (chatSessionId: string) =>
+        fillPathParams(fromEnvOrDefault("VITE_CHAT_SESSION_DOCUMENTS_API", "/api/v1/chat-sessions/:chatSessionId/documents"), {
+          chatSessionId,
+        }),
     messages: fromEnv("VITE_CHAT_MESSAGES_API"),
     messageDetail: (messageId: string) =>
       fillPathParams(fromEnv("VITE_CHAT_MESSAGE_DETAIL_API"), { messageId }),
@@ -72,6 +80,14 @@ export const API_ENDPOINTS = {
       fillPathParams(fromEnv("VITE_CHAT_SESSION_MEMORY_API"), {
         chatSessionId,
       }),
+    feedback: (messageId: string) =>
+      fillPathParams(fromEnvOrDefault("VITE_CHAT_MESSAGE_FEEDBACK_API", "/api/v1/chat-messages/:messageId/feedback"), { messageId }),
+    share: (chatSessionId: string) =>
+      fillPathParams(fromEnvOrDefault("VITE_CHAT_SESSION_SHARE_API", "/api/v1/chat-sessions/:chatSessionId/share"), { chatSessionId }),
+    shared: (shareToken: string) =>
+      fillPathParams(fromEnvOrDefault("VITE_SHARED_CHAT_API", "/api/v1/shared/chat/:shareToken"), { shareToken }),
+    exportMarkdown: (chatSessionId: string) =>
+      fillPathParams(fromEnvOrDefault("VITE_CHAT_SESSION_MARKDOWN_EXPORT_API", "/api/v1/chat-sessions/:chatSessionId/export/markdown"), { chatSessionId }),
   },
 
   subscription: {
@@ -85,6 +101,7 @@ export const API_ENDPOINTS = {
         customerPlanId,
       }),
     myUsage: fromEnv("VITE_SUBSCRIPTION_MY_USAGE_API"),
+    usageSummary: fromEnvOrDefault("VITE_SUBSCRIPTION_USAGE_API", "/api/v1/subscriptions/usage"),
     refunds: fromEnv("VITE_SUBSCRIPTION_REFUNDS_API"),
     myRefunds: fromEnvOrDefault("VITE_SUBSCRIPTION_MY_REFUNDS_API", "/api/v1/subscriptions/refunds/me"),
     refundDetail: (refundId: number | string) =>
@@ -109,6 +126,13 @@ export const API_ENDPOINTS = {
     list: fromEnv("VITE_USERS_API"),
     detail: (userId: number | string) =>
       fillPathParams(fromEnv("VITE_USER_DETAIL_API"), { userId }),
+    changePassword: fromEnvOrDefault("VITE_CHANGE_PASSWORD_API", "/api/v1/users/change-password"),
+    adminExperts: fromEnvOrDefault("VITE_ADMIN_EXPERTS_API", "/api/v1/admin/users/experts"),
+    resendExpertActivation: fromEnvOrDefault("VITE_ADMIN_EXPERT_RESEND_API", "/api/v1/admin/users/experts/resend-activation"),
+  },
+
+  adminDocuments: {
+    download: (documentId: string) => fillPathParams(fromEnvOrDefault("VITE_ADMIN_DOCUMENT_DOWNLOAD_API", "/api/v1/admin/documents/:documentId/download"), { documentId }),
   },
 
   legalTickets: {
@@ -119,6 +143,10 @@ export const API_ENDPOINTS = {
       fillPathParams(fromEnv("VITE_LEGAL_TICKET_DETAIL_API"), { ticketId }),
     messages: (ticketId: string) =>
       fillPathParams(fromEnv("VITE_LEGAL_TICKET_MESSAGES_API"), { ticketId }),
+    files: (ticketId: string) =>
+      fillPathParams(fromEnvOrDefault("VITE_LEGAL_TICKET_FILES_API", "/api/v1/legal-tickets/:ticketId/files"), { ticketId }),
+    downloadFile: (ticketId: string, documentId: string) =>
+      fillPathParams(fromEnvOrDefault("VITE_LEGAL_TICKET_FILE_DOWNLOAD_API", "/api/v1/legal-tickets/:ticketId/files/:documentId/download"), { ticketId, documentId }),
     cancel: (ticketId: string) =>
       fillPathParams(fromEnv("VITE_LEGAL_TICKET_CANCEL_API"), { ticketId }),
     customerReply: (ticketId: string) =>
@@ -150,6 +178,8 @@ export const API_ENDPOINTS = {
       }),
     reject: (ticketId: string) =>
       fillPathParams(fromEnv("VITE_ADMIN_TICKET_REJECT_API"), { ticketId }),
+    adminApprove: (ticketId: string) => `/api/v1/admin/tickets/${encodeURIComponent(ticketId)}/approve`,
+    adminClose: (ticketId: string) => `/api/v1/admin/tickets/${encodeURIComponent(ticketId)}/close`,
   },
 
   lawyerTickets: {
@@ -210,10 +240,24 @@ export const API_ENDPOINTS = {
       fillPathParams(fromEnv("VITE_ADMIN_KNOWLEDGE_BASE_PUBLISH_API"), {
         knowledgeBaseEntryId,
       }),
+    ingestionJob: (jobId: string) =>
+      fillPathParams(fromEnvOrDefault("VITE_ADMIN_KNOWLEDGE_BASE_INGESTION_JOB_API", "/api/v1/admin/knowledge-base/ingestion-jobs/:jobId"), {
+        jobId,
+      }),
+    failIngestionJob: (jobId: string) =>
+      fillPathParams(fromEnvOrDefault("VITE_ADMIN_KNOWLEDGE_BASE_FAIL_JOB_API", "/api/v1/admin/knowledge-base/ingestion-jobs/:jobId/failed"), {
+        jobId,
+      }),
+    unpublish: (knowledgeBaseEntryId: string) =>
+      fillPathParams(fromEnvOrDefault("VITE_ADMIN_KNOWLEDGE_BASE_UNPUBLISH_API", "/api/v1/admin/knowledge-base/:knowledgeBaseEntryId/unpublish"), {
+        knowledgeBaseEntryId,
+      }),
     archive: (knowledgeBaseEntryId: string) =>
       fillPathParams(fromEnv("VITE_ADMIN_KNOWLEDGE_BASE_ARCHIVE_API"), {
         knowledgeBaseEntryId,
       }),
+    sourceFile: (knowledgeBaseEntryId: string) =>
+      `/api/v1/admin/knowledge-base/${encodeURIComponent(knowledgeBaseEntryId)}/source-file`,
   },
 
   contracts: {
@@ -252,6 +296,7 @@ export const API_ENDPOINTS = {
       fillPathParams(fromEnv("VITE_ADMIN_FEEDBACK_AI_REPORT_DETAIL_API"), {
         reportId,
       }),
+    adminChatRatings: fromEnvOrDefault("VITE_ADMIN_CHAT_FEEDBACK_API", "/api/v1/admin/chat-messages/feedback"),
   },
 
   aiService: {

@@ -5,12 +5,11 @@ services:
       context: .
     ports:
       - "8080:8080"
+    env_file:
+      - .env
     environment:
-      SPRING_PROFILES_ACTIVE: dev
       DB_URL: jdbc:postgresql://postgres:5432/ai_legal_db
-      DB_USERNAME: postgres
-      DB_PASSWORD: "12345"
-      AI_SERVICE_BASE_URL: http://host.docker.internal:8000
+      APP_AI_SERVICE_BASE_URL: http://host.docker.internal:8000
     depends_on:
       postgres:
         condition: service_healthy

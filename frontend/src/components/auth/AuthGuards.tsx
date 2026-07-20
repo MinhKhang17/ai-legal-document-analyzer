@@ -157,3 +157,11 @@ export function ExpertRoute({ children }: RouteGuardProps) {
 
   return <>{children}</>;
 }
+
+export function AdminOrExpertRoute({ children }: RouteGuardProps) {
+  const { isAuthLoading, isAuthReady, isAuthenticated, user } = useAppStore();
+  if (isAuthLoading || !isAuthReady) return <AuthLoadingView />;
+  if (!isAuthenticated || user === null || user.active === false) return <Navigate to="/login" replace />;
+  if (user.role !== "ADMIN" && user.role !== "EXPERT") return <RoleAccessDeniedView />;
+  return <>{children}</>;
+}

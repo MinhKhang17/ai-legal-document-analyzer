@@ -1,6 +1,14 @@
 package com.analyzer.api.enums;
 
 public enum RefundStatus {
+    NEW,
+    ADMIN_REVIEWING,
+    WAITING_USER_BANK_INFO,
+    WAITING_EMAIL_CONFIRMATION,
+    EMAIL_CONFIRMED,
+    REFUND_REQUEST_CREATED,
+    REFUNDED,
+    CLOSED,
     REQUESTED,
     APPROVED,
     REJECTED,

@@ -6,7 +6,10 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List, Sequence
 
+from google.genai import types
+
 from app.config import settings
+from app.services.gemini_client import build_genai_client
 
 logger = logging.getLogger(__name__)
 
@@ -338,7 +341,7 @@ class GeminiService:
     def __init__(self):
         self.api_key = settings.gemini_api_key
         self.model_name = settings.gemini_model
-        self.model = None
+        self.client = None
 
     def initialize(self):
         if not self.api_key or self.api_key == "your_gemini_api_key_here":
@@ -346,10 +349,13 @@ class GeminiService:
             return False
 
         try:
-            import google.generativeai as genai
-
-            genai.configure(api_key=self.api_key)
-            self.model = genai.GenerativeModel(self.model_name)
+            self.client = build_genai_client(
+                api_key=self.api_key,
+                base_url=settings.gemini_base_url,
+                timeout_seconds=settings.gemini_timeout_seconds,
+                max_retries=settings.gemini_max_retries,
+                retry_backoff_seconds=settings.gemini_retry_backoff_seconds,
+            )
             logger.info(f"Gemini service initialized with model: {self.model_name}")
             return True
         except Exception as e:
@@ -362,16 +368,17 @@ class GeminiService:
         checklist_results: List[Dict[str, Any]],
         knowledge_chunks: List[Dict[str, Any]],
     ) -> str:
-        if not self.model:
+        if not self.client:
             logger.warning("Gemini not initialized, using fallback answer generation")
             return self._generate_fallback_answer(question, checklist_results, knowledge_chunks)
 
         try:
             prompt = build_legal_review_prompt(question, checklist_results, knowledge_chunks)
             logger.info("Generating answer with Gemini...")
-            response = self.model.generate_content(
-                prompt,
-                generation_config=self._build_generation_config(),
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt,
+                config=self._build_generation_config(),
             )
 
             if response and response.text:
@@ -391,7 +398,7 @@ class GeminiService:
         knowledge_chunks: List[Dict[str, Any]],
     ) -> LegalQueryResult:
         """Return the legal answer plus ticket-suggestion metadata."""
-        if not self.model:
+        if not self.client:
             logger.warning("Gemini not initialized, using fallback query answer generation")
             return self._build_query_fallback_result(
                 question,
@@ -406,9 +413,10 @@ class GeminiService:
         try:
             prompt = build_legal_query_prompt(question, user_chunks, knowledge_chunks)
             logger.info("Generating query answer with Gemini...")
-            response = self.model.generate_content(
-                prompt,
-                generation_config=self._build_generation_config(),
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt,
+                config=self._build_generation_config(),
             )
 
             if response and response.text:
@@ -427,7 +435,7 @@ class GeminiService:
         user_chunks: List[Dict[str, Any]],
         knowledge_chunks: List[Dict[str, Any]],
     ) -> str:
-        if not self.model:
+        if not self.client:
             logger.warning("Gemini not initialized, using fallback query answer generation")
             return self._generate_query_fallback_answer(question, user_chunks, knowledge_chunks)
 
@@ -437,9 +445,10 @@ class GeminiService:
         try:
             prompt = build_legal_query_prompt(question, user_chunks, knowledge_chunks)
             logger.info("Generating query answer with Gemini...")
-            response = self.model.generate_content(
-                prompt,
-                generation_config=self._build_generation_config(),
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt,
+                config=self._build_generation_config(),
             )
 
             if response and response.text:
@@ -459,7 +468,7 @@ class GeminiService:
         knowledge_chunks: List[Dict[str, Any]],
     ):
         """Yield SSE-ready events for a streamed answer."""
-        if not self.model:
+        if not self.client:
             logger.warning("Gemini not initialized, streaming fallback answer")
             yield from self._stream_fallback_answer(question, checklist_results, knowledge_chunks)
             return
@@ -467,10 +476,10 @@ class GeminiService:
         try:
             prompt = build_legal_review_prompt(question, checklist_results, knowledge_chunks)
             logger.info("Streaming answer with Gemini...")
-            stream = self.model.generate_content(
-                prompt,
-                generation_config=self._build_generation_config(),
-                stream=True,
+            stream = self.client.models.generate_content_stream(
+                model=self.model_name,
+                contents=prompt,
+                config=self._build_generation_config(),
             )
 
             accumulated = []
@@ -509,7 +518,7 @@ class GeminiService:
         knowledge_chunks: List[Dict[str, Any]],
     ):
         """Yield SSE-ready events for a streamed query answer."""
-        if not self.model:
+        if not self.client:
             logger.warning("Gemini not initialized, streaming fallback query answer")
             yield from self._stream_query_fallback_answer(question, user_chunks, knowledge_chunks)
             return
@@ -535,10 +544,10 @@ class GeminiService:
         try:
             prompt = build_legal_query_prompt(question, user_chunks, knowledge_chunks)
             logger.info("Streaming query answer with Gemini...")
-            stream = self.model.generate_content(
-                prompt,
-                generation_config=self._build_generation_config(),
-                stream=True,
+            stream = self.client.models.generate_content_stream(
+                model=self.model_name,
+                contents=prompt,
+                config=self._build_generation_config(),
             )
 
             accumulated = []
@@ -570,13 +579,24 @@ class GeminiService:
             logger.error(f"Error streaming query answer with Gemini: {e}")
             yield from self._stream_query_fallback_answer(question, user_chunks, knowledge_chunks)
 
-    def _build_generation_config(self) -> Dict[str, Any]:
-        return {
-            "temperature": 0.2,
-            "top_p": 0.9,
-            "top_k": 40,
-            "max_output_tokens": 8192,
-        }
+    def close(self) -> None:
+        if self.client is not None:
+            self.client.close()
+            self.client = None
+
+    def _build_generation_config(self) -> types.GenerateContentConfig:
+        thinking_config = None
+        if "gemini-2.5" in self.model_name.lower():
+            thinking_config = types.ThinkingConfig(
+                thinking_budget=max(0, settings.gemini_thinking_budget),
+            )
+        return types.GenerateContentConfig(
+            temperature=0.2,
+            top_p=0.9,
+            top_k=40,
+            max_output_tokens=settings.gemini_max_output_tokens,
+            thinking_config=thinking_config,
+        )
 
     def _encode_stream_event(self, event_type: str, payload: Dict[str, Any]) -> str:
         return f"event: {event_type}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"

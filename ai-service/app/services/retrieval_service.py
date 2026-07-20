@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from app.core.knowledge_access import is_published_system_kb
 from app.graph.repository import GraphRepository
 from app.models.knowledge_models import RetrievedChunk
 from app.services.embedding_service import EmbeddingService
@@ -52,6 +53,7 @@ class RetrievalService:
         workspace_id: str,
         top_k: int,
         document_id: str | None = None,
+        document_ids: list[str] | None = None,
     ) -> list[RagChunkHit]:
         embedding = self.embed_question(question)
         chunks = self.repository.search_user_chunks(
@@ -61,25 +63,27 @@ class RetrievalService:
             top_k=top_k,
             query_text=question,
             document_id=document_id,
+            document_ids=document_ids,
         )
         return [
             self._to_hit(
                 chunk,
-                citation_id=f"U{index}",
+                citation_id=f"USER-{index}",
                 source_type="USER_DOCUMENT",
             )
             for index, chunk in enumerate(chunks, start=1)
         ]
 
-    def build_legal_search_query(self, question: str, user_hits: list[RagChunkHit]) -> str:
-        if not user_hits:
-            return question.strip()
-        user_context = "\n".join(
-            f"[{hit.citationId}] {hit.chunkText}".strip()
-            for hit in user_hits
-            if hit.chunkText.strip()
-        )
-        return f"{question}\n\nRelevant user contract context:\n{user_context}".strip()
+    def build_legal_search_query(
+        self,
+        question: str,
+        user_hits: list[RagChunkHit],
+        *,
+        chat_history: str | None = None,
+    ) -> str:
+        from app.services.query_builder import build_legal_search_query
+
+        return build_legal_search_query(question, user_hits, chat_history=chat_history)
 
     def search_knowledge_chunks(
         self,
@@ -94,14 +98,23 @@ class RetrievalService:
             top_k=top_k,
             query_text=query_text or legal_search_query,
         )
+        chunks = [chunk for chunk in chunks if self._is_authoritative_system_kb_chunk(chunk)]
         return [
             self._to_hit(
                 chunk,
-                citation_id=f"K{index}",
+                citation_id=f"KB-{index}",
                 source_type="SYSTEM_KB",
             )
             for index, chunk in enumerate(chunks, start=1)
         ]
+
+    @staticmethod
+    def _is_authoritative_system_kb_chunk(chunk: RetrievedChunk) -> bool:
+        metadata = dict(chunk.metadata or {})
+        return is_published_system_kb(
+            metadata,
+            source_type=chunk.source_type,
+        )
 
     def _to_hit(self, chunk: RetrievedChunk, *, citation_id: str, source_type: Literal["USER_DOCUMENT", "SYSTEM_KB"]) -> RagChunkHit:
         metadata = dict(chunk.metadata or {})

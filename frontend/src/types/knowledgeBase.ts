@@ -5,7 +5,6 @@ export interface PageResponse<T> {
   totalItems: number;
   totalPages: number;
 }
-
 export interface UploadKnowledgeRequest {
   code: string;
   title: string;
@@ -13,8 +12,9 @@ export interface UploadKnowledgeRequest {
   scope: "GLOBAL" | "WORKSPACE" | string;
   createdById: number;
   workspaceId?: number | null;
-  extractedContent: string;
+  extractedContent?: string;
   rawContent?: string | null;
+  description?: string | null;
 }
 
 export interface IngestKnowledgeRequest {
@@ -22,9 +22,10 @@ export interface IngestKnowledgeRequest {
   jobPayload?: string | null;
 }
 
-export type KnowledgeStatus = "UPLOADED" | "PROCESSING" | "INGESTED" | "REVIEWING" | "PUBLIC" | "ARCHIVED" | "FAILED";
+export type KnowledgeStatus = "PENDING" | "UPLOADED" | "PROCESSING" | "INGESTED" | "REVIEWING" | "PUBLIC" | "ARCHIVED" | "FAILED";
+export type KnowledgeVisibility = "PRIVATE" | "PUBLIC";
 export type KnowledgeReviewDecision = "APPROVE" | "REQUEST_CHANGES" | "REJECT";
-export type KnowledgeAction = "INGEST" | "REVIEW" | "PUBLISH" | "ARCHIVE";
+export type KnowledgeAction = "INGEST" | "REVIEW" | "PUBLISH" | "UNPUBLISH" | "ARCHIVE";
 
 export interface KnowledgeReviewRequest {
   decision: KnowledgeReviewDecision;
@@ -52,6 +53,12 @@ export interface KnowledgeBaseEntry {
   workspaceId: number | null;
   createdAt: string;
   updatedAt: string;
+  description?: string | null;
+  fileName?: string | null;
+  contentType?: string | null;
+  size?: number | null;
+  uploadedAt?: string | null;
+  sourceFileAvailable?: boolean;
 }
 
 export interface KnowledgeBaseVersion {
@@ -62,6 +69,25 @@ export interface KnowledgeBaseVersion {
   rawContent: string | null;
   extractedContent: string | null;
   status: KnowledgeStatus | null;
+  ingestStatus?: KnowledgeStatus | null;
+  visibility?: KnowledgeVisibility | null;
+  active?: boolean | null;
+  ingestedAt?: string | null;
+  ingestedById?: number | null;
+  errorMessage?: string | null;
+  description?: string | null;
+  fileName?: string | null;
+  contentType?: string | null;
+  size?: number | null;
+  uploadedAt?: string | null;
+  sourceFileAvailable?: boolean;
+  sourceRelativePath?: string | null;
+  sourceFileHash?: string | null;
+  ingestSource?: string | null;
+  neo4jDocumentId?: string | null;
+  chunkCount?: number | null;
+  sourceVersionLabel?: string | null;
+  effectiveDate?: string | null;
   reviewDecision: KnowledgeReviewDecision | null;
   reviewedById: number | null;
   reviewedAt: string | null;
@@ -79,13 +105,17 @@ export interface KnowledgeBaseIngestedDocumentVersion {
   versionLabel: string;
   effectiveFrom: string | null;
   effectiveTo: string | null;
-  visibility: string | null;
-  ingestStatus: string | null;
+  visibility: KnowledgeVisibility | null;
+  active?: boolean | null;
+  ingestStatus: KnowledgeStatus | null;
   chunkCount: number;
   embeddedCount: number;
   sourceFileId: string | null;
   contentHash: string | null;
   ingestedAt: string | null;
+  publishedAt?: string | null;
+  ingestedById?: number | null;
+  errorMessage?: string | null;
 }
 
 export interface KnowledgeBaseIngestedDocument {
@@ -102,7 +132,9 @@ export interface KnowledgeIngestionJob {
   status: KnowledgeStatus;
   jobPayload: string | null;
   errorMessage: string | null;
+  progressPercent?: number | null;
   startedAt: string | null;
   completedAt: string | null;
+  ingestedById?: number | null;
   createdAt: string;
 }

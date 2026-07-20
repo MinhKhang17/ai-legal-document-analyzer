@@ -56,6 +56,7 @@ async def lifespan(app: FastAPI):
     yield
 
     logger.info("=== Shutting Down AI Service ===")
+    gemini_service.close()
     neo4j_client.close()
     logger.info("=== AI Service Stopped ===")
 

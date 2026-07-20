@@ -19,12 +19,12 @@ interface KnowledgeBaseIngestedDocumentsCardProps {
   documentCode: string;
 }
 
-const statusOptions = ["", "UPLOADED", "PROCESSING", "INGESTED", "REVIEWING", "PUBLIC", "ARCHIVED", "FAILED"];
-const visibilityOptions = ["", "CUSTOMER", "LAWYER", "ADMIN", "ALL_INTERNAL"];
+const statusOptions = ["", "PENDING", "PROCESSING", "INGESTED", "FAILED"];
+const visibilityOptions = ["", "PRIVATE", "PUBLIC"];
 
 const getTone = (status?: string | null) => {
   if (!status) return "slate";
-  if (["INGESTED", "PUBLIC"].includes(status)) return "green";
+  if (status === "INGESTED") return "green";
   if (["PROCESSING", "REVIEWING"].includes(status)) return "amber";
   if (["FAILED", "ARCHIVED"].includes(status)) return "red";
   return "slate";
@@ -32,10 +32,8 @@ const getTone = (status?: string | null) => {
 
 const getVisibilityTone = (visibility?: string | null) => {
   if (!visibility) return "slate";
-  if (visibility === "ALL_INTERNAL") return "blue";
-  if (visibility === "ADMIN") return "purple";
-  if (visibility === "LAWYER") return "amber";
-  return "green";
+  if (visibility === "PUBLIC") return "green";
+  return "purple";
 };
 
 const getVersionLabel = (version: KnowledgeBaseIngestedDocumentVersion, language: "en" | "vi") =>
@@ -239,6 +237,9 @@ export function KnowledgeBaseIngestedDocumentsCard({
                         <div className="flex flex-wrap gap-xs">
                           <Badge tone={getTone(version.ingestStatus)}>{version.ingestStatus || "-"}</Badge>
                           <Badge tone={getVisibilityTone(version.visibility)}>{version.visibility || "-"}</Badge>
+                          <Badge tone={version.active ? "green" : "slate"}>
+                            {version.active ? t("admin.active") : t("admin.inactive")}
+                          </Badge>
                         </div>
                       </div>
 
@@ -275,7 +276,20 @@ export function KnowledgeBaseIngestedDocumentsCard({
                           <dt className="label-uppercase">{t("knowledge.ingestedDocuments.versionLabel")}</dt>
                           <dd className="mt-xs">{version.versionLabel || "-"}</dd>
                         </div>
+                        <div>
+                          <dt className="label-uppercase">{t("knowledge.ingestedDocuments.publishedAt")}</dt>
+                          <dd className="mt-xs">{formatDisplayDate(version.publishedAt, "-", locale)}</dd>
+                        </div>
+                        <div>
+                          <dt className="label-uppercase">{t("knowledge.ingestedDocuments.ingestedBy")}</dt>
+                          <dd className="mt-xs">{version.ingestedById ?? "-"}</dd>
+                        </div>
                       </dl>
+                      {version.errorMessage && (
+                        <div className="mt-md rounded-lg bg-error-container px-md py-sm text-sm text-risk-high-text dark:bg-red-950/40 dark:text-red-200">
+                          <span className="font-semibold">{t("knowledge.ingestedDocuments.errorMessage")}:</span> {version.errorMessage}
+                        </div>
+                      )}
                     </article>
                   ))}
                 </div>

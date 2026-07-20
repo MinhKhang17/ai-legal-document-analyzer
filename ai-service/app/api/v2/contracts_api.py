@@ -66,6 +66,7 @@ class ContractAnalysisResponse(BaseModel):
     clauses: list[ClauseFindingResponse]
     summary: SummaryResponse
     knowledge_source_files: list[str]
+    contract_type: str | None = None
 
 
 router = APIRouter(prefix="/v2/contracts", tags=["contracts-v2"])
@@ -106,6 +107,7 @@ def supported_formats() -> list[str]:
 async def upload_contract(
     file: UploadFile = File(...),
     title: str | None = Form(default=None),
+    contract_type: str | None = Form(default=None),
 ) -> ContractAnalysisResponse:
     report: ContractAnalysisReport = await get_service().analyze_upload(file=file, title=title)
     return ContractAnalysisResponse(
@@ -118,6 +120,7 @@ async def upload_contract(
         clauses=[_map_clause_finding(clause) for clause in report.clauses],
         summary=SummaryResponse.model_validate(report.summary),
         knowledge_source_files=list(report.knowledge_source_files),
+        contract_type=contract_type.strip().upper() if contract_type and contract_type.strip() else None,
     )
 
 
@@ -160,7 +163,8 @@ def generate_contract(payload: GenerateContractApiRequest) -> GenerateContractAp
     if not template or not template.strip():
         template = """# ROLE
 
-You are an experienced legal professional specializing in residential lease agreements.
+You are an AI drafting assistant limited to simple personal residential rental agreements.
+You do not replace a lawyer and must not guarantee legality, compliance, or accuracy.
 
 Your responsibility is to generate a brand-new residential lease agreement based on legal reference documents retrieved from a knowledge base.
 
@@ -319,6 +323,7 @@ Generate a document that is ready for export as DOCX or PDF."""
 
     placeholders = {
         "documents": documents_text,
+        "requirements": json.dumps(inputs, ensure_ascii=False),
         "landlord": inputs.get("landlord", "[Landlord]"),
         "tenant": inputs.get("tenant", "[Tenant]"),
         "address": inputs.get("address", "[Property Address]"),
@@ -338,7 +343,11 @@ Generate a document that is ready for export as DOCX or PDF."""
     for key, value in placeholders.items():
         user_prompt = user_prompt.replace(f"{{{key}}}", str(value))
 
-    system_prompt = "You are a professional legal draft assistant."
+    system_prompt = (
+        "You are an AI drafting assistant for simple personal contracts only. "
+        "Infer the appropriate simple contract structure from the selected template and user input. "
+        "Do not act as a lawyer or guarantee legality, compliance, or accuracy."
+    )
 
     llm_client = build_default_llm_client()
     try:

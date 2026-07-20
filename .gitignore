@@ -18,6 +18,7 @@ backend/target/
 backend/.mvn/wrapper/maven-wrapper.jar
 backend/.env
 backend/.env.*
+!backend/.env.example
 *.class
 *.jar
 *.war
@@ -32,6 +33,7 @@ ai-service/.venv/
 ai-service/venv/
 ai-service/.env
 ai-service/.env.*
+!ai-service/.env.example
 ai-service/*.key
 ai-service/*.pem
 
@@ -56,6 +58,8 @@ analysis-history/
 models/
 !ai-service/app/models/
 !ai-service/app/models/**
+data/ai-cache/
+data/paddleocr/
 checkpoints/
 *.ckpt
 *.pt
@@ -70,6 +74,7 @@ logs/
 .env
 .env.*
 !.env.example
+!frontend/.env.example
 
 # --- Temporary ---
 .tmp/

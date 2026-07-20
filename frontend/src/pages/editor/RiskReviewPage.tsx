@@ -20,6 +20,7 @@ import { useI18n } from '../../hooks/useI18n';
 import { useToast } from '../../hooks/useToast';
 import type { AiContractAnalysisResponse, AiContractClauseFinding, AiIngestionResult, AiKnowledgeQueryResponse } from '../../types/ai';
 import type { RiskFinding, RiskLevel } from '../../types/risk';
+import { supportedContractScopeText } from '../../config/supportedContractTypes';
 
 type RiskKnowledgeVersion = 'v1' | 'v2';
 
@@ -45,7 +46,7 @@ const toRiskFinding = (clause: AiContractClauseFinding): RiskFinding => ({
 });
 
 export function RiskReviewPage() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const toast = useToast();
   const riskImportInputRef = useRef<HTMLInputElement | null>(null);
   const [contractFormats, setContractFormats] = useState<string[]>([]);
@@ -216,6 +217,9 @@ export function RiskReviewPage() {
           subtitle={t('risk.contractAnalysisSubtitle')}
           actions={<Badge tone="amber">{t('risk.directAiService')}</Badge>}
         >
+          <p className="mb-md rounded-xl bg-surface-container-low p-sm text-xs text-on-surface-variant dark:bg-slate-800 dark:text-slate-400">
+            {supportedContractScopeText(language)} {language === 'vi' ? 'Bạn chỉ cần tải tài liệu lên.' : 'You only need to upload the document.'}
+          </p>
           <FileUploadZone
             onUpload={handleContractUpload}
             disabled={uploadingContract || loadingFormats || aiServiceUnavailable}

@@ -105,7 +105,7 @@ export function RegisterPage() {
           setIsSubmitting(true);
 
           try {
-            await register({
+            const registration = await register({
               firstName: formData.firstName.trim(),
               lastName: formData.lastName.trim(),
               email: formData.email.trim(),
@@ -114,10 +114,11 @@ export function RegisterPage() {
               acceptedTerms,
             });
 
-            navigate('/login', {
+            navigate('/auth/check-email', {
               replace: true,
               state: {
-                message: 'Registration successful. Please sign in.',
+                email: formData.email.trim(),
+                ...registration.data,
               },
             });
           } catch (error) {

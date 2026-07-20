@@ -36,7 +36,7 @@ class Settings:
     docs_flow_dir: Path = Path(
         os.getenv(
             "LEGAL_DOCS_FLOW_DIR",
-            str(Path(__file__).resolve().parents[3] / "docs" / "flow"),
+            str(Path(__file__).resolve().parents[2] / "docs" / "flow"),
         )
     )
     risk_kb_source_file: str = os.getenv("RISK_KB_SOURCE_FILE", "RISK_KB_VI.md")
@@ -51,13 +51,15 @@ class Settings:
     legal_top_k: int = int(os.getenv("LEGAL_TOP_K", "5"))
     max_llm_candidates: int = int(os.getenv("MAX_LLM_CANDIDATES", "3"))
     llm_provider: str = os.getenv("LLM_PROVIDER", "gemini")
+    llm_query_enabled: bool = os.getenv("LLM_QUERY_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
     llm_v2_enabled: bool = os.getenv("LLM_V2_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
     gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
     gemini_base_url: str = os.getenv("GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta")
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
     gemini_fallback_model: str = os.getenv("GEMINI_FALLBACK_MODEL", "")
     gemini_timeout_seconds: float = float(os.getenv("GEMINI_TIMEOUT_SECONDS", "120"))
-    gemini_max_output_tokens: int = int(os.getenv("GEMINI_MAX_OUTPUT_TOKENS", "8192"))
+    gemini_max_output_tokens: int = int(os.getenv("GEMINI_MAX_OUTPUT_TOKENS", "4096"))
+    gemini_thinking_budget: int = int(os.getenv("GEMINI_THINKING_BUDGET", "512"))
     gemini_max_retries: int = int(os.getenv("GEMINI_MAX_RETRIES", "4"))
     gemini_retry_backoff_seconds: float = float(os.getenv("GEMINI_RETRY_BACKOFF_SECONDS", "2"))
     gemini_embedding_model: str = os.getenv("GEMINI_EMBEDDING_MODEL", "text-embedding-004")

@@ -1,7 +1,8 @@
 FLOW 08 - HỢP ĐỒNG AI VÀ QUẢN LÝ PHIÊN BẢN
 
 Mục tiêu:
-- Cho customer sinh draft hợp đồng từ template/input JSON, lưu hợp đồng, xem danh sách hợp đồng và revert version.
+- Cho customer tạo draft hợp đồng từ template hoặc input JSON, lưu thành hợp đồng thật, xem lịch sử version và revert về version cũ.
+- Cho admin quản lý template hợp đồng ở mức backend, còn FE customer chỉ đọc danh sách template để generate.
 
 Actor:
 - `CUSTOMER`
@@ -12,21 +13,21 @@ Actor:
 - Route `/contracts/:id`
 
 Điều kiện tiên quyết:
-- Đăng nhập
-- Có workspace
+- Đã đăng nhập.
+- Có workspace để gắn contract.
+- Với màn list, FE cần token hợp lệ để lấy danh sách workspace.
 
-Luồng chính:
-1. `MyContractsPage` tải song song:
-2. danh sách hợp đồng của tôi
-3. danh sách template
-4. danh sách workspace
-5. Customer nhập `requestId`, `workspaceId`, `templateId`, `sourceDocumentId`, `inputJson` để generate draft.
-6. FE gọi `generateContract()`.
-7. Nếu thành công, FE lưu `latestJob` và prefill form save contract.
-8. Customer nhập `title`, `contractType`, `content` rồi gọi `saveContract()`.
-9. FE refresh lại list contract.
-10. Tại `ContractDetailPage`, FE tải detail và version history.
-11. User chọn version + reason để gọi `revertContractVersion()`.
+Luồng tổng quát:
+1. `MyContractsPage` khởi tạo và tải song song danh sách hợp đồng, danh sách template, danh sách workspace.
+2. Customer chọn workspace, tùy chọn template, nhập `requestId`, `sourceDocumentId` và `inputJson` để yêu cầu sinh draft.
+3. FE gọi `generateContract()` tới backend contract generation.
+4. Backend trả về `ContractGenerationJob`; FE lưu `latestJob` để người dùng nhìn thấy job vừa chạy.
+5. Nếu job trả về `outputDraft`, FE đổ sẵn nội dung đó vào form lưu contract để customer chỉnh lại trước khi save.
+6. Customer nhập `title`, `contractType`, `content` rồi gọi `saveContract()`.
+7. Sau khi save thành công, FE xoá form save và refresh lại danh sách hợp đồng của tôi.
+8. Customer mở `ContractDetailPage` để xem detail, content hiện tại và version history.
+9. Customer chọn version cần quay lại, nhập reason và gọi `revertContractVersion()`.
+10. FE load lại detail sau revert để hiển thị version hiện hành và lịch sử mới.
 
 Sơ đồ text:
 - `contracts list -> generate draft -> save contract -> open detail -> revert version`
@@ -36,14 +37,14 @@ Màn hình / component:
 - `frontend/src/pages/contracts/ContractDetailPage.tsx`
 
 Dữ liệu / state:
-- `contracts`, `templates`, `workspaces`
-- `generationForm`, `saveForm`, `latestJob`
-- detail: `contract`, `versions`, `selectedVersionNo`, `reason`
+- List page: `contracts`, `templates`, `workspaces`, `generationForm`, `saveForm`, `latestJob`
+- Detail page: `contract`, `versions`, `selectedVersionNo`, `reason`
 
 Validation:
-- Generate yêu cầu `requestId`, `workspaceId`, `inputJson`
-- Save yêu cầu `workspaceId`, `title`, `contractType`, `content`
-- Revert yêu cầu chọn version và nhập reason
+- Generate yêu cầu `requestId`, `workspaceId`, `inputJson`.
+- Save yêu cầu `workspaceId`, `title`, `contractType`, `content`.
+- Revert yêu cầu chọn version và nhập `reason`.
+- FE đang normalize `workspaceId` trước khi gọi API; nếu không normalize được thì chặn ngay trên UI.
 
 API / service tích hợp:
 - FE:
@@ -58,40 +59,45 @@ API / service tích hợp:
 - `POST /api/v1/contracts/{id}/versions/{versionNo}/revert`
 
 UI states:
-- List saved contracts
-- Sidebar generate/save forms
-- Detail page hiển thị current content và version history
+- List hợp đồng đã lưu theo trang.
+- Sidebar sinh draft và sidebar lưu contract thật.
+- Card hiển thị `latestJob` sau khi generate.
+- Detail page hiển thị current content, version history và form revert.
 
 Edge cases:
-- `workspaceId` của workspace đang là chuỗi, nhưng page contracts dùng `isNumericWorkspaceId()` và ép sang số
-- Nếu workspace ID thực tế là `ws_*`, flow generate/save hiện tại sẽ bị block phía FE trước khi gọi API
-- Template create/update có backend admin API, nhưng current customer page chỉ list template
+- `workspaceId` trong workspace list hiện có thể là chuỗi; FE đang normalize trước khi gửi nên nếu workspace ID không hợp lệ sẽ bị chặn.
+- Nếu `sourceDocumentId` không có, flow generate vẫn cho phép chạy theo input JSON.
+- `templateId` ở form generate và save đều là tuỳ chọn, nhưng FE vẫn đẩy theo giá trị người dùng chọn nếu có.
+- Template create/update là backend admin API, nhưng màn hiện tại chỉ list template để customer chọn.
 
 Business rules:
-- Backend `generate` dành cho customer
-- Backend `templates create/update` dành cho admin
-- Revert version cần reason
+- Backend `generate` dành cho customer.
+- Backend `templates create/update` dành cho admin.
+- Revert version bắt buộc có reason.
+- Contract history được quản lý theo version, không sửa đè trực tiếp lên content cũ.
 
 Quyền:
-- Customer dùng generate/save/my/detail/revert
-- Admin dùng create/update template
+- Customer dùng generate/save/my/detail/versions/revert.
+- Admin dùng create/update template.
 
 File nguồn tham chiếu:
 - FE:
 - `frontend/src/pages/contracts/MyContractsPage.tsx`
 - `frontend/src/pages/contracts/ContractDetailPage.tsx`
 - `frontend/src/services/contract.service.ts`
+- `frontend/src/types/contract.ts`
 - BE:
 - `backend/src/main/java/com/analyzer/api/controller/contract/ContractManagementController.java`
 
 Điểm chưa rõ:
-- `CHƯA XÁC ĐỊNH`: backend `workspaceId` của contract request thực sự mong đợi kiểu số hay chuỗi nếu route workspace ở nơi khác dùng `ws_*`.
-- `CHƯA XÁC ĐỊNH`: hợp đồng generate có phụ thuộc document đã ingest/ready hay không.
+- `CHƯA XÁC ĐỊNH`: backend `workspaceId` của contract request thực sự muốn chuỗi workspace ID hay ID số, vì FE workspace hiện không cùng kiểu ở mọi nơi.
+- `CHƯA XÁC ĐỊNH`: generate contract có phụ thuộc document đã ingest/READY hay chỉ cần input JSON và workspace.
 
 Checklist FE:
-- Xác minh lại kiểu `workspaceId` trước khi code tiếp.
+- Xác minh lại kiểu `workspaceId` trước khi làm pixel-perfect.
 - Tách rõ generate draft với save contract thật.
-- Nên có editor tốt hơn nếu content dài.
+- Nếu content dài, nên dùng editor tốt hơn textarea đơn thuần.
+- Cần xử lý UX tốt hơn cho `latestJob` nếu job failed.
 
 Tiêu chí hoàn thành:
 - Generate được draft.
@@ -99,10 +105,10 @@ Tiêu chí hoàn thành:
 - Xem detail/version và revert được.
 
 HIỆN TRẠNG:
-- Có UI và backend thật, nhưng đang có dấu hiệu lệch contract dữ liệu ở `workspaceId`.
+- Có UI và backend thật, nhưng vẫn còn dấu hiệu lệch dữ liệu ở `workspaceId` nên cần coi đây là flow đang chạy được nhưng chưa thật chắc chắn.
 
 SUY LUẬN:
-- Flow này chưa đủ an toàn để FE triển khai sâu nếu chưa chốt kiểu ID.
+- Flow này đã đủ để mô tả và thao tác ở FE, nhưng chưa nên coi là ổn định hoàn toàn nếu schema ID chưa chốt.
 
 ĐỀ XUẤT:
-- Cần xác nhận lại schema contract request trước khi coi flow này là production-ready.
+- FE nên chốt lại schema contract request với backend trước khi triển khai trải nghiệm nâng cao cho generate/save.

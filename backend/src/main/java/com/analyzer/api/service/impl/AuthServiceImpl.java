@@ -2,15 +2,19 @@ package com.analyzer.api.service.impl;
 
 import com.analyzer.api.dto.auth.JwtResponseDTO;
 import com.analyzer.api.dto.auth.LoginRequestDTO;
+import com.analyzer.api.dto.auth.RegistrationResponseDTO;
 import com.analyzer.api.dto.user.UserResponseDTO;
 import com.analyzer.api.entity.RefreshToken;
 import com.analyzer.api.entity.User;
+import com.analyzer.api.exception.auth.ExpiredVerificationTokenException;
+import com.analyzer.api.exception.common.ResourceNotFoundException;
 import com.analyzer.api.mapper.UserMapper;
 import com.analyzer.api.repository.RefreshTokenRepository;
 import com.analyzer.api.repository.UserRepository;
 import com.analyzer.api.security.JwtTokenProvider;
 import com.analyzer.api.security.UserDetailsImpl;
 import com.analyzer.api.service.AuthService;
+import com.analyzer.api.service.EmailService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -22,20 +26,34 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.util.UUID;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.HexFormat;
+import java.util.concurrent.ConcurrentHashMap;
+import com.analyzer.api.exception.common.ForbiddenException;
+import com.analyzer.api.exception.common.TooManyRequestsException;
 
 @Service
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
+
+    private final ConcurrentHashMap<String, LocalDateTime> resendCooldowns = new ConcurrentHashMap<>();
 
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider jwtTokenProvider;
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final UserMapper userMapper;
+    private final EmailService emailService;
 
     @Override
     @Transactional
     public JwtResponseDTO login(LoginRequestDTO loginRequest, HttpServletResponse response) {
+        userRepository.findByEmail(loginRequest.getEmail().trim().toLowerCase()).ifPresent(user -> {
+            if (!user.isEmailVerified()) throw new ForbiddenException("EMAIL_NOT_VERIFIED");
+        });
         // 1. Authenticate credentials
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
@@ -189,5 +207,68 @@ public class AuthServiceImpl implements AuthService {
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         return userMapper.toResponseDTO(user);
+    }
+
+    @Override
+    @Transactional
+    public void verifyEmail(String token) {
+        User user = userRepository.findByEmailVerificationToken(sha256(token))
+                .orElseThrow(() -> new ResourceNotFoundException("Token xác thực không hợp lệ"));
+
+        if (user.isEmailVerified()) {
+            return;
+        }
+
+        if (user.getEmailVerificationTokenExpiry() == null
+                || user.getEmailVerificationTokenExpiry().isBefore(LocalDateTime.now())) {
+            throw new ExpiredVerificationTokenException(
+                    "Token xác thực đã hết hạn. Vui lòng yêu cầu gửi lại email xác thực.");
+        }
+
+        user.setEmailVerified(true);
+        user.setActive(true);
+        user.setEmailVerifiedAt(LocalDateTime.now());
+        user.setEmailVerificationToken(null);
+        user.setEmailVerificationTokenExpiry(null);
+        userRepository.save(user);
+    }
+
+    @Override
+    @Transactional
+    public RegistrationResponseDTO resendVerificationEmail(String email, String clientIp) {
+        String normalized = email.trim().toLowerCase();
+        String cooldownKey = sha256(normalized + "|" + clientIp);
+        LocalDateTime previous = resendCooldowns.putIfAbsent(cooldownKey, LocalDateTime.now());
+        if (previous != null && previous.plusSeconds(60).isAfter(LocalDateTime.now())) {
+            throw new TooManyRequestsException("RESEND_VERIFICATION_COOLDOWN");
+        }
+        resendCooldowns.put(cooldownKey, LocalDateTime.now());
+        userRepository.findByEmail(normalized).ifPresent(user -> {
+            if (user.isEmailVerified()) {
+                return;
+            }
+            String token = UUID.randomUUID().toString();
+            user.setEmailVerificationToken(sha256(token));
+            user.setEmailVerificationTokenExpiry(LocalDateTime.now().plusHours(24));
+            user.setEmailVerificationRequestedAt(LocalDateTime.now());
+            userRepository.save(user);
+            boolean sent = emailService.sendVerificationEmail(user.getEmail(), user.getFirstName(), token);
+            user.setEmailDeliveryStatus(sent ? "SENT" : "FAILED");
+            userRepository.save(user);
+        });
+        return RegistrationResponseDTO.builder().registrationStatus("PENDING_VERIFICATION")
+                .emailDeliveryStatus("SENT").maskedEmail(maskEmail(normalized))
+                .resendAvailableInSeconds(60).build();
+    }
+
+    private String maskEmail(String email) {
+        int at = email.indexOf('@');
+        if (at <= 1) return "***" + email.substring(Math.max(at, 0));
+        return email.substring(0, 1) + "***" + email.substring(at);
+    }
+
+    private String sha256(String value) {
+        try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8))); }
+        catch (Exception ex) { throw new IllegalStateException(ex); }
     }
 }

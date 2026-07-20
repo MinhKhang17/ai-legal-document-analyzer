@@ -5,6 +5,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Schema(description = "Response payload containing subscription plan details")
@@ -54,4 +55,22 @@ public class SubscriptionPlanResponseDTO {
 
     @Schema(description = "Last update date time")
     private LocalDateTime updatedAt;
+
+    private String name;
+    private String displayName;
+    private BigDecimal priceVnd;
+    private Integer billingCycleDays;
+    private Integer contractAnalysisLimit;
+    private Integer aiTokenLimit;
+    private Integer workspaceLimit;
+    private Integer documentPerWorkspaceLimit;
+    private Integer storageLimitMb;
+    private Integer maxFileSizeMb;
+    private Integer maxAttachedDocumentsPerSession;
+    private Integer contractDraftLimit;
+    private Integer expertTicketLimit;
+    private Boolean allowSystemErrorTicket;
+    private Boolean allowQueryErrorTicket;
+    private Boolean allowContactExpertTicket;
+    private List<String> features;
 }

@@ -146,6 +146,8 @@ export interface AiRagQueryResponse {
   legalDomain: string | null;
   userActionHint: "CONTINUE_CHAT" | "PROVIDE_MORE_INFO" | "CREATE_TICKET" | string;
   citations: AiRagCitation[];
+  usedKnowledgeCitationIds: string[];
+  usedUserCitationIds: string[];
   retrievedUserChunks: number;
   retrievedKnowledgeChunks: number;
 }
@@ -199,6 +201,7 @@ export interface AiContractSummary {
 }
 
 export interface AiContractAnalysisResponse {
+  contract_type?: string | null;
   document_id: string;
   filename: string;
   title: string;

@@ -24,20 +24,17 @@ import {
 import { Link, useParams } from "react-router-dom";
 import { LAWYER_UPLOAD_ACCEPT, validateLawyerUpload } from "../../config/lawyerUpload";
 import {
-  closeLawyerTicket,
   downloadLawyerTicketFile,
   getLawyerTicketDetail,
   getLawyerTicketFiles,
-  getLawyerTicketMessages,
   requestMoreInfoLawyerTicket,
   resolveLawyerTicket,
-  sendLawyerTicketMessage,
   startReviewLawyerTicket,
   type LawyerTicketDetail,
   type LawyerTicketFile,
-  type LawyerTicketMessage,
-  uploadLawyerTicketFile,
 } from "../../api/lawyerTicketApi";
+import { getAttachmentPolicy, getTicketConversation, sendTicketConversationMessage, uploadTicketAttachment, downloadTicketAttachment } from "../../services/legalTicket.service";
+import type { AttachmentPolicy, LegalTicketMessage } from "../../types/legalTicket";
 import { Badge } from "../../components/common/Badge";
 import { Button } from "../../components/common/Button";
 import { Card } from "../../components/common/Card";
@@ -47,6 +44,7 @@ import { PageHeader } from "../../components/common/PageHeader";
 import { useI18n } from "../../hooks/useI18n";
 import { useToast } from "../../hooks/useToast";
 import { formatDisplayDate } from "../../utils/format";
+import { ApiRequestError } from "../../services/http";
 
 const getValue = (value?: string | number | null) =>
   value === undefined || value === null || value === "" ? "—" : String(value);
@@ -63,21 +61,12 @@ const terminalStatuses = new Set(["REJECTED_BY_ADMIN", "RESOLVED", "CLOSED", "CA
 const canStartReview = (status?: string | null) =>
   status === "ASSIGNED_TO_LAWYER" || status === "CUSTOMER_RESPONDED" || status === "REOPENED";
 
-const canWorkOnTicket = (status?: string | null) =>
-  Boolean(status) && !terminalStatuses.has(String(status));
-
-const fileToBase64 = (file: File): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-
-    reader.onload = () => {
-      const result = String(reader.result);
-      resolve(result.split(",")[1] ?? "");
-    };
-
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
+const canChatOnTicket = (status?: string | null) =>
+  Boolean(status && ['ASSIGNED_TO_LAWYER', 'IN_REVIEW', 'NEED_MORE_INFO', 'CUSTOMER_RESPONDED', 'REOPENED'].includes(status));
+const canRequestMoreInfo = (status?: string | null) =>
+  Boolean(status && ['ASSIGNED_TO_LAWYER', 'IN_REVIEW', 'CUSTOMER_RESPONDED'].includes(status));
+const canResolveTicket = (status?: string | null) =>
+  Boolean(status && ['ASSIGNED_TO_LAWYER', 'IN_REVIEW', 'CUSTOMER_RESPONDED', 'REOPENED'].includes(status));
 
 export function LawyerTicketDetailPage() {
   const { t } = useI18n();
@@ -88,19 +77,19 @@ export function LawyerTicketDetailPage() {
   const [loading, setLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
 
-  const [messages, setMessages] = useState<LawyerTicketMessage[]>([]);
+  const [messages, setMessages] = useState<LegalTicketMessage[]>([]);
+  const [attachmentPolicy, setAttachmentPolicy] = useState<AttachmentPolicy | null>(null);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [messageValue, setMessageValue] = useState("");
   const [sendingMessage, setSendingMessage] = useState(false);
 
   const [files, setFiles] = useState<LawyerTicketFile[]>([]);
   const [filesLoading, setFilesLoading] = useState(false);
-  const [uploadingFile, setUploadingFile] = useState(false);
+  const [uploadingFile] = useState(false);
   const [selectedUploadFile, setSelectedUploadFile] = useState<File | null>(null);
   const [uploadValidationError, setUploadValidationError] = useState("");
   const [openingDocumentId, setOpeningDocumentId] = useState("");
 
-  const [closingTicket, setClosingTicket] = useState(false);
   const [startingReview, setStartingReview] = useState(false);
   const [requestInfoOpen, setRequestInfoOpen] = useState(false);
   const [requestInfoMessage, setRequestInfoMessage] = useState("");
@@ -111,7 +100,6 @@ export function LawyerTicketDetailPage() {
   const [resolveSubmitting, setResolveSubmitting] = useState(false);
   const [actionError, setActionError] = useState("");
 
-  const isClosed = ticket?.status === "CLOSED";
   const isTerminal = terminalStatuses.has(String(ticket?.status ?? ""));
 
   const loadTicket = useCallback(async () => {
@@ -137,8 +125,8 @@ export function LawyerTicketDetailPage() {
 
     try {
       setMessagesLoading(true);
-      const data = await getLawyerTicketMessages(ticketId);
-      setMessages(data ?? []);
+      const data = await getTicketConversation(ticketId);
+      setMessages(data.items ?? []);
     } catch {
       toast.error(t("lawyerTickets.messages.loadError"));
     } finally {
@@ -173,23 +161,28 @@ export function LawyerTicketDetailPage() {
   }, [loadTicket, loadMessages, loadFiles]);
 
   const handleSendMessage = useCallback(async () => {
-    if (!ticketId || !messageValue.trim()) return;
+    if (!ticketId || (!messageValue.trim() && !selectedUploadFile)) return;
 
     try {
       setSendingMessage(true);
-      await sendLawyerTicketMessage(ticketId, {
-        message: messageValue.trim(),
-      });
+      const attachmentIds: string[] = [];
+      if (selectedUploadFile) {
+        const uploaded = await uploadTicketAttachment(selectedUploadFile, `draft_${crypto.randomUUID()}`, () => undefined);
+        attachmentIds.push(uploaded.id);
+      }
+      await sendTicketConversationMessage(ticketId, messageValue.trim(), attachmentIds);
 
       setMessageValue("");
+      setSelectedUploadFile(null);
       toast.success(t("lawyerTickets.messages.sendSuccess"));
       await loadMessages();
-    } catch {
-      toast.error(t("lawyerTickets.messages.sendError"));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("lawyerTickets.messages.sendError"));
+      if (error instanceof ApiRequestError && error.status === 409) await refreshAll();
     } finally {
       setSendingMessage(false);
     }
-  }, [ticketId, messageValue, toast, t, loadMessages]);
+  }, [ticketId, messageValue, selectedUploadFile, toast, t, loadMessages, refreshAll]);
 
   const handleUploadFile = useCallback(
     async (event: ChangeEvent<HTMLInputElement>) => {
@@ -208,61 +201,13 @@ export function LawyerTicketDetailPage() {
       setSelectedUploadFile(file);
       setUploadValidationError("");
 
-      if (!ticket.assigned_lawyer_id) {
-        toast.error(t("lawyerTickets.files.uploadError"));
-        return;
-      }
-
-      try {
-        setUploadingFile(true);
-
-        const contentBase64 = await fileToBase64(file);
-
-        await uploadLawyerTicketFile(ticketId, {
-          uploadedById: ticket.assigned_lawyer_id,
-          originalFileName: file.name,
-          fileType: file.type || "application/octet-stream",
-          contentBase64,
-          visibilityScope: "CUSTOMER",
-        });
-
-        toast.success(t("lawyerTickets.files.uploadSuccess"));
+      if (attachmentPolicy && file.size > attachmentPolicy.maxAttachmentSizeKb * 1024) {
         setSelectedUploadFile(null);
-        await loadFiles();
-      } catch {
-        toast.error(t("lawyerTickets.files.uploadError"));
-      } finally {
-        setUploadingFile(false);
+        setUploadValidationError(`Tệp ${file.name} có dung lượng ${Math.ceil(file.size / 1024)} KB. Dung lượng tối đa là ${attachmentPolicy.maxAttachmentSizeKb} KB.`);
       }
     },
-    [ticketId, ticket, loadFiles, toast, t],
+    [ticketId, ticket, attachmentPolicy, t],
   );
-
-  const handleCloseTicket = useCallback(async () => {
-    if (!ticketId || isClosed) return;
-
-    const confirmed = window.confirm(
-      t("lawyerTickets.close.confirmDescription"),
-    );
-
-    if (!confirmed) return;
-
-    try {
-      setClosingTicket(true);
-
-      const data = await closeLawyerTicket(ticketId, {
-        feedback: t("lawyerTickets.close.defaultFeedback"),
-      });
-
-      setTicket(data);
-      toast.success(t("lawyerTickets.close.success"));
-      await loadTicket();
-    } catch {
-      toast.error(t("lawyerTickets.close.error"));
-    } finally {
-      setClosingTicket(false);
-    }
-  }, [ticketId, isClosed, loadTicket, toast, t]);
 
   const handleStartReview = useCallback(async () => {
     if (!ticketId || !ticket || !canStartReview(ticket.status)) return;
@@ -278,6 +223,7 @@ export function LawyerTicketDetailPage() {
       const message = error instanceof Error ? error.message : "Không thể bắt đầu xử lý ticket.";
       setActionError(message);
       toast.error(message);
+      if (error instanceof ApiRequestError && error.status === 409) await refreshAll();
     } finally {
       setStartingReview(false);
     }
@@ -300,6 +246,7 @@ export function LawyerTicketDetailPage() {
       const messageText = error instanceof Error ? error.message : "Không thể gửi yêu cầu bổ sung thông tin.";
       setActionError(messageText);
       toast.error(messageText);
+      if (error instanceof ApiRequestError && error.status === 409) await refreshAll();
     } finally {
       setRequestInfoSubmitting(false);
     }
@@ -326,6 +273,7 @@ export function LawyerTicketDetailPage() {
       const message = error instanceof Error ? error.message : "Không thể gửi kết luận xử lý ticket.";
       setActionError(message);
       toast.error(message);
+      if (error instanceof ApiRequestError && error.status === 409) await refreshAll();
     } finally {
       setResolveSubmitting(false);
     }
@@ -355,7 +303,17 @@ export function LawyerTicketDetailPage() {
 
   useEffect(() => {
     void refreshAll();
-  }, [refreshAll]);
+    void getAttachmentPolicy().then(setAttachmentPolicy).catch(() => undefined);
+    const intervalId = window.setInterval(() => {
+      if (!ticketId) return;
+      void Promise.allSettled([
+        getLawyerTicketDetail(ticketId).then(setTicket),
+        getTicketConversation(ticketId).then((page) => setMessages(page.items ?? [])),
+        getLawyerTicketFiles(ticketId).then((items) => setFiles(items ?? [])),
+      ]);
+    }, 4000);
+    return () => window.clearInterval(intervalId);
+  }, [refreshAll, ticketId]);
 
   return (
     <div className="space-y-6">
@@ -376,14 +334,6 @@ export function LawyerTicketDetailPage() {
               {t("lawyerTickets.detail.refresh")}
             </Button>
 
-            <Button
-              onClick={handleCloseTicket}
-              disabled={!ticket || loading || closingTicket || isClosed}
-            >
-              {closingTicket
-                ? t("common.loading")
-                : t("lawyerTickets.close.button")}
-            </Button>
           </div>
         }
       />
@@ -449,6 +399,8 @@ export function LawyerTicketDetailPage() {
             </div>
           </Card>
 
+          {ticket.contextSnapshot && <Card className="p-6"><h3 className="font-semibold">Context bất biến được chia sẻ</h3><div className="mt-md grid gap-md lg:grid-cols-2"><div><p className="text-xs font-semibold uppercase">Câu hỏi người dùng</p><p className="mt-xs whitespace-pre-line text-sm">{ticket.contextSnapshot.userQuestion}</p></div><div><p className="text-xs font-semibold uppercase">Câu trả lời AI bị báo cáo</p><p className="mt-xs whitespace-pre-line text-sm">{ticket.contextSnapshot.assistantAnswer || "—"}</p></div><pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-lg bg-surface-container-low p-sm text-xs">{ticket.contextSnapshot.documentSnapshotJson || "[]"}</pre><pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-lg bg-surface-container-low p-sm text-xs">{ticket.contextSnapshot.citationSnapshotJson || "[]"}</pre></div></Card>}
+
           <Card className="p-6">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
@@ -477,13 +429,13 @@ export function LawyerTicketDetailPage() {
                 <Button
                   variant="secondary"
                   onClick={() => setRequestInfoOpen(true)}
-                  disabled={!canWorkOnTicket(ticket.status)}
+                  disabled={!canRequestMoreInfo(ticket.status)}
                 >
                   Yêu cầu bổ sung
                 </Button>
                 <Button
                   onClick={() => setResolveOpen(true)}
-                  disabled={!canWorkOnTicket(ticket.status)}
+                  disabled={!canResolveTicket(ticket.status)}
                 >
                   Gửi kết luận
                 </Button>
@@ -658,12 +610,13 @@ export function LawyerTicketDetailPage() {
                     <p className="mt-3 whitespace-pre-line text-sm">
                       {getValue(message.content)}
                     </p>
+                    {message.attachments?.map((attachment) => <button type="button" key={attachment.id} className="mt-2 mr-2 rounded-lg border px-3 py-2 text-xs font-semibold text-primary" onClick={async () => { const url = await downloadTicketAttachment(attachment.id); const anchor = document.createElement("a"); anchor.href = url; anchor.download = attachment.originalFileName; anchor.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000); }}><Paperclip className="mr-1 inline h-3 w-3" />{attachment.originalFileName}</button>)}
                   </div>
                 ))}
               </div>
             )}
 
-            <div className="mt-4 flex gap-2">
+            {canChatOnTicket(ticket.status) && <div className="mt-4 flex gap-2">
               <textarea
                 value={messageValue}
                 onChange={(event) => setMessageValue(event.target.value)}
@@ -672,12 +625,12 @@ export function LawyerTicketDetailPage() {
               />
               <Button
                 onClick={handleSendMessage}
-                disabled={sendingMessage || !messageValue.trim()}
+                disabled={sendingMessage || (!messageValue.trim() && !selectedUploadFile)}
               >
                 <Send className="mr-2 h-4 w-4" />
                 {t("lawyerTickets.messages.send")}
               </Button>
-            </div>
+            </div>}
           </Card>
 
           <Card className="p-6">
@@ -695,7 +648,7 @@ export function LawyerTicketDetailPage() {
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <label className="inline-flex cursor-pointer items-center rounded-lg border px-4 py-2 text-sm font-medium">
+                {canChatOnTicket(ticket.status) && <label className="inline-flex cursor-pointer items-center rounded-lg border px-4 py-2 text-sm font-medium">
                   <input
                     type="file"
                     accept={LAWYER_UPLOAD_ACCEPT}
@@ -706,7 +659,7 @@ export function LawyerTicketDetailPage() {
                   {uploadingFile
                     ? t("common.loading")
                     : t("lawyerTickets.files.upload")}
-                </label>
+                </label>}
 
                 <Button onClick={loadFiles} disabled={filesLoading}>
                   <RefreshCw className="mr-2 h-4 w-4" />

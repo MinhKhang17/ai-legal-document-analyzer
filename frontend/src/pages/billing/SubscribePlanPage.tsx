@@ -26,6 +26,11 @@ const PAYMENT_METHODS: PaymentMethod[] = [
   'VNPAY'
 ];
 
+const planRank = (plan?: SubscriptionPlan | null) => {
+  const name = (plan?.name ?? plan?.planType ?? '').toUpperCase();
+  return name === 'PREMIUM' ? 2 : name === 'STANDARD' ? 1 : 0;
+};
+
 const getSubscriptionErrorMessage = (
   error: unknown,
   fallback: string,
@@ -86,6 +91,7 @@ export function SubscribePlanPage() {
 
   useEffect(() => {
     void loadPlans();
+    void getMyCustomerPlan().then((response) => setRefreshedCurrentPlan(response.data ?? null)).catch(() => setRefreshedCurrentPlan(null));
   }, [loadPlans]);
 
   const openConfirmDialog = () => {
@@ -131,7 +137,7 @@ export function SubscribePlanPage() {
       toast.success(successMessage, t('toast.successTitle'));
       setConfirmOpen(false);
 
-      if (paymentMethod === 'VNPAY') {
+      if (paymentMethod === 'VNPAY' && selectedPlan.price > 0 && nextCustomerPlan?.status !== 'ACTIVE') {
         if (nextCustomerPlan?.latestTransactionId !== null && typeof nextCustomerPlan?.latestTransactionId !== 'undefined') {
           try {
             const paymentUrlResponse = await createVnPayPaymentUrl(nextCustomerPlan.latestTransactionId);
@@ -271,6 +277,7 @@ export function SubscribePlanPage() {
           <section className="grid gap-gutter md:grid-cols-2 xl:grid-cols-3">
             {plans.map((plan) => {
               const isSelected = selectedPlanId === plan.id;
+              const isCurrent = refreshedCurrentPlan?.subscriptionPlan.id === plan.id;
               return (
                 <button
                   key={plan.id}
@@ -279,6 +286,7 @@ export function SubscribePlanPage() {
                     'rounded-xl text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary',
                     !plan.active && 'opacity-70',
                   )}
+                  disabled={isCurrent || !plan.active}
                   onClick={() => setSelectedPlanId(plan.id)}
                 >
                   <Card
@@ -296,8 +304,8 @@ export function SubscribePlanPage() {
                           {plan.description || t('billing.subscribe.noDescription')}
                         </p>
                       </div>
-                      <Badge tone={plan.active ? 'green' : 'slate'}>
-                        {plan.active ? t('billing.activePlan') : t('billing.inactivePlan')}
+                      <Badge tone={isCurrent ? 'blue' : plan.active ? 'green' : 'slate'}>
+                        {isCurrent ? 'Gói hiện tại' : plan.active ? t('billing.activePlan') : t('billing.inactivePlan')}
                       </Badge>
                     </div>
                     <div className="mt-lg rounded-xl bg-surface-container-low p-md dark:bg-slate-800">
@@ -315,6 +323,13 @@ export function SubscribePlanPage() {
                           {formatNumber(plan.maxQuota)} {t('billing.analyses')}
                         </dd>
                       </div>
+                      <div className="flex items-center justify-between gap-md"><dt className="text-on-surface-variant">AI tokens</dt><dd className="font-semibold">{formatNumber(plan.aiTokenLimit ?? 0)}</dd></div>
+                      <div className="flex items-center justify-between gap-md"><dt className="text-on-surface-variant">Workspace</dt><dd className="font-semibold">{plan.workspaceLimit ?? 0}</dd></div>
+                      <div className="flex items-center justify-between gap-md"><dt className="text-on-surface-variant">Tài liệu/workspace</dt><dd className="font-semibold">{plan.documentPerWorkspaceLimit ?? 0}</dd></div>
+                      <div className="flex items-center justify-between gap-md"><dt className="text-on-surface-variant">Storage / file</dt><dd className="font-semibold">{plan.storageLimitMb ?? 0} / {plan.maxFileSizeMb ?? 0} MB</dd></div>
+                      <div className="flex items-center justify-between gap-md"><dt className="text-on-surface-variant">Attach/phiên</dt><dd className="font-semibold">{plan.maxAttachedDocumentsPerSession ?? 0}</dd></div>
+                      <div className="flex items-center justify-between gap-md"><dt className="text-on-surface-variant">Bản nháp</dt><dd className="font-semibold">{plan.contractDraftLimit ?? 0}</dd></div>
+                      <div className="flex items-center justify-between gap-md"><dt className="text-on-surface-variant">CONTACT_EXPERT</dt><dd className="font-semibold">{plan.allowContactExpertTicket ? `${plan.expertTicketLimit ?? 0}/tháng` : 'Premium only'}</dd></div>
                       <div className="flex items-center justify-between gap-md">
                         <dt className="text-on-surface-variant dark:text-slate-400">{t('billing.planType')}</dt>
                         <dd className="font-semibold text-on-surface dark:text-slate-100">{plan.planType}</dd>
@@ -326,11 +341,35 @@ export function SubscribePlanPage() {
                         {t('billing.subscribe.selectedPlan')}
                       </div>
                     )}
+                    <div className="mt-md rounded-lg bg-primary/10 px-sm py-sm text-center text-sm font-semibold text-primary dark:text-inverse-primary">
+                      {isCurrent ? 'Gói hiện tại' : refreshedCurrentPlan && planRank(plan) < planRank(refreshedCurrentPlan.subscriptionPlan) ? 'Hạ gói khi gói hiện tại hết hạn' : 'Nâng cấp áp dụng ngay'}
+                    </div>
                   </Card>
                 </button>
               );
             })}
           </section>
+
+          <Card className="mt-xl" title="Bảng so sánh giới hạn gói">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[720px] text-sm">
+                <thead><tr className="border-b border-legal-border text-left dark:border-slate-700"><th className="p-sm">Giới hạn</th>{plans.map((plan) => <th key={plan.id} className="p-sm">{plan.displayName ?? plan.planName}{refreshedCurrentPlan?.subscriptionPlan.id === plan.id ? ' · Hiện tại' : ''}</th>)}</tr></thead>
+                <tbody>
+                  {[
+                    ['Phân tích hợp đồng', (plan: SubscriptionPlan) => formatNumber(plan.contractAnalysisLimit ?? plan.maxQuota)],
+                    ['AI tokens', (plan: SubscriptionPlan) => formatNumber(plan.aiTokenLimit ?? 0)],
+                    ['Workspace', (plan: SubscriptionPlan) => String(plan.workspaceLimit ?? 0)],
+                    ['Tài liệu / workspace', (plan: SubscriptionPlan) => String(plan.documentPerWorkspaceLimit ?? 0)],
+                    ['Storage', (plan: SubscriptionPlan) => `${plan.storageLimitMb ?? 0} MB`],
+                    ['Max file', (plan: SubscriptionPlan) => `${plan.maxFileSizeMb ?? 0} MB`],
+                    ['Attach / session', (plan: SubscriptionPlan) => String(plan.maxAttachedDocumentsPerSession ?? 0)],
+                    ['Contract drafts', (plan: SubscriptionPlan) => String(plan.contractDraftLimit ?? 0)],
+                    ['CONTACT_EXPERT', (plan: SubscriptionPlan) => plan.allowContactExpertTicket ? `${plan.expertTicketLimit ?? 0}/tháng` : 'Premium only'],
+                  ].map(([label, render]) => <tr key={String(label)} className="border-b border-legal-border/60 dark:border-slate-800"><td className="p-sm font-semibold">{String(label)}</td>{plans.map((plan) => <td key={plan.id} className="p-sm text-on-surface-variant dark:text-slate-300">{(render as (value: SubscriptionPlan) => string)(plan)}</td>)}</tr>)}
+                </tbody>
+              </table>
+            </div>
+          </Card>
 
           <Card className="mt-xl" title={t('billing.subscribe.confirmPanelTitle')} subtitle={t('billing.subscribe.confirmPanelSubtitle')}>
             <div className="grid gap-lg lg:grid-cols-[1fr_0.8fr]">
