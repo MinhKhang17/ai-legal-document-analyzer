@@ -65,8 +65,11 @@ class GraphRepository:
         for node in document.nodes:
             node_groups[node.label].append(node)
 
+        # Process 'Document' first to ensure parent node is created before child nodes reference it
+        labels_order = ["Document"] + [l for l in sorted(SUPPORTED_LABELS) if l != "Document"]
+
         with self.driver.session() as session:
-            for label in sorted(SUPPORTED_LABELS):
+            for label in labels_order:
                 for node in node_groups.get(label, []):
                     self._merge_node(session, node, document)
             self._link_chunk_sequence(session, [node for node in document.nodes if node.label == "Chunk"])
@@ -124,12 +127,7 @@ class GraphRepository:
             top_k=top_k,
             query_text=query_text,
             metadata_filter={
-                "source_type": "SYSTEM_KB",
-                "ingest_source": "INGEST_V2",
-                "effective_status": "ACTIVE",
-                "visibility": {"PUBLIC", None},
-                "active": {True, None},
-                "ingested_by_role": "ADMIN",
+                "source_type": {None, "SYSTEM_KB"},
             },
         )
 
@@ -154,7 +152,7 @@ class GraphRepository:
 
         with self.driver.session() as session:
             try:
-                candidate_limit = top_k if not metadata_filter else max(top_k * 5, top_k + 10)
+                candidate_limit = top_k if not metadata_filter else 2000
                 result = session.run(
                     cypher,
                     index_name=self.vector_index_name,
@@ -170,16 +168,17 @@ class GraphRepository:
                     self._record_to_retrieved_chunk(record, metadata_filter=metadata_filter)
                     for record in filtered_records[:top_k]
                 ]
-                if not query_text:
-                    return vector_hits
-
                 text_hits = self._search_chunks_by_text(
                     query_text,
                     top_k=top_k,
                     metadata_filter=metadata_filter,
                 )
-                return self._merge_hits(vector_hits, text_hits, top_k=top_k)
-            except Exception:
+                logger.info("DEBUG SEARCH COMPONENT: metadata_filter=%s, candidate_limit=%d, filtered_records=%d, vector_hits=%d, text_hits=%d", metadata_filter, candidate_limit, len(filtered_records), len(vector_hits), len(text_hits))
+                res = self._merge_hits(vector_hits, text_hits, top_k=top_k)
+                logger.info("DEBUG SEARCH COMPONENT MERGED: count=%d", len(res))
+                return res
+            except Exception as e:
+                logger.exception("Exception in _search_chunks_with_filter: %s", e)
                 if not query_text:
                     return []
                 return self._search_chunks_by_text(query_text, top_k=top_k, metadata_filter=metadata_filter)
@@ -299,7 +298,7 @@ class GraphRepository:
         # Build a Lucene-compatible query string for Neo4j Full-Text Search
         lucene_query = " OR ".join(query_tokens)
 
-        candidate_limit = max(top_k * 5, top_k + 10) if metadata_filter else top_k
+        candidate_limit = 2000 if metadata_filter else top_k
 
         cypher = f"""
         CALL db.index.fulltext.queryNodes($index_name, $query_text, {{limit: $limit}})

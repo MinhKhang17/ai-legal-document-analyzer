@@ -178,6 +178,8 @@ export function LegalChatPage() {
   const [documentActionError, setDocumentActionError] = useState("");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [messageCitations, setMessageCitations] = useState<AiCitation[]>([]);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [sessionToDelete, setSessionToDelete] = useState<WorkspaceChatSession | null>(null);
   const chatScrollContainerRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
   const activeRequestControllerRef = useRef<AbortController | null>(null);
@@ -495,10 +497,17 @@ export function LegalChatPage() {
     }
   };
 
-  const handleDeleteSession = async (chatSessionId: string) => {
-    if (!window.confirm(t("chat.sessionDeleteConfirm"))) {
-      return;
+  const handleDeleteSessionClick = (chatSessionId: string) => {
+    const session = chatSessions.find((s) => s.chatSessionId === chatSessionId);
+    if (session) {
+      setSessionToDelete(session);
+      setIsDeleteModalOpen(true);
     }
+  };
+
+  const handleConfirmDeleteSession = async () => {
+    if (!sessionToDelete) return;
+    const chatSessionId = sessionToDelete.chatSessionId;
 
     setSessionActionBusyId(chatSessionId);
     setSessionActionError("");
@@ -532,6 +541,8 @@ export function LegalChatPage() {
       toast.error(message, t("toast.errorTitle"));
     } finally {
       setSessionActionBusyId("");
+      setIsDeleteModalOpen(false);
+      setSessionToDelete(null);
     }
   };
 
@@ -1134,7 +1145,7 @@ export function LegalChatPage() {
                                 disabled={sessionActionBusyId === session.chatSessionId}
                                 onClick={() => {
                                   setSessionMenuOpenId("");
-                                  void handleDeleteSession(session.chatSessionId);
+                                  handleDeleteSessionClick(session.chatSessionId);
                                 }}
                               >
                                 <Trash2 className="h-4 w-4" />{t("chat.deleteSession")}
@@ -1551,6 +1562,42 @@ export function LegalChatPage() {
           <p className="text-sm text-on-surface-variant dark:text-slate-400">{t("chat.noMessageDetail")}</p>
         )}
       </Modal>
+
+      {/* Custom Chat Session Delete Confirmation Modal */}
+      {isDeleteModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/70 p-md" role="dialog" aria-modal="true">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-slate-800 bg-[#202123] p-lg shadow-2xl text-left">
+            <h3 className="text-lg font-bold text-white">
+              {t("chat.deleteSessionModalTitle")}
+            </h3>
+            <p className="mt-md text-sm text-slate-300">
+              {t("chat.deleteSessionModalBodyPrefix")}
+              <strong className="font-semibold text-white">{sessionToDelete?.title || t("chat.defaultSession")}</strong>
+              {t("chat.deleteSessionModalBodySuffix")}
+            </p>
+            <div className="flex justify-end gap-sm mt-lg">
+              <button
+                type="button"
+                className="px-lg py-sm rounded-full border border-slate-600 text-slate-200 hover:bg-slate-800 text-sm font-semibold transition"
+                onClick={() => {
+                  setIsDeleteModalOpen(false);
+                  setSessionToDelete(null);
+                }}
+              >
+                {t("actions.cancel")}
+              </button>
+              <button
+                type="button"
+                className="px-lg py-sm rounded-full bg-[#ff003c] text-white hover:bg-red-700 text-sm font-semibold transition disabled:opacity-50"
+                onClick={() => void handleConfirmDeleteSession()}
+                disabled={sessionActionBusyId === (sessionToDelete?.chatSessionId ?? "")}
+              >
+                {t("actions.delete")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

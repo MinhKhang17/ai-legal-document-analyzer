@@ -78,6 +78,7 @@ class LlmIntentDetector:
         *,
         has_user_chunks: bool = False,
         has_knowledge_chunks: bool = False,
+        conversation_context: str | None = None,
     ) -> IntentResult | None:
         """Classify intent using Gemini LLM.
 
@@ -92,6 +93,9 @@ class LlmIntentDetector:
             context_hint = "\n[Context: User HAS uploaded a document]"
         else:
             context_hint = "\n[Context: User has NOT uploaded any document]"
+
+        if conversation_context:
+            context_hint += f"\n[Conversation History:\n{conversation_context}\n]"
 
         user_prompt = f"Classify this query:{context_hint}\n\nQuery: {question}"
 
@@ -188,6 +192,7 @@ def detect_intent_smart(
     *,
     has_user_chunks: bool = False,
     has_knowledge_chunks: bool = False,
+    conversation_context: str | None = None,
 ) -> IntentResult:
     """Smart intent detection: uses LLM if enabled, falls back to keyword matching.
 
@@ -200,6 +205,7 @@ def detect_intent_smart(
                 question,
                 has_user_chunks=has_user_chunks,
                 has_knowledge_chunks=has_knowledge_chunks,
+                conversation_context=conversation_context,
             )
             if result is not None:
                 return result

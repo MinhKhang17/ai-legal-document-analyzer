@@ -46,7 +46,7 @@ const config: Config = {
       fontFamily: {
         sans: ['Inter', 'ui-sans-serif', 'system-ui', 'Segoe UI', 'Arial', 'sans-serif'],
         legal: ['Inter', 'ui-sans-serif', 'system-ui', 'Segoe UI', 'Arial', 'sans-serif'],
-        domine: ['Domine', 'Georgia', 'Cambria', 'Times New Roman', 'serif'],
+        domine: ['var(--font-domine)', 'Domine', 'Georgia', 'Cambria', 'Times New Roman', 'serif'],
       },
       fontSize: {
         'display-lg': ['48px', { lineHeight: '56px', letterSpacing: '-0.02em', fontWeight: '700' }],
