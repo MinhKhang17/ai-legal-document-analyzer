@@ -11,7 +11,7 @@ import { StatusBadge } from '../../components/common/StatusBadge';
 import { getWorkspaceDocuments, getWorkspaces } from '../../api/workspaceApi';
 import { useI18n } from '../../hooks/useI18n';
 import type { Document, Workspace } from '../../types/workspace';
-import { formatDisplayDateTime } from '../../utils/format';
+import { formatDisplayDateTime, localeForLanguage } from '../../utils/format';
 import { useAppStore } from '../../store/AppStore';
 
 import { getAccessToken as getSessionAccessToken } from '../../services/authSession';
@@ -25,7 +25,7 @@ export function DashboardPage() {
   const [workspaces, setWorkspaces] = useState<WorkspaceWithDocs[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const locale = language === 'vi' ? 'vi-VN' : 'en-US';
+  const locale = localeForLanguage(language);
 
   useEffect(() => {
     let active = true;
@@ -48,9 +48,9 @@ export function DashboardPage() {
         if (active) {
           setWorkspaces(workspaceDetails);
         }
-      } catch (err) {
+      } catch {
         if (active) {
-          setError(err instanceof Error ? err.message : t('dashboard.loadError'));
+          setError(t('dashboard.loadError'));
         }
       } finally {
         if (active) {
@@ -127,13 +127,13 @@ export function DashboardPage() {
 
       {user?.role === 'CUSTOMER' && user.emailVerified === false && (
         <div className="mb-lg rounded-xl border border-warning/40 bg-warning/10 p-md text-sm text-on-surface dark:text-slate-100">
-          <p className="font-semibold">{language === 'vi' ? 'Email chưa được xác thực' : 'Email is not verified'}</p>
-          <p className="mt-xs text-on-surface-variant dark:text-slate-300">{language === 'vi' ? 'Hãy mở liên kết trong email đăng ký để kích hoạt đầy đủ tài khoản.' : 'Open the link in your registration email to fully activate the account.'}</p>
+          <p className="font-semibold">{t('dashboard.emailUnverifiedTitle')}</p>
+          <p className="mt-xs text-on-surface-variant dark:text-slate-300">{t('dashboard.emailUnverifiedDescription')}</p>
         </div>
       )}
 
       {error && (
-        <div className="mb-lg rounded-xl border border-error/40 bg-error/10 p-md text-sm text-error">
+        <div role="alert" className="mb-lg rounded-xl border border-error/40 bg-error/10 p-md text-sm text-error">
           {error}
         </div>
       )}
@@ -194,8 +194,8 @@ export function DashboardPage() {
                     className="block rounded-lg border border-legal-border p-md transition hover:bg-surface-container-low dark:border-slate-700 dark:hover:bg-slate-800"
                   >
                     <div className="flex items-start justify-between gap-md">
-                      <div>
-                        <p className="font-semibold">{workspace.name}</p>
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold" title={workspace.name}>{workspace.name}</p>
                         <p className="text-sm text-on-surface-variant dark:text-slate-400">
                           {workspace.description || t('workspace.noDescription')}
                         </p>
@@ -203,8 +203,8 @@ export function DashboardPage() {
                       <StatusBadge status={workspace.status} />
                     </div>
                     <div className="mt-md flex items-center justify-between text-sm text-on-surface-variant dark:text-slate-400">
-                      <span>{workspace.documents.length} {t('nav.documents').toLowerCase()}</span>
-                      <span>{readyCount} {t('status.ready').toLowerCase()}</span>
+                      <span>{t('dashboard.documentCount', { count: workspace.documents.length })}</span>
+                      <span>{t('dashboard.readyCount', { count: readyCount })}</span>
                     </div>
                   </Link>
                 );
@@ -221,9 +221,9 @@ export function DashboardPage() {
               recentDocuments.map((document) => (
                 <div key={document.documentId} className="rounded-lg border border-legal-border p-md dark:border-slate-700">
                   <div className="flex items-center justify-between gap-md">
-                    <div>
-                      <p className="font-semibold">{document.originalFileName}</p>
-                      <p className="text-sm text-on-surface-variant dark:text-slate-400">{document.workspaceName}</p>
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold" title={document.originalFileName}>{document.originalFileName}</p>
+                      <p className="truncate text-sm text-on-surface-variant dark:text-slate-400" title={document.workspaceName}>{document.workspaceName}</p>
                     </div>
                     <StatusBadge status={document.status} />
                   </div>

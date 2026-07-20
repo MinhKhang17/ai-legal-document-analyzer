@@ -118,7 +118,6 @@ Frontend/
 - `/billing`
 - `/jobs`
 - `/admin`
-- `/admin/audit-logs`
 - `/admin/system-health`
 
 ## Feature overview

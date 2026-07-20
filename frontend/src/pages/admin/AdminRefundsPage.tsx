@@ -12,7 +12,7 @@ import { RefundStatusBadge } from '../../components/billing/RefundStatusBadge';
 import { REFUND_STATUSES } from '../../utils/refund';
 
 export function AdminRefundsPage() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const requestedStatus = params.get('status');
@@ -20,15 +20,16 @@ export function AdminRefundsPage() {
     ? requestedStatus as RefundStatus
     : '';
   const [refunds, setRefunds] = useState<RefundRequestRecord[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState('');
-  const load = useCallback(async () => { setLoading(true); setError(''); try { setRefunds((await getAdminSubscriptionRefunds(status || undefined)).data ?? []); } catch (cause) { setError(cause instanceof Error ? cause.message : t('refund.errors.loadAdmin')); } finally { setLoading(false); } }, [status, t]);
+  const load = useCallback(async () => { setLoading(true); setError(''); try { setRefunds((await getAdminSubscriptionRefunds(status || undefined)).data ?? []); } catch (cause) { console.error('Failed to load refund requests:', cause); setError(t('refund.errors.loadAdmin')); } finally { setLoading(false); } }, [status, t]);
   useEffect(() => { void load(); }, [load]);
+  const locale = language === 'vi' ? 'vi-VN' : 'en-US';
   const columns: DataTableColumn<RefundRequestRecord>[] = [
     { header: t('refund.id'), cell: (item) => <Link className="font-semibold text-primary" to={`/admin/refunds/${item.id}`}>#{item.id}</Link> },
     { header: t('refund.customer'), cell: (item) => `#${item.requestedById}` },
     { header: t('refund.transaction'), cell: (item) => `#${item.paymentTransactionId}` },
-    { header: t('refund.amount'), cell: (item) => formatVndCurrency(item.amount) },
+    { header: t('refund.amount'), cell: (item) => formatVndCurrency(item.amount, t('billing.free'), locale) },
     { header: t('table.status'), cell: (item) => <RefundStatusBadge status={item.status} /> },
-    { header: t('table.created'), cell: (item) => formatDisplayDate(item.createdAt, '-') },
+    { header: t('table.created'), cell: (item) => formatDisplayDate(item.createdAt, '-', locale) },
     {
       header: t('table.actions'),
       cell: (item) => (

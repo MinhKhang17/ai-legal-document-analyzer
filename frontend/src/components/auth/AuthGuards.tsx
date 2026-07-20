@@ -20,6 +20,45 @@ function AuthLoadingView() {
   );
 }
 
+function AuthRecoveryUnavailableView({ onRetry }: { onRetry: () => Promise<void> }) {
+  const { t } = useI18n();
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-ivory px-6 text-on-surface dark:bg-slate-950 dark:text-slate-100">
+      <div className="max-w-md text-center">
+        <h1 className="font-domine text-2xl font-bold">{t("auth.recoveryUnavailableTitle")}</h1>
+        <p className="mt-3 text-sm text-on-surface-variant dark:text-slate-400">
+          {t("auth.recoveryUnavailableMessage")}
+        </p>
+        <button
+          className="mt-5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-container focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          type="button"
+          onClick={() => void onRetry()}
+        >
+          {t("auth.retrySessionRecovery")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SignInRedirect() {
+  const location = useLocation();
+  const { t } = useI18n();
+  const returnTo = `${location.pathname}${location.search}${location.hash}`;
+
+  return (
+    <Navigate
+      to="/login"
+      replace
+      state={{
+        errorMessage: t("auth.mustSignIn"),
+        from: returnTo,
+      }}
+    />
+  );
+}
+
 type CurrentUserState = ReturnType<typeof useAppStore>["user"];
 
 function resolveRedirectToDashboardOrAdmin(user: CurrentUserState) {
@@ -32,11 +71,6 @@ function resolveRedirectToDashboardOrAdmin(user: CurrentUserState) {
   }
 
   return "/dashboard";
-}
-
-function loginRedirectState(location: ReturnType<typeof useLocation>, errorMessage?: string) {
-  const redirectTo = `${location.pathname}${location.search}${location.hash}`;
-  return { errorMessage, redirectTo, from: redirectTo };
 }
 
 function RoleAccessDeniedView() {
@@ -56,10 +90,21 @@ function RoleAccessDeniedView() {
 }
 
 export function PublicRoute({ children }: RouteGuardProps) {
-  const { isAuthLoading, isAuthReady, isAuthenticated, user } = useAppStore();
+  const {
+    isAuthLoading,
+    isAuthReady,
+    isAuthenticated,
+    authRecoveryError,
+    retryAuthRecovery,
+    user,
+  } = useAppStore();
 
   if (isAuthLoading || !isAuthReady) {
     return <AuthLoadingView />;
+  }
+
+  if (authRecoveryError) {
+    return <AuthRecoveryUnavailableView onRetry={retryAuthRecovery} />;
   }
 
   if (!isAuthenticated || user === null || user.active === false) {
@@ -70,44 +115,50 @@ export function PublicRoute({ children }: RouteGuardProps) {
 }
 
 export function AuthenticatedRoute({ children }: RouteGuardProps) {
-  const { isAuthLoading, isAuthReady, isAuthenticated, user } = useAppStore();
-  const location = useLocation();
-  const { t } = useI18n();
+  const {
+    isAuthLoading,
+    isAuthReady,
+    isAuthenticated,
+    authRecoveryError,
+    retryAuthRecovery,
+    user,
+  } = useAppStore();
 
   if (isAuthLoading || !isAuthReady) {
     return <AuthLoadingView />;
   }
 
+  if (authRecoveryError) {
+    return <AuthRecoveryUnavailableView onRetry={retryAuthRecovery} />;
+  }
+
   if (!isAuthenticated || user === null || user.active === false) {
-    return (
-      <Navigate
-        to="/login"
-        replace
-        state={loginRedirectState(location, t("auth.mustSignIn"))}
-      />
-    );
+    return <SignInRedirect />;
   }
 
   return <>{children}</>;
 }
 
 export function CustomerRoute({ children }: RouteGuardProps) {
-  const { isAuthLoading, isAuthReady, isAuthenticated, user } = useAppStore();
-  const location = useLocation();
-  const { t } = useI18n();
+  const {
+    isAuthLoading,
+    isAuthReady,
+    isAuthenticated,
+    authRecoveryError,
+    retryAuthRecovery,
+    user,
+  } = useAppStore();
 
   if (isAuthLoading || !isAuthReady) {
     return <AuthLoadingView />;
   }
 
+  if (authRecoveryError) {
+    return <AuthRecoveryUnavailableView onRetry={retryAuthRecovery} />;
+  }
+
   if (!isAuthenticated || user === null || user.active === false) {
-    return (
-      <Navigate
-        to="/login"
-        replace
-        state={loginRedirectState(location, t("auth.mustSignIn"))}
-      />
-    );
+    return <SignInRedirect />;
   }
 
   if (user.role === "CUSTOMER") {
@@ -122,15 +173,25 @@ export function CustomerRoute({ children }: RouteGuardProps) {
 }
 
 export function AdminRoute({ children }: RouteGuardProps) {
-  const { isAuthLoading, isAuthReady, isAuthenticated, user } = useAppStore();
-  const location = useLocation();
+  const {
+    isAuthLoading,
+    isAuthReady,
+    isAuthenticated,
+    authRecoveryError,
+    retryAuthRecovery,
+    user,
+  } = useAppStore();
 
   if (isAuthLoading || !isAuthReady) {
     return <AuthLoadingView />;
   }
 
+  if (authRecoveryError) {
+    return <AuthRecoveryUnavailableView onRetry={retryAuthRecovery} />;
+  }
+
   if (!isAuthenticated || user === null || user.active === false) {
-    return <Navigate to="/login" replace state={loginRedirectState(location)} />;
+    return <SignInRedirect />;
   }
 
   if (user.role !== "ADMIN") {
@@ -141,15 +202,25 @@ export function AdminRoute({ children }: RouteGuardProps) {
 }
 
 export function ExpertRoute({ children }: RouteGuardProps) {
-  const { isAuthLoading, isAuthReady, isAuthenticated, user } = useAppStore();
-  const location = useLocation();
+  const {
+    isAuthLoading,
+    isAuthReady,
+    isAuthenticated,
+    authRecoveryError,
+    retryAuthRecovery,
+    user,
+  } = useAppStore();
 
   if (isAuthLoading || !isAuthReady) {
     return <AuthLoadingView />;
   }
 
+  if (authRecoveryError) {
+    return <AuthRecoveryUnavailableView onRetry={retryAuthRecovery} />;
+  }
+
   if (!isAuthenticated || user === null || user.active === false) {
-    return <Navigate to="/login" replace state={loginRedirectState(location)} />;
+    return <SignInRedirect />;
   }
 
   if (user.role !== "EXPERT") {
@@ -160,10 +231,17 @@ export function ExpertRoute({ children }: RouteGuardProps) {
 }
 
 export function AdminOrExpertRoute({ children }: RouteGuardProps) {
-  const { isAuthLoading, isAuthReady, isAuthenticated, user } = useAppStore();
-  const location = useLocation();
+  const {
+    isAuthLoading,
+    isAuthReady,
+    isAuthenticated,
+    authRecoveryError,
+    retryAuthRecovery,
+    user,
+  } = useAppStore();
   if (isAuthLoading || !isAuthReady) return <AuthLoadingView />;
-  if (!isAuthenticated || user === null || user.active === false) return <Navigate to="/login" replace state={loginRedirectState(location)} />;
+  if (authRecoveryError) return <AuthRecoveryUnavailableView onRetry={retryAuthRecovery} />;
+  if (!isAuthenticated || user === null || user.active === false) return <SignInRedirect />;
   if (user.role !== "ADMIN" && user.role !== "EXPERT") return <RoleAccessDeniedView />;
   return <>{children}</>;
 }
