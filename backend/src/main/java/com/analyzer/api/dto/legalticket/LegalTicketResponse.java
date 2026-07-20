@@ -1,6 +1,7 @@
 package com.analyzer.api.dto.legalticket;
 
 import com.analyzer.api.enums.LegalTicketStatus;
+import com.analyzer.api.enums.LegalTicketType;
 import com.analyzer.api.enums.RiskLevel;
 import com.analyzer.api.enums.SuggestionType;
 import com.analyzer.api.enums.UserActionHint;
@@ -13,6 +14,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -21,6 +23,27 @@ import java.time.LocalDateTime;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @Schema(description = "Legal ticket response details")
 public class LegalTicketResponse {
+
+    private String ticketCode;
+    private String title;
+    private String description;
+    private String recipientType;
+    private String priority;
+    private String conversationScope;
+    private String sourceUserMessageId;
+    private String sourceAssistantMessageId;
+    private String focusedDocumentId;
+    private List<String> sharedDocumentIds;
+    private TicketContextSnapshotResponse contextSnapshot;
+
+    @JsonProperty("ticket_type")
+    private LegalTicketType ticketType;
+
+    @JsonProperty("chat_session_id")
+    private String relatedChatSessionId;
+
+    @JsonProperty("chat_message_id")
+    private String relatedChatMessageId;
 
     @JsonProperty("id")
     private String id;

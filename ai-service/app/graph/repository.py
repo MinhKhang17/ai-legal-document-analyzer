@@ -85,13 +85,16 @@ class GraphRepository:
         *,
         query_text: str | None = None,
         document_id: str | None = None,
+        document_ids: list[str] | None = None,
     ) -> list[RetrievedChunk]:
         metadata_filter: dict[str, Any] = {
             "source_type": "USER_DOCUMENT",
             "user_id": user_id,
             "workspace_id": workspace_id,
         }
-        if document_id:
+        if document_ids:
+            metadata_filter["document_id"] = set(document_ids)
+        elif document_id:
             metadata_filter["document_id"] = document_id
         return self._search_chunks_with_filter(
             query_embedding=embedding,
@@ -229,6 +232,7 @@ class GraphRepository:
         self,
         document_id: str,
         *,
+        knowledge_base_id: str | None = None,
         visibility: str,
         active: bool,
         published_at: str | None,
@@ -238,14 +242,23 @@ class GraphRepository:
         updates: list[tuple[str, str]] = []
         for row in rows:
             metadata = self._parse_metadata(row.get("metadata_json"))
+            source_metadata = metadata.get("source_metadata")
+            legacy_metadata = source_metadata if isinstance(source_metadata, dict) else {}
+            stored_knowledge_base_id = str(
+                metadata.get("knowledge_base_id")
+                or legacy_metadata.get("knowledge_base_id")
+                or ""
+            )
+            if knowledge_base_id and stored_knowledge_base_id != knowledge_base_id:
+                continue
             candidate_ids = {
                 str(metadata.get("document_id") or ""),
                 str(metadata.get("knowledge_document_id") or ""),
-                str(metadata.get("knowledge_base_id") or ""),
             }
             if document_id not in candidate_ids:
                 continue
             metadata.update({
+                "knowledge_base_id": knowledge_base_id or stored_knowledge_base_id or None,
                 "visibility": visibility,
                 "active": active,
                 "effective_status": "ACTIVE" if active and visibility == "PUBLIC" else "INACTIVE",

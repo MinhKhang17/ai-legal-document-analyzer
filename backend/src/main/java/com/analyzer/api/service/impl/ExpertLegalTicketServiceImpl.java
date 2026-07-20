@@ -18,6 +18,7 @@ import com.analyzer.api.repository.LegalTicketMessageRepository;
 import com.analyzer.api.repository.LegalTicketRepository;
 import com.analyzer.api.repository.UserRepository;
 import com.analyzer.api.service.ExpertLegalTicketService;
+import com.analyzer.api.service.EmailService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -38,6 +39,7 @@ public class ExpertLegalTicketServiceImpl implements ExpertLegalTicketService {
     private final LegalTicketMessageRepository legalTicketMessageRepository;
     private final UserRepository userRepository;
     private final LegalTicketMapper legalTicketMapper;
+    private final EmailService emailService;
 
     @Override
     @Transactional(readOnly = true)
@@ -81,7 +83,8 @@ public class ExpertLegalTicketServiceImpl implements ExpertLegalTicketService {
         validateAssignedExpert(ticket, expertId);
 
         if (ticket.getStatus() != LegalTicketStatus.ASSIGNED_TO_LAWYER &&
-            ticket.getStatus() != LegalTicketStatus.CUSTOMER_RESPONDED) {
+            ticket.getStatus() != LegalTicketStatus.CUSTOMER_RESPONDED &&
+            ticket.getStatus() != LegalTicketStatus.REOPENED) {
             throw new ConflictException("INVALID_STATUS_TRANSITION");
         }
 
@@ -97,6 +100,10 @@ public class ExpertLegalTicketServiceImpl implements ExpertLegalTicketService {
                 .internalOnly(false)
                 .build();
         legalTicketMessageRepository.save(systemMsg);
+
+        emailService.sendTicketNotificationAsync(ticket.getCreatedBy().getEmail(), ticket.getCreatedBy().getFirstName(),
+                ticket.getId(), ticket.getTicketType() != null ? ticket.getTicketType().name() : "CONTACT_EXPERT",
+                ticket.getStatus().name(), "/tickets/" + ticket.getId(), "Chuyen gia da giai quyet ticket.");
 
         return legalTicketMapper.toResponse(ticket);
     }
@@ -173,6 +180,10 @@ public class ExpertLegalTicketServiceImpl implements ExpertLegalTicketService {
                     .build();
             legalTicketMessageRepository.save(noteMsg);
         }
+
+        emailService.sendTicketNotificationAsync(ticket.getCreatedBy().getEmail(), ticket.getCreatedBy().getFirstName(),
+                ticket.getId(), ticket.getTicketType() != null ? ticket.getTicketType().name() : "CONTACT_EXPERT",
+                ticket.getStatus().name(), "/tickets/" + ticket.getId(), "Chuyen gia da giai quyet ticket.");
 
         return legalTicketMapper.toResponse(ticket);
     }

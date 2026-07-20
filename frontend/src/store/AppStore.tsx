@@ -84,6 +84,9 @@ const parseStoredUser = (): CurrentUser | null => {
         email: parsed.email,
         role: parsed.role,
         active: parsed.active,
+        emailVerified: parsed.emailVerified,
+        mustChangePassword: parsed.mustChangePassword,
+        passwordResetDeadline: parsed.passwordResetDeadline,
       };
     }
   } catch {

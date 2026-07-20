@@ -4,15 +4,21 @@ import com.analyzer.api.dto.ApiResponseDTO;
 import com.analyzer.api.dto.PageResponse;
 import com.analyzer.api.dto.chatsession.ChatSessionResponse;
 import com.analyzer.api.dto.chatsession.CreateChatSessionRequest;
+import com.analyzer.api.dto.chatsession.ShareChatSessionResponse;
 import com.analyzer.api.enums.ChatSessionStatus;
 import com.analyzer.api.security.UserDetailsImpl;
 import com.analyzer.api.service.ChatSessionService;
+import com.analyzer.api.service.ChatSessionMarkdownExportService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -24,6 +30,23 @@ import org.springframework.web.bind.annotation.*;
 public class ChatSessionController {
 
     private final ChatSessionService chatSessionService;
+    private final ChatSessionMarkdownExportService markdownExportService;
+
+    @GetMapping("/api/v1/chat-sessions/{chatSessionId}/export/markdown")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    @Operation(summary = "Export a chat analysis as UTF-8 Markdown")
+    public ResponseEntity<byte[]> exportMarkdown(@PathVariable String chatSessionId) {
+        ChatSessionMarkdownExportService.MarkdownExport export =
+                markdownExportService.export(getCurrentUserId(), chatSessionId);
+        String encodedName = URLEncoder.encode(export.fileName(), StandardCharsets.UTF_8).replace("+", "%20");
+        String asciiName = export.fileName().replaceAll("[^a-zA-Z0-9._-]", "-");
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + asciiName + "\"; filename*=UTF-8''" + encodedName)
+                .contentType(MediaType.parseMediaType("text/markdown;charset=UTF-8"))
+                .contentLength(export.content().length)
+                .body(export.content());
+    }
 
     @PostMapping("/api/v1/workspaces/{workspaceId}/chat-sessions")
     @PreAuthorize("hasRole('CUSTOMER')")
@@ -93,6 +116,15 @@ public class ChatSessionController {
             @PathVariable String chatSessionId) {
         com.analyzer.api.dto.chatsession.DeleteChatSessionResponse response = chatSessionService.deleteChatSession(getCurrentUserId(), chatSessionId);
         return ResponseEntity.ok(ApiResponseDTO.success("Chat session deleted successfully", response));
+    }
+
+    @PostMapping("/api/v1/chat-sessions/{chatSessionId}/share")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    @Operation(summary = "Share chat session", description = "Generates (or reuses) a read-only share link for Admin/Expert to view this chat session's history.")
+    public ResponseEntity<ApiResponseDTO<ShareChatSessionResponse>> shareChatSession(
+            @PathVariable String chatSessionId) {
+        ShareChatSessionResponse response = chatSessionService.shareChatSession(getCurrentUserId(), chatSessionId);
+        return ResponseEntity.ok(ApiResponseDTO.success("Chat session shared successfully", response));
     }
 
     private Long getCurrentUserId() {

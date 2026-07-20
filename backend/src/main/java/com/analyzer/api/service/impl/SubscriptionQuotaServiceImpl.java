@@ -10,6 +10,7 @@ import com.analyzer.api.enums.ChatMessageStatus;
 import com.analyzer.api.enums.ContractGenerationStatus;
 import com.analyzer.api.enums.PlanStatus;
 import com.analyzer.api.enums.LegalTicketStatus;
+import com.analyzer.api.enums.LegalTicketType;
 import com.analyzer.api.enums.UsageEventType;
 import com.analyzer.api.exception.common.ConflictException;
 import com.analyzer.api.exception.common.ResourceNotFoundException;
@@ -72,12 +73,15 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
         int draftContractsUsed = Math.toIntExact(contractGenerationJobRepository.countByRequesterIdAndStatusAndCreatedAtBetween(
                 user.getId(), ContractGenerationStatus.COMPLETED, periodStart, periodEnd));
         int expertTicketsUsed = Math.toIntExact(
-                legalTicketRepository.countByCreatedByIdAndDeletedFalseAndStatusNotInAndCreatedAtBetween(
+                legalTicketRepository.countByCreatedByIdAndTicketTypeAndDeletedFalseAndStatusNotInAndCreatedAtBetween(
                         user.getId(),
+                        LegalTicketType.CONTACT_EXPERT,
                         List.of(LegalTicketStatus.CANCELLED, LegalTicketStatus.REJECTED_BY_ADMIN),
                         periodStart,
                         periodEnd));
         int workspacesUsed = Math.toIntExact(workspaceRepository.countByUserIdAndStatus(user.getId(), ACTIVE_WORKSPACE_STATUS));
+        int documentsUsed = Math.toIntExact(documentRepository.countByUserIdAndStatusNot(user.getId(), DELETED_DOCUMENT_STATUS));
+        long storageUsedBytes = documentRepository.sumFileSizeByUserIdAndStatusNot(user.getId(), DELETED_DOCUMENT_STATUS);
 
         return SubscriptionQuotaUsageSummaryResponse.builder()
                 .periodStart(periodStart)
@@ -92,6 +96,11 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
                 .expertTicketsLimit(plan.getTicketQuota())
                 .workspacesUsed(workspacesUsed)
                 .workspacesLimit(plan.getMaxWorkspaces())
+                .documentsUsed(documentsUsed)
+                .documentsLimit(plan.getMaxWorkspaces() == null || plan.getMaxContractsPerWorkspace() == null
+                        ? null : plan.getMaxWorkspaces() * plan.getMaxContractsPerWorkspace())
+                .storageUsedBytes(storageUsedBytes)
+                .storageLimitBytes(plan.getStorageLimitMb() == null ? null : plan.getStorageLimitMb() * 1024L * 1024L)
                 .build();
     }
 
@@ -108,6 +117,12 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
     @Override
     @Transactional(readOnly = true)
     public void checkCanUploadOrAnalyzeContract(User user, String workspaceId) {
+        checkCanUploadOrAnalyzeContract(user, workspaceId, 0);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public void checkCanUploadOrAnalyzeContract(User user, String workspaceId, long fileSizeBytes) {
         SubscriptionPlan plan = getCurrentPlan(user);
         SubscriptionQuotaUsageSummaryResponse usage = getCurrentUsage(user);
 
@@ -119,6 +134,24 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
                 workspaceId, user.getId(), DELETED_DOCUMENT_STATUS);
         if (plan.getMaxContractsPerWorkspace() != null && workspaceContractCount >= plan.getMaxContractsPerWorkspace()) {
             throw new ConflictException("CONTRACTS_PER_WORKSPACE_LIMIT_EXCEEDED");
+        }
+        if (plan.getMaxFileSizeMb() != null && fileSizeBytes > plan.getMaxFileSizeMb() * 1024L * 1024L) {
+            throw new ConflictException("MAX_FILE_SIZE_EXCEEDED");
+        }
+        long storageUsed = documentRepository.sumFileSizeByUserIdAndStatusNot(user.getId(), DELETED_DOCUMENT_STATUS);
+        if (plan.getStorageLimitMb() != null
+                && storageUsed + Math.max(fileSizeBytes, 0) > plan.getStorageLimitMb() * 1024L * 1024L) {
+            throw new ConflictException("STORAGE_LIMIT_EXCEEDED");
+        }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public void checkCanAttachDocument(User user, int currentlyAttached) {
+        SubscriptionPlan plan = getCurrentPlan(user);
+        if (plan.getMaxAttachedDocumentsPerSession() != null
+                && currentlyAttached >= plan.getMaxAttachedDocumentsPerSession()) {
+            throw new ConflictException("ATTACHED_DOCUMENT_LIMIT_EXCEEDED");
         }
     }
 
@@ -167,8 +200,8 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
     public void checkCanCreateExpertTicket(User user) {
         SubscriptionPlan plan = getCurrentPlan(user);
         int ticketQuota = plan.getTicketQuota() == null ? 0 : plan.getTicketQuota();
-        if (ticketQuota <= 0) {
-            throw new ConflictException("EXPERT_TICKET_QUOTA_EXCEEDED");
+        if (!Boolean.TRUE.equals(plan.getAllowContactExpertTicket()) || ticketQuota <= 0) {
+            throw new ConflictException("EXPERT_TICKET_REQUIRES_PREMIUM");
         }
 
         SubscriptionQuotaUsageSummaryResponse usage = getCurrentUsage(user);

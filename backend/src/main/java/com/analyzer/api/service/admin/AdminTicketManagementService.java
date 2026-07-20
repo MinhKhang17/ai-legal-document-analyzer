@@ -14,6 +14,10 @@ public interface AdminTicketManagementService {
 
     LegalTicketResponse reassignLawyer(String ticketId, Long adminId, AssignLawyerRequest request);
 
+    LegalTicketResponse approveInternal(String ticketId, Long adminId);
+
+    LegalTicketResponse closeInternal(String ticketId, Long adminId, String note);
+
     TicketSummaryResponse viewAiSummary(String ticketId);
 
     AdminChatHistoryResponse viewChatHistory(String ticketId);

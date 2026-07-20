@@ -201,6 +201,7 @@ export interface AiContractSummary {
 }
 
 export interface AiContractAnalysisResponse {
+  contract_type?: string | null;
   document_id: string;
   filename: string;
   title: string;

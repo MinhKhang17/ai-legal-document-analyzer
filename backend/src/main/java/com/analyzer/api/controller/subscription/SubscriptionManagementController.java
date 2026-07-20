@@ -197,6 +197,14 @@ public class SubscriptionManagementController {
                 refundService.updateRefundStatus(refundId, request)));
     }
 
+    @GetMapping("/refunds/confirm")
+    @PreAuthorize("permitAll()")
+    @Operation(summary = "Confirm a refund request from the email link")
+    public ResponseEntity<ApiResponseDTO<RefundResponseDTO>> confirmRefundEmail(@RequestParam String token) {
+        return ResponseEntity.ok(ApiResponseDTO.success("Xac nhan email hoan tien thanh cong",
+                refundService.confirmRefundEmail(token)));
+    }
+
     private Long getCurrentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {

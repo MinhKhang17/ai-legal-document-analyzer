@@ -36,6 +36,7 @@ class Settings(BaseSettings):
 
     # Gemini Configuration
     llm_provider: str = "gemini"
+    llm_query_enabled: bool = True
     llm_v2_enabled: bool = False
     llm_v2_max_concurrency: int = 4
     gemini_api_key: str = ""

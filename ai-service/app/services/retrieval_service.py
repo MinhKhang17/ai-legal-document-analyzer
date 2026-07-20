@@ -53,6 +53,7 @@ class RetrievalService:
         workspace_id: str,
         top_k: int,
         document_id: str | None = None,
+        document_ids: list[str] | None = None,
     ) -> list[RagChunkHit]:
         embedding = self.embed_question(question)
         chunks = self.repository.search_user_chunks(
@@ -62,6 +63,7 @@ class RetrievalService:
             top_k=top_k,
             query_text=question,
             document_id=document_id,
+            document_ids=document_ids,
         )
         return [
             self._to_hit(

@@ -17,6 +17,7 @@ import com.analyzer.api.repository.LegalTicketMessageRepository;
 import com.analyzer.api.repository.LegalTicketRepository;
 import com.analyzer.api.repository.UserRepository;
 import com.analyzer.api.service.lawyer.TicketConversationService;
+import com.analyzer.api.service.EmailService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +40,7 @@ public class TicketConversationServiceImpl implements TicketConversationService 
     private final LegalTicketMessageRepository legalTicketMessageRepository;
     private final UserRepository userRepository;
     private final LegalTicketMapper legalTicketMapper;
+    private final EmailService emailService;
 
     @Override
     @Transactional
@@ -72,6 +74,10 @@ public class TicketConversationServiceImpl implements TicketConversationService 
         }
         ticket.setLastLawyerMessageAt(LocalDateTime.now());
         legalTicketRepository.save(ticket);
+
+        emailService.sendTicketNotificationAsync(ticket.getCreatedBy().getEmail(), ticket.getCreatedBy().getFirstName(),
+                ticket.getId(), ticket.getTicketType() != null ? ticket.getTicketType().name() : "CONTACT_EXPERT",
+                ticket.getStatus().name(), "/tickets/" + ticket.getId(), "Chuyen gia vua phan hoi ticket.");
 
         return ChatWithUserResponse.builder()
                 .ticketId(ticket.getId())

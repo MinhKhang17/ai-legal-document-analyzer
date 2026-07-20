@@ -4,6 +4,7 @@ import com.analyzer.api.dto.ApiResponseDTO;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -15,6 +16,7 @@ import com.analyzer.api.exception.workspace.*;
 import com.analyzer.api.exception.chat.*;
 import com.analyzer.api.exception.ai.*;
 import com.analyzer.api.exception.validation.*;
+import com.analyzer.api.exception.auth.*;
 
 @ControllerAdvice
 public class GlobalExceptionHandler {
@@ -32,6 +34,14 @@ public class GlobalExceptionHandler {
                 return new ResponseEntity<>(
                                 ApiResponseDTO.error(HttpStatus.UNAUTHORIZED.value(), "Email hoặc mật khẩu không đúng"),
                                 HttpStatus.UNAUTHORIZED);
+        }
+
+        @ExceptionHandler(DisabledException.class)
+        public ResponseEntity<ApiResponseDTO<Void>> handleDisabledException(DisabledException ex) {
+                return new ResponseEntity<>(
+                                ApiResponseDTO.error(HttpStatus.FORBIDDEN.value(),
+                                                "Tài khoản chưa được xác thực email hoặc đã bị vô hiệu hóa. Vui lòng kiểm tra email để xác thực tài khoản."),
+                                HttpStatus.FORBIDDEN);
         }
 
         @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -155,6 +165,13 @@ public class GlobalExceptionHandler {
                 return new ResponseEntity<>(
                                 ApiResponseDTO.error(HttpStatus.GATEWAY_TIMEOUT.value(), ex.getMessage(), data),
                                 HttpStatus.GATEWAY_TIMEOUT);
+        }
+
+        @ExceptionHandler(ExpiredVerificationTokenException.class)
+        public ResponseEntity<ApiResponseDTO<Void>> handleExpiredVerificationTokenException(ExpiredVerificationTokenException ex) {
+                return new ResponseEntity<>(
+                                ApiResponseDTO.error(HttpStatus.BAD_REQUEST.value(), ex.getMessage()),
+                                HttpStatus.BAD_REQUEST);
         }
 
         @ExceptionHandler(ConflictException.class)

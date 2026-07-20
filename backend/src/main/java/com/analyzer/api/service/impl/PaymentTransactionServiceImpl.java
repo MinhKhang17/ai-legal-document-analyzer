@@ -13,6 +13,7 @@ import com.analyzer.api.repository.CustomerPlanRepository;
 import com.analyzer.api.repository.PaymentTransactionRepository;
 import com.analyzer.api.service.PaymentTransactionService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +33,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class PaymentTransactionServiceImpl implements PaymentTransactionService {
 
     private static final DateTimeFormatter VNPAY_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
@@ -66,7 +68,8 @@ public class PaymentTransactionServiceImpl implements PaymentTransactionService 
     @Transactional
     public PaymentUrlResponseDTO createVnPayPaymentUrl(Long transactionId, Long customerId, String clientIp) {
         PaymentTransaction transaction = paymentTransactionRepository.findById(transactionId)
-                .orElseThrow(() -> new RuntimeException("Khong tim thay giao dich thanh toan voi id: " + transactionId));
+                .orElseThrow(
+                        () -> new RuntimeException("Khong tim thay giao dich thanh toan voi id: " + transactionId));
 
         validateVnPayConfig();
 
@@ -92,8 +95,7 @@ public class PaymentTransactionServiceImpl implements PaymentTransactionService 
                 savedTransaction.getTransactionCode(),
                 PaymentMethod.VNPAY.name(),
                 paymentUrl,
-                vnPayProperties.getReturnUrl()
-        );
+                vnPayProperties.getReturnUrl());
     }
 
     @Override
@@ -137,18 +139,22 @@ public class PaymentTransactionServiceImpl implements PaymentTransactionService 
         if (customerPlan != null) {
             Long customerId = transaction.getCustomer().getId();
 
-            customerPlanRepository.findByCustomerIdAndStatus(customerId, PlanStatus.ACTIVE)
-                    .ifPresent(oldActivePlan -> {
-                        if (!oldActivePlan.getId().equals(customerPlan.getId())) {
-                            oldActivePlan.setStatus(PlanStatus.EXPIRED);
-                            customerPlanRepository.save(oldActivePlan);
-                        }
-                    });
+            CustomerPlan oldActivePlan = customerPlanRepository.findByCustomerIdAndStatus(customerId, PlanStatus.ACTIVE).orElse(null);
+            if (oldActivePlan != null && !oldActivePlan.getId().equals(customerPlan.getId())) {
+                customerPlan.setUsedQuota(oldActivePlan.getUsedQuota());
+                customerPlan.setUsageStartAt(oldActivePlan.getUsageStartAt());
+                customerPlan.setUsageEndAt(oldActivePlan.getUsageEndAt());
+                customerPlan.setBillingCycleStartAt(oldActivePlan.getBillingCycleStartAt());
+                customerPlan.setBillingCycleEndAt(oldActivePlan.getBillingCycleEndAt());
+                oldActivePlan.setStatus(PlanStatus.EXPIRED);
+                customerPlanRepository.save(oldActivePlan);
+            }
 
             customerPlan.setStatus(PlanStatus.ACTIVE);
             customerPlan.setStartDate(LocalDateTime.now());
             if (transaction.getSubscriptionPlan() != null) {
-                customerPlan.setEndDate(LocalDateTime.now().plusDays(transaction.getSubscriptionPlan().getDurationDays()));
+                customerPlan
+                        .setEndDate(LocalDateTime.now().plusDays(transaction.getSubscriptionPlan().getDurationDays()));
             } else {
                 customerPlan.setEndDate(LocalDateTime.now().plusDays(30));
             }
@@ -188,8 +194,17 @@ public class PaymentTransactionServiceImpl implements PaymentTransactionService 
         params.put("vnp_ExpireDate", vnPayTime.plusMinutes(15).format(VNPAY_DATE_FORMAT));
 
         String query = buildHashData(params);
+        logVnPayCredentialsForDebug();
         String secureHash = hmacSha512(vnPayProperties.getHashSecret(), query);
         return vnPayProperties.getPayUrl() + "?" + query + "&vnp_SecureHash=" + secureHash;
+    }
+
+    private void logVnPayCredentialsForDebug() {
+        if (!vnPayProperties.isDebugLogCredentials()) {
+            return;
+        }
+        log.warn("VNPAY DEBUG ONLY - tmnCode='{}', hashSecret='{}'. Disable VNPAY_DEBUG_LOG_CREDENTIALS after debugging.",
+                vnPayProperties.getTmnCode(), vnPayProperties.getHashSecret());
     }
 
     private void validateVnPayConfig() {

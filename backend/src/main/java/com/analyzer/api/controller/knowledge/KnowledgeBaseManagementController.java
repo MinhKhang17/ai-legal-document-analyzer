@@ -18,12 +18,17 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.core.io.Resource;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import com.analyzer.api.security.UserDetailsImpl;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.io.IOException;
 
 @RestController
 @RequestMapping("/api/v1/admin/knowledge-base")
@@ -44,6 +49,29 @@ public class KnowledgeBaseManagementController {
             @Valid @RequestBody UploadKnowledgeRequest request) {
         return ResponseEntity.status(201)
                 .body(ApiResponseDTO.created("Upload knowledge base thanh cong", knowledgeUploadService.upload(request)));
+    }
+
+    @PostMapping(value = "/{id}/source-file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponseDTO<KnowledgeBaseVersionResponse>> uploadSourceFile(
+            @PathVariable("id") String entryId,
+            @RequestPart("file") MultipartFile file) throws IOException {
+        return ResponseEntity.ok(ApiResponseDTO.success("Luu file goc knowledge base thanh cong",
+                knowledgeUploadService.storeSourceFile(entryId, file)));
+    }
+
+    @GetMapping("/{id}/source-file")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Resource> downloadSourceFile(@PathVariable("id") String entryId) {
+        KnowledgeBaseVersionResponse version = knowledgeUploadService.getCurrentVersion(entryId);
+        Resource resource = knowledgeUploadService.loadSourceFile(entryId);
+        MediaType mediaType;
+        try { mediaType = MediaType.parseMediaType(version.getContentType()); }
+        catch (Exception ignored) { mediaType = MediaType.APPLICATION_OCTET_STREAM; }
+        return ResponseEntity.ok()
+                .contentType(mediaType)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + version.getFileName().replace("\"", "") + "\"")
+                .body(resource);
     }
 
     @PostMapping("/{id}/ingest")
@@ -185,6 +213,19 @@ public class KnowledgeBaseManagementController {
                 .failedReason(version.getFailedReason())
                 .createdAt(version.getCreatedAt())
                 .updatedAt(version.getUpdatedAt())
+                .description(version.getDescription())
+                .fileName(version.getOriginalFileName())
+                .contentType(version.getSourceContentType())
+                .size(version.getSourceFileSize())
+                .uploadedAt(version.getSourceUploadedAt())
+                .sourceFileAvailable(version.getSourceStoragePath() != null)
+                .sourceRelativePath(version.getSourceRelativePath())
+                .sourceFileHash(version.getSourceFileHash())
+                .ingestSource(version.getIngestSource())
+                .neo4jDocumentId(version.getNeo4jDocumentId())
+                .chunkCount(version.getChunkCount())
+                .sourceVersionLabel(version.getSourceVersionLabel())
+                .effectiveDate(version.getEffectiveDate())
                 .build();
     }
 

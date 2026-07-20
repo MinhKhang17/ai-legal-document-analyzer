@@ -45,6 +45,8 @@ class VectorStoreService:
             "file_name": request.fileName,
             "file_hash": file_hash,
             "callback_url": request.callbackUrl,
+            "contract_type": request.contractType,
+            "contract_type_confirmed": request.contractTypeConfirmed,
         }
 
         nodes: list[HierarchyNode] = [

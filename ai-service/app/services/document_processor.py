@@ -9,6 +9,7 @@ from app.services.callback_client import CallbackClient
 from app.services.extraction_cache import ExtractionCache
 from app.services.loader.document_loaders import build_default_loader_registry
 from app.services.vector_store import VectorStoreService
+from app.services.intent_detector import detect_contract_type
 
 
 logger = logging.getLogger(__name__)
@@ -53,6 +54,10 @@ class DocumentProcessor:
                         request.jobId,
                         request.filePath,
                     )
+
+            detected_type = detect_contract_type("\n".join(page.text for page in pages))
+            request.contractType = detected_type.value
+            request.contractTypeConfirmed = False
 
             chunk_records = self._chunk_pages_fixed(pages)
             self.vector_store.save_mock_vector_records(request, file_hash, chunk_records)

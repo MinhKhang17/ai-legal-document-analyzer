@@ -17,6 +17,7 @@ import com.analyzer.api.service.knowledge.KnowledgeArchiveService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 
@@ -54,10 +55,9 @@ public class KnowledgeArchiveServiceImpl implements KnowledgeArchiveService {
     }
 
     private boolean syncAiLifecycle(KnowledgeBaseEntry entry, KnowledgeBaseVersion version) {
-        if (aiClient.updateLifecycle(entry.getId(), entry.getId(), false)) {
-            return true;
+        if (!StringUtils.hasText(version.getNeo4jDocumentId())) {
+            return false;
         }
-        return version.getSourceDocument() != null
-                && aiClient.updateLifecycle(entry.getId(), version.getSourceDocument().getId(), false);
+        return aiClient.updateLifecycle(entry.getId(), version.getNeo4jDocumentId().trim(), false);
     }
 }

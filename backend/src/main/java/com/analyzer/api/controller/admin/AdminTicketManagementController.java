@@ -4,6 +4,7 @@ import com.analyzer.api.dto.ApiResponseDTO;
 import com.analyzer.api.dto.PageResponse;
 import com.analyzer.api.dto.legalticket.*;
 import com.analyzer.api.enums.LegalTicketStatus;
+import com.analyzer.api.enums.LegalTicketType;
 import com.analyzer.api.enums.RiskLevel;
 import com.analyzer.api.security.UserDetailsImpl;
 import com.analyzer.api.service.LegalTicketService;
@@ -35,10 +36,11 @@ public class AdminTicketManagementController {
     public ResponseEntity<ApiResponseDTO<PageResponse<LegalTicketResponse>>> viewTickets(
             @RequestParam(value = "status", required = false) LegalTicketStatus status,
             @RequestParam(value = "riskLevel", required = false) RiskLevel riskLevel,
+            @RequestParam(value = "ticketType", required = false) LegalTicketType ticketType,
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "10") int size) {
         return ResponseEntity.ok(ApiResponseDTO.success("Retrieved tickets list successfully",
-                legalTicketService.listAdminTickets(status, riskLevel, page, size)));
+                legalTicketService.listAdminTickets(status, riskLevel, ticketType, page, size)));
     }
 
     @GetMapping("/{id}")
@@ -105,6 +107,22 @@ public class AdminTicketManagementController {
         Long adminId = getCurrentUserId();
         return ResponseEntity.ok(ApiResponseDTO.success("Ticket rejected successfully",
                 legalTicketService.rejectTicket(adminId, ticketId, request)));
+    }
+
+    @PostMapping("/{id}/approve")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponseDTO<LegalTicketResponse>> approveTicket(@PathVariable("id") String ticketId) {
+        return ResponseEntity.ok(ApiResponseDTO.success("Ticket approved",
+                adminTicketManagementService.approveInternal(ticketId, getCurrentUserId())));
+    }
+
+    @PostMapping("/{id}/close")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponseDTO<LegalTicketResponse>> closeTicket(
+            @PathVariable("id") String ticketId,
+            @RequestBody(required = false) java.util.Map<String, String> body) {
+        return ResponseEntity.ok(ApiResponseDTO.success("Ticket closed",
+                adminTicketManagementService.closeInternal(ticketId, getCurrentUserId(), body == null ? null : body.get("note"))));
     }
 
     private Long getCurrentUserId() {

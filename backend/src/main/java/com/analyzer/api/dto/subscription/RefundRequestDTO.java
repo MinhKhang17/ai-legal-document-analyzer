@@ -29,4 +29,11 @@ public class RefundRequestDTO {
     @NotNull
     @Positive
     private BigDecimal amount;
+
+    @Size(max = 200) private String bankName;
+    @Size(max = 100) private String accountNumber;
+    @Size(max = 200) private String accountHolderName;
+    @Size(max = 100) private String transactionId;
+    @Size(max = 100) private String invoiceId;
+    @Size(max = 2000) private String refundReason;
 }

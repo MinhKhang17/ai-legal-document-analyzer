@@ -1,14 +1,11 @@
 import { API_ENDPOINTS } from "../config/api";
 import type {
   ContractGenerationJob,
-  ContractTemplate,
   ContractVersion,
-  CreateContractTemplateRequest,
   GenerateContractRequest,
   PageResponse,
   RevertContractVersionRequest,
   SaveContractRequest,
-  UpdateContractTemplateRequest,
   UserContract,
 } from "../types/contract";
 import { buildAuthHeaders, requestApiData } from "./http";
@@ -46,57 +43,6 @@ const postJson = <TResponse>(
       body: JSON.stringify(payload),
     },
     errorMessage,
-  );
-
-const putJson = <TResponse>(
-  endpoint: string,
-  payload: object,
-  errorMessage: string,
-) =>
-  requestApiData<TResponse>(
-    endpoint,
-    {
-      method: "PUT",
-      headers: buildAuthHeaders(jsonHeaders),
-      credentials: "include",
-      body: JSON.stringify(payload),
-    },
-    errorMessage,
-  );
-
-export const getContractTemplates = async (
-  page = 0,
-  size = 20,
-): Promise<PageResponse<ContractTemplate>> =>
-  getJson<PageResponse<ContractTemplate>>(
-    `${API_ENDPOINTS.contracts.templates}?${buildPageQuery(page, size)}`,
-    "Không thể tải danh sách contract template",
-  );
-
-export const getAllContractTemplates = async (size = 50): Promise<ContractTemplate[]> => {
-  const first = await getContractTemplates(0, size);
-  if (first.totalPages <= 1) return first.items;
-  const remaining = await Promise.all(Array.from({ length: first.totalPages - 1 }, (_, index) => getContractTemplates(index + 1, size)));
-  return [first, ...remaining].flatMap((page) => page.items);
-};
-
-export const createContractTemplate = async (
-  payload: CreateContractTemplateRequest,
-): Promise<ContractTemplate> =>
-  postJson<ContractTemplate>(
-    API_ENDPOINTS.contracts.templates,
-    payload,
-    "Không thể tạo contract template",
-  );
-
-export const updateContractTemplate = async (
-  templateId: number | string,
-  payload: UpdateContractTemplateRequest,
-): Promise<ContractTemplate> =>
-  putJson<ContractTemplate>(
-    API_ENDPOINTS.contracts.templateDetail(templateId),
-    payload,
-    "Không thể cập nhật contract template",
   );
 
 export const generateContract = async (

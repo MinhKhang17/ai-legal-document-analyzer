@@ -11,5 +11,7 @@ public interface KnowledgeBaseEntryRepository extends JpaRepository<KnowledgeBas
 
     Optional<KnowledgeBaseEntry> findByCode(String code);
 
+    Optional<KnowledgeBaseEntry> findFirstByTitleIgnoreCase(String title);
+
     List<KnowledgeBaseEntry> findByCurrentStatus(KnowledgeStatus status);
 }

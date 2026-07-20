@@ -16,7 +16,7 @@ import { createLegalTicket, getMyLegalTickets } from "../../services/legalTicket
 import { getWorkspaceDocuments, getWorkspaces } from "../../services/workspace.service";
 import { useI18n } from "../../hooks/useI18n";
 import { useToast } from "../../hooks/useToast";
-import type { LegalTicket } from "../../types/legalTicket";
+import type { LegalTicket, LegalTicketType } from "../../types/legalTicket";
 import type { LegalTicketFilter } from "../../types/legalTicketStatus";
 import type { Document, Workspace } from "../../types/workspace";
 import {
@@ -77,6 +77,7 @@ export function CustomerTicketsPage() {
   const [ticketWorkspaceId, setTicketWorkspaceId] = useState("");
   const [ticketDocumentId, setTicketDocumentId] = useState("");
   const [ticketQuestion, setTicketQuestion] = useState("");
+  const [ticketType, setTicketType] = useState<LegalTicketType>("CONTACT_EXPERT");
   const [ticketSubmitting, setTicketSubmitting] = useState(false);
   const filterOptions = useMemo(() => getLegalTicketFilterOptions(t), [t]);
 
@@ -202,6 +203,7 @@ export function CustomerTicketsPage() {
 
     try {
       const ticket = await createLegalTicket({
+        ticket_type: ticketType,
         workspace_id: ticketWorkspaceId,
         document_id: ticketDocumentId || null,
         question,
@@ -310,7 +312,15 @@ export function CustomerTicketsPage() {
       />
 
       <Card title={t("legalTickets.createTitle")} subtitle={t("legalTickets.createSubtitle")} className="mb-xl">
-        <div className="grid gap-md lg:grid-cols-[1.2fr_1fr]">
+        <div className="grid gap-md lg:grid-cols-3">
+          <div className="space-y-sm">
+            <label className="label-uppercase" htmlFor="ticket-type">{language === "vi" ? "Lý do" : "Reason"}</label>
+            <select id="ticket-type" className="form-field" value={ticketType} onChange={(event) => setTicketType(event.target.value as LegalTicketType)}>
+              <option value="CONTACT_EXPERT">{language === "vi" ? "Liên hệ chuyên gia" : "Contact expert"}</option>
+              <option value="QUERY_ERROR">{language === "vi" ? "Câu trả lời AI sai/thiếu" : "AI answer issue"}</option>
+              <option value="SYSTEM_ERROR">{language === "vi" ? "Lỗi hệ thống" : "System error"}</option>
+            </select>
+          </div>
           <div className="space-y-sm">
             <label className="label-uppercase" htmlFor="ticket-workspace">
               {t("legalTickets.createWorkspace")}

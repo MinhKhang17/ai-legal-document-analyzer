@@ -16,6 +16,7 @@ import {
 } from "../../services/contract.service";
 import type { ContractVersion, UserContract } from "../../types/contract";
 import { formatDisplayDate } from "../../utils/format";
+import { getSupportedContractTypeLabel } from "../../config/supportedContractTypes";
 
 const getStatusTone = (status?: string) => {
   if (status === "ACTIVE" || status === "GENERATED") return "green";
@@ -161,17 +162,13 @@ export function ContractDetailPage() {
           <main className="space-y-gutter">
             <Card
               title={contract.title}
-              subtitle={contract.contractType}
+              subtitle={getSupportedContractTypeLabel(contract.contractType, language) ?? (language === "vi" ? "Ngoài phạm vi hỗ trợ" : "Outside supported scope")}
               actions={<Badge tone={getStatusTone(contract.status)}>{contract.status}</Badge>}
             >
               <dl className="grid gap-md text-sm md:grid-cols-2">
                 <div>
                   <dt className="label-uppercase">{t("contracts.workspace")}</dt>
                   <dd className="mt-xs">{contract.workspaceId}</dd>
-                </div>
-                <div>
-                  <dt className="label-uppercase">{t("contracts.template")}</dt>
-                  <dd className="mt-xs">{contract.templateId ?? "-"}</dd>
                 </div>
                 <div>
                   <dt className="label-uppercase">{t("contracts.currentVersion")}</dt>

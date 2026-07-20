@@ -160,10 +160,17 @@ def _run_admin_ingest_job(
             filename=filename,
             ingestion_version=2,
         )
+        logger.info(
+            "AI ingest completed jobId=%s aiDocumentId=%s knowledgeBaseId=%s",
+            job_id,
+            result.document_id,
+            knowledge_base_id,
+        )
         callback.post_json(callback_url, {
             "status": "INGESTED",
             "progressPercent": 100,
             "chunkCount": result.total_chunks,
+            "neo4jDocumentId": result.document_id,
             "errorMessage": None,
         })
     except Exception as exc:
@@ -217,6 +224,7 @@ async def ingest_document_v2_async(
         knowledge_base_id=knowledge_base_id,
         ingested_by_user_id=ingested_by_user_id.strip() or "SYSTEM_ADMIN",
     )
+    logger.info("AI ingest accepted jobId=%s knowledgeBaseId=%s", job_id, knowledge_base_id)
     return AsyncIngestAcceptedResponse(jobId=job_id)
 
 

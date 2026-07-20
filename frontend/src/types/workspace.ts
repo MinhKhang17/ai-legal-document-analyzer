@@ -1,4 +1,5 @@
 import type { Status } from "./status";
+import type { SupportedContractType } from "../config/supportedContractTypes";
 
 export interface Workspace {
   workspaceId: string;
@@ -16,6 +17,9 @@ export interface Document {
   fileSize: number;
   status: Status;
   uploadedAt: string;
+  errorMessage?: string | null;
+  contractType?: SupportedContractType | null;
+  contractTypeConfirmed?: boolean;
 }
 
 export interface CreateWorkspaceRequest {

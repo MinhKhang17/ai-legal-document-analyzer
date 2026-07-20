@@ -5,7 +5,6 @@ export interface PageResponse<T> {
   totalItems: number;
   totalPages: number;
 }
-
 export interface UploadKnowledgeRequest {
   code: string;
   title: string;
@@ -13,8 +12,9 @@ export interface UploadKnowledgeRequest {
   scope: "GLOBAL" | "WORKSPACE" | string;
   createdById: number;
   workspaceId?: number | null;
-  extractedContent: string;
+  extractedContent?: string;
   rawContent?: string | null;
+  description?: string | null;
 }
 
 export interface IngestKnowledgeRequest {
@@ -53,6 +53,12 @@ export interface KnowledgeBaseEntry {
   workspaceId: number | null;
   createdAt: string;
   updatedAt: string;
+  description?: string | null;
+  fileName?: string | null;
+  contentType?: string | null;
+  size?: number | null;
+  uploadedAt?: string | null;
+  sourceFileAvailable?: boolean;
 }
 
 export interface KnowledgeBaseVersion {
@@ -69,6 +75,19 @@ export interface KnowledgeBaseVersion {
   ingestedAt?: string | null;
   ingestedById?: number | null;
   errorMessage?: string | null;
+  description?: string | null;
+  fileName?: string | null;
+  contentType?: string | null;
+  size?: number | null;
+  uploadedAt?: string | null;
+  sourceFileAvailable?: boolean;
+  sourceRelativePath?: string | null;
+  sourceFileHash?: string | null;
+  ingestSource?: string | null;
+  neo4jDocumentId?: string | null;
+  chunkCount?: number | null;
+  sourceVersionLabel?: string | null;
+  effectiveDate?: string | null;
   reviewDecision: KnowledgeReviewDecision | null;
   reviewedById: number | null;
   reviewedAt: string | null;
@@ -118,10 +137,4 @@ export interface KnowledgeIngestionJob {
   completedAt: string | null;
   ingestedById?: number | null;
   createdAt: string;
-}
-
-export interface AsyncKnowledgeIngestAccepted {
-  jobId: string;
-  status: "PROCESSING";
-  progressPercent: number;
 }

@@ -40,7 +40,8 @@ _LEGAL_NOT_CONTRACT_KEYWORDS = [
 _OUT_OF_STUDENT_SCOPE_KEYWORDS = [
     "m&a", "sáp nhập", "mua bán doanh nghiệp", "tín dụng ngân hàng",
     "thế chấp", "dự án bất động sản", "chuyển nhượng đất", "hợp đồng quốc tế",
-    "đầu tư lớn", "trái phiếu", "khoản vay ngân hàng",
+    "đầu tư", "trái phiếu", "khoản vay ngân hàng", "bảo hiểm",
+    "hợp đồng thương mại", "tố tụng", "vụ án", "hình sự",
 ]
 _FOREIGN_KEYWORDS = [
     "singapore", "usa", "united states", "nhật", "japan", "hàn quốc",
@@ -98,15 +99,19 @@ def _contains_any(text: str, keywords: list[str]) -> bool:
 def detect_contract_type(question: str) -> ContractType:
     q = _normalize(question)
     if any(key in q for key in ["thuê trọ", "thuê phòng", "thuê nhà", "bên thuê", "bên cho thuê"]):
-        return ContractType.STUDENT_RENTAL
-    if any(key in q for key in ["làm thêm", "thực tập", "intern", "cộng tác viên", "part-time"]):
-        return ContractType.PART_TIME_OR_INTERNSHIP
+        return ContractType.RENTAL
+    if any(key in q for key in ["thực tập", "internship", "intern"]):
+        return ContractType.INTERNSHIP
+    if any(key in q for key in ["cộng tác viên", "collaborator"]):
+        return ContractType.COLLABORATOR
+    if any(key in q for key in ["làm thêm", "bán thời gian", "part-time"]):
+        return ContractType.PART_TIME_EMPLOYMENT
     if any(key in q for key in ["dịch vụ", "freelance", "thiết kế", "viết bài", "gia công nhỏ"]):
-        return ContractType.SMALL_SERVICE_OR_FREELANCE
+        return ContractType.FREELANCE_SERVICE
     if any(key in q for key in ["mua bán", "bán laptop", "bán xe", "tài sản nhỏ", "đặt mua"]):
         return ContractType.SMALL_ASSET_SALE
     if any(key in q for key in ["giấy vay", "vay tiền", "mượn tiền", "cho vay tiền"]):
-        return ContractType.PERSONAL_LOAN_SIMPLE
+        return ContractType.PERSONAL_LOAN
     if _contains_any(q, _OUT_OF_STUDENT_SCOPE_KEYWORDS):
         return ContractType.OUT_OF_STUDENT_SCOPE
     return ContractType.UNKNOWN
@@ -140,11 +145,13 @@ def detect_jurisdiction(question: str) -> Jurisdiction:
 
 def _review_intent_for_contract_type(contract_type: ContractType) -> LegalQueryIntent:
     mapping = {
-        ContractType.STUDENT_RENTAL: LegalQueryIntent.STUDENT_RENTAL_CONTRACT_REVIEW,
-        ContractType.PART_TIME_OR_INTERNSHIP: LegalQueryIntent.PART_TIME_OR_INTERNSHIP_CONTRACT_REVIEW,
-        ContractType.SMALL_SERVICE_OR_FREELANCE: LegalQueryIntent.SMALL_SERVICE_CONTRACT_REVIEW,
+        ContractType.RENTAL: LegalQueryIntent.STUDENT_RENTAL_CONTRACT_REVIEW,
+        ContractType.PART_TIME_EMPLOYMENT: LegalQueryIntent.PART_TIME_OR_INTERNSHIP_CONTRACT_REVIEW,
+        ContractType.INTERNSHIP: LegalQueryIntent.PART_TIME_OR_INTERNSHIP_CONTRACT_REVIEW,
+        ContractType.COLLABORATOR: LegalQueryIntent.PART_TIME_OR_INTERNSHIP_CONTRACT_REVIEW,
+        ContractType.FREELANCE_SERVICE: LegalQueryIntent.SMALL_SERVICE_CONTRACT_REVIEW,
         ContractType.SMALL_ASSET_SALE: LegalQueryIntent.SMALL_SALE_CONTRACT_REVIEW,
-        ContractType.PERSONAL_LOAN_SIMPLE: LegalQueryIntent.PERSONAL_LOAN_NOTE_REVIEW,
+        ContractType.PERSONAL_LOAN: LegalQueryIntent.PERSONAL_LOAN_NOTE_REVIEW,
     }
     return mapping.get(contract_type, LegalQueryIntent.UNDER_SPECIFIED_LEGAL_QUERY)
 

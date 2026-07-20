@@ -13,6 +13,11 @@ import com.analyzer.api.repository.knowledge.KnowledgeBaseEntryRepository;
 import com.analyzer.api.repository.knowledge.KnowledgeBaseVersionRepository;
 import com.analyzer.api.repository.knowledge.KnowledgeIngestionJobRepository;
 import com.analyzer.api.repository.UserRepository;
+import com.analyzer.api.service.knowledge.KnowledgeIngestNotificationService;
+import com.analyzer.api.service.knowledge.event.KnowledgeIngestionDispatchRequested;
+import org.springframework.context.ApplicationEventPublisher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.analyzer.api.service.knowledge.KnowledgeIngestionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -25,10 +30,14 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class KnowledgeIngestionServiceImpl implements KnowledgeIngestionService {
 
+    private static final Logger logger = LoggerFactory.getLogger(KnowledgeIngestionServiceImpl.class);
+
     private final KnowledgeBaseEntryRepository entryRepository;
     private final KnowledgeBaseVersionRepository versionRepository;
     private final KnowledgeIngestionJobRepository jobRepository;
     private final UserRepository userRepository;
+    private final KnowledgeIngestNotificationService notificationService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional
@@ -63,6 +72,7 @@ public class KnowledgeIngestionServiceImpl implements KnowledgeIngestionService 
         job.setStatus(nextStatus);
         if (nextStatus == KnowledgeStatus.INGESTED) {
             LocalDateTime now = LocalDateTime.now();
+            boolean firstSuccessfulCallback = version.getIngestNotifiedAt() == null;
             job.setProgressPercent(100);
             job.setCompletedAt(now);
             job.setErrorMessage(null);
@@ -70,8 +80,26 @@ public class KnowledgeIngestionServiceImpl implements KnowledgeIngestionService 
             version.setIngestStatus(KnowledgeStatus.INGESTED);
             version.setIngestedAt(now);
             version.setIngestedBy(job.getIngestedBy());
+            if (request.getChunkCount() != null) version.setChunkCount(request.getChunkCount());
+            if (request.getNeo4jDocumentId() != null && !request.getNeo4jDocumentId().isBlank()) {
+                version.setNeo4jDocumentId(request.getNeo4jDocumentId().trim());
+                logger.info("AI ingest completed jobId={} aiDocumentId={}", job.getId(), version.getNeo4jDocumentId());
+                logger.info("Stored aiDocumentId in Postgres versionId={} aiDocumentId={}",
+                        version.getId(), version.getNeo4jDocumentId());
+            } else {
+                logger.warn("AI ingest callback completed without aiDocumentId jobId={} versionId={}",
+                        job.getId(), version.getId());
+            }
             version.setErrorMessage(null);
             entry.setCurrentStatus(KnowledgeStatus.INGESTED);
+            if (firstSuccessfulCallback) {
+                version.setIngestNotifiedAt(now);
+                try {
+                    notificationService.notifyFirstSuccessfulIngest(job, entry, version, now);
+                } catch (Exception exception) {
+                    logger.warn("Unable to deliver knowledge ingest notification jobId={}: {}", job.getId(), exception.getMessage());
+                }
+            }
         } else if (nextStatus == KnowledgeStatus.FAILED) {
             String message = request.getErrorMessage() == null ? "Ingest failed" : request.getErrorMessage();
             job.setProgressPercent(100);
@@ -125,6 +153,9 @@ public class KnowledgeIngestionServiceImpl implements KnowledgeIngestionService 
 
         versionRepository.save(version);
         entryRepository.save(entry);
-        return KnowledgeMappingSupport.toJobResponse(jobRepository.save(job));
+        KnowledgeIngestionJob savedJob = jobRepository.save(job);
+        eventPublisher.publishEvent(new KnowledgeIngestionDispatchRequested(
+                knowledgeBaseEntryId, savedJob.getId(), admin == null ? null : admin.getId()));
+        return KnowledgeMappingSupport.toJobResponse(savedJob);
     }
 }

@@ -21,8 +21,8 @@ class _FakeRetrievalService:
     def __init__(self):
         self.document_id = None
 
-    def search_user_chunks(self, question: str, user_id: str, workspace_id: str, top_k: int, document_id: str | None = None):
-        self.document_id = document_id
+    def search_user_chunks(self, question: str, user_id: str, workspace_id: str, top_k: int, document_id: str | None = None, document_ids: list[str] | None = None):
+        self.document_id = document_id or (document_ids[0] if document_ids else None)
         return [
             RagChunkHit(
                 citationId="USER-1",
@@ -99,6 +99,34 @@ class _KnowledgeOnlyRetrievalService(_FakeRetrievalService):
 
 
 class RagQueryTests(unittest.TestCase):
+    def test_llm_preview_mode_returns_exact_prompts_without_calling_llm(self) -> None:
+        llm_client = _CapturingLlmClient()
+        service = RagQueryService(
+            retrieval_service=_FakeRetrievalService(),
+            llm_client=llm_client,
+            llm_enabled=False,
+        )
+
+        response = service.query(
+            RagQueryRequest(
+                requestId="req-preview",
+                userId="user-1",
+                workspaceId="ws-1",
+                chatSessionId="chat-preview",
+                question="Phan tich rui ro hop dong thue nha cua toi",
+            )
+        )
+
+        self.assertFalse(response.llmExecuted)
+        self.assertEqual(response.model, "prompt-preview")
+        self.assertEqual(response.responseStatus, "PROMPT_PREVIEW")
+        self.assertIn("===== SYSTEM PROMPT =====", response.answer)
+        self.assertIn("===== USER PROMPT =====", response.answer)
+        self.assertEqual(response.usage.totalTokens, 0)
+        self.assertEqual(llm_client.user_prompts, [])
+        self.assertTrue(response.systemPromptPreview)
+        self.assertTrue(response.userPromptPreview)
+
     def test_rag_query_service_builds_response(self) -> None:
         retrieval_service = _FakeRetrievalService()
         service = RagQueryService(
@@ -262,7 +290,7 @@ class RagQueryTests(unittest.TestCase):
         )
 
         self.assertEqual(response.intent, "CLAUSE_ANALYSIS")
-        self.assertEqual(response.contractType, "STUDENT_RENTAL")
+        self.assertEqual(response.contractType, "RENTAL")
         self.assertEqual(response.userRole, "PARTY_B")
         self.assertTrue(response.inputComplete)
         self.assertEqual(response.usedKnowledgeCitationIds, ["KB-1"])

@@ -44,6 +44,7 @@ class UserSource:
     content: str
     page: int | None
     section: str | None
+    documentId: str | None = None
 
 
 @dataclass(frozen=True)
@@ -189,6 +190,7 @@ def snapshot_hits(
             sourceType="USER_DOCUMENT",
             score=1.0,
             chunkText=source.content,
+            documentId=source.documentId,
             fileName=source.title,
             pageNumber=source.page,
             sectionTitle=source.section or source.clauseName,
@@ -222,8 +224,14 @@ def merge_snapshot_with_current_hits(
     snapshot: AnalysisSnapshot,
     current_user_hits: list[RagChunkHit],
     current_knowledge_hits: list[RagChunkHit],
+    allowed_document_ids: set[str] | None = None,
 ) -> tuple[list[RagChunkHit], list[RagChunkHit]]:
     snapshot_user_hits, snapshot_knowledge_hits = snapshot_hits(snapshot)
+    if allowed_document_ids is not None:
+        snapshot_user_hits = [
+            hit for hit in snapshot_user_hits
+            if hit.documentId is not None and hit.documentId in allowed_document_ids
+        ]
     return (
         _merge_hits(snapshot_user_hits, current_user_hits, "USER"),
         _merge_hits(snapshot_knowledge_hits, current_knowledge_hits, "KB"),
@@ -258,6 +266,7 @@ def _to_user_source(hit: RagChunkHit) -> UserSource:
     source_type = "contract_clause" if hit.sectionTitle or hit.clauseNumber else "uploaded_document"
     return UserSource(
         id=hit.citationId,
+        documentId=hit.documentId,
         type=source_type,
         title=hit.fileName or hit.title or None,
         clauseName=hit.sectionTitle or hit.clauseNumber,

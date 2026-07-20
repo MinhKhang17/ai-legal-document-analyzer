@@ -39,4 +39,17 @@ public class KnowledgeBaseVersionResponse {
     private String failedReason;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private String description;
+    private String fileName;
+    private String contentType;
+    private Long size;
+    private LocalDateTime uploadedAt;
+    private Boolean sourceFileAvailable;
+    private String sourceRelativePath;
+    private String sourceFileHash;
+    private String ingestSource;
+    private String neo4jDocumentId;
+    private Integer chunkCount;
+    private String sourceVersionLabel;
+    private String effectiveDate;
 }

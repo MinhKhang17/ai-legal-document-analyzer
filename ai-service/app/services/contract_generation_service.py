@@ -6,7 +6,7 @@ import re
 import datetime
 import httpx
 from fastapi import HTTPException
-from app.schemas import RagCitation, RagQueryRequest, RagQueryResponse
+from app.schemas import RagCitation, RagQueryRequest, RagQueryResponse, RagUsage
 from app.services.llm_client import build_default_llm_client
 from app.services.retrieval_service import RetrievalService
 
@@ -38,8 +38,8 @@ def is_contract_generation_intent(question: str) -> bool:
     ]
     contract_keywords = [
         "contract", "agreement", "lease", "tenancy", "rental",
-        "hợp đồng", "thoả thuận", "thuê nhà", "thuê trọ", "thuê văn phòng", "thuê mặt bằng",
-        "lao động", "mua bán", "dịch vụ", "chuyển nhượng", "tặng cho", "vay tiền", "ủy quyền"
+        "hợp đồng", "thoả thuận", "thuê nhà", "thuê trọ", "thuê phòng",
+        "làm thêm", "thực tập", "cộng tác viên", "freelance", "mua bán tài sản cá nhân", "vay tiền cá nhân"
     ]
     
     has_creation = any(kw in question_lower for kw in creation_keywords)
@@ -62,9 +62,11 @@ class ContractGenerationService:
         *,
         retrieval_service: RetrievalService | None = None,
         llm_client: None = None,
+        llm_enabled: bool = True,
     ) -> None:
         self.retrieval_service = retrieval_service or RetrievalService()
         self.llm_client = llm_client or build_default_llm_client()
+        self.llm_enabled = llm_enabled
 
     def generate_contract(self, request: RagQueryRequest) -> RagQueryResponse:
         # Search Neo4j for the Top K relevant legal contract templates
@@ -135,8 +137,9 @@ class ContractGenerationService:
                     user_documents_text += f"User Document Fragment {idx}:\n{hit.chunkText}\n\n"
 
         user_prompt = f"""# ROLE
-You are an experienced legal professional specializing in Vietnamese administrative and legal documents.
-Your responsibility is to generate a document based on legal reference documents retrieved from a knowledge base.
+You are an AI drafting assistant for simple Vietnamese personal civil and employment contracts only.
+You do not replace a lawyer and must not claim guaranteed legality, compliance, or accuracy.
+Infer the simple personal contract structure from the user's request and available document context.
 
 -----------------------------------------------------
 
@@ -195,8 +198,9 @@ Format guidelines for the content inside <noi_dung>:
 - All Vietnamese administrative document rules (margins, font size, layout structure) will be applied during document rendering."""
 
         system_prompt = (
-            "Bạn là chuyên gia định dạng văn bản hành chính và văn bản quy phạm pháp luật Việt Nam.\n"
-            "Nhiệm vụ của bạn là định dạng nội dung thành đúng mẫu văn bản Quyết định của Chính phủ Việt Nam theo Nghị định 30/2020/NĐ-CP.\n\n"
+            "Bạn là trợ lý AI soạn thảo hợp đồng dân sự và lao động cá nhân đơn giản tại Việt Nam.\n"
+            "Bạn không phải luật sư, không thay thế tư vấn pháp lý và không được cam kết tính hợp pháp, tuân thủ hoặc chính xác tuyệt đối.\n"
+            "Tự xác định cấu trúc hợp đồng cá nhân đơn giản từ yêu cầu và tài liệu người dùng cung cấp.\n\n"
             "YÊU CẦU QUAN TRỌNG: Để tránh bộ lọc sao chép (recitation/copyright filter) của API tự động cắt cụt văn bản giữa chừng, bạn TUYỆT ĐỐI KHÔNG sao chép nguyên văn các đoạn dài của tài liệu nguồn. Hãy diễn đạt lại (rephrase) các điều khoản bằng văn phong pháp lý chuyên nghiệp của bạn. Lưu ý: Đối với phần nội dung trong thẻ <noi_dung>, bạn phải giữ lại toàn bộ các điều khoản chi tiết, quyền lợi, nghĩa vụ, điều kiện và các mục pháp lý quan trọng của tài liệu gốc, không được phép lược bỏ hay tóm tắt nội dung chi tiết này.\n\n"
             "YÊU CẦU ĐẶC BIỆT VỀ CẤU TRÚC PHẢN HỒI (RẤT QUAN TRỌNG):\n"
             "Bạn phải trả về phản hồi chính xác dưới cấu trúc sau:\n"
@@ -233,6 +237,46 @@ Format guidelines for the content inside <noi_dung>:
             "</noi_dung>\n"
             "--- KẾT THÚC VÍ DỤ ---"
         )
+
+        # Keep the effective instruction narrowly aligned with the product scope.
+        system_prompt = (
+            "Bạn là trợ lý AI soạn thảo hợp đồng cá nhân đơn giản tại Việt Nam. "
+            "Chỉ xử lý hợp đồng thuê phòng/nhà, lao động bán thời gian, thực tập, cộng tác viên, "
+            "dịch vụ/freelance nhỏ, mua bán tài sản cá nhân nhỏ và vay cá nhân đơn giản. "
+            "Tự nhận diện loại hợp đồng từ yêu cầu; không yêu cầu người dùng chọn loại trước. "
+            "Không phải luật sư; không thay thế tư vấn pháp lý; không cam kết tính hợp pháp, "
+            "tuân thủ hoặc chính xác tuyệt đối. Không tạo văn bản ngoài phạm vi đã xác nhận."
+        )
+
+        if not self.llm_enabled:
+            logger.info("LLM_QUERY_ENABLED=false; returning contract prompt preview for request %s", request.requestId)
+            return RagQueryResponse(
+                requestId=request.requestId,
+                chatSessionId=request.chatSessionId,
+                answer=(
+                    "[LLM PROMPT PREVIEW - PROMPT CHUA DUOC GUI TOI LLM]\n\n"
+                    "===== SYSTEM PROMPT =====\n"
+                    f"{system_prompt}\n\n"
+                    "===== USER PROMPT =====\n"
+                    f"{user_prompt}"
+                ),
+                confidenceScore=None,
+                shouldSuggestTicket=False,
+                suggestionType="NONE",
+                suggestionReason="LLM preview mode is enabled.",
+                missingInformation=None,
+                riskLevel="NONE",
+                legalDomain="Contract Law",
+                userActionHint="CONTINUE_CHAT",
+                citations=[],
+                retrievedUserChunks=len(user_hits),
+                retrievedKnowledgeChunks=len(retrieved_chunks),
+                model="prompt-preview",
+                usage=RagUsage(promptTokens=0, completionTokens=0, totalTokens=0),
+                llmExecuted=False,
+                systemPromptPreview=system_prompt,
+                userPromptPreview=user_prompt,
+            )
 
         # Call LLM to generate contract
         llm_result = self.llm_client.generate(system_prompt=system_prompt, user_prompt=user_prompt)
@@ -1037,4 +1081,5 @@ Format guidelines for the content inside <noi_dung>:
             citations=citations,
             retrievedUserChunks=len(user_hits),
             retrievedKnowledgeChunks=len(retrieved_chunks),
+            llmExecuted=True,
         )
