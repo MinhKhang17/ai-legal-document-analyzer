@@ -9,6 +9,7 @@ import {
 } from "react";
 import {
   getCurrentUser,
+  isAuthRequestError,
   isAuthUnauthorizedError,
   logout as requestLogout,
   refreshAccessToken,
@@ -28,6 +29,7 @@ interface AppStoreValue {
   isAuthenticated: boolean;
   isAuthLoading: boolean;
   isAuthReady: boolean;
+  authRecoveryError: boolean;
   user: CurrentUser | null;
   setTheme: (theme: ThemeMode) => void;
   setLanguage: (language: Language) => void;
@@ -35,6 +37,7 @@ interface AppStoreValue {
   setMobileSidebarOpen: (open: boolean) => void;
   signIn: (accessToken?: string, user?: CurrentUser) => void;
   signOut: (options?: SignOutOptions) => Promise<void>;
+  retryAuthRecovery: () => Promise<void>;
 }
 
 interface SignOutOptions {
@@ -113,6 +116,43 @@ const isCurrentUser = (value: unknown): value is CurrentUser => {
   );
 };
 
+const REFRESH_CREDENTIAL_REJECTION_MESSAGES = [
+  "refresh token không tìm thấy trong cookie",
+  "refresh token không hợp lệ",
+  "refresh token đã bị thu hồi",
+  "refresh token đã hết hạn",
+] as const;
+
+const isRefreshCredentialRejectedError = (error: unknown): boolean => {
+  if (isAuthUnauthorizedError(error)) return true;
+  if (!isAuthRequestError(error) || error.status !== 400) return false;
+
+  const responseText = [
+    error.details?.message,
+    error.details?.error,
+    error.rawText,
+  ]
+    .filter((value): value is string => typeof value === "string")
+    .join(" ")
+    .toLocaleLowerCase("vi");
+
+  return REFRESH_CREDENTIAL_REJECTION_MESSAGES.some((message) =>
+    responseText.includes(message),
+  );
+};
+
+let refreshRequest: ReturnType<typeof refreshAccessToken> | undefined;
+
+const refreshAccessTokenSingleFlight = (): ReturnType<typeof refreshAccessToken> => {
+  if (!refreshRequest) {
+    refreshRequest = refreshAccessToken().finally(() => {
+      refreshRequest = undefined;
+    });
+  }
+
+  return refreshRequest;
+};
+
 const AppStoreContext = createContext<AppStoreValue | undefined>(undefined);
 
 export function AppStoreProvider({ children }: { children: ReactNode }) {
@@ -147,6 +187,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
   const [isAuthReady, setIsAuthReady] = useState<boolean>(false);
+  const [authRecoveryError, setAuthRecoveryError] = useState(false);
   const [user, setUser] = useState<CurrentUser | null>(() => parseStoredUser());
 
   useEffect(() => {
@@ -188,21 +229,31 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   };
 
   const clearAuthState = () => {
+    clearAccessToken();
+
     if (typeof window === "undefined") {
       setIsAuthenticated(false);
       setUser(null);
       setIsAuthLoading(false);
       setIsAuthReady(true);
+      setAuthRecoveryError(false);
       return;
     }
 
-    clearAccessToken();
     window.localStorage.removeItem(STORAGE_KEYS.user);
 
     setIsAuthenticated(false);
     setUser(null);
     setIsAuthLoading(false);
     setIsAuthReady(true);
+    setAuthRecoveryError(false);
+  };
+
+  const markAuthRecoveryUnavailable = () => {
+    setIsAuthenticated(false);
+    setIsAuthLoading(false);
+    setIsAuthReady(true);
+    setAuthRecoveryError(true);
   };
 
   const hydrateAuthState = (accessToken: string, nextUser: CurrentUser) => {
@@ -217,6 +268,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     setIsAuthenticated(true);
     setIsAuthLoading(false);
     setIsAuthReady(true);
+    setAuthRecoveryError(false);
   };
 
   const refreshSession = useCallback(async (): Promise<void> => {
@@ -227,6 +279,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     }
 
     setIsAuthLoading(true);
+    setAuthRecoveryError(false);
 
     try {
       const storedToken = migrateLegacyAccessToken();
@@ -234,34 +287,41 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       if (storedToken) try {
         const response = await getCurrentUser(storedToken);
         if (!isCurrentUser(response.data)) {
-          clearAuthState();
+          markAuthRecoveryUnavailable();
           return;
         }
         hydrateAuthState(storedToken, response.data);
         return;
       } catch (error) {
         if (!isAuthUnauthorizedError(error)) {
-          clearAuthState();
+          markAuthRecoveryUnavailable();
           return;
         }
+
+        clearAccessToken();
       }
 
-      const refreshResponse = await refreshAccessToken();
+      const refreshResponse = await refreshAccessTokenSingleFlight();
       const refreshedToken = refreshResponse.data?.accessToken;
 
       if (typeof refreshedToken !== "string" || refreshedToken.trim().length === 0) {
-        clearAuthState();
+        markAuthRecoveryUnavailable();
         return;
       }
 
+      setAccessToken(refreshedToken);
       const response = await getCurrentUser(refreshedToken);
       if (!isCurrentUser(response.data)) {
-        clearAuthState();
+        markAuthRecoveryUnavailable();
         return;
       }
       hydrateAuthState(refreshedToken, response.data);
-    } catch {
-      clearAuthState();
+    } catch (error) {
+      if (isRefreshCredentialRejectedError(error)) {
+        clearAuthState();
+      } else {
+        markAuthRecoveryUnavailable();
+      }
     } finally {
       setIsAuthLoading(false);
       setIsAuthReady(true);
@@ -313,6 +373,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       isAuthenticated,
       isAuthLoading,
       isAuthReady,
+      authRecoveryError,
       user,
       setTheme,
       setLanguage,
@@ -320,6 +381,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       setMobileSidebarOpen,
       signIn,
       signOut,
+      retryAuthRecovery: refreshSession,
     }),
     [
       theme,
@@ -330,7 +392,9 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       isAuthenticated,
       isAuthLoading,
       isAuthReady,
+      authRecoveryError,
       user,
+      refreshSession,
     ],
   );
 
