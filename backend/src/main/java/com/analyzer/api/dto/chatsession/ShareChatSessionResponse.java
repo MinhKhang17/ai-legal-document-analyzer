@@ -26,4 +26,8 @@ public class ShareChatSessionResponse {
 
     @Schema(description = "Timestamp the session was first shared")
     private LocalDateTime sharedAt;
+
+    private com.analyzer.api.enums.ShareAccessLevel accessLevel;
+
+    private boolean authenticationRequired;
 }

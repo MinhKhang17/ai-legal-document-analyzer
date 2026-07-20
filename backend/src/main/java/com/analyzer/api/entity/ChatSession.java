@@ -90,6 +90,11 @@ public class ChatSession {
     @Column(name = "shared_at")
     private LocalDateTime sharedAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "share_access_level", nullable = false)
+    @Builder.Default
+    private com.analyzer.api.enums.ShareAccessLevel shareAccessLevel = com.analyzer.api.enums.ShareAccessLevel.RESTRICTED;
+
     @Column(name = "last_message_at")
     private LocalDateTime lastMessageAt;
 

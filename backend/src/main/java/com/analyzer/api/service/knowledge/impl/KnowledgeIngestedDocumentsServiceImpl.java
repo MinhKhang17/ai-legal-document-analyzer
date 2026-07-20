@@ -176,7 +176,57 @@ public class KnowledgeIngestedDocumentsServiceImpl implements KnowledgeIngestedD
                 .publishedAt(version.getPublishedAt())
                 .ingestedById(version.getIngestedBy() == null ? null : version.getIngestedBy().getId())
                 .errorMessage(version.getErrorMessage() != null ? version.getErrorMessage() : version.getFailedReason())
+                .originalFileName(version.getOriginalFileName())
+                .ingestSource(version.getIngestSource())
+                .createdAt(version.getCreatedAt())
                 .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<KnowledgeBaseIngestedDocumentResponse> searchIngestedDocuments(
+            String title, String category, Integer versionNo, String source, String status,
+            LocalDateTime createdFrom, LocalDateTime createdTo, int page, int size) {
+        List<KnowledgeBaseIngestedDocumentResponse> matches = versionRepository.findAll().stream()
+                .filter(version -> matchesGlobalFilters(version, title, category, versionNo, source, status,
+                        createdFrom, createdTo))
+                .sorted(Comparator.comparing(KnowledgeBaseVersion::getCreatedAt,
+                        Comparator.nullsLast(Comparator.reverseOrder())))
+                .map(version -> KnowledgeBaseIngestedDocumentResponse.builder()
+                        .legalDocumentId(version.getKnowledgeBaseEntry().getId())
+                        .title(version.getKnowledgeBaseEntry().getTitle())
+                        .documentCode(version.getKnowledgeBaseEntry().getCode())
+                        .versions(List.of(toVersionResponse(version, Map.of())))
+                        .build())
+                .toList();
+        int totalItems = matches.size();
+        int fromIndex = Math.min(page * size, totalItems);
+        int toIndex = Math.min(fromIndex + size, totalItems);
+        int totalPages = totalItems == 0 ? 0 : (int) Math.ceil((double) totalItems / size);
+        return PageResponse.<KnowledgeBaseIngestedDocumentResponse>builder()
+                .items(fromIndex >= toIndex ? List.of() : matches.subList(fromIndex, toIndex))
+                .page(page).size(size).totalItems(totalItems).totalPages(totalPages).build();
+    }
+
+    private boolean matchesGlobalFilters(KnowledgeBaseVersion version, String title, String category,
+                                         Integer versionNo, String source, String status,
+                                         LocalDateTime createdFrom, LocalDateTime createdTo) {
+        KnowledgeBaseEntry entry = version.getKnowledgeBaseEntry();
+        if (StringUtils.hasText(title) && !contains(entry.getTitle(), title.trim().toLowerCase(Locale.ROOT))) return false;
+        if (StringUtils.hasText(category) && !category.trim().equalsIgnoreCase(entry.getCategory())) return false;
+        if (versionNo != null && !versionNo.equals(version.getVersionNo())) return false;
+        if (StringUtils.hasText(status)) {
+            String actual = version.getIngestStatus() != null ? version.getIngestStatus().name() : version.getStatus().name();
+            if (!status.trim().equalsIgnoreCase(actual)) return false;
+        }
+        if (StringUtils.hasText(source)) {
+            String keyword = source.trim().toLowerCase(Locale.ROOT);
+            if (!contains(version.getOriginalFileName(), keyword)
+                    && !contains(version.getIngestSource(), keyword)
+                    && !contains(version.getSourceRelativePath(), keyword)) return false;
+        }
+        if (createdFrom != null && (version.getCreatedAt() == null || version.getCreatedAt().isBefore(createdFrom))) return false;
+        return createdTo == null || (version.getCreatedAt() != null && !version.getCreatedAt().isAfter(createdTo));
     }
 
     private String resolveIngestStatus(KnowledgeBaseVersion version, AiDocumentSnapshot aiSnapshot) {

@@ -12,4 +12,8 @@ public interface KnowledgeIngestedDocumentsService {
             String visibility,
             int page,
             int size);
+
+    PageResponse<KnowledgeBaseIngestedDocumentResponse> searchIngestedDocuments(
+            String title, String category, Integer version, String source, String status,
+            java.time.LocalDateTime createdFrom, java.time.LocalDateTime createdTo, int page, int size);
 }

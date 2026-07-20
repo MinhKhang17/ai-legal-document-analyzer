@@ -28,4 +28,7 @@ public class KnowledgeBaseIngestedDocumentVersionResponse {
     private LocalDateTime publishedAt;
     private Long ingestedById;
     private String errorMessage;
+    private String originalFileName;
+    private String ingestSource;
+    private LocalDateTime createdAt;
 }
