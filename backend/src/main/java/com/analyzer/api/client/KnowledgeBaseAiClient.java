@@ -10,6 +10,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -29,6 +30,38 @@ public class KnowledgeBaseAiClient {
 
     @Value("${app.ai-service.base-url:http://localhost:8000}")
     private String aiServiceBaseUrl;
+
+    public void submitIngest(
+            Resource sourceFile,
+            String title,
+            String jobId,
+            String callbackUrl,
+            String knowledgeBaseId,
+            Long ingestedByUserId) {
+        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+        body.add("file", sourceFile);
+        body.add("title", title);
+        body.add("job_id", jobId);
+        body.add("callback_url", callbackUrl);
+        body.add("knowledge_base_id", knowledgeBaseId);
+        body.add("ingested_by_user_id", ingestedByUserId == null ? "SYSTEM_ADMIN" : String.valueOf(ingestedByUserId));
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+        headers.setAccept(java.util.List.of(MediaType.APPLICATION_JSON));
+
+        ResponseEntity<String> response = restTemplate.exchange(
+                URI.create(aiServiceBaseUrl + "/api/knowledge/ingest-v2/async"),
+                org.springframework.http.HttpMethod.POST,
+                new HttpEntity<>(body, headers),
+                String.class
+        );
+        if (!response.getStatusCode().is2xxSuccessful()) {
+            throw new IllegalStateException(
+                    "AI knowledge ingest rejected. status=" + response.getStatusCode().value()
+                            + ", body=" + response.getBody());
+        }
+    }
 
     public PageResponse<KnowledgeBaseIngestedDocumentResponse> getIngestedDocuments(
             String kbId,
@@ -68,6 +101,7 @@ public class KnowledgeBaseAiClient {
     }
 
     public boolean updateLifecycle(String kbId, String documentId, boolean makePublic) {
+        log.info("Lifecycle sync target kbId={} aiDocumentId={} public={}", kbId, documentId, makePublic);
         try {
             URI uri = UriComponentsBuilder.fromUriString(aiServiceBaseUrl)
                     .path("/ai/admin/knowledge-bases/{kbId}/ingested-documents/{documentId}/lifecycle")
@@ -81,9 +115,12 @@ public class KnowledgeBaseAiClient {
                     new HttpEntity<>(Map.of("public", makePublic), headers),
                     String.class
             );
-            return response.getStatusCode().is2xxSuccessful();
+            boolean succeeded = response.getStatusCode().is2xxSuccessful();
+            log.info("Lifecycle sync {} kbId={} aiDocumentId={} status={}",
+                    succeeded ? "success" : "failure", kbId, documentId, response.getStatusCode().value());
+            return succeeded;
         } catch (RestClientException ex) {
-            log.warn("Unable to update AI KB lifecycle kbId={} documentId={}: {}", kbId, documentId, ex.getMessage());
+            log.warn("Lifecycle sync failure kbId={} aiDocumentId={}: {}", kbId, documentId, ex.getMessage());
             return false;
         }
     }

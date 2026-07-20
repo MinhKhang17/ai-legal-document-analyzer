@@ -86,6 +86,8 @@ export const API_ENDPOINTS = {
       fillPathParams(fromEnvOrDefault("VITE_CHAT_SESSION_SHARE_API", "/api/v1/chat-sessions/:chatSessionId/share"), { chatSessionId }),
     shared: (shareToken: string) =>
       fillPathParams(fromEnvOrDefault("VITE_SHARED_CHAT_API", "/api/v1/shared/chat/:shareToken"), { shareToken }),
+    exportMarkdown: (chatSessionId: string) =>
+      fillPathParams(fromEnvOrDefault("VITE_CHAT_SESSION_MARKDOWN_EXPORT_API", "/api/v1/chat-sessions/:chatSessionId/export/markdown"), { chatSessionId }),
   },
 
   subscription: {
@@ -309,10 +311,6 @@ export const API_ENDPOINTS = {
     importV2: fromEnv("VITE_AI_RISK_KNOWLEDGE_IMPORT_V2_API"),
     query: fromEnv("VITE_AI_RISK_KNOWLEDGE_QUERY_API"),
     queryV2: fromEnv("VITE_AI_RISK_KNOWLEDGE_QUERY_V2_API"),
-  },
-
-  aiKnowledge: {
-    ingestV2: fromEnvOrDefault("VITE_AI_KNOWLEDGE_INGEST_V2_API", "/api/knowledge/ingest-v2/async"),
   },
 
   aiContracts: {

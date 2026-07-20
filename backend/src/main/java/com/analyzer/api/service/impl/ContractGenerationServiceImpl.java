@@ -74,7 +74,6 @@ public class ContractGenerationServiceImpl implements ContractGenerationService 
             template = templateRepository.findById(request.getTemplateId())
                     .orElseThrow(() -> new RuntimeException("Contract template not found with id: " + request.getTemplateId()));
         }
-
         Document sourceDocument = null;
         if (request.getSourceDocumentId() != null) {
             sourceDocument = documentRepository.findById(request.getSourceDocumentId())
@@ -123,7 +122,6 @@ public class ContractGenerationServiceImpl implements ContractGenerationService 
             String contractId = "contract_" + UUID.randomUUID().toString().replace("-", "");
             String title = template != null ? "Hợp đồng - " + template.getName() : "Hợp đồng thuê nhà";
             String contractType = template != null ? template.getCategory() : "LEASE";
-
             UserContract contract = UserContract.builder()
                     .id(contractId)
                     .owner(requester)

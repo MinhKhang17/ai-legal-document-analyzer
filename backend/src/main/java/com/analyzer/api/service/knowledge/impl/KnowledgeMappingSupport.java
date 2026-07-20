@@ -60,6 +60,13 @@ final class KnowledgeMappingSupport {
                 .size(version.getSourceFileSize())
                 .uploadedAt(version.getSourceUploadedAt())
                 .sourceFileAvailable(version.getSourceStoragePath() != null)
+                .sourceRelativePath(version.getSourceRelativePath())
+                .sourceFileHash(version.getSourceFileHash())
+                .ingestSource(version.getIngestSource())
+                .neo4jDocumentId(version.getNeo4jDocumentId())
+                .chunkCount(version.getChunkCount())
+                .sourceVersionLabel(version.getSourceVersionLabel())
+                .effectiveDate(version.getEffectiveDate())
                 .build();
     }
 

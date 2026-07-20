@@ -13,6 +13,7 @@ import com.analyzer.api.dto.chatsession.ChatSessionResponse;
 import com.analyzer.api.entity.ChatMessage;
 import com.analyzer.api.entity.ChatMessageFeedback;
 import com.analyzer.api.entity.ChatSession;
+import com.analyzer.api.entity.ChatSessionDocument;
 import com.analyzer.api.entity.AiCitation;
 import com.analyzer.api.entity.Document;
 import com.analyzer.api.entity.User;
@@ -110,6 +111,8 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                 workspaceId, userId, ChatSessionStatus.ACTIVE)
                 .orElseGet(() -> createDefaultChatSession(workspace));
 
+        ensureAttachedDocumentsReady(chatSession, userId);
+
         // Create User Message
         ChatMessage userMessage = createAndSaveUserMessage(chatSession, request.getMessage().trim());
 
@@ -149,6 +152,8 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         // No attached document means system-KB-only mode. An explicit document ID is
         // still validated to preserve compatibility with older API clients.
         Document selectedDocument = resolveSelectedDocument(userId, workspace.getId(), request.getDocumentId());
+
+        ensureAttachedDocumentsReady(chatSession, userId);
 
         // Create User Message
         ChatMessage userMessage = createAndSaveUserMessage(chatSession, request.getMessage().trim());
@@ -338,8 +343,38 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                     1,
                     0);
         }
-
         return document;
+    }
+
+    private void ensureAttachedDocumentsReady(ChatSession chatSession, Long userId) {
+        List<ChatSessionDocument> activeMappings = chatSessionDocumentRepository
+                .findByChatSessionIdAndUserIdAndActiveTrueOrderByAttachedAtAsc(chatSession.getId(), userId);
+        ensureAttachedDocumentsReady(activeMappings, chatSession.getWorkspace().getId());
+    }
+
+    static void ensureAttachedDocumentsReady(List<ChatSessionDocument> activeMappings, String workspaceId) {
+        if (activeMappings.isEmpty()) {
+            return;
+        }
+
+        long readyCount = activeMappings.stream()
+                .map(ChatSessionDocument::getDocument)
+                .filter(document -> "READY".equalsIgnoreCase(document.getStatus()))
+                .count();
+        if (readyCount == activeMappings.size()) {
+            return;
+        }
+
+        boolean hasFailedDocument = activeMappings.stream()
+                .map(ChatSessionDocument::getDocument)
+                .anyMatch(document -> "FAILED".equalsIgnoreCase(document.getStatus()));
+        throw new NoReadyDocumentsException(
+                hasFailedDocument
+                        ? "An attached document failed processing. Remove it or upload it again before chatting"
+                        : "Attached documents are still processing. Please wait until all attached documents are ready",
+                workspaceId,
+                readyCount,
+                activeMappings.size() - readyCount);
     }
 
     private ChatSession createDefaultChatSession(Workspace workspace) {
@@ -395,17 +430,12 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         try {
             var activeMappings = chatSessionDocumentRepository
                     .findByChatSessionIdAndUserIdAndActiveTrueOrderByAttachedAtAsc(chatSession.getId(), currentUser.getId());
+            ensureAttachedDocumentsReady(activeMappings, workspace.getId());
             List<String> attachedDocumentIds = activeMappings.stream()
                     .map(mapping -> mapping.getDocument())
-                    .filter(document -> "READY".equalsIgnoreCase(document.getStatus()))
                     .map(Document::getId)
                     .distinct()
                     .toList();
-            if (!activeMappings.isEmpty() && attachedDocumentIds.isEmpty()) {
-                throw new NoReadyDocumentsException(
-                        "Attached documents are still processing",
-                        workspace.getId(), 0, activeMappings.size());
-            }
             List<String> messageAttachedDocumentIds = resolveMessageAttachedDocumentIds(
                     currentUser.getId(), workspace.getId(), sendRequest.getMessageAttachedDocumentIds());
             String focusedDocumentId = resolveFocusedDocumentId(

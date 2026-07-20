@@ -18,6 +18,7 @@ import com.analyzer.api.service.knowledge.KnowledgePublicationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 
@@ -41,9 +42,9 @@ public class KnowledgePublicationServiceImpl implements KnowledgePublicationServ
             throw new ConflictException("Knowledge version chua duoc approve de publish");
         }
         User publisher = userRepository.findById(entry.getCreatedBy().getId()).orElse(entry.getCreatedBy());
-        // Best-effort for legacy records that predate knowledge_base_id metadata.
-        // Retrieval remains fail-closed because unsynchronized chunks stay private/inactive.
-        syncAiLifecycle(entry, version, true);
+        if (!syncAiLifecycle(entry, version, true)) {
+            throw new ConflictException("Khong the publish: AI document ID khong ton tai hoac lifecycle sync that bai");
+        }
         version.setStatus(KnowledgeStatus.PUBLIC);
         version.setPublishedBy(publisher);
         version.setPublishedAt(LocalDateTime.now());
@@ -80,10 +81,9 @@ public class KnowledgePublicationServiceImpl implements KnowledgePublicationServ
     }
 
     private boolean syncAiLifecycle(KnowledgeBaseEntry entry, KnowledgeBaseVersion version, boolean makePublic) {
-        if (aiClient.updateLifecycle(entry.getId(), entry.getId(), makePublic)) {
-            return true;
+        if (!StringUtils.hasText(version.getNeo4jDocumentId())) {
+            return false;
         }
-        return version.getSourceDocument() != null
-                && aiClient.updateLifecycle(entry.getId(), version.getSourceDocument().getId(), makePublic);
+        return aiClient.updateLifecycle(entry.getId(), version.getNeo4jDocumentId().trim(), makePublic);
     }
 }

@@ -20,6 +20,7 @@ import {
   getChatSessionDocuments,
   attachChatSessionDocument,
   detachChatSessionDocument,
+  exportChatSessionMarkdown,
 } from "../../api/chatApi";
 import { getChatMessageAiCitations } from "../../api/aiFeatureApi";
 import { createLegalTicket } from "../../api/legalTicketApi";
@@ -36,6 +37,7 @@ import type { WorkspaceChatMessage, WorkspaceChatSession } from "../../types/cha
 import type { AiCitation } from "../../types/aiFeature";
 import { formatDisplayDateTime } from "../../utils/format";
 import { simulateStreaming } from "../../utils/simulateStreaming";
+import { supportedContractScopeText } from "../../config/supportedContractTypes";
 
 import { getAccessToken as getSessionAccessToken } from "../../services/authSession";
 const getAccessToken = () => getSessionAccessToken() ?? "";
@@ -90,6 +92,44 @@ const createOptimisticUserMessage = (
   status: "completed",
 });
 
+const normalizedDocumentStatus = (status?: string) => (status ?? "").trim().toUpperCase();
+const isDocumentReady = (status?: string) => normalizedDocumentStatus(status) === "READY";
+const isDocumentFailed = (status?: string) => normalizedDocumentStatus(status) === "FAILED";
+
+function DocumentProcessingProgress({ status, language }: { status?: string; language: "en" | "vi" }) {
+  if (isDocumentReady(status)) {
+    return (
+      <div className="mt-xs" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={100}>
+        <div className="h-1.5 overflow-hidden rounded-full bg-emerald-100 dark:bg-emerald-950/50">
+          <div className="h-full w-full rounded-full bg-emerald-500" />
+        </div>
+        <p className="mt-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+          {language === "vi" ? "Đã xử lý xong" : "Processing complete"}
+        </p>
+      </div>
+    );
+  }
+
+  if (isDocumentFailed(status)) {
+    return (
+      <p className="mt-xs text-[11px] font-medium text-error">
+        {language === "vi" ? "Xử lý thất bại — hãy bỏ file hoặc upload lại." : "Processing failed — remove or upload the file again."}
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-xs" role="progressbar" aria-label={language === "vi" ? "Tài liệu đang được xử lý" : "Document is processing"}>
+      <div className="h-1.5 overflow-hidden rounded-full bg-amber-100 dark:bg-amber-950/50">
+        <div className="h-full w-2/3 animate-pulse rounded-full bg-amber-500" />
+      </div>
+      <p className="mt-1 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+        {language === "vi" ? "AI đang xử lý, bạn có thể rời trang." : "AI is processing; you may leave this page."}
+      </p>
+    </div>
+  );
+}
+
 type DisplayMessage = ChatMessage;
 
 export function LegalChatPage() {
@@ -129,6 +169,7 @@ export function LegalChatPage() {
   const [messageDetail, setMessageDetail] = useState<WorkspaceChatMessage | null>(null);
   const [messageDetailLoading, setMessageDetailLoading] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [exportingMarkdown, setExportingMarkdown] = useState(false);
   const [shareUrl, setShareUrl] = useState("");
   const [attachedDocuments, setAttachedDocuments] = useState<ChatSessionDocument[]>([]);
   const [documentModalOpen, setDocumentModalOpen] = useState(false);
@@ -166,6 +207,18 @@ export function LegalChatPage() {
     () => chatSessions.find((session) => session.chatSessionId === selectedSessionId),
     [chatSessions, selectedSessionId],
   );
+  const canExportMarkdown = Boolean(selectedSessionId) && messages.some(
+    (message) => message.role === "assistant" && message.status === "completed" && message.content.trim(),
+  );
+  const unavailableAttachedDocuments = useMemo(
+    () => attachedDocuments.filter((document) => !isDocumentReady(document.uploadStatus)),
+    [attachedDocuments],
+  );
+  const failedAttachedDocuments = useMemo(
+    () => unavailableAttachedDocuments.filter((document) => isDocumentFailed(document.uploadStatus)),
+    [unavailableAttachedDocuments],
+  );
+  const chatBlockedByAttachedDocuments = unavailableAttachedDocuments.length > 0;
 
   useEffect(() => {
     let active = true;
@@ -320,7 +373,7 @@ export function LegalChatPage() {
         const items = await getChatSessionDocuments(getAccessToken(), selectedSessionId);
         if (!active) return;
         setAttachedDocuments(items);
-        if (items.some((item) => !["READY", "FAILED"].includes(item.uploadStatus.toUpperCase()))) {
+        if (items.some((item) => !["READY", "FAILED"].includes(normalizedDocumentStatus(item.uploadStatus)))) {
           timer = setTimeout(loadAttached, 3000);
         }
       } catch (err) {
@@ -679,6 +732,15 @@ export function LegalChatPage() {
       return;
     }
 
+    if (chatBlockedByAttachedDocuments) {
+      const message = failedAttachedDocuments.length > 0
+        ? (language === "vi" ? "Có tài liệu đính kèm xử lý thất bại. Hãy bỏ tài liệu đó hoặc upload lại trước khi chat." : "An attached document failed processing. Remove it or upload it again before chatting.")
+        : (language === "vi" ? "Vui lòng đợi tất cả tài liệu đính kèm xử lý xong trước khi chat." : "Please wait until all attached documents finish processing before chatting.");
+      setError(message);
+      toast.error(message);
+      return;
+    }
+
     const optimisticUserMessage = createOptimisticUserMessage(question, language, t("common.justNow"));
     const assistantMessageId = `local-assistant-${Date.now()}`;
     const controller = new AbortController();
@@ -786,6 +848,27 @@ export function LegalChatPage() {
         subtitle={`${language === "vi" ? "Dự án" : "Workspace"}: ${selectedWorkspace?.name ?? "—"}`}
         actions={
           <>
+            {selectedSessionId && (
+              <Button
+                variant="secondary"
+                leftIcon={<Download className="h-4 w-4" />}
+                disabled={!canExportMarkdown || exportingMarkdown}
+                title={!canExportMarkdown ? (language === "vi" ? "Phiên chưa có kết quả phân tích để xuất" : "No analysis content to export") : undefined}
+                onClick={async () => {
+                  setExportingMarkdown(true);
+                  try {
+                    await exportChatSessionMarkdown(getAccessToken(), selectedSessionId);
+                    toast.success(language === "vi" ? "Đã tải bản phân tích Markdown." : "Markdown analysis downloaded.");
+                  } catch (exportError) {
+                    toast.error(exportError instanceof Error ? exportError.message : "Unable to export Markdown.");
+                  } finally {
+                    setExportingMarkdown(false);
+                  }
+                }}
+              >
+                {exportingMarkdown ? (language === "vi" ? "Đang xuất…" : "Exporting…") : "Export Markdown"}
+              </Button>
+            )}
             {selectedSessionId && (
               <Button
                 variant="secondary"
@@ -937,6 +1020,7 @@ export function LegalChatPage() {
                       <Badge tone={document.uploadStatus.toUpperCase() === "READY" ? "green" : document.uploadStatus.toUpperCase() === "FAILED" ? "red" : "amber"}>{document.uploadStatus}</Badge>
                       <Button size="sm" variant="danger" leftIcon={<Trash2 className="h-4 w-4" />} disabled={documentActionBusy} onClick={() => void handleDetachDocument(document.documentId)}>{language === "vi" ? "Bỏ tài liệu" : "Remove document"}</Button>
                     </div>
+                    <DocumentProcessingProgress status={document.uploadStatus} language={language} />
                   </article>
                 ))
               )}
@@ -1079,15 +1163,18 @@ export function LegalChatPage() {
               </div>
               <div className="flex gap-sm overflow-x-auto pb-xs">
                 {attachedDocuments.map((document) => (
-                  <div key={document.documentId} className="flex min-w-[220px] max-w-[280px] flex-1 items-center gap-sm rounded-xl border border-legal-border bg-surface-container-low p-sm dark:border-slate-700 dark:bg-slate-800">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-50 text-error dark:bg-red-950/40"><FileText className="h-5 w-5" /></div>
-                    <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold" title={document.originalFileName}>{document.originalFileName}</p><p className="text-xs text-on-surface-variant">{(document.size / 1024 / 1024).toFixed(2)} MB</p></div>
-                    <button type="button" className="rounded-md p-xs text-on-surface-variant hover:bg-surface-container-high hover:text-error" aria-label="Detach document" disabled={documentActionBusy} onClick={() => void handleDetachDocument(document.documentId)}><X className="h-4 w-4" /></button>
+                  <div key={document.documentId} className="min-w-[240px] max-w-[300px] flex-1 rounded-xl border border-legal-border bg-surface-container-low p-sm dark:border-slate-700 dark:bg-slate-800">
+                    <div className="flex items-center gap-sm">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-50 text-error dark:bg-red-950/40"><FileText className="h-5 w-5" /></div>
+                      <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold" title={document.originalFileName}>{document.originalFileName}</p><p className="text-xs text-on-surface-variant">{(document.size / 1024 / 1024).toFixed(2)} MB</p></div>
+                      <button type="button" className="rounded-md p-xs text-on-surface-variant hover:bg-surface-container-high hover:text-error" aria-label="Detach document" disabled={documentActionBusy} onClick={() => void handleDetachDocument(document.documentId)}><X className="h-4 w-4" /></button>
+                    </div>
+                    <DocumentProcessingProgress status={document.uploadStatus} language={language} />
                   </div>
                 ))}
                 <button type="button" onClick={() => void handleOpenDocumentModal()} disabled={!selectedWorkspaceId || openingDocumentModal} className="flex min-h-16 shrink-0 items-center justify-center gap-sm rounded-xl border border-dashed border-primary/40 bg-primary/5 px-md text-sm font-semibold text-primary transition hover:bg-primary/10 disabled:opacity-50"><Plus className="h-4 w-4" />{language === "vi" ? "Thêm tài liệu" : "Add document"}</button>
               </div>
-              <div className="mt-sm flex items-center gap-sm rounded-lg bg-blue-50 px-md py-sm text-xs font-medium text-blue-700 dark:bg-blue-950/30 dark:text-blue-200"><Bot className="h-4 w-4 shrink-0" /><span className="min-w-0 flex-1">{attachedDocuments.length > 0 ? (language === "vi" ? `AI đang trả lời dựa trên ${attachedDocuments.length} tài liệu đã chọn và kiến thức pháp luật được cập nhật.` : `AI is answering from ${attachedDocuments.length} selected document(s) and the published legal knowledge base.`) : (language === "vi" ? "AI đang trả lời bằng kho tri thức pháp luật do admin công khai." : "AI is answering from the admin-published legal knowledge base.")}</span><button type="button" className="shrink-0 font-semibold hover:underline" onClick={() => setActiveDrawer("documents")}>{language === "vi" ? "Xem nguồn" : "View sources"}</button></div>
+              <div className={`mt-sm flex items-center gap-sm rounded-lg px-md py-sm text-xs font-medium ${chatBlockedByAttachedDocuments ? "bg-amber-50 text-amber-800 dark:bg-amber-950/30 dark:text-amber-200" : "bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-200"}`}><Bot className="h-4 w-4 shrink-0" /><span className="min-w-0 flex-1">{chatBlockedByAttachedDocuments ? (failedAttachedDocuments.length > 0 ? (language === "vi" ? "Chat đang khóa vì có tài liệu xử lý thất bại. Hãy bỏ tài liệu đó hoặc upload lại." : "Chat is blocked because an attached document failed processing. Remove it or upload it again.") : (language === "vi" ? `Đang xử lý ${unavailableAttachedDocuments.length} tài liệu đính kèm. Chat sẽ mở khi tất cả tài liệu sẵn sàng.` : `Processing ${unavailableAttachedDocuments.length} attached document(s). Chat will unlock when all are ready.`)) : attachedDocuments.length > 0 ? (language === "vi" ? `AI đang trả lời dựa trên ${attachedDocuments.length} tài liệu đã chọn và kiến thức pháp luật được cập nhật.` : `AI is answering from ${attachedDocuments.length} selected document(s) and the published legal knowledge base.`) : (language === "vi" ? "Không có tài liệu đính kèm: AI đang trả lời bằng kho tri thức pháp luật do admin công khai." : "No documents attached: AI is answering from the admin-published legal knowledge base.")}</span><button type="button" className="shrink-0 font-semibold hover:underline" onClick={() => setActiveDrawer("documents")}>{language === "vi" ? "Xem nguồn" : "View sources"}</button></div>
             </div>
             <div
               ref={chatScrollContainerRef}
@@ -1255,6 +1342,13 @@ export function LegalChatPage() {
                 void handleSend();
               }}
             >
+              {chatBlockedByAttachedDocuments && (
+                <p className="mb-sm rounded-lg bg-amber-50 px-md py-sm text-xs font-semibold text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+                  {failedAttachedDocuments.length > 0
+                    ? (language === "vi" ? "Không thể gửi tin nhắn: hãy bỏ tài liệu lỗi hoặc upload lại." : "Cannot send: remove the failed document or upload it again.")
+                    : (language === "vi" ? "Không thể gửi tin nhắn trong khi tài liệu đính kèm đang được xử lý." : "Messages cannot be sent while attached documents are processing.")}
+                </p>
+              )}
               <label className="sr-only" htmlFor="legal-chat-input">
                 {t("chat.inputLabel")}
               </label>
@@ -1270,11 +1364,11 @@ export function LegalChatPage() {
                   onKeyDown={(event) => {
                     if (event.key === "Enter" && !event.shiftKey) {
                       event.preventDefault();
-                      if (input.trim() && selectedWorkspaceId && !sending) void handleSend();
+                      if (input.trim() && selectedWorkspaceId && !sending && !chatBlockedByAttachedDocuments) void handleSend();
                     }
                   }}
                   placeholder={t("chat.inputPlaceholder")}
-                  disabled={!selectedWorkspaceId}
+                  disabled={!selectedWorkspaceId || chatBlockedByAttachedDocuments}
                 />
                 {sending ? (
                   <Button
@@ -1292,7 +1386,7 @@ export function LegalChatPage() {
                     type="submit"
                     size="icon"
                     aria-label={t("actions.ask")}
-                    disabled={!input.trim() || !selectedWorkspaceId}
+                    disabled={!input.trim() || !selectedWorkspaceId || chatBlockedByAttachedDocuments}
                   >
                     <Send className="h-5 w-5" />
                   </Button>
@@ -1345,9 +1439,12 @@ export function LegalChatPage() {
           <section>
             <p className="font-semibold">{language === "vi" ? "Upload tài liệu mới" : "Upload new document"}</p>
             <p className="mt-xs text-xs text-on-surface-variant">{language === "vi" ? "File được lưu vào workspace và tự động gắn vào phiên chat. Quota được kiểm tra trước khi upload." : "The file is saved to the workspace and attached to this session."}</p>
-            <div className="mt-sm flex flex-col gap-sm sm:flex-row">
-              <input className="form-field" type="file" onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)} />
-              <Button disabled={!uploadFile || documentActionBusy} onClick={() => void handleUploadAndAttach()}>{documentActionBusy ? (language === "vi" ? "Đang xử lý…" : "Processing…") : (language === "vi" ? "Upload và thêm" : "Upload & attach")}</Button>
+            <div className="mt-sm space-y-sm">
+              <p className="text-xs text-on-surface-variant">{supportedContractScopeText(language)} {language === "vi" ? "Chỉ cần chọn file, không cần khai báo loại hợp đồng." : "Choose a file; no contract-type selection is required."}</p>
+              <div className="flex flex-col gap-sm sm:flex-row">
+                <input className="form-field" type="file" onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)} />
+                <Button disabled={!uploadFile || documentActionBusy} onClick={() => void handleUploadAndAttach()}>{documentActionBusy ? (language === "vi" ? "Đang xử lý…" : "Processing…") : (language === "vi" ? "Upload và thêm" : "Upload & attach")}</Button>
+              </div>
             </div>
           </section>
           <section>
@@ -1356,7 +1453,12 @@ export function LegalChatPage() {
               {workspaceDocuments.length === 0 ? <p className="text-sm text-on-surface-variant">{t("chat.noDocuments")}</p> : workspaceDocuments.map((document) => {
                 const attached = attachedDocuments.some((item) => item.documentId === document.documentId);
                 return <div key={document.documentId} className="flex items-center justify-between gap-md rounded-lg border border-legal-border p-sm dark:border-slate-700">
-                  <div className="min-w-0"><p className="truncate font-semibold" title={document.originalFileName}>{document.originalFileName}</p><div className="mt-xs"><StatusBadge status={document.status} /></div></div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold" title={document.originalFileName}>{document.originalFileName}</p>
+                    <div className="mt-xs"><StatusBadge status={document.status} /></div>
+                    <DocumentProcessingProgress status={document.status} language={language} />
+                    {document.errorMessage && <p className="mt-xs text-xs text-error">{document.errorMessage}</p>}
+                  </div>
                   <div className="flex gap-xs">
                     <Button size="icon" variant="ghost" aria-label="Download" onClick={() => void handleDownloadWorkspaceDocument(document)}><Download className="h-4 w-4" /></Button>
                     {attached ? (

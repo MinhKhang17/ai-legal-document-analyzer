@@ -321,7 +321,10 @@ public class WorkspaceServiceImpl implements WorkspaceService {
                 document.getFileType(),
                 document.getFileSize(),
                 document.getStatus(),
-                document.getUploadedAt()
+                document.getUploadedAt(),
+                document.getErrorMessage(),
+                document.getContractType() == null ? null : document.getContractType().name(),
+                document.getContractTypeConfirmed()
         );
     }
 

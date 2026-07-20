@@ -5,7 +5,6 @@ export interface PageResponse<T> {
   totalItems: number;
   totalPages: number;
 }
-
 export interface UploadKnowledgeRequest {
   code: string;
   title: string;
@@ -82,6 +81,13 @@ export interface KnowledgeBaseVersion {
   size?: number | null;
   uploadedAt?: string | null;
   sourceFileAvailable?: boolean;
+  sourceRelativePath?: string | null;
+  sourceFileHash?: string | null;
+  ingestSource?: string | null;
+  neo4jDocumentId?: string | null;
+  chunkCount?: number | null;
+  sourceVersionLabel?: string | null;
+  effectiveDate?: string | null;
   reviewDecision: KnowledgeReviewDecision | null;
   reviewedById: number | null;
   reviewedAt: string | null;
@@ -131,10 +137,4 @@ export interface KnowledgeIngestionJob {
   completedAt: string | null;
   ingestedById?: number | null;
   createdAt: string;
-}
-
-export interface AsyncKnowledgeIngestAccepted {
-  jobId: string;
-  status: "PROCESSING";
-  progressPercent: number;
 }

@@ -115,6 +115,7 @@ export async function getWorkspaceDocuments(
   return data.map((document) => normalizeStatus(document) as Document);
 }
 
+
 export async function downloadWorkspaceDocument(accessToken: string, workspaceId: string, documentId: string): Promise<string> {
   const response = await fetch(buildApiUrl(API_ENDPOINTS.workspaces.documentDownload(workspaceId, documentId)), {
     method: "GET",

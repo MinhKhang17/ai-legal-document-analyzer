@@ -12,14 +12,10 @@ import {
   archiveKnowledgeBaseEntry,
   getKnowledgeBaseEntry,
   getKnowledgeBaseVersions,
-  publishKnowledgeBaseEntry,
   reviewKnowledgeBaseEntry,
   unpublishKnowledgeBaseEntry,
   downloadKnowledgeBaseSourceFile,
-  getKnowledgeBaseSourceFile,
   ingestKnowledgeBaseEntry,
-  ingestKnowledgeBaseFile,
-  failKnowledgeIngestionJob,
 } from "../../services/knowledgeBase.service";
 import { useI18n } from "../../hooks/useI18n";
 import { useToast } from "../../hooks/useToast";
@@ -27,13 +23,11 @@ import type { KnowledgeBaseEntry, KnowledgeBaseVersion } from "../../types/knowl
 import { formatDisplayDate } from "../../utils/format";
 import { canKnowledgeAction } from "../../utils/knowledgeLifecycle";
 import { downloadStaffDocument } from "../../services/legalTicket.service";
-import { useAppStore } from "../../store/AppStore";
 
 export function KnowledgeBaseDetailPage() {
   const { id = "" } = useParams();
   const { t, language } = useI18n();
   const toast = useToast();
-  const { user } = useAppStore();
   const locale = language === "vi" ? "vi-VN" : "en-US";
   const [entry, setEntry] = useState<KnowledgeBaseEntry | null>(null);
   const [versions, setVersions] = useState<KnowledgeBaseVersion[]>([]);
@@ -86,20 +80,18 @@ export function KnowledgeBaseDetailPage() {
   };
 
   const retryIngest = async () => {
-    if (!entry || !user?.id) return;
+    if (!entry) return;
     setSaving(true);
     setError("");
-    let jobId: string | null = null;
     try {
-      const file = await getKnowledgeBaseSourceFile(entry.id);
-      const job = await ingestKnowledgeBaseEntry(entry.id, { requestId: `kb-retry-${Date.now()}`, jobPayload: JSON.stringify({ filename: file.name, retry: true }) });
-      jobId = job.id;
-      await ingestKnowledgeBaseFile(file, entry.id, entry.title, user.id, job.id);
+      await ingestKnowledgeBaseEntry(entry.id, {
+        requestId: `kb-retry-${Date.now()}`,
+        jobPayload: JSON.stringify({ filename: versions[0]?.fileName ?? null, retry: true }),
+      });
       toast.success(language === "vi" ? "Đã bắt đầu ingest lại ở chế độ nền." : "Background retry started.");
       await loadEntry();
     } catch (retryError) {
       const message = retryError instanceof Error ? retryError.message : "Unable to retry ingest";
-      if (jobId) { try { await failKnowledgeIngestionJob(jobId, message); } catch { /* keep original error */ } }
       setError(message);
       toast.error(message);
     } finally {
@@ -205,15 +197,6 @@ export function KnowledgeBaseDetailPage() {
                     )}
                   >
                     {t("knowledge.approve")}
-                  </Button>
-                  <Button
-                    disabled={saving || !note.trim() || !canKnowledgeAction(entry.currentStatus, 'PUBLISH')}
-                    onClick={() => void runAction(
-                      () => publishKnowledgeBaseEntry(id, { note: note.trim() }),
-                      t("knowledge.publishSuccess"),
-                    )}
-                  >
-                    {t("knowledge.publish")}
                   </Button>
                   <Button
                     variant="secondary"

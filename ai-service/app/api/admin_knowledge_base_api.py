@@ -120,8 +120,17 @@ def get_ingested_documents(
 
     for row in chunk_rows:
         metadata = _parse_metadata(row.get("metadata_json"))
-        # TODO: once KB ingestion stores kbId in vector metadata, filter here by kb_id directly.
-        document_id = _safe_str(metadata.get("document_id")) or _safe_str(row.get("source_path")) or _safe_str(row.get("chunk_id"))
+        source_metadata = metadata.get("source_metadata")
+        legacy_metadata = source_metadata if isinstance(source_metadata, dict) else {}
+        stored_kb_id = _safe_str(metadata.get("knowledge_base_id")) or _safe_str(legacy_metadata.get("knowledge_base_id"))
+        if stored_kb_id and stored_kb_id != kb_id:
+            continue
+        document_id = (
+            _safe_str(metadata.get("knowledge_document_id"))
+            or _safe_str(metadata.get("document_id"))
+            or _safe_str(row.get("source_path"))
+            or _safe_str(row.get("chunk_id"))
+        )
         if not document_id:
             continue
 
@@ -129,7 +138,11 @@ def get_ingested_documents(
         document_code = _safe_str(metadata.get("document_code")) or (
             Path(str(metadata.get("file_name") or "")).stem if metadata.get("file_name") else None
         )
-        source_file_id = _safe_str(metadata.get("document_id")) or document_id
+        source_file_id = (
+            _safe_str(metadata.get("knowledge_document_id"))
+            or _safe_str(metadata.get("document_id"))
+            or document_id
+        )
         content_hash = _safe_str(metadata.get("file_hash"))
         visibility_value = _safe_str(metadata.get("visibility_scope") or metadata.get("visibility"))
         active_value = metadata.get("active") if isinstance(metadata.get("active"), bool) else None
@@ -213,6 +226,7 @@ def update_document_lifecycle(
     try:
         updated = repo.update_document_lifecycle(
             document_id,
+            knowledge_base_id=kb_id,
             visibility=visibility,
             active=request.public,
             published_at=published_at,

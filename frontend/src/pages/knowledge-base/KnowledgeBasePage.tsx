@@ -12,9 +12,7 @@ import { PageHeader } from "../../components/common/PageHeader";
 import {
   getKnowledgeBaseEntries,
   getKnowledgeIngestionJob,
-  failKnowledgeIngestionJob,
   ingestKnowledgeBaseEntry,
-  ingestKnowledgeBaseFile,
   uploadKnowledgeBaseEntry,
   uploadKnowledgeBaseSourceFile,
 } from "../../services/knowledgeBase.service";
@@ -110,8 +108,6 @@ export function KnowledgeBasePage() {
 
     setSaving(true);
     setError("");
-    let createdJob: KnowledgeIngestionJob | null = null;
-
     try {
       const payload: UploadKnowledgeRequest = {
         code: form.code.trim(),
@@ -135,15 +131,7 @@ export function KnowledgeBasePage() {
           requestId: `kb-file-${Date.now()}-${selectedFile.name}`,
           jobPayload: JSON.stringify({ filename: selectedFile.name }),
         });
-        createdJob = job;
         setActiveJob(job);
-        await ingestKnowledgeBaseFile(
-          selectedFile,
-          uploadedVersion.knowledgeBaseEntryId,
-          payload.title,
-          user.id,
-          job.id,
-        );
       }
       toast.success(startIngest ? t("knowledge.backgroundIngestStarted") : (language === "vi" ? "Đã lưu bản nháp riêng tư." : "Private draft saved."));
       setForm(emptyForm);
@@ -152,13 +140,6 @@ export function KnowledgeBasePage() {
       await loadEntries();
     } catch (uploadError) {
       const message = uploadError instanceof Error ? uploadError.message : t("knowledge.uploadError");
-      if (createdJob) {
-        try {
-          await failKnowledgeIngestionJob(createdJob.id, message);
-        } catch {
-          // Preserve the original upload error; polling can recover if AI accepted the job.
-        }
-      }
       setActiveJob(null);
       setError(message);
       toast.error(message);
@@ -306,9 +287,9 @@ export function KnowledgeBasePage() {
             )}
             <div className="flex flex-wrap justify-end gap-sm border-t border-legal-border pt-md dark:border-slate-700">
               <Button variant="secondary" onClick={() => { setForm(emptyForm); setSelectedFile(null); setSelectedFileName(""); }} disabled={saving}>Hủy</Button>
-              <Button variant="secondary" onClick={() => void handleUpload(false)} disabled={saving}>{saving ? t("knowledge.uploading") : "Lưu nháp"}</Button>
+              <Button variant="secondary" onClick={() => void handleUpload(false)} disabled={saving}>{saving ? (language === "vi" ? "Đang gửi tới backend..." : "Submitting to backend...") : "Lưu nháp"}</Button>
               <Button leftIcon={<Upload className="h-4 w-4" />} onClick={() => void handleUpload(true)} disabled={saving || !selectedFile}>
-                {saving ? t("knowledge.uploading") : "Bắt đầu ingest"}
+                {saving ? (language === "vi" ? "Đang gửi tới backend..." : "Submitting to backend...") : "Bắt đầu ingest"}
               </Button>
             </div>
 
@@ -334,14 +315,12 @@ export function KnowledgeBasePage() {
               </div>
             )}
 
-            <div className="grid grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] items-center gap-xs text-center text-xs text-on-surface-variant dark:text-slate-400">
+            <div className="grid grid-cols-[1fr_auto_1fr_auto_1fr] items-center gap-xs text-center text-xs text-on-surface-variant dark:text-slate-400">
               <div><FileText className="mx-auto mb-xs h-4 w-4" /><span>{t("knowledge.lifecycleUpload")}</span></div>
               <ArrowRight className="h-4 w-4" />
               <div><span className="font-semibold text-on-surface dark:text-slate-200">2</span><br />{t("knowledge.ingest")}</div>
               <ArrowRight className="h-4 w-4" />
-              <div><span className="font-semibold text-on-surface dark:text-slate-200">3</span><br />{t("knowledge.review")}</div>
-              <ArrowRight className="h-4 w-4" />
-              <div><span className="font-semibold text-on-surface dark:text-slate-200">4</span><br />{t("knowledge.publish")}</div>
+              <div><span className="font-semibold text-on-surface dark:text-slate-200">3</span><br />{language === "vi" ? "Duyệt & công khai" : "Approve & publish"}</div>
             </div>
           </div>
         </Card>
@@ -352,7 +331,7 @@ export function KnowledgeBasePage() {
             <ul className="space-y-xs text-sm text-on-surface-variant dark:text-slate-300">
               <li>✓ PDF, DOC, DOCX, TXT, Markdown, CSV, JSON</li>
               <li>✓ AI xử lý nền; bạn có thể rời trang</li>
-              <li>✓ Cần Review và Publish trước khi dùng cho RAG</li>
+              <li>✓ Khi admin duyệt, tài liệu được công khai và dùng cho RAG ngay</li>
               <li>✓ Có thể tải lại file gốc sau khi upload</li>
             </ul>
             <div className="flex flex-wrap gap-xs"><Badge tone="amber">PENDING</Badge><Badge tone="amber">PROCESSING</Badge><Badge tone="green">INGESTED</Badge><Badge tone="purple">REVIEWING</Badge><Badge tone="green">PUBLIC</Badge><Badge tone="red">FAILED</Badge></div>

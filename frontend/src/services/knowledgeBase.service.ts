@@ -1,7 +1,6 @@
 import { API_ENDPOINTS, buildApiUrl } from "../config/api";
 import type {
   ArchiveKnowledgeRequest,
-  AsyncKnowledgeIngestAccepted,
   IngestKnowledgeRequest,
   KnowledgeBaseEntry,
   KnowledgeBaseIngestedDocument,
@@ -12,7 +11,7 @@ import type {
   PublishKnowledgeRequest,
   UploadKnowledgeRequest,
 } from "../types/knowledgeBase";
-import { buildAuthHeaders, requestAiJson, requestApiData } from "./http";
+import { buildAuthHeaders, requestApiData } from "./http";
 
 const jsonHeaders = {
   Accept: "application/json",
@@ -179,28 +178,6 @@ export const publishKnowledgeBaseEntry = async (
     payload,
     "Không thể publish knowledge base",
   );
-
-export const ingestKnowledgeBaseFile = async (
-  file: File,
-  knowledgeBaseEntryId: string,
-  title: string,
-  adminId: number,
-  jobId: string,
-): Promise<AsyncKnowledgeIngestAccepted> => {
-  const formData = new FormData();
-  formData.append("file", file);
-  formData.append("title", title);
-  formData.append("ingested_by_user_id", String(adminId));
-  formData.append("knowledge_base_id", knowledgeBaseEntryId);
-  formData.append("job_id", jobId);
-  formData.append("callback_url", buildApiUrl(`/api/internal/knowledge-ingestion/${encodeURIComponent(jobId)}/progress`));
-
-  return requestAiJson<AsyncKnowledgeIngestAccepted>(
-    API_ENDPOINTS.aiKnowledge.ingestV2,
-    { method: "POST", body: formData },
-    "Không thể upload và ingest file tài liệu pháp lý",
-  );
-};
 
 export const getKnowledgeIngestionJob = async (
   jobId: string,

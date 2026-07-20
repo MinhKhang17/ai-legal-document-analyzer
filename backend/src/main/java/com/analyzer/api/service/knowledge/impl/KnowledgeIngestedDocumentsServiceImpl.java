@@ -28,6 +28,8 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class KnowledgeIngestedDocumentsServiceImpl implements KnowledgeIngestedDocumentsService {
 
+    private static final int AI_SNAPSHOT_PAGE_SIZE = 100;
+
     private final KnowledgeBaseEntryRepository entryRepository;
     private final KnowledgeBaseVersionRepository versionRepository;
     private final KnowledgeBaseAiClient aiClient;
@@ -92,30 +94,35 @@ public class KnowledgeIngestedDocumentsServiceImpl implements KnowledgeIngestedD
             String keyword,
             String ingestStatus,
             String visibility) {
-        PageResponse<KnowledgeBaseIngestedDocumentResponse> snapshotPage = aiClient.getIngestedDocuments(
-                knowledgeBaseEntryId,
-                keyword,
-                ingestStatus,
-                visibility,
-                0,
-                1000);
-
         Map<String, AiDocumentSnapshot> snapshots = new HashMap<>();
-        if (snapshotPage.getItems() == null) {
-            return snapshots;
-        }
-
-        for (KnowledgeBaseIngestedDocumentResponse document : snapshotPage.getItems()) {
-            if (document.getVersions() == null) {
-                continue;
-            }
-            for (KnowledgeBaseIngestedDocumentVersionResponse version : document.getVersions()) {
-                if (!StringUtils.hasText(version.getSourceFileId())) {
-                    continue;
+        int snapshotPageNumber = 0;
+        int totalPages;
+        do {
+            PageResponse<KnowledgeBaseIngestedDocumentResponse> snapshotPage = aiClient.getIngestedDocuments(
+                    knowledgeBaseEntryId,
+                    keyword,
+                    ingestStatus,
+                    visibility,
+                    snapshotPageNumber,
+                    AI_SNAPSHOT_PAGE_SIZE);
+            if (snapshotPage.getItems() != null) {
+                for (KnowledgeBaseIngestedDocumentResponse document : snapshotPage.getItems()) {
+                    if (document.getVersions() == null) {
+                        continue;
+                    }
+                    for (KnowledgeBaseIngestedDocumentVersionResponse version : document.getVersions()) {
+                        if (StringUtils.hasText(version.getSourceFileId())) {
+                            snapshots.put(version.getSourceFileId(), new AiDocumentSnapshot(document, version));
+                        }
+                    }
                 }
-                snapshots.put(version.getSourceFileId(), new AiDocumentSnapshot(document, version));
             }
-        }
+            totalPages = Math.max(snapshotPage.getTotalPages(), 0);
+            snapshotPageNumber++;
+            if (totalPages == 0) {
+                break;
+            }
+        } while (snapshotPageNumber < totalPages);
 
         return snapshots;
     }
@@ -125,8 +132,13 @@ public class KnowledgeIngestedDocumentsServiceImpl implements KnowledgeIngestedD
             Map<String, AiDocumentSnapshot> aiSnapshots) {
         Document sourceDocument = version.getSourceDocument();
         String sourceFileId = sourceDocument != null ? sourceDocument.getId() : null;
-        AiDocumentSnapshot aiSnapshot = sourceFileId == null ? null : aiSnapshots.get(sourceFileId);
-        Integer chunkCount = sourceDocument != null && sourceDocument.getChunkCount() != null
+        String aiDocumentId = StringUtils.hasText(version.getNeo4jDocumentId())
+                ? version.getNeo4jDocumentId()
+                : sourceFileId;
+        AiDocumentSnapshot aiSnapshot = aiDocumentId == null ? null : aiSnapshots.get(aiDocumentId);
+        Integer chunkCount = version.getChunkCount() != null
+                ? version.getChunkCount()
+                : sourceDocument != null && sourceDocument.getChunkCount() != null
                 ? sourceDocument.getChunkCount()
                 : aiSnapshot != null && aiSnapshot.version().getChunkCount() != null
                     ? aiSnapshot.version().getChunkCount()
@@ -157,8 +169,9 @@ public class KnowledgeIngestedDocumentsServiceImpl implements KnowledgeIngestedD
                 .ingestStatus(resolveIngestStatus(version, aiSnapshot))
                 .chunkCount(chunkCount)
                 .embeddedCount(embeddedCount)
-                .sourceFileId(sourceFileId)
-                .contentHash(aiSnapshot != null ? aiSnapshot.version().getContentHash() : null)
+                .sourceFileId(aiDocumentId)
+                .contentHash(version.getSourceFileHash() != null ? version.getSourceFileHash()
+                        : aiSnapshot != null ? aiSnapshot.version().getContentHash() : null)
                 .ingestedAt(ingestedAt)
                 .publishedAt(version.getPublishedAt())
                 .ingestedById(version.getIngestedBy() == null ? null : version.getIngestedBy().getId())

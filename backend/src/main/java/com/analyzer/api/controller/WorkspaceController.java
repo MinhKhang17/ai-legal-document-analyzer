@@ -75,7 +75,7 @@ public class WorkspaceController {
 
     @PostMapping("/{workspaceId}/documents")
     @PreAuthorize("hasRole('CUSTOMER')")
-    @Operation(summary = "Upload workspace document", description = "Upload a user document, save it, and request Python AI Service processing.")
+    @Operation(summary = "Upload workspace document", description = "Upload a document and request AI processing. Contract type is detected internally when possible.")
     public ResponseEntity<ApiResponseDTO<DocumentResponseDTO>> uploadDocument(
             @PathVariable String workspaceId,
             @RequestPart("file") MultipartFile file) throws IOException {

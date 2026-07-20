@@ -17,6 +17,7 @@ export {
   getChatSessionDocuments,
   attachChatSessionDocument,
   detachChatSessionDocument,
+  exportChatSessionMarkdown,
 } from "../services/chat.service";
 
 export type {

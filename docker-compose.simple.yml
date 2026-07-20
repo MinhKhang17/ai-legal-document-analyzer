@@ -28,6 +28,7 @@ services:
       - ai-service
     volumes:
       - shared_uploads:/app/uploads
+      - ./data:/app/data
 
   ai-service:
     image: legal-rag-platform/ai-service:dev
@@ -42,6 +43,7 @@ services:
       DOCUMENT_IMPORT_DIR: /app/uploads
     volumes:
       - shared_uploads:/app/uploads
+      - ./data:/app/data
 
   postgres:
     image: postgres:16-alpine
