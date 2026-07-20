@@ -115,7 +115,7 @@ public class WorkspaceController {
     }
 
     @GetMapping("/{workspaceId}/documents/system/download")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'EXPERT', 'ADMIN')")
     @Operation(summary = "Download system knowledge base document", description = "Download a system knowledge base document by filename.")
     public ResponseEntity<org.springframework.core.io.Resource> downloadSystemDocument(
             @PathVariable String workspaceId,

@@ -1543,13 +1543,52 @@ export function LegalChatPage() {
                       <p className="mt-xs text-on-surface-variant dark:text-slate-400">
                         {citation.excerpt || citation.uri || "-"}
                       </p>
-                      <div className="mt-sm flex flex-wrap gap-xs">
-                        {citation.sourceType && <Badge>{citation.sourceType}</Badge>}
-                        {typeof citation.score === "number" && (
-                          <Badge tone="blue">{Math.round(citation.score * 100)}%</Badge>
-                        )}
-                        {typeof citation.pageNumber === "number" && (
-                          <Badge tone="gold">{t("common.page")} {citation.pageNumber}</Badge>
+                      <div className="mt-sm flex flex-wrap items-center justify-between gap-xs">
+                        <div className="flex flex-wrap gap-xs">
+                          {citation.sourceType && <Badge>{citation.sourceType}</Badge>}
+                          {typeof citation.score === "number" && (
+                            <Badge tone="blue">{Math.round(citation.score * 100)}%</Badge>
+                          )}
+                          {typeof citation.pageNumber === "number" && (
+                            <Badge tone="gold">{t("common.page")} {citation.pageNumber}</Badge>
+                          )}
+                        </div>
+                        {citation.uri && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            leftIcon={<Download className="h-4 w-4" />}
+                            onClick={async () => {
+                              try {
+                                const response = await fetch(citation.uri!, {
+                                  headers: {
+                                    Authorization: `Bearer ${getAccessToken()}`,
+                                  },
+                                });
+                                if (!response.ok) throw new Error("Tải file thất bại");
+                                const blob = await response.blob();
+                                const blobUrl = URL.createObjectURL(blob);
+                                const anchor = document.createElement("a");
+                                anchor.href = blobUrl;
+                                let fileName = citation.label || "document";
+                                if (citation.uri!.includes("filename=")) {
+                                  const match = citation.uri!.match(/filename=([^&]+)/);
+                                  if (match) {
+                                    fileName = decodeURIComponent(match[1]);
+                                  }
+                                }
+                                anchor.download = fileName;
+                                anchor.click();
+                                window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+                              } catch (downloadError) {
+                                toast.error(
+                                  downloadError instanceof Error ? downloadError.message : "Unable to download document."
+                                );
+                              }
+                            }}
+                          >
+                            {language === "vi" ? "Tải xuống" : "Download"}
+                          </Button>
                         )}
                       </div>
                     </article>
