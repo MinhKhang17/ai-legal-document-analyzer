@@ -8,6 +8,7 @@ import com.analyzer.api.entity.RefreshToken;
 import com.analyzer.api.entity.User;
 import com.analyzer.api.exception.auth.ExpiredVerificationTokenException;
 import com.analyzer.api.exception.common.ResourceNotFoundException;
+import com.analyzer.api.exception.common.ConflictException;
 import com.analyzer.api.mapper.UserMapper;
 import com.analyzer.api.repository.RefreshTokenRepository;
 import com.analyzer.api.repository.UserRepository;
@@ -212,8 +213,15 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public void verifyEmail(String token) {
-        User user = userRepository.findByEmailVerificationToken(sha256(token))
-                .orElseThrow(() -> new ResourceNotFoundException("Token xác thực không hợp lệ"));
+        String tokenHash = sha256(token);
+        var userWithActiveToken = userRepository.findByEmailVerificationToken(tokenHash);
+        if (userWithActiveToken.isEmpty()) {
+            if (userRepository.findByEmailVerificationLastUsedToken(tokenHash).isPresent()) {
+                throw new ConflictException("TOKEN_ALREADY_USED");
+            }
+            throw new ResourceNotFoundException("TOKEN_INVALID");
+        }
+        User user = userWithActiveToken.get();
 
         if (user.isEmailVerified()) {
             return;
@@ -221,13 +229,14 @@ public class AuthServiceImpl implements AuthService {
 
         if (user.getEmailVerificationTokenExpiry() == null
                 || user.getEmailVerificationTokenExpiry().isBefore(LocalDateTime.now())) {
-            throw new ExpiredVerificationTokenException(
-                    "Token xác thực đã hết hạn. Vui lòng yêu cầu gửi lại email xác thực.");
+            throw new ExpiredVerificationTokenException("TOKEN_EXPIRED");
         }
 
         user.setEmailVerified(true);
         user.setActive(true);
         user.setEmailVerifiedAt(LocalDateTime.now());
+        user.setEmailVerificationLastUsedToken(tokenHash);
+        user.setEmailVerificationTokenUsedAt(LocalDateTime.now());
         user.setEmailVerificationToken(null);
         user.setEmailVerificationTokenExpiry(null);
         userRepository.save(user);

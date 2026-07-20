@@ -1,7 +1,6 @@
 import {
   Activity,
   BookOpen,
-  Bot,
   ChevronLeft,
   ChevronRight,
   FileClock,
@@ -92,13 +91,6 @@ const navItems: NavItem[] = [
     to: '/chat/history',
     labelKey: 'nav.chatHistory',
     icon: FileClock,
-    section: 'intelligence',
-    allowedRoles: ['CUSTOMER'],
-  },
-  {
-    to: '/chat/contract-assistant',
-    labelKey: 'nav.contractAssistant',
-    icon: Bot,
     section: 'intelligence',
     allowedRoles: ['CUSTOMER'],
   },

@@ -5,6 +5,14 @@ import { Button } from "../../components/common/Button";
 import { Card } from "../../components/common/Card";
 import { resendVerificationEmail, verifyEmail } from "../../services/auth.service";
 
+const verificationErrorMessage = (error: unknown) => {
+  const message = error instanceof Error ? error.message : "";
+  if (message.includes("TOKEN_EXPIRED")) return "Liên kết đã hết hạn.";
+  if (message.includes("TOKEN_ALREADY_USED")) return "Liên kết đã được sử dụng.";
+  if (message.includes("TOKEN_INVALID")) return "Liên kết không hợp lệ.";
+  return message || "Không thể xác thực email.";
+};
+
 export function VerifyEmailPage() {
   const [params] = useSearchParams();
   const token = params.get("token")?.trim() ?? "";
@@ -26,7 +34,7 @@ export function VerifyEmailPage() {
       .catch((error: unknown) => {
         if (active) {
           setState("error");
-          setMessage(error instanceof Error ? error.message : "Không thể xác thực email.");
+          setMessage(verificationErrorMessage(error));
         }
       });
     return () => { active = false; };

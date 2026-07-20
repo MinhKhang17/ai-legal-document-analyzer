@@ -34,6 +34,11 @@ function resolveRedirectToDashboardOrAdmin(user: CurrentUserState) {
   return "/dashboard";
 }
 
+function loginRedirectState(location: ReturnType<typeof useLocation>, errorMessage?: string) {
+  const redirectTo = `${location.pathname}${location.search}${location.hash}`;
+  return { errorMessage, redirectTo, from: redirectTo };
+}
+
 function RoleAccessDeniedView() {
   const { t } = useI18n();
 
@@ -78,10 +83,7 @@ export function AuthenticatedRoute({ children }: RouteGuardProps) {
       <Navigate
         to="/login"
         replace
-        state={{
-          errorMessage: t("auth.mustSignIn"),
-          from: location.pathname,
-        }}
+        state={loginRedirectState(location, t("auth.mustSignIn"))}
       />
     );
   }
@@ -103,10 +105,7 @@ export function CustomerRoute({ children }: RouteGuardProps) {
       <Navigate
         to="/login"
         replace
-        state={{
-          errorMessage: t("auth.mustSignIn"),
-          from: location.pathname,
-        }}
+        state={loginRedirectState(location, t("auth.mustSignIn"))}
       />
     );
   }
@@ -124,13 +123,14 @@ export function CustomerRoute({ children }: RouteGuardProps) {
 
 export function AdminRoute({ children }: RouteGuardProps) {
   const { isAuthLoading, isAuthReady, isAuthenticated, user } = useAppStore();
+  const location = useLocation();
 
   if (isAuthLoading || !isAuthReady) {
     return <AuthLoadingView />;
   }
 
   if (!isAuthenticated || user === null || user.active === false) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" replace state={loginRedirectState(location)} />;
   }
 
   if (user.role !== "ADMIN") {
@@ -142,13 +142,14 @@ export function AdminRoute({ children }: RouteGuardProps) {
 
 export function ExpertRoute({ children }: RouteGuardProps) {
   const { isAuthLoading, isAuthReady, isAuthenticated, user } = useAppStore();
+  const location = useLocation();
 
   if (isAuthLoading || !isAuthReady) {
     return <AuthLoadingView />;
   }
 
   if (!isAuthenticated || user === null || user.active === false) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" replace state={loginRedirectState(location)} />;
   }
 
   if (user.role !== "EXPERT") {
@@ -160,8 +161,9 @@ export function ExpertRoute({ children }: RouteGuardProps) {
 
 export function AdminOrExpertRoute({ children }: RouteGuardProps) {
   const { isAuthLoading, isAuthReady, isAuthenticated, user } = useAppStore();
+  const location = useLocation();
   if (isAuthLoading || !isAuthReady) return <AuthLoadingView />;
-  if (!isAuthenticated || user === null || user.active === false) return <Navigate to="/login" replace />;
+  if (!isAuthenticated || user === null || user.active === false) return <Navigate to="/login" replace state={loginRedirectState(location)} />;
   if (user.role !== "ADMIN" && user.role !== "EXPERT") return <RoleAccessDeniedView />;
   return <>{children}</>;
 }

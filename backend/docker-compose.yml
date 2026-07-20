@@ -9,6 +9,10 @@ services:
       - .env
     environment:
       DB_URL: jdbc:postgresql://postgres:5432/ai_legal_db
+      JPA_DDL_AUTO: validate
+      SPRING_FLYWAY_ENABLED: "true"
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: "true"
+      SPRING_FLYWAY_OUT_OF_ORDER: "true"
       APP_AI_SERVICE_BASE_URL: http://host.docker.internal:8000
     depends_on:
       postgres:

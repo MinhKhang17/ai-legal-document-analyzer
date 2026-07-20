@@ -46,6 +46,12 @@ public class User {
     @Column(name = "email_verification_token")
     private String emailVerificationToken;
 
+    @Column(name = "email_verification_last_used_token")
+    private String emailVerificationLastUsedToken;
+
+    @Column(name = "email_verification_token_used_at")
+    private java.time.LocalDateTime emailVerificationTokenUsedAt;
+
     @Column(name = "email_verification_token_expiry")
     private java.time.LocalDateTime emailVerificationTokenExpiry;
 

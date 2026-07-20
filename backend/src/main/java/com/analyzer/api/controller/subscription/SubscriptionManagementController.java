@@ -201,7 +201,7 @@ public class SubscriptionManagementController {
     @PreAuthorize("permitAll()")
     @Operation(summary = "Confirm a refund request from the email link")
     public ResponseEntity<ApiResponseDTO<RefundResponseDTO>> confirmRefundEmail(@RequestParam String token) {
-        return ResponseEntity.ok(ApiResponseDTO.success("Xac nhan email hoan tien thanh cong",
+        return ResponseEntity.ok(ApiResponseDTO.success("CONFIRMATION_SUCCESS",
                 refundService.confirmRefundEmail(token)));
     }
 

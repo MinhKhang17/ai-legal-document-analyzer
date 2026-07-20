@@ -4,6 +4,14 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Button } from '../../components/common/Button';
 import { confirmSubscriptionRefundEmail } from '../../services/subscription.service';
 
+const confirmationErrorMessage = (error: unknown) => {
+  const message = error instanceof Error ? error.message : '';
+  if (message.includes('TOKEN_EXPIRED')) return 'Liên kết đã hết hạn.';
+  if (message.includes('TOKEN_ALREADY_USED')) return 'Liên kết đã được sử dụng.';
+  if (message.includes('TOKEN_INVALID')) return 'Liên kết không hợp lệ.';
+  return message || 'Liên kết đã hết hạn hoặc không hợp lệ.';
+};
+
 export function RefundEmailConfirmationPage() {
   const [params] = useSearchParams();
   const [state, setState] = useState<'loading' | 'success' | 'error'>('loading');
@@ -23,7 +31,7 @@ export function RefundEmailConfirmationPage() {
       })
       .catch((error: unknown) => {
         setState('error');
-        setMessage(error instanceof Error ? error.message : 'Liên kết đã hết hạn hoặc không hợp lệ.');
+        setMessage(confirmationErrorMessage(error));
       });
   }, [params]);
 

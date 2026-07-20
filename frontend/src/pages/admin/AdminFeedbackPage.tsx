@@ -26,6 +26,7 @@ import { formatDisplayDate } from "../../utils/format";
 import { getAdminChatFeedback } from "../../api/chatApi";
 import { getAccessToken } from "../../services/authSession";
 import type { ChatMessageFeedback } from "../../types/chat";
+import { AdminAiFeedbackPanel } from "../../components/admin/AdminAiFeedbackPanel";
 
 const surveyTypes: FeedbackSurveyType[] = ["SATISFACTION", "PRODUCT", "BUG", "USABILITY"];
 const surveyStatuses: FeedbackSurveyStatus[] = ["DRAFT", "ACTIVE", "CLOSED", "ARCHIVED"];
@@ -329,11 +330,17 @@ export function AdminFeedbackPage() {
         </div>
       )}
 
+      <div className="mb-gutter">
+        <AdminAiFeedbackPanel language={language} />
+      </div>
+
       <div className="grid gap-gutter xl:grid-cols-[minmax(0,1fr)_420px]">
         <main className="space-y-gutter">
+          {false && (
           <Card title={language === 'vi' ? 'Đánh giá câu trả lời AI' : 'AI answer ratings'} actions={<Badge tone="blue">{chatRatings.length}</Badge>}>
             <DataTable columns={ratingColumns} data={chatRatings} getRowKey={(item) => item.id} emptyMessage={language === 'vi' ? 'Chưa có đánh giá.' : 'No ratings yet.'} />
           </Card>
+          )}
           <Card title={t("feedback.surveys")} actions={<Badge tone="blue">{surveys.length}</Badge>}>
             {loading ? (
               <p className="text-sm text-on-surface-variant dark:text-slate-400">

@@ -47,6 +47,12 @@ export function LoginPage() {
   const initialNotice =
     getStringStateValue(location.state, "noticeMessage") ||
     getStringStateValue(location.state, "message");
+  const requestedRedirect =
+    getStringStateValue(location.state, "redirectTo") ||
+    getStringStateValue(location.state, "from");
+  const safeRedirect = requestedRedirect.startsWith("/") && !requestedRedirect.startsWith("//")
+    ? requestedRedirect
+    : "";
   const [error, setError] = useState(initialError);
   const [notice, setNotice] = useState(initialNotice);
   const [emailNotVerified, setEmailNotVerified] = useState(false);
@@ -102,7 +108,9 @@ export function LoginPage() {
 
             signIn(accessToken, currentUser);
 
-            if (currentUser.role === "ADMIN") {
+            if (safeRedirect) {
+              navigate(safeRedirect, { replace: true });
+            } else if (currentUser.role === "ADMIN") {
               navigate("/admin", { replace: true });
             } else if (currentUser.role === "EXPERT") {
               navigate("/lawyer/tickets", { replace: true });

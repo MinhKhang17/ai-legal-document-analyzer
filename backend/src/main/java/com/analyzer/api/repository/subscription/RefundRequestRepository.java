@@ -17,6 +17,7 @@ public interface RefundRequestRepository extends JpaRepository<RefundRequest, Lo
 
     Optional<RefundRequest> findByIdAndRequestedById(Long id, Long requestedById);
     Optional<RefundRequest> findByConfirmationTokenHash(String confirmationTokenHash);
+    Optional<RefundRequest> findByConfirmationUsedTokenHash(String confirmationUsedTokenHash);
 
     List<RefundRequest> findByRequestedByIdOrderByCreatedAtDesc(Long requestedById);
 

@@ -98,7 +98,7 @@ public class AuthController {
     )
     public ResponseEntity<ApiResponseDTO<Void>> verifyEmail(@RequestParam String token) {
         authService.verifyEmail(token);
-        return ResponseEntity.ok(ApiResponseDTO.success("Xác thực email thành công"));
+        return ResponseEntity.ok(ApiResponseDTO.success("CONFIRMATION_SUCCESS"));
     }
 
     @PostMapping("/resend-verification")

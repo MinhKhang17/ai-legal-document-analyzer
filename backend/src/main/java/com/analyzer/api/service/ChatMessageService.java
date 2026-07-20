@@ -18,4 +18,6 @@ public interface ChatMessageService {
     ChatMessageResponse getMessageDetail(Long userId, String messageId);
 
     ChatMessageFeedbackResponse submitFeedback(Long userId, String messageId, ChatMessageFeedbackRequest request);
+
+    void removeFeedback(Long userId, String messageId);
 }

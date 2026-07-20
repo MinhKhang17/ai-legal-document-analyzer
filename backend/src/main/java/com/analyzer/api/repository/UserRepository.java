@@ -19,6 +19,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     Optional<User> findByEmailVerificationToken(String emailVerificationToken);
 
+    Optional<User> findByEmailVerificationLastUsedToken(String emailVerificationLastUsedToken);
+
     List<User> findAllByRole_NameAndActiveTrue(RoleName roleName);
 
     List<User> findAllByMustChangePasswordTrueAndActiveTrueAndPasswordResetDeadlineBefore(LocalDateTime now);

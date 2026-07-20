@@ -49,7 +49,6 @@ import { SharedChatPage } from "../pages/chat/SharedChatPage";
 import { SharedTicketConversationPage } from "../pages/tickets/SharedTicketConversationPage";
 
 const RiskReviewPage = lazy(() => import("../pages/editor/RiskReviewPage").then((module) => ({ default: module.RiskReviewPage })));
-const ContractAssistantPage = lazy(() => import("../pages/chat/ContractAssistantPage").then((module) => ({ default: module.ContractAssistantPage })));
 const LegalChatPage = lazy(() => import("../pages/chat/LegalChatPage").then((module) => ({ default: module.LegalChatPage })));
 const ChatHistoryPage = lazy(() => import("../pages/chat/ChatHistoryPage").then((module) => ({ default: module.ChatHistoryPage })));
 const AdminConsolePage = lazy(() => import("../pages/admin/AdminConsolePage").then((module) => ({ default: module.AdminConsolePage })));
@@ -148,11 +147,7 @@ export const router = createBrowserRouter([
       },
       {
         path: "/chat/contract-assistant",
-        element: (
-          <CustomerRoute>
-            <ContractAssistantPage />
-          </CustomerRoute>
-        ),
+        element: <Navigate to="/chat" replace />,
       },
       {
         path: "/chat",

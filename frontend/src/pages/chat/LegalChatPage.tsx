@@ -1159,7 +1159,11 @@ export function LegalChatPage() {
             <div className="border-b border-legal-border bg-white p-md dark:border-slate-700 dark:bg-slate-900">
               <div className="mb-sm flex items-center justify-between gap-md">
                 <p className="text-sm font-semibold">{language === "vi" ? `Tài liệu đang sử dụng trong phiên chat (${attachedDocuments.length})` : `Documents used in this chat (${attachedDocuments.length})`}</p>
-                <Badge tone="gold">RAG</Badge>
+                <Badge tone={attachedDocuments.length > 0 ? "blue" : "green"}>
+                  {attachedDocuments.length > 0
+                    ? (language === "vi" ? "Phân tích tài liệu" : "Document analysis")
+                    : (language === "vi" ? "Hỏi đáp pháp luật" : "Legal Q&A")}
+                </Badge>
               </div>
               <div className="flex gap-sm overflow-x-auto pb-xs">
                 {attachedDocuments.map((document) => (
@@ -1367,7 +1371,9 @@ export function LegalChatPage() {
                       if (input.trim() && selectedWorkspaceId && !sending && !chatBlockedByAttachedDocuments) void handleSend();
                     }
                   }}
-                  placeholder={t("chat.inputPlaceholder")}
+                  placeholder={attachedDocuments.length > 0
+                    ? (language === "vi" ? "Hỏi về tài liệu hoặc vấn đề pháp lý liên quan..." : "Ask about the document or a related legal issue...")
+                    : (language === "vi" ? "Nhập câu hỏi pháp luật của bạn..." : "Enter your legal question...")}
                   disabled={!selectedWorkspaceId || chatBlockedByAttachedDocuments}
                 />
                 {sending ? (
