@@ -23,5 +23,16 @@ public interface SubscriptionPlanMapper {
     @Mapping(target = "allowContactExpertTicket", ignore = true)
     SubscriptionPlan toEntity(SubscriptionPlanRequestDTO requestDTO);
 
+    @Mapping(target = "name", ignore = true)
+    @Mapping(target = "displayName", ignore = true)
+    @Mapping(target = "priceVnd", ignore = true)
+    @Mapping(target = "billingCycleDays", ignore = true)
+    @Mapping(target = "contractAnalysisLimit", ignore = true)
+    @Mapping(target = "aiTokenLimit", ignore = true)
+    @Mapping(target = "workspaceLimit", ignore = true)
+    @Mapping(target = "documentPerWorkspaceLimit", ignore = true)
+    @Mapping(target = "contractDraftLimit", ignore = true)
+    @Mapping(target = "expertTicketLimit", ignore = true)
+    @Mapping(target = "features", ignore = true)
     SubscriptionPlanResponseDTO toResponseDTO(SubscriptionPlan plan);
 }
