@@ -21,7 +21,6 @@ const routeLabels: Array<{ prefix: string; key: string }> = [
   { prefix: '/billing/subscribe', key: 'nav.billingSubscribe' },
   { prefix: '/billing', key: 'nav.billing' },
   { prefix: '/jobs', key: 'nav.jobs' },
-  { prefix: '/templates', key: 'nav.templates' },
   { prefix: '/admin/system-health', key: 'nav.systemHealth' },
   { prefix: '/admin/audit-logs', key: 'nav.auditLogs' },
   { prefix: '/admin', key: 'nav.admin' },

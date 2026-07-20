@@ -171,10 +171,6 @@ export function ContractDetailPage() {
                   <dd className="mt-xs">{contract.workspaceId}</dd>
                 </div>
                 <div>
-                  <dt className="label-uppercase">{t("contracts.template")}</dt>
-                  <dd className="mt-xs">{contract.templateId ?? "-"}</dd>
-                </div>
-                <div>
                   <dt className="label-uppercase">{t("contracts.currentVersion")}</dt>
                   <dd className="mt-xs">{contract.currentVersionNo}</dd>
                 </div>
