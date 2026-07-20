@@ -22,6 +22,22 @@ interface KnowledgeBaseIngestedDocumentsCardProps {
 const statusOptions = ["", "PENDING", "PROCESSING", "INGESTED", "FAILED"];
 const visibilityOptions = ["", "PRIVATE", "PUBLIC"];
 
+const knowledgeStatusKeys: Record<string, string> = {
+  PENDING: "knowledge.status.PENDING",
+  UPLOADED: "knowledge.status.PENDING",
+  PROCESSING: "knowledge.status.PROCESSING",
+  INGESTED: "knowledge.status.INGESTED",
+  REVIEWING: "knowledge.status.REVIEWING",
+  PUBLIC: "knowledge.status.PUBLIC",
+  ARCHIVED: "knowledge.status.ARCHIVED",
+  FAILED: "knowledge.status.FAILED",
+};
+
+const knowledgeVisibilityKeys: Record<string, string> = {
+  PRIVATE: "knowledge.visibility.PRIVATE",
+  PUBLIC: "knowledge.visibility.PUBLIC",
+};
+
 const getTone = (status?: string | null) => {
   if (!status) return "slate";
   if (status === "INGESTED") return "green";
@@ -36,8 +52,8 @@ const getVisibilityTone = (visibility?: string | null) => {
   return "purple";
 };
 
-const getVersionLabel = (version: KnowledgeBaseIngestedDocumentVersion, language: "en" | "vi") =>
-  version.versionLabel || (language === "vi" ? "Phiên bản" : "Version");
+const getVersionLabel = (version: KnowledgeBaseIngestedDocumentVersion, fallback: string) =>
+  version.versionLabel || fallback;
 
 export function KnowledgeBaseIngestedDocumentsCard({
   knowledgeBaseEntryId,
@@ -46,6 +62,12 @@ export function KnowledgeBaseIngestedDocumentsCard({
 }: KnowledgeBaseIngestedDocumentsCardProps) {
   const { t, language } = useI18n();
   const locale = language === "vi" ? "vi-VN" : "en-US";
+  const numberFormatter = new Intl.NumberFormat(locale);
+  const translateEnum = (value: string | null | undefined, keys: Record<string, string>, fallback = "-") => {
+    if (!value) return fallback;
+    const key = keys[value];
+    return key ? t(key) : value;
+  };
   const [data, setData] = useState<PageResponse<KnowledgeBaseIngestedDocument> | null>(null);
   const [keyword, setKeyword] = useState("");
   const [ingestStatus, setIngestStatus] = useState("");
@@ -72,8 +94,8 @@ export function KnowledgeBaseIngestedDocumentsCard({
         size,
       });
       setData(response);
-    } catch (loadError) {
-      const message = loadError instanceof Error ? loadError.message : t("knowledge.ingestedDocuments.loadError");
+    } catch {
+      const message = t("knowledge.ingestedDocuments.loadError");
       setError(message);
       setData(null);
     } finally {
@@ -96,8 +118,12 @@ export function KnowledgeBaseIngestedDocumentsCard({
     }
     const start = page * size + 1;
     const end = Math.min((page + 1) * size, totalItems);
-    return t("knowledge.ingestedDocuments.range", { start, end, total: totalItems });
-  }, [page, size, t, totalItems]);
+    return t("knowledge.ingestedDocuments.range", {
+      start: numberFormatter.format(start),
+      end: numberFormatter.format(end),
+      total: numberFormatter.format(totalItems),
+    });
+  }, [numberFormatter, page, size, t, totalItems]);
 
   return (
     <Card
@@ -146,7 +172,7 @@ export function KnowledgeBaseIngestedDocumentsCard({
             >
               {statusOptions.map((option) => (
                 <option key={option || "ALL"} value={option}>
-                  {option || t("common.all")}
+                  {option ? translateEnum(option, knowledgeStatusKeys) : t("common.all")}
                 </option>
               ))}
             </select>
@@ -163,7 +189,7 @@ export function KnowledgeBaseIngestedDocumentsCard({
             >
               {visibilityOptions.map((option) => (
                 <option key={option || "ALL"} value={option}>
-                  {option || t("common.all")}
+                  {option ? translateEnum(option, knowledgeVisibilityKeys) : t("common.all")}
                 </option>
               ))}
             </select>
@@ -194,7 +220,7 @@ export function KnowledgeBaseIngestedDocumentsCard({
             {t("knowledge.ingestedDocuments.code")}: <span className="font-semibold text-on-surface dark:text-slate-100">{documentCode}</span>
           </div>
           <div className="flex items-center gap-sm text-sm">
-            <Badge tone="blue">{t("knowledge.ingestedDocuments.versions")} {totalItems}</Badge>
+            <Badge tone="blue">{t("knowledge.ingestedDocuments.versions")} {numberFormatter.format(totalItems)}</Badge>
             <span className="text-on-surface-variant dark:text-slate-400">{pageLabel}</span>
           </div>
         </div>
@@ -228,15 +254,15 @@ export function KnowledgeBaseIngestedDocumentsCard({
                       <div className="flex flex-wrap items-center justify-between gap-sm">
                         <div>
                           <p className="font-semibold">
-                            {getVersionLabel(version, language)} · {version.versionId}
+                            {getVersionLabel(version, t("contracts.version"))} · {version.versionId}
                           </p>
                           <p className="text-xs text-on-surface-variant dark:text-slate-400">
                             {version.sourceFileId || "-"}
                           </p>
                         </div>
                         <div className="flex flex-wrap gap-xs">
-                          <Badge tone={getTone(version.ingestStatus)}>{version.ingestStatus || "-"}</Badge>
-                          <Badge tone={getVisibilityTone(version.visibility)}>{version.visibility || "-"}</Badge>
+                          <Badge tone={getTone(version.ingestStatus)}>{translateEnum(version.ingestStatus, knowledgeStatusKeys)}</Badge>
+                          <Badge tone={getVisibilityTone(version.visibility)}>{translateEnum(version.visibility, knowledgeVisibilityKeys)}</Badge>
                           <Badge tone={version.active ? "green" : "slate"}>
                             {version.active ? t("admin.active") : t("admin.inactive")}
                           </Badge>
@@ -254,11 +280,11 @@ export function KnowledgeBaseIngestedDocumentsCard({
                         </div>
                         <div>
                           <dt className="label-uppercase">{t("knowledge.ingestedDocuments.chunkCount")}</dt>
-                          <dd className="mt-xs font-semibold">{version.chunkCount ?? 0}</dd>
+                          <dd className="mt-xs font-semibold">{numberFormatter.format(version.chunkCount ?? 0)}</dd>
                         </div>
                         <div>
                           <dt className="label-uppercase">{t("knowledge.ingestedDocuments.embeddedCount")}</dt>
-                          <dd className="mt-xs font-semibold">{version.embeddedCount ?? 0}</dd>
+                          <dd className="mt-xs font-semibold">{numberFormatter.format(version.embeddedCount ?? 0)}</dd>
                         </div>
                         <div>
                           <dt className="label-uppercase">{t("knowledge.ingestedDocuments.sourceFile")}</dt>
@@ -287,7 +313,7 @@ export function KnowledgeBaseIngestedDocumentsCard({
                       </dl>
                       {version.errorMessage && (
                         <div className="mt-md rounded-lg bg-error-container px-md py-sm text-sm text-risk-high-text dark:bg-red-950/40 dark:text-red-200">
-                          <span className="font-semibold">{t("knowledge.ingestedDocuments.errorMessage")}:</span> {version.errorMessage}
+                          <span className="font-semibold">{t("knowledge.ingestedDocuments.errorMessage")}:</span> {t("knowledge.backgroundIngestFailed")}
                         </div>
                       )}
                     </article>
@@ -296,7 +322,7 @@ export function KnowledgeBaseIngestedDocumentsCard({
 
                 <div className="mt-md flex flex-wrap items-center justify-between gap-sm">
                   <p className="text-sm text-on-surface-variant dark:text-slate-400">
-                    {t("pagination.page")} {page + 1} / {Math.max(totalPages, 1)}
+                    {t("pagination.page")} {numberFormatter.format(page + 1)} / {numberFormatter.format(Math.max(totalPages, 1))}
                   </p>
                   <div className="flex gap-sm">
                     <Button

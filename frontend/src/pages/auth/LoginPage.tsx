@@ -120,9 +120,9 @@ export function LoginPage() {
           } catch (error) {
             clearAccessToken();
             void signOut({ remote: false });
-            const message = error instanceof Error ? error.message : t("auth.loginFailed");
-            setEmailNotVerified(message.includes("EMAIL_NOT_VERIFIED"));
-            setError(message === "EMAIL_NOT_VERIFIED" ? "Tài khoản chưa xác thực email." : message);
+            const isEmailNotVerified = error instanceof Error && error.message.includes("EMAIL_NOT_VERIFIED");
+            setEmailNotVerified(isEmailNotVerified);
+            setError(isEmailNotVerified ? t("auth.emailNotVerified") : t("auth.loginFailed"));
           } finally {
             setLoading(false);
           }
@@ -141,7 +141,7 @@ export function LoginPage() {
               id="email"
               className="form-field h-10 py-2 pl-9 text-sm"
               type="email"
-              placeholder="name@company.com"
+              placeholder={t("auth.emailPlaceholder")}
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               required
@@ -211,7 +211,7 @@ export function LoginPage() {
             {error}
           </p>
         )}
-        {emailNotVerified && <Button type="button" variant="secondary" className="w-full" onClick={() => navigate("/auth/check-email", { state: { email: email.trim(), maskedEmail: email.trim() } })}>Gửi lại email xác thực</Button>}
+        {emailNotVerified && <Button type="button" variant="secondary" className="w-full" onClick={() => navigate("/auth/check-email", { state: { email: email.trim(), maskedEmail: email.trim() } })}>{t("auth.resendVerificationEmail")}</Button>}
         {notice && !error && (
           <p className="rounded-md bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700">
             {notice}

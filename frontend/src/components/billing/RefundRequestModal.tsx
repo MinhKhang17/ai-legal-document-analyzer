@@ -29,7 +29,7 @@ export function RefundRequestModal({ transaction, submitting, onClose, onSubmit 
     const validationError = validateRefundForm({ amount, reason }, transaction.amount);
     if (validationError) { setError(t(validationError)); return; }
     if (!bankName.trim() || !accountNumber.trim() || !accountHolderName.trim()) {
-      setError('Vui lòng nhập đầy đủ thông tin tài khoản nhận hoàn tiền.');
+      setError(t('validation.refund.bankDetailsRequired'));
       return;
     }
     setError('');
@@ -49,17 +49,17 @@ export function RefundRequestModal({ transaction, submitting, onClose, onSubmit 
           <textarea className="form-field mt-xs min-h-28" maxLength={2000} value={reason} disabled={submitting} onChange={(event) => setReason(event.target.value)} />
         </label>
         <div className="grid gap-md md:grid-cols-2">
-          <label className="block text-sm font-semibold">Ngân hàng
+          <label className="block text-sm font-semibold">{t('refund.bankName')}
             <input className="form-field mt-xs" value={bankName} disabled={submitting} onChange={(event) => setBankName(event.target.value)} />
           </label>
-          <label className="block text-sm font-semibold">Số tài khoản
+          <label className="block text-sm font-semibold">{t('refund.accountNumber')}
             <input className="form-field mt-xs" value={accountNumber} disabled={submitting} onChange={(event) => setAccountNumber(event.target.value)} />
           </label>
         </div>
-        <label className="block text-sm font-semibold">Tên chủ tài khoản
+        <label className="block text-sm font-semibold">{t('refund.accountHolderName')}
           <input className="form-field mt-xs uppercase" value={accountHolderName} disabled={submitting} onChange={(event) => setAccountHolderName(event.target.value)} />
         </label>
-        <p className="rounded-lg bg-amber-500/10 p-sm text-xs text-amber-700 dark:text-amber-300">Sau khi gửi, bạn cần xác nhận qua email trước khi admin có thể tạo lệnh hoàn tiền.</p>
+        <p className="rounded-lg bg-amber-500/10 p-sm text-xs text-amber-700 dark:text-amber-300">{t('refund.emailConfirmationNotice')}</p>
         {error && <p className="text-sm text-error" role="alert">{error}</p>}
       </div>
     </Modal>

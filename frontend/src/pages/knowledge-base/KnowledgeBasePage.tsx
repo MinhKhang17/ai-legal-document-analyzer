@@ -32,12 +32,41 @@ const emptyForm = {
   rawContent: "",
 };
 
+const knowledgeStatusKeys: Record<string, string> = {
+  PENDING: "knowledge.status.PENDING",
+  UPLOADED: "knowledge.status.PENDING",
+  PROCESSING: "knowledge.status.PROCESSING",
+  INGESTED: "knowledge.status.INGESTED",
+  REVIEWING: "knowledge.status.REVIEWING",
+  PUBLIC: "knowledge.status.PUBLIC",
+  ARCHIVED: "knowledge.status.ARCHIVED",
+  FAILED: "knowledge.status.FAILED",
+};
+
+const knowledgeScopeKeys: Record<string, string> = {
+  GLOBAL: "knowledge.scopeValue.GLOBAL",
+  WORKSPACE: "knowledge.scopeValue.WORKSPACE",
+};
+
+const knowledgeCategoryKeys: Record<string, string> = {
+  LEGAL_SOURCE: "knowledge.categoryValue.LEGAL_SOURCE",
+};
+
 export function KnowledgeBasePage() {
   const { t, language } = useI18n();
   const toast = useToast();
   const { user } = useAppStore();
   const [searchParams, setSearchParams] = useSearchParams();
   const locale = language === "vi" ? "vi-VN" : "en-US";
+  const fileSizeFormatter = new Intl.NumberFormat(locale, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  const translateEnum = (value: string | null | undefined, keys: Record<string, string>) => {
+    if (!value) return t("common.unknown");
+    const key = keys[value];
+    return key ? t(key) : value;
+  };
   const [entries, setEntries] = useState<KnowledgeBaseEntry[]>([]);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
@@ -59,8 +88,8 @@ export function KnowledgeBasePage() {
       setEntries(response.items ?? []);
       setTotalItems(response.totalItems ?? 0);
       setTotalPages(response.totalPages ?? 0);
-    } catch (loadError) {
-      const message = loadError instanceof Error ? loadError.message : t("knowledge.loadError");
+    } catch {
+      const message = t("knowledge.loadError");
       setError(message);
     } finally {
       setLoading(false);
@@ -84,7 +113,7 @@ export function KnowledgeBasePage() {
           await loadEntries();
           setActiveJob(null);
         } else if (job.status === "FAILED") {
-          toast.error(job.errorMessage || t("knowledge.backgroundIngestFailed"));
+          toast.error(t("knowledge.backgroundIngestFailed"));
           await loadEntries();
           setActiveJob(null);
         }
@@ -133,13 +162,13 @@ export function KnowledgeBasePage() {
         });
         setActiveJob(job);
       }
-      toast.success(startIngest ? t("knowledge.backgroundIngestStarted") : (language === "vi" ? "Đã lưu bản nháp riêng tư." : "Private draft saved."));
+      toast.success(startIngest ? t("knowledge.backgroundIngestStarted") : t("knowledge.privateDraftSaved"));
       setForm(emptyForm);
       setSelectedFileName("");
       setSelectedFile(null);
       await loadEntries();
-    } catch (uploadError) {
-      const message = uploadError instanceof Error ? uploadError.message : t("knowledge.uploadError");
+    } catch {
+      const message = t("knowledge.uploadError");
       setActiveJob(null);
       setError(message);
       toast.error(message);
@@ -184,9 +213,9 @@ export function KnowledgeBasePage() {
       ),
     },
     { header: t("knowledge.code"), cell: (entry) => entry.code },
-    { header: t("knowledge.category"), cell: (entry) => entry.category },
-    { header: t("knowledge.scope"), cell: (entry) => <Badge>{entry.scope}</Badge> },
-    { header: t("table.status"), cell: (entry) => <div><Badge>{entry.currentStatus === "UPLOADED" ? "PENDING" : entry.currentStatus || t("common.unknown")}</Badge>{!entry.active && <p className="mt-xs text-xs text-on-surface-variant">Chưa đưa vào retrieval</p>}</div> },
+    { header: t("knowledge.category"), cell: (entry) => translateEnum(entry.category, knowledgeCategoryKeys) },
+    { header: t("knowledge.scope"), cell: (entry) => <Badge>{translateEnum(entry.scope, knowledgeScopeKeys)}</Badge> },
+    { header: t("table.status"), cell: (entry) => <div><Badge>{translateEnum(entry.currentStatus, knowledgeStatusKeys)}</Badge>{!entry.active && <p className="mt-xs text-xs text-on-surface-variant">{t("knowledge.inactiveForRetrieval")}</p>}</div> },
     { header: t("knowledge.ingestedDocuments.active"), cell: (entry) => <Badge tone={entry.active ? "green" : "slate"}>{entry.active ? t("admin.active") : t("admin.inactive")}</Badge> },
     { header: t("table.updated"), cell: (entry) => formatDisplayDate(entry.updatedAt, "-", locale) },
   ];
@@ -228,9 +257,9 @@ export function KnowledgeBasePage() {
                     {t("knowledge.newDocumentDefaultsDescription")}
                   </p>
                   <div className="mt-sm flex flex-wrap gap-xs">
-                    <Badge tone="amber">PENDING</Badge>
-                    <Badge tone="purple">PRIVATE</Badge>
-                    <Badge tone="slate">INACTIVE</Badge>
+                    <Badge tone="amber">{t("knowledge.status.PENDING")}</Badge>
+                    <Badge tone="purple">{t("knowledge.visibility.PRIVATE")}</Badge>
+                    <Badge tone="slate">{t("admin.inactive")}</Badge>
                   </div>
                 </div>
               </div>
@@ -268,28 +297,28 @@ export function KnowledgeBasePage() {
               <label className="text-sm font-semibold">
                 {t("knowledge.scope")}
                 <select className="form-field mt-xs" value={form.scope} onChange={(event) => setForm((previous) => ({ ...previous, scope: event.target.value }))}>
-                  <option value="GLOBAL">GLOBAL</option>
-                  <option value="WORKSPACE">WORKSPACE</option>
+                  <option value="GLOBAL">{t("knowledge.scopeValue.GLOBAL")}</option>
+                  <option value="WORKSPACE">{t("knowledge.scopeValue.WORKSPACE")}</option>
                 </select>
               </label>
             </div>
             <label className="block text-sm font-semibold">
-              {language === "vi" ? "Mô tả ngắn (tùy chọn)" : "Short description (optional)"}
+              {t("knowledge.shortDescriptionOptional")}
               <textarea className="form-field mt-xs min-h-24" maxLength={500} value={form.description} onChange={(event) => setForm((previous) => ({ ...previous, description: event.target.value }))} />
             </label>
             {selectedFile && (
               <div className="grid gap-sm rounded-xl border border-legal-border p-md text-sm dark:border-slate-700 sm:grid-cols-2">
-                <p><span className="text-on-surface-variant">File:</span> <strong>{selectedFile.name}</strong></p>
-                <p><span className="text-on-surface-variant">Content type:</span> {selectedFile.type || "application/octet-stream"}</p>
-                <p><span className="text-on-surface-variant">Dung lượng:</span> {(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
-                <p><span className="text-on-surface-variant">Uploaded at:</span> {new Date().toLocaleString(locale)}</p>
+                <p><span className="text-on-surface-variant">{t("common.file")}:</span> <strong>{selectedFile.name}</strong></p>
+                <p><span className="text-on-surface-variant">{t("knowledge.contentType")}:</span> {selectedFile.type || "application/octet-stream"}</p>
+                <p><span className="text-on-surface-variant">{t("knowledge.fileSize")}:</span> {fileSizeFormatter.format(selectedFile.size / 1024 / 1024)} MB</p>
+                <p><span className="text-on-surface-variant">{t("documents.uploadedAt")}:</span> {new Date().toLocaleString(locale)}</p>
               </div>
             )}
             <div className="flex flex-wrap justify-end gap-sm border-t border-legal-border pt-lg dark:border-slate-700">
-              <Button variant="secondary" onClick={() => { setForm(emptyForm); setSelectedFile(null); setSelectedFileName(""); }} disabled={saving}>Hủy</Button>
-              <Button variant="secondary" onClick={() => void handleUpload(false)} disabled={saving}>{saving ? (language === "vi" ? "Đang gửi tới backend..." : "Submitting to backend...") : "Lưu nháp"}</Button>
+              <Button variant="secondary" onClick={() => { setForm(emptyForm); setSelectedFile(null); setSelectedFileName(""); }} disabled={saving}>{t("actions.cancel")}</Button>
+              <Button variant="secondary" onClick={() => void handleUpload(false)} disabled={saving}>{saving ? t("knowledge.submitting") : t("knowledge.saveDraft")}</Button>
               <Button leftIcon={<Upload className="h-4 w-4" />} onClick={() => void handleUpload(true)} disabled={saving || !selectedFile}>
-                {saving ? (language === "vi" ? "Đang gửi tới backend..." : "Submitting to backend...") : "Bắt đầu ingest"}
+                {saving ? t("knowledge.submitting") : t("knowledge.startIngest")}
               </Button>
             </div>
 
@@ -299,11 +328,11 @@ export function KnowledgeBasePage() {
                   <div>
                     <p className="font-semibold">{t("knowledge.ingestProgress")}</p>
                     <p className="text-on-surface-variant dark:text-slate-400">
-                      {activeJob.status === "PROCESSING" ? t("knowledge.ingestRunningInBackground") : activeJob.status === "INGESTED" ? t("knowledge.backgroundIngestSuccess") : activeJob.errorMessage || t("knowledge.backgroundIngestFailed")}
+                      {activeJob.status === "PROCESSING" ? t("knowledge.ingestRunningInBackground") : activeJob.status === "INGESTED" ? t("knowledge.backgroundIngestSuccess") : t("knowledge.backgroundIngestFailed")}
                     </p>
                   </div>
                   <Badge tone={activeJob.status === "INGESTED" ? "green" : activeJob.status === "FAILED" ? "red" : "amber"}>
-                    {activeJob.status} · {activeJob.progressPercent ?? 0}%
+                    {translateEnum(activeJob.status, knowledgeStatusKeys)} · {activeJob.progressPercent ?? 0}%
                   </Badge>
                 </div>
                 <div className="mt-sm h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
@@ -320,21 +349,21 @@ export function KnowledgeBasePage() {
               <ArrowRight className="h-4 w-4" />
               <div><span className="font-semibold text-on-surface dark:text-slate-200">2</span><br />{t("knowledge.ingest")}</div>
               <ArrowRight className="h-4 w-4" />
-              <div><span className="font-semibold text-on-surface dark:text-slate-200">3</span><br />{language === "vi" ? "Duyệt & công khai" : "Approve & publish"}</div>
+              <div><span className="font-semibold text-on-surface dark:text-slate-200">3</span><br />{t("knowledge.approvePublishStep")}</div>
             </div>
           </div>
         </Card>
 
         <Card title={t("knowledge.entries")}>
           <div className="mb-lg space-y-sm rounded-2xl border border-primary/20 bg-primary/5 p-lg dark:border-indigo-400/20 dark:bg-indigo-950/20">
-            <h3 className="font-semibold">Hướng dẫn nhập tài liệu</h3>
+            <h3 className="font-semibold">{t("knowledge.guideTitle")}</h3>
             <ul className="grid gap-xs text-sm text-on-surface-variant dark:text-slate-300 2xl:grid-cols-2">
-              <li>✓ PDF, DOC, DOCX, TXT, Markdown, CSV, JSON</li>
-              <li>✓ AI xử lý nền; bạn có thể rời trang</li>
-              <li>✓ Khi admin duyệt, tài liệu được công khai và dùng cho RAG ngay</li>
-              <li>✓ Có thể tải lại file gốc sau khi upload</li>
+              <li>✓ {t("knowledge.guideSupportedFormats")}</li>
+              <li>✓ {t("knowledge.guideBackgroundProcessing")}</li>
+              <li>✓ {t("knowledge.guidePublish")}</li>
+              <li>✓ {t("knowledge.guideSourceDownload")}</li>
             </ul>
-            <div className="flex flex-wrap gap-xs"><Badge tone="amber">PENDING</Badge><Badge tone="amber">PROCESSING</Badge><Badge tone="green">INGESTED</Badge><Badge tone="purple">REVIEWING</Badge><Badge tone="green">PUBLIC</Badge><Badge tone="red">FAILED</Badge></div>
+            <div className="flex flex-wrap gap-xs"><Badge tone="amber">{t("knowledge.status.PENDING")}</Badge><Badge tone="amber">{t("knowledge.status.PROCESSING")}</Badge><Badge tone="green">{t("knowledge.status.INGESTED")}</Badge><Badge tone="purple">{t("knowledge.status.REVIEWING")}</Badge><Badge tone="green">{t("knowledge.status.PUBLIC")}</Badge><Badge tone="red">{t("knowledge.status.FAILED")}</Badge></div>
           </div>
           {error ? (
             <div role="alert" className="text-sm text-error">{error} <Button variant="secondary" onClick={() => void loadEntries()}>{t("common.retry")}</Button></div>
