@@ -7,7 +7,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -22,11 +22,14 @@ public class SharedChatSessionController {
     private final ChatSessionService chatSessionService;
 
     @GetMapping("/{shareToken}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'EXPERT')")
     @Operation(summary = "View shared chat session", description = "Retrieves the read-only history of a chat session shared via token. Sending new messages is not supported through this endpoint.")
     public ResponseEntity<ApiResponseDTO<SharedChatSessionResponse>> getSharedChatSession(
-            @PathVariable String shareToken) {
-        SharedChatSessionResponse response = chatSessionService.getSharedChatSession(shareToken);
+            @PathVariable String shareToken,
+            Authentication authentication) {
+        boolean adminOrExpert = authentication != null && authentication.isAuthenticated()
+                && authentication.getAuthorities().stream().anyMatch(authority ->
+                "ROLE_ADMIN".equals(authority.getAuthority()) || "ROLE_EXPERT".equals(authority.getAuthority()));
+        SharedChatSessionResponse response = chatSessionService.getSharedChatSession(shareToken, adminOrExpert);
         return ResponseEntity.ok(ApiResponseDTO.success("Shared chat session retrieved successfully", response));
     }
 }

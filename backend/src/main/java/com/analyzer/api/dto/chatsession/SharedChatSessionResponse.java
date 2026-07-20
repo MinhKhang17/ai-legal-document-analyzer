@@ -34,4 +34,8 @@ public class SharedChatSessionResponse {
 
     @Schema(description = "Full chronological message history of the session")
     private List<ChatMessageResponse> messages;
+
+    private com.analyzer.api.enums.ShareAccessLevel accessLevel;
+
+    private boolean readOnly;
 }

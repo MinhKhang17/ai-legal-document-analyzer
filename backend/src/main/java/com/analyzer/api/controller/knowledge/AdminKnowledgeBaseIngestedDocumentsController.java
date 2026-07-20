@@ -15,6 +15,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.format.annotation.DateTimeFormat;
+import java.time.LocalDateTime;
 
 @RestController
 @RequestMapping("/api/v1/admin/knowledge-bases")
@@ -22,6 +24,24 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminKnowledgeBaseIngestedDocumentsController {
 
     private final KnowledgeIngestedDocumentsService knowledgeIngestedDocumentsService;
+
+    @GetMapping("/ingested-documents/search")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Search all ingested knowledge documents")
+    public ResponseEntity<ApiResponseDTO<PageResponse<KnowledgeBaseIngestedDocumentResponse>>> searchIngestedDocuments(
+            @RequestParam(required = false) String title,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) Integer version,
+            @RequestParam(required = false) String source,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime createdFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime createdTo,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size) {
+        return ResponseEntity.ok(ApiResponseDTO.success("Tim kiem tai lieu da ingest thanh cong",
+                knowledgeIngestedDocumentsService.searchIngestedDocuments(
+                        title, category, version, source, status, createdFrom, createdTo, page, size)));
+    }
 
     @GetMapping("/{kbId}/ingested-documents")
     @PreAuthorize("hasRole('ADMIN')")

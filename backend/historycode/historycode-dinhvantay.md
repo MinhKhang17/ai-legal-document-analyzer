@@ -996,3 +996,61 @@ BUILD SUCCESS
     - `frontend/.env.example`
     - `frontend/vite.config.ts`
     - `ai-service/package-lock.json`
+
+---
+
+# Update History - 2026-07-20 - Backend Follow-up Features
+
+## Share Link Access And Session Handling
+
+- Bo sung `ShareAccessLevel` gom `RESTRICTED` va `PUBLIC`; mac dinh la `RESTRICTED` de bao ve noi dung phap ly.
+- Owner co the chon access level khi tao/cap nhat share link.
+- Link `PUBLIC` cho phep xem an danh; link `RESTRICTED` chi cho `ADMIN` hoac `EXPERT` co JWT hop le.
+- Backend nhan authentication hien tai neu request co Bearer token, khong bat dang nhap lai khi JWT van hop le.
+- Response tra `accessLevel`, `authenticationRequired` va `readOnly` cho frontend xu ly route.
+
+## Expert Revenue
+
+- Bo sung phi tu van va trang thai thanh toan `UNPAID`, `PENDING`, `PAID` theo legal ticket.
+- Admin cap nhat phi/trang thai qua `PATCH /api/v1/admin/tickets/{id}/expert-payment`.
+- Expert xem `GET /api/v1/expert/revenue` va `GET /api/v1/expert/revenue/tickets`.
+- Tong doanh thu chi tinh ticket da `RESOLVED` hoac `CLOSED`; khong lay tien mua subscription plan lam doanh thu expert.
+
+## Forgot And Reset Password
+
+- Bo sung `POST /api/v1/auth/forgot-password` va `POST /api/v1/auth/reset-password`.
+- Token raw chi gui qua email; database luu SHA-256 hash, het han sau 30 phut va chi dung mot lan.
+- Forgot-password tra response chung de tranh do tim email; reset validate confirm va chan trung mat khau hien tai.
+
+## Admin Ingested Document Search
+
+- Bo sung `GET /api/v1/admin/knowledge-bases/ingested-documents/search`.
+- Filter theo `title`, `category`, `version`, `source`, `status`, `createdFrom`, `createdTo`, `page`, `size`.
+- Response version bo sung `originalFileName`, `ingestSource`, `createdAt`.
+
+## Tests And Verification
+
+- Bo sung `ChatSessionSharingServiceImplTest`, `ExpertRevenueServiceImplTest` va `UserServicePasswordResetTest`.
+- Surefire: `Tests run: 36, Failures: 0, Errors: 0, Skipped: 0`.
+- Ket qua: `BUILD SUCCESS` khi dung temp directory nam trong workspace.
+
+---
+
+# Update History - 2026-07-20 - Service Layer Structure Correction
+
+- Tach `TicketCollaborationService` thanh interface dung quy uoc cua tang service.
+- Chuyen toan bo implementation sang `service/impl/TicketCollaborationServiceImpl`.
+- Controller va cac service khac tiep tuc phu thuoc interface; khong thay doi API hay business logic.
+- Cap nhat unit test de khoi tao implementation truc tiep.
+- Tach `KnowledgeIngestNotificationService` thanh interface va chuyen logic sang
+  `service/knowledge/impl/KnowledgeIngestNotificationServiceImpl`; khong thay doi luong notification/email.
+
+---
+
+# Update History - 2026-07-20 - Frontend VNPAY Session Handoff
+
+- Them `docs/frontend_vnpay_payment_return_session_fix.md` de ban giao frontend xu ly mat access
+  token khi VNPAY redirect va ung dung bi full-page reload.
+- Tai lieu huong dan fallback bang `sessionStorage`, thu tu khoi phuc auth, giu return URL khi login,
+  cau hinh payment-result URL tren deploy va checklist test.
+- Chi cap nhat tai lieu; khong sua frontend hoac business logic backend.

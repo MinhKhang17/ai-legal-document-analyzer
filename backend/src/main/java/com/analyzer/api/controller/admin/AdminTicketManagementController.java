@@ -29,6 +29,17 @@ public class AdminTicketManagementController {
 
     private final AdminTicketManagementService adminTicketManagementService;
     private final LegalTicketService legalTicketService;
+    private final com.analyzer.api.service.ExpertRevenueService expertRevenueService;
+
+    @PatchMapping("/{id}/expert-payment")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Update expert consultation fee and payment status")
+    public ResponseEntity<ApiResponseDTO<com.analyzer.api.dto.revenue.ExpertRevenueTicketResponse>> updateExpertPayment(
+            @PathVariable("id") String ticketId,
+            @Valid @RequestBody com.analyzer.api.dto.revenue.UpdateExpertPaymentRequest request) {
+        return ResponseEntity.ok(ApiResponseDTO.success("Cap nhat thanh toan expert thanh cong",
+                expertRevenueService.updatePayment(ticketId, request)));
+    }
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
