@@ -1044,3 +1044,13 @@ BUILD SUCCESS
 - Cap nhat unit test de khoi tao implementation truc tiep.
 - Tach `KnowledgeIngestNotificationService` thanh interface va chuyen logic sang
   `service/knowledge/impl/KnowledgeIngestNotificationServiceImpl`; khong thay doi luong notification/email.
+
+---
+
+# Update History - 2026-07-20 - Frontend VNPAY Session Handoff
+
+- Them `docs/frontend_vnpay_payment_return_session_fix.md` de ban giao frontend xu ly mat access
+  token khi VNPAY redirect va ung dung bi full-page reload.
+- Tai lieu huong dan fallback bang `sessionStorage`, thu tu khoi phuc auth, giu return URL khi login,
+  cau hinh payment-result URL tren deploy va checklist test.
+- Chi cap nhat tai lieu; khong sua frontend hoac business logic backend.
