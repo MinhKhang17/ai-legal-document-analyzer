@@ -128,8 +128,8 @@ def run_evaluation():
     print("=" * 80)
 
     comp_tests = [
-        (LegalQueryIntent.FULL_CONTRACT_REVIEW, True, "Kiểm tra hợp đồng", True),
-        (LegalQueryIntent.FULL_CONTRACT_REVIEW, False, "Kiểm tra hợp đồng", False),
+        (LegalQueryIntent.CONTRACT_RISK_ANALYSIS, True, "Kiểm tra hợp đồng", True),
+        (LegalQueryIntent.CONTRACT_RISK_ANALYSIS, False, "Kiểm tra hợp đồng", False),
         (LegalQueryIntent.SIGNING_DECISION_SUPPORT, True, "Tôi là bên B, có nên ký?", True),
         (LegalQueryIntent.SIGNING_DECISION_SUPPORT, True, "Có nên ký không?", False),
         (LegalQueryIntent.CLAUSE_ANALYSIS, True, "Phân tích phần đặt cọc", True),
