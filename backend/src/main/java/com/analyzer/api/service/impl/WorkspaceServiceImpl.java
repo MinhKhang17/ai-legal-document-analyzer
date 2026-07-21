@@ -483,4 +483,23 @@ public class WorkspaceServiceImpl implements WorkspaceService {
             throw new RuntimeException("Loi khi doc file tri thuc: " + e.getMessage(), e);
         }
     }
+
+    @Override
+    @Transactional
+    public void softDeleteDocument(Long userId, String workspaceId, String documentId) {
+        Document document = documentRepository.findById(documentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Tài liệu không tồn tại với ID: " + documentId));
+
+        if (!document.getUser().getId().equals(userId)) {
+            throw new ForbiddenException("Bạn không có quyền xóa tài liệu này");
+        }
+
+        if (!document.getWorkspace().getId().equals(workspaceId)) {
+            throw new ResourceNotFoundException("Tài liệu không thuộc về dự án này");
+        }
+
+        document.setStatus(STATUS_DELETED);
+        document.setUpdatedAt(LocalDateTime.now());
+        documentRepository.save(document);
+    }
 }

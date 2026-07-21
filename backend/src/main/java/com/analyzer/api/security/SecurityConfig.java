@@ -79,7 +79,9 @@ public class SecurityConfig {
                             "/api/v1/subscriptions/refunds/confirm",
                             "/api/subscription/refunds/confirm",
                             "/api/internal/**",
-                            "/api/v1/workspaces/*/documents/*/download"
+                            "/api/v1/workspaces/*/documents/*/download",
+                            "/api/v1/workspaces/*/documents/system/download",
+                            "/api/v1/workspaces/**/download**"
                     ).permitAll()
                     .requestMatchers(
                             "/v3/api-docs",
