@@ -19,6 +19,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -30,6 +31,7 @@ import com.analyzer.api.security.UserDetailsImpl;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Locale;
 import java.io.IOException;
 
 @RestController
@@ -117,8 +119,8 @@ public class KnowledgeBaseManagementController {
             @RequestParam(required = false) String category,
             @RequestParam(required = false) Boolean active,
             Pageable pageable) {
-        Page<KnowledgeBaseEntryResponse> page = entryRepository.searchForAdmin(
-                        normalizeFilter(keyword), status, scope, normalizeFilter(category), active, pageable)
+        Page<KnowledgeBaseEntryResponse> page = entryRepository.findAll(
+                        buildKnowledgeFilter(keyword, status, scope, category, active), pageable)
                 .map(this::toEntryResponse);
         return ResponseEntity.ok(ApiResponseDTO.success("Lay danh sach knowledge base thanh cong", toPageResponse(page)));
     }
@@ -249,6 +251,43 @@ public class KnowledgeBaseManagementController {
 
     private String normalizeFilter(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private String normalizeLowercaseFilter(String value) {
+        String normalized = normalizeFilter(value);
+        return normalized == null ? null : normalized.toLowerCase(Locale.ROOT);
+    }
+
+    private Specification<KnowledgeBaseEntry> buildKnowledgeFilter(
+            String keyword,
+            KnowledgeStatus status,
+            KnowledgeScope scope,
+            String category,
+            Boolean active) {
+        Specification<KnowledgeBaseEntry> specification = (root, query, builder) -> builder.conjunction();
+        String normalizedKeyword = normalizeLowercaseFilter(keyword);
+        if (normalizedKeyword != null) {
+            String pattern = "%" + normalizedKeyword + "%";
+            specification = specification.and((root, query, builder) -> builder.or(
+                    builder.like(builder.lower(root.get("title")), pattern),
+                    builder.like(builder.lower(root.get("code")), pattern),
+                    builder.like(builder.lower(root.get("category")), pattern)));
+        }
+        if (status != null) {
+            specification = specification.and((root, query, builder) -> builder.equal(root.get("currentStatus"), status));
+        }
+        if (scope != null) {
+            specification = specification.and((root, query, builder) -> builder.equal(root.get("scope"), scope));
+        }
+        String normalizedCategory = normalizeLowercaseFilter(category);
+        if (normalizedCategory != null) {
+            specification = specification.and((root, query, builder) ->
+                    builder.equal(builder.lower(root.get("category")), normalizedCategory));
+        }
+        if (active != null) {
+            specification = specification.and((root, query, builder) -> builder.equal(root.get("active"), active));
+        }
+        return specification;
     }
 
     private <T> PageResponse<T> toPageResponse(Page<T> page) {
