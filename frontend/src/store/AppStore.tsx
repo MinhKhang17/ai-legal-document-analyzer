@@ -126,7 +126,7 @@ const REFRESH_CREDENTIAL_REJECTION_MESSAGES = [
 
 const isRefreshCredentialRejectedError = (error: unknown): boolean => {
   if (isAuthUnauthorizedError(error)) return true;
-  if (!isAuthRequestError(error) || error.status !== 400) return false;
+  if (!isAuthRequestError(error)) return false;
 
   const responseText = [
     error.details?.message,
@@ -288,6 +288,15 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
     try {
       const storedToken = migrateLegacyAccessToken();
+      const hasStoredUser = window.localStorage.getItem(STORAGE_KEYS.user) !== null;
+
+      // A first-time visitor has no recoverable client session. Calling the
+      // refresh endpoint in this state turns an expected missing cookie into
+      // a misleading session-recovery error when an older backend returns 4xx/5xx.
+      if (!storedToken && !hasStoredUser) {
+        clearAuthState();
+        return;
+      }
 
       if (storedToken) try {
         const response = await getCurrentUser(storedToken);

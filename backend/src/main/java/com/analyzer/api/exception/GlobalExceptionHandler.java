@@ -174,6 +174,14 @@ public class GlobalExceptionHandler {
                                 HttpStatus.BAD_REQUEST);
         }
 
+        @ExceptionHandler(InvalidRefreshTokenException.class)
+        public ResponseEntity<ApiResponseDTO<Void>> handleInvalidRefreshTokenException(
+                        InvalidRefreshTokenException ex) {
+                return new ResponseEntity<>(
+                                ApiResponseDTO.error(HttpStatus.UNAUTHORIZED.value(), ex.getMessage()),
+                                HttpStatus.UNAUTHORIZED);
+        }
+
         @ExceptionHandler(ConflictException.class)
         public ResponseEntity<ApiResponseDTO<Void>> handleConflictException(ConflictException ex) {
                 return new ResponseEntity<>(
