@@ -53,6 +53,7 @@ public class AuthServiceImpl implements AuthService {
     public JwtResponseDTO login(LoginRequestDTO loginRequest, HttpServletResponse response) {
         userRepository.findByEmail(loginRequest.getEmail().trim().toLowerCase()).ifPresent(user -> {
             if (!user.isEmailVerified()) throw new ForbiddenException("EMAIL_NOT_VERIFIED");
+            if (!user.isActive()) throw new ForbiddenException("Tài khoản của bạn đã bị vô hiệu hóa hoặc ngừng hoạt động.");
         });
         // 1. Authenticate credentials
         Authentication authentication = authenticationManager.authenticate(

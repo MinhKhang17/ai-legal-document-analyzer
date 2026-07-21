@@ -202,4 +202,28 @@ public class UserServiceImpl implements UserService {
                 .map(userMapper::toResponseDTO)
                 .collect(Collectors.toList());
     }
+
+    @Override
+    @Transactional
+    public void softDeleteUser(Long userId, Long currentAdminId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với id: " + userId));
+
+        if (user.getId().equals(currentAdminId)) {
+            throw new ForbiddenException("Bạn không thể tự vô hiệu hóa / xóa tài khoản Admin của chính mình");
+        }
+
+        user.setActive(false);
+        userRepository.save(user);
+    }
+
+    @Override
+    @Transactional
+    public void restoreUser(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với id: " + userId));
+
+        user.setActive(true);
+        userRepository.save(user);
+    }
 }

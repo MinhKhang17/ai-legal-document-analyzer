@@ -20,4 +20,14 @@ public interface UserService {
      * locked for missing the password-change deadline, and resends the account-info email.
      */
     void resendExpertActivation(String email);
+
+    /**
+     * Soft deletes (deactivates) a user account.
+     */
+    void softDeleteUser(Long userId, Long currentAdminId);
+
+    /**
+     * Restores (re-activates) a soft-deleted user account.
+     */
+    void restoreUser(Long userId);
 }
