@@ -65,7 +65,7 @@ export function Topbar() {
       : "--";
 
   return (
-    <header className="sticky top-0 z-30 border-b border-outline-variant bg-white/90 px-md py-sm backdrop-blur dark:border-slate-800 dark:bg-slate-950/90 sm:px-lg">
+    <header className="sticky top-0 z-30 shrink-0 border-b border-outline-variant bg-white/90 px-md py-sm backdrop-blur dark:border-slate-800 dark:bg-slate-950/90 sm:px-lg">
       <div className="flex items-center justify-between gap-md">
         <div className="flex min-w-0 flex-1 items-center gap-md">
           <Button variant="ghost" size="icon" className="lg:hidden" aria-label={t('nav.openNavigation')} onClick={() => setMobileSidebarOpen(true)}>
