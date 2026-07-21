@@ -8,6 +8,7 @@ import com.analyzer.api.entity.User;
 import com.analyzer.api.enums.LegalTicketStatus;
 import com.analyzer.api.enums.LegalTicketMessageType;
 import com.analyzer.api.enums.RiskLevel;
+import com.analyzer.api.enums.ExpertPaymentStatus;
 import com.analyzer.api.enums.RoleName;
 import com.analyzer.api.enums.SuggestionType;
 import com.analyzer.api.exception.common.ConflictException;
@@ -23,6 +24,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Service
@@ -65,6 +67,9 @@ public class AdminTicketManagementServiceImpl implements AdminTicketManagementSe
                 && ticket.getAssignedLawyer().getId().equals(request.getLawyerId())) {
             return legalTicketMapper.toResponse(ticket);
         }
+        if (Boolean.TRUE.equals(request.getForceReassign()) && hasPaymentData(ticket)) {
+            throw new ConflictException("CANNOT_REASSIGN_TICKET_WITH_PAYMENT_SET");
+        }
 
         User lawyer = userRepository.findById(request.getLawyerId())
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy Luật sư ID: " + request.getLawyerId()));
@@ -88,6 +93,12 @@ public class AdminTicketManagementServiceImpl implements AdminTicketManagementSe
                 ticketType, savedTicket.getStatus().name(), "/tickets/" + savedTicket.getId(),
                 "Ticket da duoc phan cong cho chuyen gia.");
         return legalTicketMapper.toResponse(savedTicket);
+    }
+
+    private boolean hasPaymentData(LegalTicket ticket) {
+        return ticket.getExpertPaymentStatus() != ExpertPaymentStatus.UNPAID
+                || (ticket.getConsultationFee() != null
+                    && ticket.getConsultationFee().compareTo(BigDecimal.ZERO) > 0);
     }
 
     @Override
@@ -123,6 +134,9 @@ public class AdminTicketManagementServiceImpl implements AdminTicketManagementSe
                 .orElseThrow(() -> new ResourceNotFoundException("ADMIN_NOT_FOUND"));
         if (ticket.getStatus() == LegalTicketStatus.CLOSED || ticket.getStatus() == LegalTicketStatus.CANCELLED) {
             throw new ConflictException("INVALID_STATUS_TRANSITION");
+        }
+        if (ticket.getAssignedLawyer() != null && ticket.getStatus() != LegalTicketStatus.RESOLVED) {
+            throw new ConflictException("TICKET_NOT_RESOLVED_BY_EXPERT");
         }
         ticket.setStatus(LegalTicketStatus.CLOSED);
         ticket.setClosedAt(java.time.LocalDateTime.now());

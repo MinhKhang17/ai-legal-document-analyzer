@@ -7,6 +7,7 @@ import com.analyzer.api.entity.Role;
 import com.analyzer.api.entity.User;
 import com.analyzer.api.enums.LegalTicketStatus;
 import com.analyzer.api.enums.LegalTicketType;
+import com.analyzer.api.enums.ExpertPaymentStatus;
 import com.analyzer.api.enums.RoleName;
 import com.analyzer.api.exception.common.ConflictException;
 import com.analyzer.api.mapper.LegalTicketMapper;
@@ -21,6 +22,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -29,6 +31,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
 
 @ExtendWith(MockitoExtension.class)
 class AdminTicketManagementServiceImplTest {
@@ -122,6 +125,70 @@ class AdminTicketManagementServiceImplTest {
 
         verify(ticketRepository, never()).save(ticket);
         verifyNoInteractions(emailService);
+    }
+
+    @Test
+    void reassigningSameExpertRemainsNoOpWhenPaymentExists() {
+        User expert = activeUser(20L, RoleName.EXPERT);
+        LegalTicket ticket = LegalTicket.builder().id("ticket_same_paid").assignedLawyer(expert)
+                .ticketType(LegalTicketType.CONTACT_EXPERT).status(LegalTicketStatus.IN_REVIEW)
+                .expertPaymentStatus(ExpertPaymentStatus.PENDING).build();
+        AssignLawyerRequest request = AssignLawyerRequest.builder().lawyerId(20L).build();
+        when(ticketRepository.findById("ticket_same_paid")).thenReturn(Optional.of(ticket));
+        when(mapper.toResponse(ticket)).thenReturn(new LegalTicketResponse());
+
+        service.reassignLawyer("ticket_same_paid", 1L, request);
+
+        verify(ticketRepository, never()).save(any());
+        verifyNoInteractions(emailService);
+    }
+
+    @Test
+    void reassigningDifferentExpertIsBlockedAfterPaymentDataExists() {
+        User oldExpert = activeUser(20L, RoleName.EXPERT);
+        LegalTicket ticket = LegalTicket.builder().id("ticket_paid").assignedLawyer(oldExpert)
+                .ticketType(LegalTicketType.CONTACT_EXPERT).status(LegalTicketStatus.IN_REVIEW)
+                .consultationFee(new BigDecimal("500000")).build();
+        AssignLawyerRequest request = AssignLawyerRequest.builder().lawyerId(21L).build();
+        when(ticketRepository.findById("ticket_paid")).thenReturn(Optional.of(ticket));
+
+        assertThatThrownBy(() -> service.reassignLawyer("ticket_paid", 1L, request))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("CANNOT_REASSIGN_TICKET_WITH_PAYMENT_SET");
+        verify(userRepository, never()).findById(21L);
+        verify(ticketRepository, never()).save(any());
+    }
+
+    @Test
+    void closeInternalRejectsAssignedTicketBeforeExpertResolvesIt() {
+        User expert = activeUser(20L, RoleName.EXPERT);
+        User admin = User.builder().id(1L).build();
+        LegalTicket ticket = LegalTicket.builder().id("ticket_review").assignedLawyer(expert)
+                .status(LegalTicketStatus.IN_REVIEW).build();
+        when(ticketRepository.findByIdAndDeletedFalse("ticket_review")).thenReturn(Optional.of(ticket));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(admin));
+
+        assertThatThrownBy(() -> service.closeInternal("ticket_review", 1L, "note"))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("TICKET_NOT_RESOLVED_BY_EXPERT");
+        verify(ticketRepository, never()).save(any());
+    }
+
+    @Test
+    void closeInternalAllowsResolvedExpertTicket() {
+        User expert = activeUser(20L, RoleName.EXPERT);
+        User customer = User.builder().id(10L).email("customer@example.com").firstName("Customer").build();
+        User admin = User.builder().id(1L).build();
+        LegalTicket ticket = LegalTicket.builder().id("ticket_resolved").assignedLawyer(expert)
+                .createdBy(customer).status(LegalTicketStatus.RESOLVED).build();
+        when(ticketRepository.findByIdAndDeletedFalse("ticket_resolved")).thenReturn(Optional.of(ticket));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(admin));
+        when(ticketRepository.save(ticket)).thenReturn(ticket);
+        when(mapper.toResponse(ticket)).thenReturn(new LegalTicketResponse());
+
+        service.closeInternal("ticket_resolved", 1L, "done");
+
+        verify(ticketRepository).save(ticket);
     }
 
     private User activeUser(Long id, RoleName roleName) {
