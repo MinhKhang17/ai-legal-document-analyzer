@@ -2,6 +2,7 @@ package com.analyzer.api.controller;
 
 import com.analyzer.api.dto.ApiResponseDTO;
 import com.analyzer.api.dto.user.ChangePasswordRequestDTO;
+import com.analyzer.api.dto.user.UpdateProfileRequestDTO;
 import com.analyzer.api.dto.user.UserResponseDTO;
 import com.analyzer.api.security.UserDetailsImpl;
 import com.analyzer.api.service.UserService;
@@ -37,6 +38,15 @@ public class UserController {
     @Operation(summary = "Get all users", description = "Retrieves a list of all registered users")
     public ResponseEntity<ApiResponseDTO<List<UserResponseDTO>>> getAllUsers() {
         return ResponseEntity.ok(ApiResponseDTO.success(userService.getAllUsers()));
+    }
+
+    @PutMapping("/profile")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Update current user profile", description = "Updates profile details for the currently authenticated user.")
+    public ResponseEntity<ApiResponseDTO<UserResponseDTO>> updateProfile(
+            @Valid @RequestBody UpdateProfileRequestDTO request) {
+        UserResponseDTO updatedUser = userService.updateProfile(getCurrentUserId(), request);
+        return ResponseEntity.ok(ApiResponseDTO.success("Cập nhật thông tin cá nhân thành công", updatedUser));
     }
 
     @PostMapping("/change-password")

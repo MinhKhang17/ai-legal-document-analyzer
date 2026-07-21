@@ -115,6 +115,32 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
+    public UserResponseDTO updateProfile(Long userId, com.analyzer.api.dto.user.UpdateProfileRequestDTO request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với id: " + userId));
+
+        if (StringUtils.hasText(request.getFirstName())) {
+            user.setFirstName(request.getFirstName().trim());
+        }
+        if (StringUtils.hasText(request.getLastName())) {
+            user.setLastName(request.getLastName().trim());
+        }
+        if (request.getSpecialty() != null) {
+            user.setSpecialty(request.getSpecialty().trim());
+        }
+        if (request.getLegalDomain() != null) {
+            user.setLegalDomain(request.getLegalDomain().trim());
+        }
+        if (request.getDescription() != null) {
+            user.setDescription(request.getDescription().trim());
+        }
+
+        User savedUser = userRepository.save(user);
+        return userMapper.toResponseDTO(savedUser);
+    }
+
+    @Override
+    @Transactional
     public void changePassword(Long userId, ChangePasswordRequestDTO request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
@@ -209,6 +235,10 @@ public class UserServiceImpl implements UserService {
     public void softDeleteUser(Long userId, Long currentAdminId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với id: " + userId));
+
+        if (user.getRole() != null && user.getRole().getName() == RoleName.ADMIN) {
+            throw new ForbiddenException("Không thể xóa tài khoản Quản trị viên (Admin)");
+        }
 
         if (user.getId().equals(currentAdminId)) {
             throw new ForbiddenException("Bạn không thể tự vô hiệu hóa / xóa tài khoản Admin của chính mình");
