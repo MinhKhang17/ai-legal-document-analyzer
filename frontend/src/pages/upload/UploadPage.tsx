@@ -1,4 +1,4 @@
-import { FileText, Sparkles } from "lucide-react";
+import { AlertTriangle, FileText, RefreshCw, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState, useRef } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -22,6 +22,7 @@ import { useToast } from "../../hooks/useToast";
 import { getAccessToken as getSessionAccessToken } from "../../services/authSession";
 import { supportedContractScopeText } from "../../config/supportedContractTypes";
 import { formatFileSize, localeForLanguage } from "../../utils/format";
+import { validateDocumentFiles } from "../../config/upload";
 const getAccessToken = () => getSessionAccessToken() ?? "";
 
 export function UploadPage() {
@@ -166,6 +167,17 @@ export function UploadPage() {
       const msg = t("upload.selectWorkspaceRequired");
       setError(msg);
       toast.warning(msg, t("toast.warningTitle"));
+      return;
+    }
+
+    const validation = validateDocumentFiles([file]);
+    if (!validation.valid) {
+      const msg = t(validation.messageKey);
+      setSelectedFile(file);
+      setUploadState('failed');
+      setUploadError(msg);
+      setError(msg);
+      toast.error(msg, t("toast.errorTitle"));
       return;
     }
 
@@ -383,6 +395,38 @@ export function UploadPage() {
                 disabled={uploadState === 'uploading' || !selectedWorkspaceId}
               />
 
+              {uploadState === 'failed' && (
+                <div role="alert" className="mt-md rounded-xl border border-error/50 bg-error/10 p-md text-left text-sm text-error dark:border-red-900/60 dark:bg-red-950/40">
+                  <div className="flex items-center gap-xs font-bold text-error dark:text-red-300">
+                    <AlertTriangle className="h-5 w-5 shrink-0" />
+                    <span>{t('upload.failedBannerTitle')}</span>
+                  </div>
+                  <p className="mt-xs font-semibold text-on-surface dark:text-slate-200">
+                    {uploadError || t('upload.error.unknown')}
+                  </p>
+                  <p className="mt-xs text-xs text-on-surface-variant dark:text-slate-400">
+                    {t('upload.retryHelp')}
+                  </p>
+                  <div className="mt-sm flex flex-wrap gap-xs">
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      leftIcon={<RefreshCw className="h-4 w-4" />}
+                      onClick={handleRetryUpload}
+                    >
+                      {t('upload.retry')}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleClearFile}
+                    >
+                      {t('actions.remove')}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               {!selectedWorkspaceId && (
                 <p className="mt-md text-sm text-on-surface-variant dark:text-slate-400">
                   {t("upload.selectWorkspaceRequired")}
@@ -391,7 +435,7 @@ export function UploadPage() {
             </div>
           </Card>
 
-          {error && (
+          {error && uploadState !== 'failed' && (
             <div role="alert" className="rounded-xl border border-error/40 bg-error/10 p-md text-sm text-error">
               {error}
             </div>

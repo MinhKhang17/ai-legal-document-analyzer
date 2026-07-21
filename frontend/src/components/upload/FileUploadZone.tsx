@@ -1,4 +1,4 @@
-import { UploadCloud } from 'lucide-react';
+import { AlertCircle, RefreshCw, UploadCloud } from 'lucide-react';
 import { useCallback, useRef, useState, type DragEvent } from 'react';
 import { Button } from '../common/Button';
 import { cn } from '../../utils/cn';
@@ -37,6 +37,7 @@ export function FileUploadZone({
   const [localSelectedFile, setLocalSelectedFile] = useState<File | null>(null);
 
   const activeFile = selectedFile !== undefined ? selectedFile : localSelectedFile;
+  const isErrorState = Boolean(validationError) || uploadState === 'failed';
 
   const handleFiles = useCallback(
     (files: FileList | null) => {
@@ -44,7 +45,8 @@ export function FileUploadZone({
 
       const result = validateDocumentFiles(files);
       if (!result.valid) {
-        setValidationError(t(result.messageKey));
+        const errorText = t(result.messageKey);
+        setValidationError(errorText);
         return;
       }
       setValidationError('');
@@ -82,6 +84,7 @@ export function FileUploadZone({
         'rounded-xl border-2 border-dashed border-outline-variant bg-white p-xl text-center transition dark:border-slate-700 dark:bg-slate-900',
         dragging &&
           'border-primary bg-surface-container-low dark:border-inverse-primary dark:bg-slate-800',
+        isErrorState && 'border-error/60 bg-error/5 dark:border-red-900/60 dark:bg-red-950/20',
         compact && 'p-lg',
         disabled && 'cursor-not-allowed opacity-60',
       )}
@@ -111,8 +114,11 @@ export function FileUploadZone({
         }}
       />
 
-      <div className="mx-auto mb-md flex h-14 w-14 items-center justify-center rounded-xl bg-surface-container-high text-primary dark:bg-slate-800 dark:text-inverse-primary">
-        <UploadCloud className="h-7 w-7" aria-hidden="true" />
+      <div className={cn(
+        'mx-auto mb-md flex h-14 w-14 items-center justify-center rounded-xl bg-surface-container-high text-primary dark:bg-slate-800 dark:text-inverse-primary',
+        isErrorState && 'bg-error/10 text-error dark:bg-red-950/40 dark:text-red-400'
+      )}>
+        {isErrorState ? <AlertCircle className="h-7 w-7" aria-hidden="true" /> : <UploadCloud className="h-7 w-7" aria-hidden="true" />}
       </div>
 
       <h3 className="text-title-lg font-semibold text-on-surface dark:text-slate-100">
@@ -122,15 +128,23 @@ export function FileUploadZone({
       <p className="mt-xs text-sm text-on-surface-variant dark:text-slate-400">
         {t('documents.dropzoneHint')}
       </p>
+      <p className="mt-xs text-xs font-medium text-slate-500 dark:text-slate-400">
+        {t('upload.allowedFormatsHint')}
+      </p>
       
-      {validationError && <p className="mt-sm text-sm text-error" role="alert">{validationError}</p>}
+      {validationError && (
+        <div className="mt-sm inline-flex items-center gap-xs rounded-lg bg-error/10 px-md py-xs text-sm font-semibold text-error dark:bg-red-950/40" role="alert">
+          <AlertCircle className="h-4 w-4" />
+          <span>{validationError}</span>
+        </div>
+      )}
       
       {activeFile && (
         <div className="mt-sm space-y-md" aria-live="polite">
           {uploadState === 'idle' && (
             <div className="flex flex-wrap items-center justify-center gap-sm text-sm">
               <span className="font-medium text-on-surface dark:text-slate-200">
-                {activeFile.name} · {(activeFile.size / 1024).toFixed(1)} KB
+                {activeFile.name} · {(activeFile.size / (1024 * 1024)).toFixed(2)} MB
               </span>
               <Button
                 type="button"
@@ -163,19 +177,24 @@ export function FileUploadZone({
           )}
 
           {uploadState === 'failed' && (
-            <div className="flex flex-col items-center gap-sm">
+            <div className="flex flex-col items-center gap-sm rounded-xl border border-error/30 bg-error/10 p-md text-center dark:border-red-900/50 dark:bg-red-950/30">
+              <div className="flex items-center gap-xs text-sm font-bold text-error dark:text-red-300">
+                <AlertCircle className="h-4 w-4" />
+                <span>{t('upload.failedBannerTitle')}</span>
+              </div>
               <span className="text-sm font-semibold text-on-surface dark:text-slate-200">
                 {activeFile.name}
               </span>
-              <p className="text-sm text-error font-medium" role="alert">
-                {uploadError}
+              <p className="text-xs text-error font-medium" role="alert">
+                {uploadError || t('upload.error.unknown')}
               </p>
-              <div className="flex justify-center gap-sm">
+              <div className="mt-xs flex justify-center gap-sm">
                 {onRetry && (
                   <Button
                     type="button"
                     variant="primary"
                     size="sm"
+                    leftIcon={<RefreshCw className="h-3.5 w-3.5" />}
                     onClick={(event) => {
                       event.stopPropagation();
                       onRetry();
