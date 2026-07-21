@@ -1,4 +1,4 @@
-import { ArrowRight, ArrowUpDown, FileText, RefreshCw, RotateCcw, Search, ShieldCheck, SlidersHorizontal, Upload, UploadCloud } from "lucide-react";
+import { ArrowRight, ArrowUpDown, FileText, RefreshCw, RotateCcw, Search, SlidersHorizontal, Upload, UploadCloud } from "lucide-react";
 import type { ChangeEvent } from "react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
