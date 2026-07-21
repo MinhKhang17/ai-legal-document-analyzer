@@ -29,6 +29,8 @@ services:
       TICKET_ATTACHMENT_UPLOAD_ROOT: /app/uploads/ticket_attachments
       APP_AI_SERVICE_BASE_URL: http://ai-service:8000
       APP_API_CALLBACK_BASE_URL: http://backend:8080
+      KNOWLEDGE_BULK_ADMIN_ID: "1"
+
     depends_on:
       - ai-service
       - postgres
