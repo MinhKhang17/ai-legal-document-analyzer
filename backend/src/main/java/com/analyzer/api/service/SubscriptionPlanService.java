@@ -2,6 +2,7 @@ package com.analyzer.api.service;
 
 import com.analyzer.api.dto.subscriptionplan.SubscriptionPlanRequestDTO;
 import com.analyzer.api.dto.subscriptionplan.SubscriptionPlanResponseDTO;
+import com.analyzer.api.entity.SubscriptionPlan;
 import java.util.List;
 
 public interface SubscriptionPlanService {
@@ -10,4 +11,6 @@ public interface SubscriptionPlanService {
     SubscriptionPlanResponseDTO getPlanById(Long id);
     SubscriptionPlanResponseDTO updatePlan(Long id, SubscriptionPlanRequestDTO request);
     void deletePlan(Long id);
+
+    SubscriptionPlanResponseDTO toResponse(SubscriptionPlan plan);
 }

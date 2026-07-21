@@ -43,8 +43,7 @@ public class ChatSessionDocumentServiceImpl implements ChatSessionDocumentServic
         boolean alreadyActive = mappingRepository.findByChatSessionIdAndDocumentIdAndUserId(sessionId, documentId, userId)
                 .map(ChatSessionDocument::isActive).orElse(false);
         if (!alreadyActive) {
-            int attached = mappingRepository.findByChatSessionIdAndUserIdAndActiveTrueOrderByAttachedAtAsc(sessionId, userId).size();
-            subscriptionQuotaService.checkCanAttachDocument(session.getUser(), attached);
+            subscriptionQuotaService.checkCanAttachDocument(session.getUser(), sessionId);
         }
         Document document = documentRepository.findById(documentId)
                 .orElseThrow(() -> new ResourceNotFoundException("DOCUMENT_NOT_FOUND"));

@@ -28,7 +28,9 @@ Before deployment, confirm that the backend points to the intended database thro
 Flyway startup; no application data is removed.
 
 `EntityMigrationCoverageTest` fails when a new entity table or column is added without
-updating the baseline/reconciliation migration coverage.
+being covered by a `CREATE TABLE`/`ADD COLUMN` statement in *some* migration file — it
+scans every file under `db/migration`, so a new column can land in its own dedicated
+migration instead of requiring an edit to `V20260720_02`.
 
 ## Why the schema was inconsistent
 

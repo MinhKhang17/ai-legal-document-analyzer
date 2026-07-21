@@ -4,12 +4,14 @@ import com.analyzer.api.dto.ApiResponseDTO;
 import com.analyzer.api.dto.paymenttransaction.PaymentTransactionResponseDTO;
 import com.analyzer.api.dto.paymenttransaction.PaymentUrlResponseDTO;
 import com.analyzer.api.dto.paymenttransaction.VnPayIpnResponseDTO;
+import com.analyzer.api.exception.payment.VnPayCallbackException;
 import com.analyzer.api.security.UserDetailsImpl;
 import com.analyzer.api.service.PaymentTransactionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -33,6 +35,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/payment-transactions")
 @RequiredArgsConstructor
+@Slf4j
 @Tag(
         name = "Quản lý giao dịch thanh toán",
         description = "Các API dùng để xem lịch sử giao dịch thanh toán và xử lý thanh toán qua VNPAY"
@@ -92,7 +95,14 @@ public class PaymentTransactionController {
     )
     public ResponseEntity<Void> handleVnPayReturn(
             @RequestParam Map<String, String> params) {
-        paymentTransactionService.handleVnPayCallback(params);
+        try {
+            paymentTransactionService.handleVnPayCallback(params);
+        } catch (Exception ex) {
+            // Never let a callback validation failure surface as a raw JSON error page to the
+            // browser — log it server-side and still redirect; the frontend reads vnp_ResponseCode
+            // (already present in params) to render success/failure.
+            log.warn("VNPay return callback failed: {}", ex.getMessage());
+        }
         URI redirectUri = buildPaymentResultRedirectUri(params);
         return ResponseEntity.status(HttpStatus.FOUND)
                 .header(HttpHeaders.LOCATION, redirectUri.toString())
@@ -105,8 +115,16 @@ public class PaymentTransactionController {
             description = "Xác thực thông báo IPN từ VNPAY và cập nhật trạng thái giao dịch."
     )
     public ResponseEntity<VnPayIpnResponseDTO> handleVnPayIpn(@RequestParam Map<String, String> params) {
-        paymentTransactionService.handleVnPayCallback(params);
-        return ResponseEntity.ok(new VnPayIpnResponseDTO("00", "Confirm Success"));
+        try {
+            paymentTransactionService.handleVnPayCallback(params);
+            return ResponseEntity.ok(new VnPayIpnResponseDTO("00", "Confirm Success"));
+        } catch (VnPayCallbackException ex) {
+            log.warn("VNPay IPN rejected: rspCode={} message={}", ex.getRspCode(), ex.getMessage());
+            return ResponseEntity.ok(new VnPayIpnResponseDTO(ex.getRspCode(), ex.getMessage()));
+        } catch (Exception ex) {
+            log.warn("VNPay IPN callback failed unexpectedly", ex);
+            return ResponseEntity.ok(new VnPayIpnResponseDTO("99", "Unknown error"));
+        }
     }
 
     private Long getCurrentUserId() {

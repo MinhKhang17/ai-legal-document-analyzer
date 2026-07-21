@@ -14,10 +14,13 @@ import com.analyzer.api.repository.CustomerPlanRepository;
 import com.analyzer.api.repository.PaymentTransactionRepository;
 import com.analyzer.api.repository.SubscriptionPlanRepository;
 import com.analyzer.api.repository.UserRepository;
+import com.analyzer.api.service.support.CustomerPlanSnapshotHelper;
+import com.analyzer.api.util.AppClock;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -41,6 +44,7 @@ public class DataInitializer implements CommandLineRunner {
         private final PaymentTransactionRepository paymentTransactionRepository;
         private final PasswordEncoder passwordEncoder;
         private final JdbcTemplate jdbcTemplate;
+        private final CustomerPlanSnapshotHelper customerPlanSnapshotHelper;
 
         @Value("${app.admin.email:admin@123}")
         private String adminEmail;
@@ -87,17 +91,36 @@ public class DataInitializer implements CommandLineRunner {
                 seedUser("expert", "expert", "expert@123", "pass@123", expertRole);
 
                 logger.info("Seeding subscription plans...");
-                seedOrUpdatePlan("FREE", "Free Plan", SubscriptionTier.BASIC,
-                                "Free plan for trial legal analysis usage.",
-                                BigDecimal.ZERO, 30, 5, 50_000, 0, 1, 3, 1);
-                seedOrUpdatePlan("STANDARD", "Standard Plan", SubscriptionTier.PRO,
-                                "Standard monthly plan for regular contract analysis and AI chat.",
-                                new BigDecimal("79000"), 30, 50, 1_500_000, 0, 5, 15, 10);
-                seedOrUpdatePlan("PREMIUM", "Premium Plan", SubscriptionTier.PREMIUM,
-                                "Premium monthly plan with higher AI limits and one expert review ticket.",
-                                new BigDecimal("299000"), 30, 200, 8_500_000, 1, 20, 50, 40);
+                seedSubscriptionPlansIfMissing();
 
                 grantPremiumPlanToDemoUser();
+        }
+
+        private void seedSubscriptionPlansIfMissing() {
+                // Checked once upfront rather than per plan type: if an admin renames a seeded
+                // plan's planType, a per-type check would no longer find it and would insert a
+                // duplicate. Any existing plan at all is enough evidence this DB has already been
+                // seeded (or is admin-managed), so skip entirely.
+                if (subscriptionPlanRepository.count() > 0) {
+                        logger.info("Subscription plans already exist; skipping reseed to preserve admin edits");
+                        return;
+                }
+                try {
+                        seedPlan("FREE", "Free Plan", SubscriptionTier.BASIC,
+                                        "Free plan for trial legal analysis usage.",
+                                        BigDecimal.ZERO, 30, 5, 50_000, 0, 1, 3, 1);
+                        seedPlan("STANDARD", "Standard Plan", SubscriptionTier.PRO,
+                                        "Standard monthly plan for regular contract analysis and AI chat.",
+                                        new BigDecimal("79000"), 30, 50, 1_500_000, 0, 5, 15, 10);
+                        seedPlan("PREMIUM", "Premium Plan", SubscriptionTier.PREMIUM,
+                                        "Premium monthly plan with higher AI limits and one expert review ticket.",
+                                        new BigDecimal("299000"), 30, 200, 8_500_000, 1, 20, 50, 40);
+                } catch (DataIntegrityViolationException ex) {
+                        // Another instance won the race to seed first (uk_subscription_plan_type_lower
+                        // rejected the duplicate insert). Don't fail app startup over it.
+                        logger.warn("Subscription plan seeding hit a uniqueness conflict, likely a concurrent "
+                                        + "instance seeding at the same time; skipping. {}", ex.getMessage());
+                }
         }
 
         private void seedUser(String firstName, String lastName, String email, String rawPassword, Role role) {
@@ -114,7 +137,7 @@ public class DataInitializer implements CommandLineRunner {
                 logger.info("Seeded default user: {} / {}", email, rawPassword);
         }
 
-        private void seedOrUpdatePlan(
+        private void seedPlan(
                         String planType,
                         String planName,
                         SubscriptionTier tier,
@@ -127,9 +150,7 @@ public class DataInitializer implements CommandLineRunner {
                         int maxWorkspaces,
                         int maxContractsPerWorkspace,
                         int maxDraftContracts) {
-                SubscriptionPlan plan = subscriptionPlanRepository.findByPlanTypeIgnoreCase(planType)
-                                .orElseGet(SubscriptionPlan::new);
-
+                SubscriptionPlan plan = new SubscriptionPlan();
                 plan.setPlanType(planType);
                 plan.setPlanName(planName);
                 plan.setTier(tier);
@@ -170,7 +191,7 @@ public class DataInitializer implements CommandLineRunner {
                 plan.setActive(true);
 
                 subscriptionPlanRepository.save(plan);
-                logger.info("Seeded or updated subscription plan {}", planType);
+                logger.info("Seeded subscription plan {}", planType);
         }
 
         private void grantPremiumPlanToDemoUser() {
@@ -179,7 +200,7 @@ public class DataInitializer implements CommandLineRunner {
                 SubscriptionPlan premiumPlan = subscriptionPlanRepository.findByPlanTypeIgnoreCase("PREMIUM")
                                 .orElseThrow(() -> new IllegalStateException("PREMIUM plan was not seeded"));
 
-                LocalDateTime now = LocalDateTime.now();
+                LocalDateTime now = AppClock.now();
                 List<CustomerPlan> demoPlans = customerPlanRepository.findByCustomerId(demoUser.getId());
                 CustomerPlan demoPremiumPlan = demoPlans.stream()
                                 .filter(plan -> plan.getSubscriptionPlan() != null
@@ -218,6 +239,7 @@ public class DataInitializer implements CommandLineRunner {
                         demoPremiumPlan.setUsedQuota(0);
                         demoPremiumPlan.setAutoRenew(false);
                         demoPremiumPlan.setCancelReason(null);
+                        customerPlanSnapshotHelper.applySnapshot(demoPremiumPlan, premiumPlan);
                         demoPremiumPlan = customerPlanRepository.save(demoPremiumPlan);
                 }
 

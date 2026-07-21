@@ -37,6 +37,9 @@ public class CustomerPlanResponseDTO {
     @Schema(description = "Auto renew subscription status", example = "false")
     private Boolean autoRenew;
 
+    @Schema(description = "Reason the plan was cancelled, if any (e.g. self-service cancel pending at end of cycle, or refund)")
+    private String cancelReason;
+
     @Schema(description = "Remaining quota", example = "95")
     private Integer remainingQuota;
 

@@ -66,6 +66,48 @@ public class CustomerPlan {
     @Column(name = "cancel_reason", columnDefinition = "TEXT")
     private String cancelReason;
 
+    @Column(name = "plan_name_snapshot")
+    private String planNameSnapshot;
+
+    @Column(name = "plan_type_snapshot")
+    private String planTypeSnapshot;
+
+    @Column(name = "price_snapshot")
+    private java.math.BigDecimal priceSnapshot;
+
+    @Column(name = "billing_cycle_days_snapshot")
+    private Integer billingCycleDaysSnapshot;
+
+    @Column(name = "analysis_limit_snapshot")
+    private Integer analysisLimitSnapshot;
+
+    @Column(name = "ai_token_limit_snapshot")
+    private Integer aiTokenLimitSnapshot;
+
+    @Column(name = "workspace_limit_snapshot")
+    private Integer workspaceLimitSnapshot;
+
+    @Column(name = "documents_per_workspace_limit_snapshot")
+    private Integer documentsPerWorkspaceLimitSnapshot;
+
+    @Column(name = "storage_limit_mb_snapshot")
+    private Integer storageLimitMbSnapshot;
+
+    @Column(name = "max_file_size_mb_snapshot")
+    private Integer maxFileSizeMbSnapshot;
+
+    @Column(name = "attached_documents_limit_snapshot")
+    private Integer attachedDocumentsLimitSnapshot;
+
+    @Column(name = "draft_contract_limit_snapshot")
+    private Integer draftContractLimitSnapshot;
+
+    @Column(name = "expert_ticket_limit_snapshot")
+    private Integer expertTicketLimitSnapshot;
+
+    @Column(name = "allow_contact_expert_ticket_snapshot")
+    private Boolean allowContactExpertTicketSnapshot;
+
     @Transient
     private Integer remainingQuota;
 
