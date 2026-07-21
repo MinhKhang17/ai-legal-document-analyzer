@@ -732,6 +732,35 @@ class RagQueryTests(unittest.TestCase):
             )
         )
 
+    def test_signing_decision_offers_ticket_when_grounded_even_at_medium_risk(self) -> None:
+        service = RagQueryService(retrieval_service=_FakeRetrievalService(), llm_client=_FakeLlmClient())
+
+        self.assertTrue(
+            service._should_suggest_ticket(
+                intent=LegalQueryIntent.SIGNING_DECISION_SUPPORT,
+                input_complete=True,
+                used_knowledge_ids=["KB-1"],
+                invalid_citation_ids=[],
+                risk_level="MEDIUM",
+                response_status="PARTIALLY_ANSWERABLE",
+            )
+        )
+
+        self.assertTrue(
+            service._should_suggest_ticket(
+                intent=LegalQueryIntent.SIGNING_DECISION_SUPPORT,
+                input_complete=False,
+                used_knowledge_ids=[],
+                invalid_citation_ids=["KB-999"],
+                risk_level="LOW",
+                response_status="NEED_MORE_INFORMATION",
+            )
+        )
+
+        safe_answer = service._apply_signing_decision_safety("Một số điều khoản cần được làm rõ.")
+        self.assertIn("không khuyến khích bạn ký", safe_answer)
+        self.assertIn("tạo ticket để chuyên gia xem xét", safe_answer)
+
     def test_rag_query_endpoint_returns_response(self) -> None:
         fake_service = SimpleNamespace(
             query=lambda payload: RagQueryResponse(

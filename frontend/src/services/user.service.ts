@@ -78,3 +78,17 @@ export const changePassword = async (payload: { oldPassword: string; newPassword
     credentials: "include",
     body: JSON.stringify(payload),
   }, "Không thể đổi mật khẩu").then(() => undefined);
+
+export const deleteUser = async (userId: number | string): Promise<void> =>
+  requestApiResponse<void>(API_ENDPOINTS.users.delete(userId), {
+    method: "DELETE",
+    headers: buildAuthHeaders({ Accept: "application/json" }),
+    credentials: "include",
+  }, "Không thể xóa/vô hiệu hóa tài khoản người dùng").then(() => undefined);
+
+export const restoreUser = async (userId: number | string): Promise<void> =>
+  requestApiResponse<void>(API_ENDPOINTS.users.restore(userId), {
+    method: "POST",
+    headers: buildAuthHeaders({ Accept: "application/json" }),
+    credentials: "include",
+  }, "Không thể khôi phục tài khoản người dùng").then(() => undefined);

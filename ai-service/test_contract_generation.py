@@ -9,8 +9,8 @@ def test_generation():
     service = RagQueryService()
     request = RagQueryRequest(
         request_id="test_req_123",
-        user_id="1",
-        workspace_id="test_ws",
+        user_id="3",
+        workspace_id="ws_353ded3492e14a568c24f74762a80b7f",
         question="Provide me with a residential lease agreement.",
         top_k_knowledge_chunks=3
     )

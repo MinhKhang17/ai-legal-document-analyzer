@@ -5,6 +5,11 @@
 :root {
   color-scheme: light;
   font-family: Inter, "Noto Sans", ui-sans-serif, system-ui, "Segoe UI", Arial, sans-serif;
+  --font-domine: Domine, Georgia, Cambria, "Times New Roman", serif;
+}
+
+html[lang='vi'] {
+  --font-domine: Inter, "Noto Sans", ui-sans-serif, system-ui, "Segoe UI", Arial, sans-serif;
 }
 
 :root.dark {
@@ -63,7 +68,7 @@ body {
   }
 
   .font-display {
-    font-family: Domine, "Noto Serif", "DejaVu Serif", Georgia, Cambria, "Times New Roman", serif;
+    font-family: var(--font-domine);
   }
 
   html[lang='vi'] h1,
@@ -71,7 +76,7 @@ body {
   html[lang='vi'] h3,
   html[lang='vi'] .font-display,
   html[lang='vi'] .font-domine {
-    font-family: Inter, "Noto Sans", ui-sans-serif, system-ui, "Segoe UI", Arial, sans-serif;
+    font-family: var(--font-domine);
   }
 
   a {
@@ -129,10 +134,10 @@ body {
   }
 
   .legal-text {
-    font-family: Domine, "Noto Serif", "DejaVu Serif", Georgia, Cambria, "Times New Roman", serif;
+    font-family: var(--font-domine);
   }
 
   html[lang='vi'] .legal-text {
-    font-family: Inter, "Noto Sans", ui-sans-serif, system-ui, "Segoe UI", Arial, sans-serif;
+    font-family: var(--font-domine);
   }
 }

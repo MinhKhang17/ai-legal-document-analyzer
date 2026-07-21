@@ -36,6 +36,8 @@ export const API_ENDPOINTS = {
     logout: fromEnv("VITE_AUTH_LOGOUT_API"),
     verifyEmail: fromEnvOrDefault("VITE_AUTH_VERIFY_EMAIL_API", "/api/v1/auth/verify-email"),
     resendVerification: fromEnvOrDefault("VITE_AUTH_RESEND_VERIFICATION_API", "/api/v1/auth/resend-verification"),
+    forgotPassword: fromEnvOrDefault("VITE_AUTH_FORGOT_PASSWORD_API", "/api/v1/auth/forgot-password"),
+    resetPassword: fromEnvOrDefault("VITE_AUTH_RESET_PASSWORD_API", "/api/v1/auth/reset-password"),
   },
 
   workspaces: {
@@ -129,6 +131,10 @@ export const API_ENDPOINTS = {
     changePassword: fromEnvOrDefault("VITE_CHANGE_PASSWORD_API", "/api/v1/users/change-password"),
     adminExperts: fromEnvOrDefault("VITE_ADMIN_EXPERTS_API", "/api/v1/admin/users/experts"),
     resendExpertActivation: fromEnvOrDefault("VITE_ADMIN_EXPERT_RESEND_API", "/api/v1/admin/users/experts/resend-activation"),
+    delete: (userId: number | string) =>
+      fillPathParams(fromEnvOrDefault("VITE_ADMIN_USER_DELETE_API", "/api/v1/admin/users/:userId"), { userId }),
+    restore: (userId: number | string) =>
+      fillPathParams(fromEnvOrDefault("VITE_ADMIN_USER_RESTORE_API", "/api/v1/admin/users/:userId/restore"), { userId }),
   },
 
   adminDocuments: {

@@ -70,6 +70,9 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.POST,
                             "/api/v1/admin/knowledge-base/bulk-ingest-server-file").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/shared/chat/*").permitAll()
+                    .requestMatchers(HttpMethod.GET,
+                            "/api/v1/subscriptions/refunds/confirm",
+                            "/api/subscription/refunds/confirm").permitAll()
                     .requestMatchers(
                             "/api/v1/payment-transactions/vnpay-return",
                             "/api/v1/payment-transactions/vnpay-ipn",

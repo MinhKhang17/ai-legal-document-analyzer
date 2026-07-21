@@ -55,4 +55,37 @@ public class AdminUserController {
         userService.resendExpertActivation(request.getEmail());
         return ResponseEntity.ok(ApiResponseDTO.success("Đã gửi lại thông tin đăng nhập cho Expert"));
     }
+
+    @org.springframework.web.bind.annotation.DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Soft delete user", description = "Deactivates (soft deletes) a user account.")
+    public ResponseEntity<ApiResponseDTO<Void>> deleteUser(
+            @org.springframework.web.bind.annotation.PathVariable Long id) {
+        Long currentAdminId = getCurrentUserId();
+        userService.softDeleteUser(id, currentAdminId);
+        return ResponseEntity.ok(ApiResponseDTO.success("Đã xóa (vô hiệu hóa) tài khoản người dùng thành công"));
+    }
+
+    @PostMapping("/{id}/restore")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Restore user", description = "Re-activates a soft-deleted user account.")
+    public ResponseEntity<ApiResponseDTO<Void>> restoreUser(
+            @org.springframework.web.bind.annotation.PathVariable Long id) {
+        userService.restoreUser(id);
+        return ResponseEntity.ok(ApiResponseDTO.success("Đã khôi phục tài khoản người dùng thành công"));
+    }
+
+    private Long getCurrentUserId() {
+        org.springframework.security.core.Authentication authentication =
+                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()
+                || "anonymousUser".equals(authentication.getPrincipal())) {
+            throw new RuntimeException("Bạn chưa đăng nhập");
+        }
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof com.analyzer.api.security.UserDetailsImpl userDetails) {
+            return userDetails.getId();
+        }
+        throw new RuntimeException("Thông tin xác thực không hợp lệ");
+    }
 }

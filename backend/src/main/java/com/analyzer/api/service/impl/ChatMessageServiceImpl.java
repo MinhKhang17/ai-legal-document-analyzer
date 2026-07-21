@@ -584,7 +584,7 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         ChatMessage assistantMessage = assistantBuilder.build();
         chatMessageRepository.save(assistantMessage);
         applyConversationMemoryUpdate(chatSession, aiResponse.getConversationMemoryUpdate());
-        saveCitations(aiResponse.getCitations(), assistantMessage);
+        saveCitations(chatSession.getWorkspace().getId(), aiResponse.getCitations(), assistantMessage);
         subscriptionQuotaService.recordAiChatUsage(
                 currentUser,
                 assistantMessage.getPromptTokens() == null ? estimateTokens(question) : assistantMessage.getPromptTokens(),
@@ -676,7 +676,7 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                 .build();
     }
 
-    private void saveCitations(List<RagQueryResponse.Citation> citations, ChatMessage assistantMessage) {
+    private void saveCitations(String workspaceId, List<RagQueryResponse.Citation> citations, ChatMessage assistantMessage) {
         if (citations == null || citations.isEmpty()) {
             return;
         }
@@ -693,6 +693,23 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                             citation.getFileName(),
                             citation.getSectionTitle(),
                             citation.getCitationId());
+
+                    String uri = null;
+                    if (knowledgeBase) {
+                        if (citation.getFileName() != null && !citation.getFileName().isBlank()) {
+                            try {
+                                uri = "/api/v1/workspaces/" + workspaceId + "/documents/system/download?filename=" 
+                                    + java.net.URLEncoder.encode(citation.getFileName(), java.nio.charset.StandardCharsets.UTF_8.toString());
+                            } catch (java.io.UnsupportedEncodingException e) {
+                                uri = "/api/v1/workspaces/" + workspaceId + "/documents/system/download?filename=" + citation.getFileName();
+                            }
+                        }
+                    } else {
+                        if (citation.getDocumentId() != null && !citation.getDocumentId().isBlank()) {
+                            uri = "/api/v1/workspaces/" + workspaceId + "/documents/" + citation.getDocumentId() + "/download";
+                        }
+                    }
+
                     return AiCitation.builder()
                             .id("cite_" + UUID.randomUUID().toString().replace("-", ""))
                             .sourceType(knowledgeBase ? CitationSourceType.KNOWLEDGE_BASE : CitationSourceType.DOCUMENT)
@@ -702,6 +719,7 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                             .pageNumber(citation.getPageNumber())
                             .score(citation.getScore())
                             .chatMessage(assistantMessage)
+                            .uri(uri)
                             .build();
                 })
                 .toList();

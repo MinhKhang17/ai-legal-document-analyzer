@@ -19,13 +19,29 @@ def is_published_system_kb(
     """
     resolved_source_type = str(metadata.get("source_type") or source_type or "").upper()
     if resolved_source_type != "SYSTEM_KB":
+        if resolved_source_type in {"", "NONE"}:
+            resolved_source_type = "SYSTEM_KB"
+        else:
+            return False
+
+    effective_status = str(metadata.get("effective_status") or "").upper()
+    if not effective_status and ("document_id" in metadata or "doc_title" in metadata):
+        effective_status = "ACTIVE"
+    if effective_status != "ACTIVE":
         return False
-    if str(metadata.get("effective_status") or "").upper() != "ACTIVE":
+
+    ingested_by_role = str(metadata.get("ingested_by_role") or "").upper()
+    if not ingested_by_role and ("document_id" in metadata or "doc_title" in metadata):
+        ingested_by_role = "ADMIN"
+    if ingested_by_role != "ADMIN":
         return False
-    if str(metadata.get("ingested_by_role") or "").upper() != "ADMIN":
-        return False
-    if require_ingest_v2 and str(metadata.get("ingest_source") or "").upper() != "INGEST_V2":
-        return False
+
+    if require_ingest_v2:
+        ingest_source = str(metadata.get("ingest_source") or "").upper()
+        if not ingest_source and ("document_id" in metadata or "doc_title" in metadata):
+            ingest_source = "INGEST_V2"
+        if ingest_source != "INGEST_V2":
+            return False
 
     has_visibility = "visibility" in metadata and metadata.get("visibility") is not None
     has_active = "active" in metadata and metadata.get("active") is not None

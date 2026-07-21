@@ -160,12 +160,12 @@ export function LoginPage() {
             <label className="label-uppercase text-[9px]" htmlFor="password">
               {t("auth.password")}
             </label>
-            <a
+            <Link
               className="text-[10px] font-semibold text-primary hover:underline dark:text-inverse-primary"
-              href="#forgot"
+              to="/forgot-password"
             >
               {t("auth.forgotPassword")}
-            </a>
+            </Link>
           </div>
           <div className="relative">
             <Lock
