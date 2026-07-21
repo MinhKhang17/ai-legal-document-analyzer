@@ -1242,19 +1242,19 @@ export function LegalChatPage() {
 
         </aside>
 
-        <section className="order-2 min-w-0 md:order-1 md:min-h-0">
-          <div className="relative flex min-h-[70svh] min-w-0 flex-col gap-sm lg:h-full lg:min-h-0">
-            <section className="shrink-0 rounded-xl border border-legal-border bg-white p-sm shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-md" aria-labelledby="chat-documents-heading">
-              <div className="flex flex-wrap items-center justify-between gap-sm">
-                <div className="min-w-0">
-                  <h2 id="chat-documents-heading" className="text-sm font-semibold text-on-surface dark:text-slate-100">
-                    {t("chat.documents.usedCount", { count: formatNumber(attachedDocuments.length, locale) })}
-                  </h2>
-                  <p className="mt-0.5 text-xs text-on-surface-variant dark:text-slate-400">
-                    {t("chat.documents.contextHint")}
-                  </p>
-                </div>
-                <Badge tone="gold">RAG</Badge>
+
+        <section className="order-1 min-w-0 space-y-gutter">
+          <Card
+            className="relative flex min-h-[680px] flex-col overflow-hidden border-legal-border p-0 xl:h-[calc(100vh-3rem)] xl:max-h-[900px]"
+          >
+            <div className="border-b border-legal-border bg-white p-md dark:border-slate-700 dark:bg-slate-900">
+              <div className="mb-sm flex items-center justify-between gap-md">
+                <p className="text-sm font-semibold">{t("chat.documents.usedCount", { count: formatNumber(attachedDocuments.length, locale) })}</p>
+                <Badge tone={attachedDocuments.length > 0 ? "blue" : "green"}>
+                  {attachedDocuments.length > 0
+                    ? (language === "vi" ? "Phân tích tài liệu" : "Document analysis")
+                    : (language === "vi" ? "Hỏi đáp pháp luật" : "Legal Q&A")}
+                </Badge>
               </div>
               <div className="mt-sm flex gap-sm overflow-x-auto pb-xs">
                 {attachedDocuments.map((document) => (
@@ -1496,7 +1496,9 @@ export function LegalChatPage() {
                       if (input.trim() && selectedWorkspaceId && !sending && !chatBlockedByAttachedDocuments) void handleSend();
                     }
                   }}
-                  placeholder={t("chat.inputPlaceholder")}
+                  placeholder={attachedDocuments.length > 0
+                    ? (language === "vi" ? "Hỏi về tài liệu hoặc vấn đề pháp lý liên quan..." : "Ask about the document or a related legal issue...")
+                    : (language === "vi" ? "Nhập câu hỏi pháp luật của bạn..." : "Enter your legal question...")}
                   disabled={!selectedWorkspaceId || chatBlockedByAttachedDocuments}
                 />
                 {sending ? (

@@ -16,6 +16,9 @@ import type {
   ShareChatSessionResponse,
   SharedChatSession,
   ChatSessionDocument,
+  AiFeedbackType,
+  AiFeedbackSummary,
+  ChatMode,
 } from "../types/chat";
 
 interface ApiResponse<T> {
@@ -40,6 +43,8 @@ interface ApiErrorResponse {
 type SendMessageRequest = {
   message: string;
   documentId?: string;
+  documentIds?: string[];
+  mode?: ChatMode;
 };
 
 
@@ -403,7 +408,7 @@ export async function detachChatSessionDocument(accessToken: string, chatSession
   );
 }
 
-export async function submitChatMessageFeedback(accessToken: string, messageId: string, payload: { rating: ChatFeedbackRating; reasons?: ChatFeedbackReason[]; comment?: string }): Promise<ChatMessageFeedback> {
+export async function submitChatMessageFeedback(accessToken: string, messageId: string, payload: { feedbackType?: AiFeedbackType; reason?: string; rating?: ChatFeedbackRating; reasons?: ChatFeedbackReason[]; comment?: string }): Promise<ChatMessageFeedback> {
   const response = await postJson<ApiResponse<ChatMessageFeedback>>(API_ENDPOINTS.chat.feedback(messageId), payload, "Không thể gửi đánh giá", accessToken);
   return response.data;
 }
@@ -411,6 +416,10 @@ export async function submitChatMessageFeedback(accessToken: string, messageId: 
 export async function shareChatSession(accessToken: string, chatSessionId: string): Promise<ShareChatSessionResponse> {
   const response = await postJson<ApiResponse<ShareChatSessionResponse>>(API_ENDPOINTS.chat.share(chatSessionId), {}, "Không thể chia sẻ phiên chat", accessToken);
   return response.data;
+}
+
+export async function deleteChatMessageFeedback(accessToken: string, messageId: string): Promise<void> {
+  await deleteJson<ApiResponse<unknown>>(API_ENDPOINTS.chat.feedback(messageId), "KhÃ´ng thá»ƒ xÃ³a Ä‘Ã¡nh giÃ¡", accessToken);
 }
 
 export async function exportChatSessionMarkdown(accessToken: string, chatSessionId: string): Promise<void> {
@@ -446,5 +455,30 @@ export async function getAdminChatFeedback(accessToken: string, page = 0, size =
   const query = new URLSearchParams({ page: String(page), size: String(size) });
   if (rating) query.set('rating', rating);
   const response = await getJson<ApiResponse<PageResponse<ChatMessageFeedback>>>(`${API_ENDPOINTS.feedback.adminChatRatings}?${query}`, "Không thể tải đánh giá câu trả lời AI", accessToken);
+  return response.data;
+}
+
+export type AdminAiFeedbackFilters = {
+  feedbackType?: AiFeedbackType;
+  resolvedMode?: Exclude<ChatMode, 'AUTO'>;
+  riskLevel?: string;
+  fromDate?: string;
+  toDate?: string;
+  keyword?: string;
+  page?: number;
+  size?: number;
+};
+
+export async function getAdminAiFeedback(accessToken: string, filters: AdminAiFeedbackFilters = {}): Promise<PageResponse<ChatMessageFeedback>> {
+  const query = new URLSearchParams({ page: String(filters.page ?? 0), size: String(filters.size ?? 20) });
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value !== undefined && key !== 'page' && key !== 'size' && String(value).trim()) query.set(key, String(value));
+  });
+  const response = await getJson<ApiResponse<PageResponse<ChatMessageFeedback>>>(`/api/v1/admin/ai-feedbacks?${query}`, "KhÃ´ng thá»ƒ táº£i pháº£n há»“i AI", accessToken);
+  return response.data;
+}
+
+export async function getAdminAiFeedbackSummary(accessToken: string): Promise<AiFeedbackSummary> {
+  const response = await getJson<ApiResponse<AiFeedbackSummary>>("/api/v1/admin/ai-feedbacks/summary", "KhÃ´ng thá»ƒ táº£i thá»‘ng kÃª pháº£n há»“i AI", accessToken);
   return response.data;
 }

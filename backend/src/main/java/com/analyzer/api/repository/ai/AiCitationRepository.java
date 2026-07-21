@@ -13,5 +13,7 @@ public interface AiCitationRepository extends JpaRepository<AiCitation, String> 
     List<AiCitation> findByLegalTicket_Id(String ticketId);
 
     List<AiCitation> findByChatMessage_Id(String chatMessageId);
+
+    long countByChatMessage_Id(String chatMessageId);
 }
 

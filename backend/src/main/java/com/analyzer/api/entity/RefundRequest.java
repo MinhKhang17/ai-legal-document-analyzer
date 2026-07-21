@@ -64,6 +64,9 @@ public class RefundRequest {
     @Column(name = "confirmation_token_hash", length = 64)
     private String confirmationTokenHash;
 
+    @Column(name = "confirmation_used_token_hash", length = 64)
+    private String confirmationUsedTokenHash;
+
     @Column(name = "confirmation_expires_at")
     private LocalDateTime confirmationExpiresAt;
 

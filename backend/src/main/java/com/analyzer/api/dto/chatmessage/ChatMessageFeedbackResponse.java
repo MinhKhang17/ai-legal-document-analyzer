@@ -1,8 +1,10 @@
 package com.analyzer.api.dto.chatmessage;
 
+import com.analyzer.api.enums.AiFeedbackType;
+import com.analyzer.api.enums.ChatMode;
 import com.analyzer.api.enums.FeedbackReason;
 import com.analyzer.api.enums.FeedbackRating;
-import io.swagger.v3.oas.annotations.media.Schema;
+import com.analyzer.api.enums.RiskLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -15,33 +17,29 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Schema(description = "Response payload for a chat message feedback entry")
 public class ChatMessageFeedbackResponse {
-
-    @Schema(description = "Feedback ID")
     private String id;
-
-    @Schema(description = "ID of the rated chat message")
+    private String messageId;
     private String chatMessageId;
+    private String chatSessionId;
+    private AiFeedbackType feedbackType;
+    private String reason;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 
-    @Schema(description = "Snippet of the rated AI answer content")
+    // Existing response fields remain available for older clients.
     private String messageContent;
-
-    @Schema(description = "Thumbs up or down")
     private FeedbackRating rating;
-
-    @Schema(description = "Preset lý do được chọn khi rating = THUMBS_DOWN")
     private List<FeedbackReason> reasons;
-
-    @Schema(description = "Feedback comment")
     private String comment;
-
-    @Schema(description = "ID khách hàng đã gửi đánh giá (chủ sở hữu tin nhắn được đánh giá)")
     private Long submittedById;
-
-    @Schema(description = "Tên hiển thị của khách hàng đã gửi đánh giá")
     private String submittedByName;
 
-    @Schema(description = "Timestamp the feedback was submitted")
-    private LocalDateTime createdAt;
+    // Admin-only presentation metadata.
+    private String userEmail;
+    private String questionSnippet;
+    private String answerSnippet;
+    private ChatMode resolvedMode;
+    private RiskLevel riskLevel;
+    private Long sourceCount;
 }

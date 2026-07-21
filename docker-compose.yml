@@ -21,10 +21,16 @@ services:
       - ./backend/.env
     environment:
       DB_URL: jdbc:postgresql://postgres:5432/ai_legal_db
+      JPA_DDL_AUTO: validate
+      SPRING_FLYWAY_ENABLED: "true"
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: "true"
+      SPRING_FLYWAY_OUT_OF_ORDER: "true"
       APP_STORAGE_UPLOAD_ROOT: /app/uploads
       TICKET_ATTACHMENT_UPLOAD_ROOT: /app/uploads/ticket_attachments
       APP_AI_SERVICE_BASE_URL: http://ai-service:8000
       APP_API_CALLBACK_BASE_URL: http://backend:8080
+      KNOWLEDGE_BULK_ADMIN_ID: "1"
+
     depends_on:
       - ai-service
       - postgres

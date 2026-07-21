@@ -6,6 +6,14 @@ import { Card } from "../../components/common/Card";
 import { useI18n } from "../../hooks/useI18n";
 import { resendVerificationEmail, verifyEmail } from "../../services/auth.service";
 
+const verificationErrorMessage = (error: unknown) => {
+  const message = error instanceof Error ? error.message : "";
+  if (message.includes("TOKEN_EXPIRED")) return "Liên kết đã hết hạn.";
+  if (message.includes("TOKEN_ALREADY_USED")) return "Liên kết đã được sử dụng.";
+  if (message.includes("TOKEN_INVALID")) return "Liên kết không hợp lệ.";
+  return message || "Không thể xác thực email.";
+};
+
 export function VerifyEmailPage() {
   const { t } = useI18n();
   const [params] = useSearchParams();
@@ -25,10 +33,10 @@ export function VerifyEmailPage() {
     let active = true;
     void verifyEmail(token)
       .then(() => { if (active) setState("success"); })
-      .catch(() => {
+      .catch((error) => {
         if (active) {
           setState("error");
-          setMessage(t("auth.verifyEmail.error"));
+          setMessage(verificationErrorMessage(error));
         }
       });
     return () => { active = false; };

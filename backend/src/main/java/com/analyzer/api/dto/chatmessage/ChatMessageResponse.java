@@ -3,6 +3,7 @@ package com.analyzer.api.dto.chatmessage;
 import com.analyzer.api.enums.RiskLevel;
 import com.analyzer.api.enums.SuggestionType;
 import com.analyzer.api.enums.UserActionHint;
+import com.analyzer.api.enums.ChatMode;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -30,6 +31,7 @@ public class ChatMessageResponse {
     private RiskLevel riskLevel;
     private String legalDomain;
     private UserActionHint userActionHint;
+    private ChatMode resolvedMode;
     private Integer promptTokens;
     private Integer completionTokens;
     private Integer totalTokens;

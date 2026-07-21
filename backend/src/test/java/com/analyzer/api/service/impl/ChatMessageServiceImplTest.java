@@ -3,6 +3,7 @@ package com.analyzer.api.service.impl;
 import com.analyzer.api.entity.ChatSessionDocument;
 import com.analyzer.api.entity.Document;
 import com.analyzer.api.exception.workspace.NoReadyDocumentsException;
+import com.analyzer.api.enums.ChatMode;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -38,6 +39,19 @@ class ChatMessageServiceImplTest {
 
         assertEquals("An attached document failed processing. Remove it or upload it again before chatting",
                 exception.getMessage());
+    }
+
+    @Test
+    void noDocumentsResolvesToLegalQa() {
+        assertEquals(ChatMode.LEGAL_QA, ChatMessageServiceImpl.resolveChatMode(List.of(), List.of(), null));
+    }
+
+    @Test
+    void sessionOrMessageDocumentResolvesToDocumentAnalysis() {
+        assertEquals(ChatMode.DOCUMENT_ANALYSIS,
+                ChatMessageServiceImpl.resolveChatMode(List.of("doc-1"), List.of(), null));
+        assertEquals(ChatMode.DOCUMENT_ANALYSIS,
+                ChatMessageServiceImpl.resolveChatMode(List.of(), List.of("doc-2"), null));
     }
 
     private static ChatSessionDocument mapping(String status) {

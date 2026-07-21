@@ -26,6 +26,7 @@ import { formatDisplayDate } from "../../utils/format";
 import { getAdminChatFeedback } from "../../api/chatApi";
 import { getAccessToken } from "../../services/authSession";
 import type { ChatMessageFeedback } from "../../types/chat";
+import { AdminAiFeedbackPanel } from "../../components/admin/AdminAiFeedbackPanel";
 
 const surveyTypes: FeedbackSurveyType[] = ["SATISFACTION", "PRODUCT", "BUG", "USABILITY"];
 const surveyStatuses: FeedbackSurveyStatus[] = ["DRAFT", "ACTIVE", "CLOSED", "ARCHIVED"];
@@ -376,6 +377,10 @@ export function AdminFeedbackPage() {
           {error}
         </div>
       )}
+
+      <div className="mb-gutter">
+        <AdminAiFeedbackPanel language={language} />
+      </div>
 
       <div className="grid gap-gutter xl:grid-cols-[minmax(0,1fr)_420px]">
         <main className="space-y-gutter">

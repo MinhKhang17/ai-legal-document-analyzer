@@ -48,6 +48,12 @@ export function LoginPage() {
   const initialNotice =
     getStringStateValue(location.state, "noticeMessage") ||
     getStringStateValue(location.state, "message");
+  const requestedRedirect =
+    getStringStateValue(location.state, "redirectTo") ||
+    getStringStateValue(location.state, "from");
+  const safeRedirect = requestedRedirect.startsWith("/") && !requestedRedirect.startsWith("//")
+    ? requestedRedirect
+    : "";
   const [error, setError] = useState(initialError);
   const [notice, setNotice] = useState(initialNotice);
   const [emailNotVerified, setEmailNotVerified] = useState(false);
@@ -104,7 +110,7 @@ export function LoginPage() {
             signIn(accessToken, currentUser);
 
             const returnPath = getSafeAuthReturnPath(
-              getStringStateValue(location.state, "from"),
+              safeRedirect,
               currentUser.role,
             );
 
