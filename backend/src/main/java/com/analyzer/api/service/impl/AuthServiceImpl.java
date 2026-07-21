@@ -7,6 +7,7 @@ import com.analyzer.api.dto.user.UserResponseDTO;
 import com.analyzer.api.entity.RefreshToken;
 import com.analyzer.api.entity.User;
 import com.analyzer.api.exception.auth.ExpiredVerificationTokenException;
+import com.analyzer.api.exception.auth.InvalidRefreshTokenException;
 import com.analyzer.api.exception.common.ResourceNotFoundException;
 import com.analyzer.api.exception.common.ConflictException;
 import com.analyzer.api.mapper.UserMapper;
@@ -109,23 +110,23 @@ public class AuthServiceImpl implements AuthService {
         // 1. Read Refresh Token from HttpOnly Cookie
         String refreshTokenStr = jwtTokenProvider.getRefreshTokenFromCookies(request);
         if (refreshTokenStr == null || refreshTokenStr.isBlank()) {
-            throw new RuntimeException("Refresh token không tìm thấy trong cookie");
+            throw new InvalidRefreshTokenException("Refresh token không tìm thấy trong cookie");
         }
 
         // 2. Look up in database
         RefreshToken refreshToken = refreshTokenRepository.findByToken(refreshTokenStr)
-                .orElseThrow(() -> new RuntimeException("Refresh token không hợp lệ"));
+                .orElseThrow(() -> new InvalidRefreshTokenException("Refresh token không hợp lệ"));
 
         // 3. Check if revoked
         if (refreshToken.isRevoked()) {
-            throw new RuntimeException("Refresh token đã bị thu hồi");
+            throw new InvalidRefreshTokenException("Refresh token đã bị thu hồi");
         }
 
         // 4. Check if expired
         if (refreshToken.isExpired()) {
             refreshToken.setRevoked(true);
             refreshTokenRepository.save(refreshToken);
-            throw new RuntimeException("Refresh token đã hết hạn. Vui lòng đăng nhập lại");
+            throw new InvalidRefreshTokenException("Refresh token đã hết hạn. Vui lòng đăng nhập lại");
         }
 
         User user = refreshToken.getUser();
