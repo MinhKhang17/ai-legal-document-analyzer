@@ -993,6 +993,7 @@ const en: TranslationDictionary = {
 "lawyerTickets.ticketQueue": "Ticket queue",
 "lawyerTickets.ticketQueueDescription":
   "These tickets are assigned to your expert account.",
+"lawyerTickets.statusFilter": "Filter by status",
 "lawyerTickets.createdBy": "Created by",
 "lawyerTickets.workspace": "Workspace",
 "lawyerTickets.document": "Document",
@@ -2505,6 +2506,7 @@ const vi: TranslationDictionary = {
 "lawyerTickets.ticketQueue": "Danh sách ticket",
 "lawyerTickets.ticketQueueDescription":
   "Các yêu cầu này được gán cho tài khoản chuyên gia hiện tại.",
+"lawyerTickets.statusFilter": "Lọc theo trạng thái",
 "lawyerTickets.createdBy": "Tạo bởi",
 "lawyerTickets.workspace": "Workspace",
 "lawyerTickets.document": "Tài liệu",
