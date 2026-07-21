@@ -14,6 +14,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import java.util.List;
 
 @Data
@@ -140,6 +141,24 @@ public class LegalTicketResponse {
 
     @JsonProperty("expert_internal_note")
     private String expertInternalNote;
+
+    @JsonProperty("consultation_fee")
+    private BigDecimal consultationFee;
+
+    @JsonProperty("commission_rate")
+    private BigDecimal commissionRate;
+
+    @JsonProperty("platform_fee")
+    private BigDecimal platformFee;
+
+    @JsonProperty("expert_payout")
+    private BigDecimal expertPayout;
+
+    @JsonProperty("expert_payment_status")
+    private com.analyzer.api.enums.ExpertPaymentStatus expertPaymentStatus;
+
+    @JsonProperty("expert_paid_at")
+    private LocalDateTime expertPaidAt;
 
     @JsonProperty("admin_note")
     private String adminNote;
