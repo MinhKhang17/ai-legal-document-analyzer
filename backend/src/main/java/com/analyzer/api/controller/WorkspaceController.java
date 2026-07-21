@@ -16,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -114,27 +115,48 @@ public class WorkspaceController {
                 .body(resource);
     }
 
+    @DeleteMapping("/{workspaceId}/documents/{documentId}")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    @Operation(summary = "Soft delete workspace document", description = "Soft delete a document (status set to DELETED).")
+    public ResponseEntity<ApiResponseDTO<Void>> deleteDocument(
+            @PathVariable String workspaceId,
+            @PathVariable String documentId) {
+        workspaceService.softDeleteDocument(getCurrentUserId(), workspaceId, documentId);
+        return ResponseEntity.ok(ApiResponseDTO.success("Xóa tài liệu thành công", null));
+    }
+
     @GetMapping("/{workspaceId}/documents/system/download")
-    @PreAuthorize("hasAnyRole('CUSTOMER', 'EXPERT', 'ADMIN')")
     @Operation(summary = "Download system knowledge base document", description = "Download a system knowledge base document by filename.")
     public ResponseEntity<org.springframework.core.io.Resource> downloadSystemDocument(
             @PathVariable String workspaceId,
             @RequestParam String filename) {
         org.springframework.core.io.Resource resource = workspaceService.downloadSystemDocumentFile(filename);
         
+        String realFilename = (resource != null && resource.getFilename() != null) ? resource.getFilename() : filename;
+        String lowerName = realFilename.toLowerCase();
+
         String contentType = "application/octet-stream";
-        if (filename.endsWith(".docx")) {
+        String downloadName = realFilename;
+
+        if (lowerName.endsWith(".docx")) {
             contentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-        } else if (filename.endsWith(".doc")) {
+        } else if (lowerName.endsWith(".doc")) {
             contentType = "application/msword";
-        } else if (filename.endsWith(".pdf")) {
+        } else if (lowerName.endsWith(".pdf")) {
             contentType = "application/pdf";
-        } else if (filename.endsWith(".txt")) {
-            contentType = "text/plain";
+        } else if (lowerName.endsWith(".txt")) {
+            contentType = "text/plain; charset=utf-8";
+        } else if (lowerName.endsWith(".md")) {
+            contentType = "text/plain; charset=utf-8";
+            downloadName = realFilename + ".txt";
+        } else {
+            contentType = "text/plain; charset=utf-8";
+            downloadName = realFilename + ".txt";
         }
 
         return ResponseEntity.ok()
-                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + resource.getFilename() + "\"")
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + downloadName + "\"")
+                .header(org.springframework.http.HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS, "Content-Disposition")
                 .contentType(org.springframework.http.MediaType.parseMediaType(contentType))
                 .body(resource);
     }

@@ -20,7 +20,7 @@ const toneClasses: Record<BadgeTone, string> = {
 export function Badge({ tone = 'slate', className, children, ...props }: BadgeProps) {
   return (
     <span
-      className={cn('inline-flex items-center gap-xs rounded-full px-sm py-xs text-[11px] font-bold uppercase tracking-wider', toneClasses[tone], className)}
+      className={cn('inline-flex items-center justify-center gap-xs rounded-full px-sm py-xs text-[11px] font-bold uppercase tracking-wider whitespace-nowrap shrink-0', toneClasses[tone], className)}
       {...props}
     >
       {children}

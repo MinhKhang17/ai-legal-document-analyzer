@@ -21,4 +21,5 @@ public interface WorkspaceService {
     DocumentResponseDTO registerGeneratedDocument(com.analyzer.api.dto.document.RegisterDocumentRequestDTO request);
     org.springframework.core.io.Resource downloadSystemDocumentFile(String filename);
     org.springframework.core.io.Resource downloadDocumentForStaff(Long currentUserId, String currentUserRole, String documentId);
+    void softDeleteDocument(Long userId, String workspaceId, String documentId);
 }

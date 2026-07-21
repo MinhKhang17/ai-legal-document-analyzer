@@ -121,7 +121,15 @@ class RetrievalService:
         document_id = str(metadata.get("document_id") or metadata.get("documentId") or "").strip() or None
         workspace_id = str(metadata.get("workspace_id") or metadata.get("workspaceId") or "").strip() or None
         user_id = str(metadata.get("user_id") or metadata.get("userId") or "").strip() or None
-        file_name = str(metadata.get("file_name") or metadata.get("fileName") or "").strip() or None
+        file_name = str(
+            metadata.get("file_name")
+            or metadata.get("fileName")
+            or metadata.get("source_file")
+            or metadata.get("doc_title")
+            or metadata.get("law_name")
+            or chunk.title
+            or ""
+        ).strip() or None
         knowledge_document_id = None
         if source_type == "SYSTEM_KB":
             knowledge_document_id = str(

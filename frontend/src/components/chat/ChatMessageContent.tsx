@@ -40,14 +40,44 @@ function renderInline(text: string): ReactNode[] {
         </strong>
       );
     } else if (token.type === "link") {
+      const isApiDownload = token.url.includes("/documents/system/download") || token.url.includes("/download");
       return (
         <a
           key={`${token.type}-${index}`}
           href={token.url}
+          onClick={isApiDownload ? async (e) => {
+            e.preventDefault();
+            try {
+              const tokenStr = localStorage.getItem("token") || "";
+              const response = await fetch(token.url, {
+                headers: tokenStr ? { Authorization: `Bearer ${tokenStr}` } : {},
+              });
+              if (!response.ok) throw new Error("Download failed");
+              const blob = await response.blob();
+              const blobUrl = URL.createObjectURL(blob);
+              const anchor = document.createElement("a");
+              anchor.href = blobUrl;
+              let fileName = "";
+              const contentDisposition = response.headers.get("content-disposition") || response.headers.get("Content-Disposition");
+              if (contentDisposition) {
+                const match = contentDisposition.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i);
+                if (match) fileName = decodeURIComponent(match[1]);
+              }
+              if (!fileName && token.url.includes("filename=")) {
+                const match = token.url.match(/filename=([^&]+)/);
+                if (match) fileName = decodeURIComponent(match[1]);
+              }
+              if (!fileName) fileName = "document";
+              anchor.download = fileName;
+              anchor.click();
+              setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+            } catch {
+              window.open(token.url, "_blank");
+            }
+          } : undefined}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 font-semibold text-primary hover:underline dark:text-inverse-primary transition-colors cursor-pointer"
-          download
+          className="inline-flex items-center gap-1 font-semibold text-primary hover:underline dark:text-inverse-primary transition-colors cursor-pointer rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary dark:bg-primary/20"
         >
           {token.text}
         </a>
