@@ -355,7 +355,7 @@ export function Sidebar() {
     <>
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 hidden border-r border-outline-variant shadow-sm transition-all duration-300 dark:border-slate-800 lg:block',
+          'fixed inset-y-0 left-0 z-50 hidden h-screen h-[100dvh] border-r border-outline-variant shadow-sm transition-all duration-300 dark:border-slate-800 lg:block',
           sidebarCollapsed ? 'w-20' : 'w-72',
         )}
       >
@@ -371,7 +371,7 @@ export function Sidebar() {
 
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 w-72 transform border-r border-outline-variant shadow-raised transition-transform duration-300 dark:border-slate-800 lg:hidden',
+          'fixed inset-y-0 left-0 z-50 h-screen h-[100dvh] w-72 transform border-r border-outline-variant shadow-raised transition-transform duration-300 dark:border-slate-800 lg:hidden',
           mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
