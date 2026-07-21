@@ -150,7 +150,7 @@ class RagQueryService:
         logger.info("DEBUG RAG QUERY: request=%s, user_hits_count=%d", request.model_dump(exclude={"chatHistory", "conversationSummaryJson"}), len(user_hits))
         if self._needs_document_selection(request, user_hits):
             return self._build_document_selection_response(request, user_hits, knowledge_hits)
-        if follow_up and previous_snapshot is None:
+        if follow_up and previous_snapshot is None and not bounded_history_text.strip():
             return self._build_missing_snapshot_response(request, user_hits, knowledge_hits)
 
         # ── Step 2: Detect intent ──
@@ -421,7 +421,7 @@ class RagQueryService:
         response = RagQueryResponse(
             requestId=request.requestId,
             chatSessionId=request.chatSessionId,
-            answer=answer,
+            answer=self._enrich_answer_with_download_links(answer, request.workspaceId, prompt_knowledge_hits),
             confidenceScore=effective_confidence,
             shouldSuggestTicket=should_suggest_ticket,
             suggestionType=suggestion_type,
@@ -1148,3 +1148,39 @@ class RagQueryService:
             clauseNumber=hit.clauseNumber,
             sectionTitle=hit.sectionTitle,
         )
+
+    def _enrich_answer_with_download_links(
+        self, answer: str, workspace_id: str, knowledge_hits: list[RagChunkHit]
+    ) -> str:
+        if not answer or not knowledge_hits or not workspace_id:
+            return answer
+
+        kb_map = {}
+        for hit in knowledge_hits:
+            if hit.citationId:
+                file_target = (
+                    (hit.fileName or "").strip()
+                    or (hit.lawName or "").strip()
+                    or (hit.title or "").strip()
+                    or (hit.knowledgeDocumentId or "").strip()
+                )
+                if file_target:
+                    kb_map[hit.citationId] = file_target
+
+        logger.info("DEBUG ENRICH DOWNLOAD LINKS: kb_map=%s, answer_has_kb=%s", kb_map, "[KB-" in answer)
+        if not kb_map:
+            return answer
+
+        import re
+        from urllib.parse import quote
+
+        def _replace_tag(match):
+            tag = match.group(1)
+            if tag in kb_map:
+                filename = kb_map[tag]
+                encoded = quote(filename)
+                download_url = f"/api/v1/workspaces/{workspace_id}/documents/system/download?filename={encoded}"
+                return f"[[{tag} 📥 Tải về]]({download_url})"
+            return match.group(0)
+
+        return re.sub(r"\[(KB-\d+)\]", _replace_tag, answer)

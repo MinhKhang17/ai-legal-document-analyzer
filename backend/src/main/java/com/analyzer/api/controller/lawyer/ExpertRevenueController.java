@@ -1,6 +1,7 @@
 package com.analyzer.api.controller.lawyer;
 
 import com.analyzer.api.dto.ApiResponseDTO;
+import com.analyzer.api.dto.PageResponse;
 import com.analyzer.api.dto.revenue.ExpertRevenueSummaryResponse;
 import com.analyzer.api.dto.revenue.ExpertRevenueTicketResponse;
 import com.analyzer.api.security.UserDetailsImpl;
@@ -10,7 +11,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/expert/revenue")
@@ -26,9 +26,11 @@ public class ExpertRevenueController {
     }
 
     @GetMapping("/tickets")
-    public ResponseEntity<ApiResponseDTO<List<ExpertRevenueTicketResponse>>> tickets() {
+    public ResponseEntity<ApiResponseDTO<PageResponse<ExpertRevenueTicketResponse>>> tickets(
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "10") int size) {
         return ResponseEntity.ok(ApiResponseDTO.success("Lay doanh thu theo ticket thanh cong",
-                revenueService.getTickets(currentUserId())));
+                revenueService.getTickets(currentUserId(), page, size)));
     }
 
     private Long currentUserId() {

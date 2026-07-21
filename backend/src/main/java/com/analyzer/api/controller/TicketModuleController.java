@@ -28,8 +28,8 @@ public class TicketModuleController {
     private final AdminTicketManagementService adminTicketManagementService;
 
     @GetMapping("/config/attachment-policy")
-    public ApiResponseDTO<AttachmentPolicyResponse> attachmentPolicy() {
-        return ApiResponseDTO.success("Attachment policy", collaborationService.policy());
+    public ResponseEntity<ApiResponseDTO<AttachmentPolicyResponse>> attachmentPolicy() {
+        return ResponseEntity.ok(ApiResponseDTO.success("Attachment policy", collaborationService.policy()));
     }
 
     @PostMapping(value = "/attachments", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -41,9 +41,9 @@ public class TicketModuleController {
     }
 
     @DeleteMapping("/attachments/{attachmentId}")
-    public ApiResponseDTO<Void> deleteAttachment(@PathVariable String attachmentId) {
+    public ResponseEntity<ApiResponseDTO<Void>> deleteAttachment(@PathVariable String attachmentId) {
         collaborationService.remove(currentUserId(), attachmentId);
-        return ApiResponseDTO.success("Attachment removed", null);
+        return ResponseEntity.ok(ApiResponseDTO.success("Attachment removed", null));
     }
 
     @GetMapping("/attachments/{attachmentId}/download")
@@ -63,7 +63,7 @@ public class TicketModuleController {
     }
 
     @GetMapping("/tickets")
-    public ApiResponseDTO<PageResponse<LegalTicketResponse>> listTickets(
+    public ResponseEntity<ApiResponseDTO<PageResponse<LegalTicketResponse>>> listTickets(
             @RequestParam(value = "status", required = false) LegalTicketStatus status,
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "10") int size) {
@@ -73,19 +73,20 @@ public class TicketModuleController {
                 : "EXPERT".equals(role)
                     ? expertLegalTicketService.getAssignedTickets(currentUserId(), status, page, size)
                     : legalTicketService.getMyTickets(currentUserId(), status, page, size);
-        return ApiResponseDTO.success("Tickets retrieved", result);
+        return ResponseEntity.ok(ApiResponseDTO.success("Tickets retrieved", result));
     }
 
     @GetMapping("/tickets/{ticketId}")
-    public ApiResponseDTO<LegalTicketResponse> ticketDetail(@PathVariable String ticketId) {
-        return ApiResponseDTO.success("Ticket retrieved", legalTicketService.getTicketById(currentUserId(), currentRole(), ticketId));
+    public ResponseEntity<ApiResponseDTO<LegalTicketResponse>> ticketDetail(@PathVariable String ticketId) {
+        return ResponseEntity.ok(ApiResponseDTO.success("Ticket retrieved",
+                legalTicketService.getTicketById(currentUserId(), currentRole(), ticketId)));
     }
 
     @PatchMapping("/tickets/{ticketId}")
-    public ApiResponseDTO<LegalTicketResponse> transition(
+    public ResponseEntity<ApiResponseDTO<LegalTicketResponse>> transition(
             @PathVariable String ticketId, @Valid @RequestBody TicketActionRequest request) {
-        return ApiResponseDTO.success("Ticket updated",
-                collaborationService.transition(currentUserId(), currentRole(), ticketId, request));
+        return ResponseEntity.ok(ApiResponseDTO.success("Ticket updated",
+                collaborationService.transition(currentUserId(), currentRole(), ticketId, request)));
     }
 
     @PostMapping("/tickets/{ticketId}/messages")
@@ -96,17 +97,19 @@ public class TicketModuleController {
     }
 
     @GetMapping("/tickets/{ticketId}/messages")
-    public ApiResponseDTO<PageResponse<LegalTicketMessageResponse>> messages(
+    public ResponseEntity<ApiResponseDTO<PageResponse<LegalTicketMessageResponse>>> messages(
             @PathVariable String ticketId,
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "30") int size) {
-        return ApiResponseDTO.success("Messages retrieved", collaborationService.messages(currentUserId(), currentRole(), ticketId, page, size));
+        return ResponseEntity.ok(ApiResponseDTO.success("Messages retrieved",
+                collaborationService.messages(currentUserId(), currentRole(), ticketId, page, size)));
     }
 
     @PostMapping("/tickets/{ticketId}/assign")
     @PreAuthorize("hasRole('ADMIN')")
-    public ApiResponseDTO<LegalTicketResponse> assign(@PathVariable String ticketId, @Valid @RequestBody AssignLawyerRequest request) {
-        return ApiResponseDTO.success("Ticket assigned", adminTicketManagementService.assignLawyer(ticketId, currentUserId(), request));
+    public ResponseEntity<ApiResponseDTO<LegalTicketResponse>> assign(@PathVariable String ticketId, @Valid @RequestBody AssignLawyerRequest request) {
+        return ResponseEntity.ok(ApiResponseDTO.success("Ticket assigned",
+                adminTicketManagementService.assignLawyer(ticketId, currentUserId(), request)));
     }
 
     @PostMapping("/tickets/{ticketId}/shares")
@@ -117,15 +120,15 @@ public class TicketModuleController {
     }
 
     @DeleteMapping("/tickets/{ticketId}/shares/{shareId}")
-    public ApiResponseDTO<Void> revokeShare(@PathVariable String ticketId, @PathVariable String shareId) {
+    public ResponseEntity<ApiResponseDTO<Void>> revokeShare(@PathVariable String ticketId, @PathVariable String shareId) {
         collaborationService.revokeShare(currentUserId(), currentRole(), ticketId, shareId);
-        return ApiResponseDTO.success("Share revoked", null);
+        return ResponseEntity.ok(ApiResponseDTO.success("Share revoked", null));
     }
 
     @GetMapping("/shared-conversation/{token}")
-    public ApiResponseDTO<LegalTicketResponse> sharedConversation(@PathVariable String token) {
-        return ApiResponseDTO.success("Shared conversation retrieved",
-                collaborationService.openShare(currentUserId(), currentRole(), token));
+    public ResponseEntity<ApiResponseDTO<LegalTicketResponse>> sharedConversation(@PathVariable String token) {
+        return ResponseEntity.ok(ApiResponseDTO.success("Shared conversation retrieved",
+                collaborationService.openShare(currentUserId(), currentRole(), token)));
     }
 
     private Long currentUserId() {

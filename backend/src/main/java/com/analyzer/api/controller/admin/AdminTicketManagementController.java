@@ -38,7 +38,17 @@ public class AdminTicketManagementController {
             @PathVariable("id") String ticketId,
             @Valid @RequestBody com.analyzer.api.dto.revenue.UpdateExpertPaymentRequest request) {
         return ResponseEntity.ok(ApiResponseDTO.success("Cap nhat thanh toan expert thanh cong",
-                expertRevenueService.updatePayment(ticketId, request)));
+                expertRevenueService.updatePayment(ticketId, getCurrentUserId(), request)));
+    }
+
+    @PostMapping("/{id}/expert-payment/reset")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Reset expert payment/commission data on a ticket",
+            description = "Clears consultationFee, commissionRate, platformFee, expertPayout and paymentStatus so the ticket can be reassigned to a different expert. Blocked once paymentStatus is PAID.")
+    public ResponseEntity<ApiResponseDTO<com.analyzer.api.dto.revenue.ExpertRevenueTicketResponse>> resetExpertPayment(
+            @PathVariable("id") String ticketId) {
+        return ResponseEntity.ok(ApiResponseDTO.success("Da reset du lieu thanh toan expert",
+                expertRevenueService.resetFinancials(ticketId, getCurrentUserId())));
     }
 
     @GetMapping

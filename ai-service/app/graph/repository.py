@@ -462,7 +462,9 @@ class GraphRepository:
         except Exception:
             return {}
 
-    def _tokenize(self, text: str) -> list[str]:
+    def _tokenize(self, text: str | None) -> list[str]:
+        if not text:
+            return []
         normalized = unicodedata.normalize("NFKD", text)
         stripped = "".join(char for char in normalized if not unicodedata.combining(char))
         return re.findall(r"[a-z0-9]+", stripped.lower())

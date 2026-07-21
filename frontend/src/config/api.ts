@@ -49,6 +49,8 @@ export const API_ENDPOINTS = {
         fillPathParams(fromEnv("VITE_WORKSPACE_DOCUMENTS_API"), { workspaceId }),
       documentDownload: (workspaceId: string, documentId: string) =>
         `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/documents/${encodeURIComponent(documentId)}/download`,
+      documentDelete: (workspaceId: string, documentId: string) =>
+        `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/documents/${encodeURIComponent(documentId)}`,
   },
 
   chat: {

@@ -37,6 +37,8 @@ def is_contract_generation_intent(question: str) -> bool:
         "kiểm tra", "đánh giá", "nhận xét", "góp ý", "sửa lỗi", "rà soát",
         "nguồn nào", "file nào", "tệp nào", "thông tin lấy từ", "lấy từ đâu",
         "tham khảo", "đã tham khảo", "tham chiếu", "đã dùng", "đã sử dụng", "nguồn gốc",
+        "căn cứ", "căn cứ vào", "dựa vào", "dựa trên", "căn cứ đâu", "bạn lấy ở đâu",
+        "dẫn chứng", "bằng chứng", "nghị định nào", "thông tư nào", "luật nào",
     ]
     if any(kw in question_lower for kw in qa_keywords):
         return False
@@ -69,17 +71,16 @@ def is_contract_generation_intent(question: str) -> bool:
 
 def is_export_docx_intent(question: str) -> bool:
     """Detect whether the user is asking to export/download the current chat content as a DOCX file.
-
-    Covers all possible Vietnamese & English patterns:
-    - Direct export: "xuất file docx", "export to word"
-    - Download: "tải file", "download docx", "tải về cho tôi"
-    - Save: "lưu file", "save as docx"
-    - Print: "in ra file", "in ra word"
-    - Convert: "chuyển sang docx", "chuyển thành file word"
-    - Implicit: "cho tôi bản word", "gửi file cho tôi", "ra file đi"
-    - Shorthand: "docx đi", "file đi", "word đi"
     """
     question_lower = question.lower().strip()
+
+    # Informational reference document queries should NOT be treated as file export requests
+    reference_keywords = [
+        "tham khảo", "tài liệu tham khảo", "văn bản tham khảo", "tài liệu khác",
+        "danh sách tài liệu", "danh sách văn bản", "nguồn tham khảo", "căn cứ pháp lý",
+    ]
+    if any(kw in question_lower for kw in reference_keywords) and not any(kw in question_lower for kw in ["docx", "doc", "word", "pdf"]):
+        return False
 
     # ── 1. Export/action keywords ──
     export_keywords = [
@@ -281,12 +282,22 @@ class ContractGenerationService:
         """Find the best matching template and return a download link."""
 
         # 1. Search ALL chunks (not just SYSTEM_KB) for relevant template documents.
-        embedding = self.retrieval_service.embed_question(request.question)
+        search_query = request.question.lower().strip()
+        if any(k in search_query for k in ["thuê nhà", "thuê phòng", "thuê trọ", "thuê mặt bằng", "thuê căn hộ", "thuê văn phòng"]):
+            template_search_text = "Mẫu Hợp đồng Thuê nhà ở"
+        elif any(k in search_query for k in ["lao động", "làm việc", "cộng tác viên", "thử việc"]):
+            template_search_text = "Mẫu Hợp đồng Lao động"
+        elif "mua bán" in search_query:
+            template_search_text = "Mẫu Hợp đồng Mua bán"
+        else:
+            template_search_text = request.question
+
+        embedding = self.retrieval_service.embed_question(template_search_text)
         from app.models.knowledge_models import RetrievedChunk
         raw_chunks = self.retrieval_service.repository.search_chunks(
             embedding,
             top_k=max(20, request.topKKnowledgeChunks or 5),
-            query_text=None,
+            query_text=template_search_text,
         )
         # Convert raw RetrievedChunk objects to RagChunkHit for uniform handling
         retrieved_chunks = [
@@ -714,11 +725,17 @@ class ContractGenerationService:
 
     def _build_template_summary(self, doc_title: str, retrieved_chunks) -> str:
         """Build a brief summary describing the matched template."""
-        # Provide first ~500 chars of the best chunk as a preview
         preview = ""
+        matched_chunk = None
         if retrieved_chunks:
-            raw = (retrieved_chunks[0].chunkText or "").strip()
-            # Split by ' > ' to clean breadcrumb prefixes
+            for ch in retrieved_chunks:
+                ch_title = (ch.title or "").strip()
+                if ch_title == doc_title.strip() or doc_title.strip() in ch_title:
+                    matched_chunk = ch
+                    break
+
+        if matched_chunk:
+            raw = (matched_chunk.chunkText or "").strip()
             parts = raw.split(" > ")
             clean_raw = parts[-1].strip()
             if clean_raw:

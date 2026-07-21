@@ -83,6 +83,8 @@ _LEGAL_KB_QUESTION_KEYWORDS = [
     "quy định", "pháp luật", "theo luật", "có được", "được phép", "có quyền",
     "tăng giá", "đặt cọc", "trả góp", "chấm dứt", "bồi thường", "phạt vi phạm",
     "quyền lợi", "nghĩa vụ", "thời hạn", "giá thuê", "thuê nhà", "nhà ở",
+    "tài liệu", "tham khảo", "văn bản", "căn cứ", "nghị định", "bộ luật", "thông tư",
+    "nguồn tham khảo", "tài liệu khác", "văn bản khác",
 ]
 
 
