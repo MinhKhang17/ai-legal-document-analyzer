@@ -61,9 +61,7 @@ export function ProfilePage() {
   // Profile Form state
   const [firstName, setFirstName] = useState(user?.firstName ?? '');
   const [lastName, setLastName] = useState(user?.lastName ?? '');
-  const [specialty, setSpecialty] = useState(user?.specialty ?? '');
-  const [legalDomain, setLegalDomain] = useState(user?.legalDomain ?? '');
-  const [description, setDescription] = useState(user?.description ?? '');
+
   const [savingProfile, setSavingProfile] = useState(false);
 
   // Security Password Form state
@@ -84,9 +82,7 @@ export function ProfilePage() {
     if (user) {
       setFirstName(user.firstName ?? '');
       setLastName(user.lastName ?? '');
-      setSpecialty(user.specialty ?? '');
-      setLegalDomain(user.legalDomain ?? '');
-      setDescription(user.description ?? '');
+
     }
   }, [user]);
 
@@ -141,17 +137,11 @@ export function ProfilePage() {
       const updatedUser = await updateProfile({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
-        specialty: specialty.trim() || undefined,
-        legalDomain: legalDomain.trim() || undefined,
-        description: description.trim() || undefined,
       });
 
       updateUser({
         firstName: updatedUser.firstName,
         lastName: updatedUser.lastName,
-        specialty: updatedUser.specialty,
-        legalDomain: updatedUser.legalDomain,
-        description: updatedUser.description,
       });
 
       toast.success(
@@ -336,50 +326,7 @@ export function ProfilePage() {
               </p>
             </div>
 
-            {user?.role === 'EXPERT' && (
-              <>
-                <div className="grid gap-md sm:grid-cols-2">
-                  <div>
-                    <label className="block text-sm font-semibold text-on-surface dark:text-slate-200">
-                      {language === 'vi' ? 'Chuyên môn chính' : 'Main Specialty'}
-                    </label>
-                    <input
-                      type="text"
-                      value={specialty}
-                      onChange={(e) => setSpecialty(e.target.value)}
-                      className="mt-xs w-full rounded-xl border border-outline-variant bg-white px-md py-sm text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                      placeholder="VD: Tư vấn hợp đồng lao động, Doanh nghiệp"
-                    />
-                  </div>
 
-                  <div>
-                    <label className="block text-sm font-semibold text-on-surface dark:text-slate-200">
-                      {language === 'vi' ? 'Lĩnh vực hoạt động' : 'Legal Domain'}
-                    </label>
-                    <input
-                      type="text"
-                      value={legalDomain}
-                      onChange={(e) => setLegalDomain(e.target.value)}
-                      className="mt-xs w-full rounded-xl border border-outline-variant bg-white px-md py-sm text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                      placeholder="VD: Luật Lao động, Dân sự, Thương mại"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-on-surface dark:text-slate-200">
-                    {language === 'vi' ? 'Giới thiệu bản thân / Ghi chú' : 'Bio / Description'}
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    className="mt-xs w-full rounded-xl border border-outline-variant bg-white p-md text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                    placeholder={language === 'vi' ? 'Mô tả ngắn gọn về kinh nghiệm hoặc vị trí của bạn...' : 'Brief overview of your experience or position...'}
-                  />
-                </div>
-              </>
-            )}
 
             <div className="flex justify-end pt-sm">
               <Button type="submit" disabled={savingProfile} leftIcon={<Save className="h-4 w-4" />}>
