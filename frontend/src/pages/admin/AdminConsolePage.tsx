@@ -1,5 +1,5 @@
 import { Cpu, Database, Monitor, Moon, MoreHorizontal, Palette, Receipt, RefreshCw, ShieldCheck, Sun, UserPlus, UsersRound } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AdminMetricCard } from '../../components/admin/AdminMetricCard';
 import { Badge } from '../../components/common/Badge';
@@ -9,6 +9,7 @@ import { DataTable, type DataTableColumn } from '../../components/common/DataTab
 import { EmptyState } from '../../components/common/EmptyState';
 import { Modal } from '../../components/common/Modal';
 import { PageHeader } from '../../components/common/PageHeader';
+import { Pagination } from '../../components/common/Pagination';
 import { ProgressBar } from '../../components/common/ProgressBar';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { Tabs } from '../../components/common/Tabs';
@@ -30,7 +31,9 @@ import { getLegalTicketStatusLabel } from '../../types/legalTicketStatus';
 import type { PaymentTransaction } from '../../types/paymentTransaction';
 import type { SubscriptionPlan, SubscriptionPlanRequest } from '../../types/subscription';
 import type { WorkspaceUser } from '../../types/user';
+import { getAdminTicketLoadErrorMessage, getSafeApiErrorStatus } from '../../utils/adminTicketError';
 import { formatDisplayDate, formatNumber, formatVndCurrency, localeForLanguage } from '../../utils/format';
+import { clampPage } from '../../utils/pagination';
 
 type AdminTabId = 'users' | 'plans' | 'tickets' | 'workspace' | 'language' | 'theme' | 'security' | 'aiConfig';
 
@@ -52,6 +55,7 @@ const themeOptions: Array<{ mode: ThemeMode; labelKey: string; icon: typeof Sun 
 ];
 
 const legalTextSizes = ['16px', '18px', '20px'] as const;
+const ADMIN_TICKET_PAGE_SIZE = 10;
 
 const emptyPlanForm: SubscriptionPlanRequest = {
   planName: '',
@@ -115,6 +119,11 @@ export function AdminConsolePage() {
   const [paymentTransactions, setPaymentTransactions] = useState<PaymentTransaction[]>([]);
   const [subscriptionPlans, setSubscriptionPlans] = useState<SubscriptionPlan[]>([]);
   const [legalTickets, setLegalTickets] = useState<LegalTicket[]>([]);
+  const [ticketPage, setTicketPage] = useState(0);
+  const [ticketPageSize, setTicketPageSize] = useState(ADMIN_TICKET_PAGE_SIZE);
+  const [ticketTotalItems, setTicketTotalItems] = useState(0);
+  const [ticketTotalPages, setTicketTotalPages] = useState(0);
+  const [isLoadingTickets, setIsLoadingTickets] = useState(true);
   const [isLoadingAdminData, setIsLoadingAdminData] = useState(true);
   const [adminError, setAdminError] = useState<string | null>(null);
   const [selectedUserDetail, setSelectedUserDetail] = useState<BackendUser | null>(null);
@@ -132,16 +141,52 @@ export function AdminConsolePage() {
   const [createExpertOpen, setCreateExpertOpen] = useState(false);
   const [savingExpert, setSavingExpert] = useState(false);
   const [expertForm, setExpertForm] = useState({ firstName: '', lastName: '', email: '', specialty: '', legalDomain: '', description: '' });
+  const ticketRequestSequenceRef = useRef(0);
+
+  const loadAdminTickets = useCallback(async () => {
+    const requestSequence = ++ticketRequestSequenceRef.current;
+    setIsLoadingTickets(true);
+    setTicketError(null);
+
+    try {
+      const response = await getAdminLegalTickets(ticketPage, ticketPageSize);
+      if (requestSequence !== ticketRequestSequenceRef.current) return;
+
+      const safePage = clampPage(response.page, response.totalPages);
+      setTicketPage(response.page);
+      setTicketPageSize(response.size);
+      setTicketTotalItems(response.totalItems ?? 0);
+      setTicketTotalPages(response.totalPages ?? 0);
+
+      if (safePage !== response.page) {
+        setTicketPage(safePage);
+        return;
+      }
+
+      setLegalTickets(response.items ?? []);
+    } catch (loadError) {
+      if (requestSequence !== ticketRequestSequenceRef.current) return;
+
+      const message = getAdminTicketLoadErrorMessage(loadError, t);
+      console.error('Failed to load admin console tickets', {
+        status: getSafeApiErrorStatus(loadError),
+      });
+      setTicketError(message);
+    } finally {
+      if (requestSequence === ticketRequestSequenceRef.current) {
+        setIsLoadingTickets(false);
+      }
+    }
+  }, [t, ticketPage, ticketPageSize]);
 
   const loadAdminData = useCallback(async () => {
     setIsLoadingAdminData(true);
     setAdminError(null);
 
-    const [usersResult, paymentsResult, plansResult, ticketsResult, expertsResult] = await Promise.allSettled([
+    const [usersResult, paymentsResult, plansResult, expertsResult] = await Promise.allSettled([
       getUsers(),
       getAllPaymentTransactions(),
       getSubscriptionPlans(),
-      getAdminLegalTickets(),
       getAdminExperts(),
     ]);
 
@@ -174,13 +219,6 @@ export function AdminConsolePage() {
       });
     }
 
-    if (ticketsResult.status === 'fulfilled') {
-      setLegalTickets(ticketsResult.value.items ?? []);
-    } else {
-      setLegalTickets([]);
-      setTicketError(t('admin.errors.loadTickets'));
-    }
-
     if (expertsResult.status === 'fulfilled') {
       setBackendUsers((current) => {
         const nonExperts = current.filter((entry) => entry.role !== 'EXPERT');
@@ -194,6 +232,13 @@ export function AdminConsolePage() {
   useEffect(() => {
     void loadAdminData();
   }, [loadAdminData]);
+
+  useEffect(() => {
+    void loadAdminTickets();
+    return () => {
+      ticketRequestSequenceRef.current += 1;
+    };
+  }, [loadAdminTickets]);
 
   const activeUsersCount = useMemo(
     () => adminUsers.filter((user) => user.status === 'active').length,
@@ -758,26 +803,48 @@ export function AdminConsolePage() {
 
   const renderTicketsTab = () => (
     <div className="grid gap-gutter xl:grid-cols-[1.2fr_0.8fr]">
-      <Card title={t('admin.tabs.tickets')} subtitle={t('admin.tickets.persistedSubtitle')}>
+      <Card
+        aria-busy={isLoadingTickets}
+        title={t('admin.tabs.tickets')}
+        subtitle={t('admin.tickets.persistedSubtitle')}
+        actions={<Badge tone="blue">{ticketTotalItems}</Badge>}
+      >
         {ticketError && (
-          <p className="mb-md rounded-lg bg-error-container px-md py-sm text-sm font-semibold text-risk-high-text dark:bg-red-950/40 dark:text-red-200">
-            {ticketError}
-          </p>
+          <div
+            className="mb-md rounded-lg bg-error-container px-md py-sm text-sm font-semibold text-risk-high-text dark:bg-red-950/40 dark:text-red-200"
+            role="alert"
+          >
+            {ticketError}{' '}
+            <Button variant="secondary" size="sm" onClick={() => void loadAdminTickets()}>
+              {t('common.retry')}
+            </Button>
+          </div>
         )}
         {ticketActionMessage && (
           <p className="mb-md rounded-lg bg-emerald-50 px-md py-sm text-sm font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200">
             {ticketActionMessage}
           </p>
         )}
-        {isLoadingAdminData ? (
-          <p className="text-sm text-on-surface-variant dark:text-slate-400">{t('admin.loadingTickets')}</p>
+        {isLoadingTickets && legalTickets.length === 0 ? (
+          <p className="text-sm text-on-surface-variant dark:text-slate-400" aria-live="polite" role="status">
+            {t('admin.loadingTickets')}
+          </p>
         ) : (
-          <DataTable
-            columns={ticketColumns}
-            data={legalTickets}
-            getRowKey={(ticket) => ticket.id}
-            emptyMessage={t('admin.noTickets')}
-          />
+          <>
+            <DataTable
+              columns={ticketColumns}
+              data={legalTickets}
+              getRowKey={(ticket) => ticket.id}
+              emptyMessage={t('admin.noTickets')}
+            />
+            <Pagination
+              page={ticketPage}
+              totalPages={ticketTotalPages}
+              totalItems={ticketTotalItems}
+              disabled={isLoadingTickets}
+              onPageChange={setTicketPage}
+            />
+          </>
         )}
       </Card>
 
@@ -1037,8 +1104,8 @@ export function AdminConsolePage() {
             <Button
               variant="secondary"
               leftIcon={<RefreshCw className="h-4 w-4" />}
-              onClick={() => void loadAdminData()}
-              disabled={isLoadingAdminData}
+              onClick={() => void Promise.all([loadAdminData(), loadAdminTickets()])}
+              disabled={isLoadingAdminData || isLoadingTickets}
             >
               {t('billing.refresh')}
             </Button>

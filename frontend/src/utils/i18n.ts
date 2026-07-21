@@ -788,9 +788,19 @@ const en: TranslationDictionary = {
     "The backend has not returned any real legal tickets yet. This page does not create or show fake data.",
   "legalTickets.errors.load":
     "Unable to load legal tickets. Please try again later.",
+  "legalTickets.errors.forbidden":
+    "You do not have permission to access Admin Tickets.",
+  "legalTickets.errors.network":
+    "Unable to connect to the ticket service. Check your connection and try again.",
+  "legalTickets.errors.invalidRequest":
+    "The ticket filters are invalid. Reset the filters and try again.",
+  "legalTickets.errors.server":
+    "The ticket service is temporarily unavailable. Please try again later.",
   "legalTickets.status.unknown": "Unknown",
   "legalTickets.filters.ALL": "All tickets",
   "legalTickets.filters.allRisks": "All risks",
+  "legalTickets.filters.active": "Active filters",
+  "legalTickets.filters.reset": "Reset filters",
   "legalTickets.filters.DRAFT": "Draft",
   "legalTickets.filters.PENDING_ADMIN_REVIEW": "Pending admin review",
   "legalTickets.filters.REJECTED_BY_ADMIN": "Rejected by admin",
@@ -2890,9 +2900,19 @@ const vi: TranslationDictionary = {
     "Backend chưa trả về ticket pháp lý thật. Trang này không tạo hoặc hiển thị dữ liệu giả.",
   "legalTickets.errors.load":
     "Không thể tải danh sách ticket pháp lý. Vui lòng thử lại sau.",
+  "legalTickets.errors.forbidden":
+    "Bạn không có quyền truy cập danh sách Ticket Admin.",
+  "legalTickets.errors.network":
+    "Không thể kết nối dịch vụ ticket. Vui lòng kiểm tra kết nối và thử lại.",
+  "legalTickets.errors.invalidRequest":
+    "Bộ lọc ticket không hợp lệ. Vui lòng xóa bộ lọc và thử lại.",
+  "legalTickets.errors.server":
+    "Dịch vụ ticket đang tạm thời gián đoạn. Vui lòng thử lại sau.",
   "legalTickets.status.unknown": "Không xác định",
   "legalTickets.filters.ALL": "Tất cả ticket",
   "legalTickets.filters.allRisks": "Tất cả rủi ro",
+  "legalTickets.filters.active": "Bộ lọc đang áp dụng",
+  "legalTickets.filters.reset": "Xóa bộ lọc",
   "legalTickets.filters.DRAFT": "Bản nháp",
   "legalTickets.filters.PENDING_ADMIN_REVIEW": "Chờ admin duyệt",
   "legalTickets.filters.REJECTED_BY_ADMIN": "Admin đã từ chối",
