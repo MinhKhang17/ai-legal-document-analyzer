@@ -1,4 +1,4 @@
-import { Cpu, Database, Monitor, Moon, MoreHorizontal, Palette, Receipt, RefreshCw, ShieldCheck, Sun, UserPlus, UsersRound } from 'lucide-react';
+import { Cpu, Database, Monitor, Moon, MoreHorizontal, Palette, Receipt, RefreshCw, RotateCcw, ShieldCheck, Sun, Trash2, UserPlus, UsersRound } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AdminMetricCard } from '../../components/admin/AdminMetricCard';
@@ -24,7 +24,7 @@ import {
   getSubscriptionPlans,
   updateSubscriptionPlan,
 } from '../../services/subscription.service';
-import { createExpert, getAdminExperts, getUserDetail, getUsers, resendExpertActivation, type BackendUser } from '../../services/user.service';
+import { createExpert, deleteUser, getAdminExperts, getUserDetail, getUsers, resendExpertActivation, restoreUser, type BackendUser } from '../../services/user.service';
 import { useAppStore, type ThemeMode } from '../../store/AppStore';
 import type { LegalTicket } from '../../types/legalTicket';
 import { getLegalTicketStatusLabel } from '../../types/legalTicketStatus';
@@ -141,6 +141,9 @@ export function AdminConsolePage() {
   const [createExpertOpen, setCreateExpertOpen] = useState(false);
   const [savingExpert, setSavingExpert] = useState(false);
   const [expertForm, setExpertForm] = useState({ firstName: '', lastName: '', email: '', specialty: '', legalDomain: '', description: '' });
+  const [isDeleteUserModalOpen, setIsDeleteUserModalOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<WorkspaceUser | null>(null);
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
   const ticketRequestSequenceRef = useRef(0);
 
   const loadAdminTickets = useCallback(async () => {
@@ -289,6 +292,43 @@ export function AdminConsolePage() {
       toast.success(t('admin.expert.resendSuccess'), t('toast.successTitle'));
       await loadAdminData();
     } catch { toast.error(t('admin.expert.resendError'), t('toast.errorTitle')); }
+  };
+
+  const handleSoftDeleteUserClick = (user: WorkspaceUser) => {
+    setUserToDelete(user);
+    setIsDeleteUserModalOpen(true);
+  };
+
+  const handleConfirmSoftDeleteUser = async () => {
+    if (!userToDelete) return;
+    setDeletingUserId(userToDelete.id);
+    try {
+      await deleteUser(userToDelete.id);
+      toast.success(
+        language === 'vi' ? 'Đã xóa (vô hiệu hóa) người dùng thành công.' : 'User deactivated successfully.',
+        t('toast.successTitle'),
+      );
+      await loadAdminData();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to deactivate user.', t('toast.errorTitle'));
+    } finally {
+      setDeletingUserId(null);
+      setIsDeleteUserModalOpen(false);
+      setUserToDelete(null);
+    }
+  };
+
+  const handleRestoreUser = async (userId: string) => {
+    try {
+      await restoreUser(userId);
+      toast.success(
+        language === 'vi' ? 'Đã khôi phục tài khoản người dùng thành công.' : 'User restored successfully.',
+        t('toast.successTitle'),
+      );
+      await loadAdminData();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to restore user.', t('toast.errorTitle'));
+    }
   };
 
   const resetPlanForm = () => {
@@ -469,16 +509,46 @@ export function AdminConsolePage() {
     { header: t('admin.users.lastAccess'), cell: (user) => <span className="whitespace-nowrap">{user.lastAccess}</span> },
     {
       header: t('table.actions'),
-      cell: (user) => (
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label={t('admin.users.userActions')}
-          onClick={() => void handleOpenUserDetail(user.id)}
-        >
-          <MoreHorizontal className="h-4 w-4" />
-        </Button>
-      ),
+      cell: (user) => {
+        const rawUser = backendUsers.find((b) => String(b.id) === user.id);
+        const isActive = rawUser ? rawUser.active : user.status === 'active';
+        return (
+          <div className="flex items-center gap-xs">
+            <Button
+              variant="ghost"
+              size="icon"
+              title={language === 'vi' ? 'Xem chi tiết' : 'View details'}
+              aria-label={t('admin.users.userActions')}
+              onClick={() => void handleOpenUserDetail(user.id)}
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+            {isActive ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                title={language === 'vi' ? 'Xóa người dùng (Soft Delete)' : 'Deactivate user'}
+                aria-label={language === 'vi' ? 'Xóa người dùng' : 'Deactivate user'}
+                className="text-error hover:bg-error/10"
+                onClick={() => handleSoftDeleteUserClick(user)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            ) : (
+              <Button
+                variant="ghost"
+                size="icon"
+                title={language === 'vi' ? 'Khôi phục người dùng' : 'Restore user'}
+                aria-label={language === 'vi' ? 'Khôi phục người dùng' : 'Restore user'}
+                className="text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/30"
+                onClick={() => void handleRestoreUser(user.id)}
+              >
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        );
+      },
     },
   ];
 
@@ -1193,6 +1263,42 @@ export function AdminConsolePage() {
           <label className="text-sm font-semibold sm:col-span-2">{t('admin.expert.experienceDescription')}<textarea className="form-field mt-xs min-h-24" value={expertForm.description} onChange={(e) => setExpertForm((v) => ({ ...v, description: e.target.value }))} /></label>
         </div>
       </Modal>
+
+      {/* Custom Soft Delete User Confirmation Modal */}
+      {isDeleteUserModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/70 p-md" role="dialog" aria-modal="true">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-slate-800 bg-[#202123] p-lg shadow-2xl text-left">
+            <h3 className="text-lg font-bold text-white">
+              {t("admin.users.deleteConfirmTitle")}
+            </h3>
+            <p className="mt-md text-sm text-slate-300">
+              {t("admin.users.deleteConfirmPrefix")}
+              <strong className="font-semibold text-white">{userToDelete?.name || userToDelete?.email}</strong>
+              {t("admin.users.deleteConfirmSuffix")}
+            </p>
+            <div className="flex justify-end gap-sm mt-lg">
+              <button
+                type="button"
+                className="px-lg py-sm rounded-full border border-slate-600 text-slate-200 hover:bg-slate-800 text-sm font-semibold transition"
+                onClick={() => {
+                  setIsDeleteUserModalOpen(false);
+                  setUserToDelete(null);
+                }}
+              >
+                {t("actions.cancel")}
+              </button>
+              <button
+                type="button"
+                className="px-lg py-sm rounded-full bg-[#ff003c] text-white hover:bg-red-700 text-sm font-semibold transition disabled:opacity-50"
+                onClick={() => void handleConfirmSoftDeleteUser()}
+                disabled={deletingUserId === userToDelete?.id}
+              >
+                {t("actions.delete")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

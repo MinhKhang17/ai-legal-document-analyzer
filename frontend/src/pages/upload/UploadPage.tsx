@@ -1,13 +1,14 @@
-import { FileText, Sparkles } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, FileText, RefreshCw, Sparkles } from "lucide-react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   createWorkspace,
   getWorkspaceDocuments,
   getWorkspaces,
-  uploadDocument,
+  uploadDocumentAxios,
 } from "../../api/workspaceApi";
 import type { Document, Workspace } from "../../api/workspaceApi";
+import axios from "axios";
 import { Badge } from "../../components/common/Badge";
 import { Button } from "../../components/common/Button";
 import { Card } from "../../components/common/Card";
@@ -21,6 +22,7 @@ import { useToast } from "../../hooks/useToast";
 import { getAccessToken as getSessionAccessToken } from "../../services/authSession";
 import { supportedContractScopeText } from "../../config/supportedContractTypes";
 import { formatFileSize, localeForLanguage } from "../../utils/format";
+import { validateDocumentFiles } from "../../config/upload";
 const getAccessToken = () => getSessionAccessToken() ?? "";
 
 export function UploadPage() {
@@ -39,11 +41,15 @@ export function UploadPage() {
   const [workspaceDescription, setWorkspaceDescription] = useState("");
 
   const [documents, setDocuments] = useState<Document[]>([]);
-  const [uploading, setUploading] = useState(false);
   const [creatingWorkspace, setCreatingWorkspace] = useState(false);
   const [loadingWorkspaces, setLoadingWorkspaces] = useState(false);
   const [loadingDocuments, setLoadingDocuments] = useState(false);
   const [error, setError] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadState, setUploadState] = useState<'idle' | 'uploading' | 'success' | 'failed'>('idle');
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [uploadError, setUploadError] = useState<string>('');
+  const cancelTokenSourceRef = useRef<any>(null);
 
   const hasProcessingDocument = documents.some(
     (document) => document.status === "processing",
@@ -157,32 +163,109 @@ export function UploadPage() {
   };
 
   const handleUploadFile = async (file: File) => {
-    setError("");
-
     if (!selectedWorkspaceId) {
-      setError(t("upload.selectWorkspaceRequired"));
-      toast.warning(t("upload.selectWorkspaceRequired"), t("toast.warningTitle"));
+      const msg = t("upload.selectWorkspaceRequired");
+      setError(msg);
+      toast.warning(msg, t("toast.warningTitle"));
       return;
     }
-    try {
-      setUploading(true);
 
-      const uploadedDocument = await uploadDocument(
+    const validation = validateDocumentFiles([file]);
+    if (!validation.valid) {
+      const msg = t(validation.messageKey);
+      setSelectedFile(file);
+      setUploadState('failed');
+      setUploadError(msg);
+      setError(msg);
+      toast.error(msg, t("toast.errorTitle"));
+      return;
+    }
+
+    if (cancelTokenSourceRef.current) {
+      cancelTokenSourceRef.current.cancel("New upload started");
+    }
+
+    const cancelTokenSource = axios.CancelToken.source();
+    cancelTokenSourceRef.current = cancelTokenSource;
+
+    setSelectedFile(file);
+    setUploadState('uploading');
+    setUploadProgress(0);
+    setUploadError('');
+    setError("");
+
+    try {
+      const uploadedDocument = await uploadDocumentAxios(
         getAccessToken(),
         selectedWorkspaceId,
         file,
+        (progress) => {
+          setUploadProgress(progress);
+        },
+        cancelTokenSource
       );
 
+      setUploadState('success');
       setDocuments((previous) => [uploadedDocument, ...previous]);
       toast.success(t("workspace.uploadDocumentSuccess"), t("toast.successTitle"));
       void navigate(`/projects/${selectedWorkspaceId}`, { replace: false });
-    } catch {
-      const message = t("workspace.uploadDocumentError");
-      setError(message);
-      toast.error(message, t("toast.errorTitle"));
+    } catch (err: any) {
+      if (axios.isCancel(err)) {
+        setUploadState('idle');
+        setUploadError(t('upload.error.cancelled'));
+        return;
+      }
+
+      setUploadState('failed');
+      
+      let msg = t('upload.error.unknown');
+      if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+        msg = t('upload.error.timeout');
+      } else if (!navigator.onLine || err.message?.includes('Network Error')) {
+        msg = t('upload.error.connection');
+      } else if (err.response) {
+        const status = err.response.status;
+        const resData = err.response.data;
+        if (status === 401) {
+          msg = t('upload.error.unauthorized');
+        } else if (status === 403) {
+          msg = t('upload.error.forbidden');
+        } else if (status === 413 || resData?.code === 'FILE_TOO_LARGE') {
+          msg = t('upload.error.fileTooLarge');
+        } else if (status === 500) {
+          msg = t('upload.error.server');
+        } else if (resData?.message) {
+          msg = resData.message;
+        }
+      } else if (err instanceof Error) {
+        msg = err.message;
+      }
+
+      setUploadError(msg);
+      setError(msg);
+      toast.error(msg, t("toast.errorTitle"));
     } finally {
-      setUploading(false);
+      if (cancelTokenSourceRef.current === cancelTokenSource) {
+        cancelTokenSourceRef.current = null;
+      }
     }
+  };
+
+  const handleRetryUpload = () => {
+    if (selectedFile) {
+      handleUploadFile(selectedFile);
+    }
+  };
+
+  const handleClearFile = () => {
+    if (cancelTokenSourceRef.current) {
+      cancelTokenSourceRef.current.cancel("Upload cancelled by user");
+    }
+    setSelectedFile(null);
+    setUploadState('idle');
+    setUploadProgress(0);
+    setUploadError('');
+    setError('');
   };
 
   return (
@@ -298,9 +381,51 @@ export function UploadPage() {
               </p>
 
               <FileUploadZone
-                onUpload={handleUploadFile}
-                disabled={uploading || !selectedWorkspaceId}
+                selectedFile={selectedFile}
+                onFileSelect={(file) => {
+                  if (file) {
+                    handleUploadFile(file);
+                  }
+                }}
+                onClearFile={handleClearFile}
+                onRetry={handleRetryUpload}
+                uploadState={uploadState}
+                uploadProgress={uploadProgress}
+                uploadError={uploadError}
+                disabled={uploadState === 'uploading' || !selectedWorkspaceId}
               />
+
+              {uploadState === 'failed' && (
+                <div role="alert" className="mt-md rounded-xl border border-error/50 bg-error/10 p-md text-left text-sm text-error dark:border-red-900/60 dark:bg-red-950/40">
+                  <div className="flex items-center gap-xs font-bold text-error dark:text-red-300">
+                    <AlertTriangle className="h-5 w-5 shrink-0" />
+                    <span>{t('upload.failedBannerTitle')}</span>
+                  </div>
+                  <p className="mt-xs font-semibold text-on-surface dark:text-slate-200">
+                    {uploadError || t('upload.error.unknown')}
+                  </p>
+                  <p className="mt-xs text-xs text-on-surface-variant dark:text-slate-400">
+                    {t('upload.retryHelp')}
+                  </p>
+                  <div className="mt-sm flex flex-wrap gap-xs">
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      leftIcon={<RefreshCw className="h-4 w-4" />}
+                      onClick={handleRetryUpload}
+                    >
+                      {t('upload.retry')}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleClearFile}
+                    >
+                      {t('actions.remove')}
+                    </Button>
+                  </div>
+                </div>
+              )}
 
               {!selectedWorkspaceId && (
                 <p className="mt-md text-sm text-on-surface-variant dark:text-slate-400">
@@ -310,7 +435,7 @@ export function UploadPage() {
             </div>
           </Card>
 
-          {error && (
+          {error && uploadState !== 'failed' && (
             <div role="alert" className="rounded-xl border border-error/40 bg-error/10 p-md text-sm text-error">
               {error}
             </div>

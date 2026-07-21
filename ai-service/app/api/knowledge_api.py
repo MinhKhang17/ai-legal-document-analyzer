@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 import logging
@@ -18,6 +18,7 @@ from app.core.config import settings
 from app.models.knowledge_models import IngestionResult, RetrievedChunk
 from app.services.gemini_client import GeminiClient
 from app.services.knowledge_service import KnowledgeService, KnowledgeServiceV2
+from app.services.llm_reranker import LlmReranker
 from app.services.callback_client import CallbackClient
 
 
@@ -280,6 +281,15 @@ def ask_legal_knowledge_v2(payload: AskRequest) -> AskResponse:
     started_at = time.perf_counter()
     retrieved_chunks = get_service().search(payload.query, top_k=RETRIEVAL_TOP_K)
     reranked_chunks = _rerank_chunks(payload.query, retrieved_chunks, top_k=RERANK_TOP_K)
+
+    # LLM Reranking (optional, enabled via LLM_RERANK_ENABLED=true)
+    if settings.llm_rerank_enabled:
+        try:
+            llm_reranker = LlmReranker()
+            reranked_chunks = llm_reranker.rerank(payload.query, reranked_chunks)
+        except Exception as exc:
+            logger.warning("LLM reranking failed, using heuristic order: %s", exc)
+
     llm_chunks = _select_llm_chunks(reranked_chunks, token_budget=MAX_CONTEXT_TOKENS, max_chunks=FINAL_CONTEXT_CHUNKS)
     llm_enabled = _is_llm_v2_enabled()
     if llm_enabled:

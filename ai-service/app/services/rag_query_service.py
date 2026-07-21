@@ -25,6 +25,7 @@ from app.schemas import (
     TokenUsageBreakdown,
 )
 from app.services.completeness_checker import check_completeness
+from app.services.llm_intent_detector import detect_intent_smart
 from app.services.conversation_memory_service import ConversationMemoryService, PreparedConversationMemory
 from app.services.conversation_context import (
     LegalConversationContextStore,
@@ -118,12 +119,25 @@ class RagQueryService:
         return request.chatHistory
 
     def query(self, request: RagQueryRequest) -> RagQueryResponse:
-        from app.services.contract_generation_service import ContractGenerationService, is_contract_generation_intent
+        # ── Step 0a: Export chat to DOCX shortcut ──
+        from app.services.contract_generation_service import (
+            ContractGenerationService,
+            is_contract_generation_intent,
+            is_export_docx_intent,
+        )
 
         follow_up = is_follow_up_query(request.question)
         previous_snapshot = self.context_store.latest(request.chatSessionId) if follow_up else None
         bounded_history_text = self._request_history_text(request)
 
+        if is_export_docx_intent(request.question):
+            gen_service = ContractGenerationService(
+                retrieval_service=self.retrieval_service,
+                llm_client=self.llm_client,
+            )
+            return gen_service.export_chat_to_docx(request)
+
+        # ── Step 0b: Contract generation shortcut ──
         if is_contract_generation_intent(request.question) and not follow_up:
             gen_service = ContractGenerationService(
                 retrieval_service=self.retrieval_service,
@@ -133,12 +147,14 @@ class RagQueryService:
             return gen_service.generate_contract(request)
 
         user_hits, legal_search_query, knowledge_hits = self._retrieve(request)
+        logger.info("DEBUG RAG QUERY: request=%s, user_hits_count=%d", request.model_dump(exclude={"chatHistory", "conversationSummaryJson"}), len(user_hits))
         if self._needs_document_selection(request, user_hits):
             return self._build_document_selection_response(request, user_hits, knowledge_hits)
         if follow_up and previous_snapshot is None:
             return self._build_missing_snapshot_response(request, user_hits, knowledge_hits)
 
-        intent_result = detect_intent(
+        # ── Step 2: Detect intent ──
+        intent_result = detect_intent_smart(
             request.question,
             has_user_chunks=bool(user_hits),
             has_knowledge_chunks=bool(knowledge_hits),
@@ -295,8 +311,10 @@ class RagQueryService:
         llm_result = self.llm_client.generate(system_prompt=system_prompt, user_prompt=user_prompt)
         if llm_result.error or not llm_result.answer:
             raise LlmGenerationError(llm_result.error or "LLM returned an empty answer")
-        answer = sanitize_response(llm_result.answer or self._build_fallback_answer(user_hits, knowledge_hits))
-        answer, removed_recommendations = self._filter_ungrounded_recommendation_items(answer)
+        raw_answer = sanitize_response(llm_result.answer or self._build_fallback_answer(user_hits, knowledge_hits))
+        logger.info("DEBUG RAW ANSWER:\n%s", raw_answer)
+        answer, removed_recommendations = self._filter_ungrounded_recommendation_items(raw_answer)
+        logger.info("DEBUG FILTERED ANSWER:\n%s", answer)
         if removed_recommendations:
             logger.warning(
                 "Removed %s ungrounded recommendation item(s) for request %s",
@@ -596,6 +614,7 @@ class RagQueryService:
                 top_k=request.topKKnowledgeChunks,
                 query_text=build_legal_text_query(request.question, chat_history=bounded_history_text),
             )
+        logger.info("DEBUG RAG RETRIEVAL: question=%s, preliminary_intent=%s, legal_search_query=%s, knowledge_hits_count=%d", request.question, preliminary_intent, legal_search_query, len(knowledge_hits))
         return user_hits, legal_search_query, knowledge_hits
 
     def _summary_requires_legal_kb(self, question: str) -> bool:
@@ -959,31 +978,33 @@ class RagQueryService:
 
     def _recommendation_section_is_grounded(self, answer: str) -> bool:
         recommendation_match = re.search(
-            r"(?:khuyến nghị|recommendations?)\s*:?\**\s*(.*)$",
+            r"(?:^\s*###+\s*(?:khuyến nghị|recommendations?)|^\s*(?:\*\*|__)(?:khuyến nghị|recommendations?)(?:\*\*|__):?|^\s*(?:khuyến nghị|recommendations?)\s*:)\s*(.*)$",
             answer,
-            flags=re.IGNORECASE | re.DOTALL,
+            flags=re.IGNORECASE | re.MULTILINE | re.DOTALL,
         )
         if recommendation_match is None:
             return True
-        section = recommendation_match.group(1)
+        section = recommendation_match.group(1).strip()
+        if not section:
+            return True
         bullet_blocks = re.split(r"(?m)(?=^\s*(?:[-*•]|\d+[.)])\s+)", section)
         actual_bullets = [
             block for block in bullet_blocks if re.match(r"^\s*(?:[-*•]|\d+[.)])\s+", block)
         ]
         if actual_bullets:
             return all(re.search(r"\[KB-\d+\]", block, flags=re.IGNORECASE) for block in actual_bullets)
-        return bool(re.search(r"\[KB-\d+\]", section, flags=re.IGNORECASE))
+        return True
 
     def _filter_ungrounded_recommendation_items(self, answer: str) -> tuple[str, int]:
         heading = re.search(
-            r"(?:khuyến nghị|recommendations?)\s*:?\**",
+            r"(?:^\s*###+\s*(?:khuyến nghị|recommendations?)|^\s*(?:\*\*|__)(?:khuyến nghị|recommendations?)(?:\*\*|__):?|^\s*(?:khuyến nghị|recommendations?)\s*:)",
             answer,
-            flags=re.IGNORECASE,
+            flags=re.IGNORECASE | re.MULTILINE,
         )
         if heading is None:
             return answer, 0
 
-        prefix = answer[: heading.end()]
+        prefix = answer[: heading.start()]
         section = answer[heading.end() :]
         blocks = re.split(r"(?m)(?=^\s*(?:[-*•]|\d+[.)])\s+)", section)
         kept: list[str] = []
@@ -994,7 +1015,12 @@ class RagQueryService:
                 removed += 1
                 continue
             kept.append(block)
-        return (prefix + "".join(kept)).rstrip(), removed
+
+        remaining_section = "".join(kept).strip()
+        if not remaining_section:
+            return prefix.rstrip(), removed
+
+        return (answer[: heading.end()] + "".join(kept)).rstrip(), removed
 
     def _grounding_failure_answer(self, has_invalid_citation: bool) -> str:
         if has_invalid_citation:

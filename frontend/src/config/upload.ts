@@ -1,10 +1,11 @@
 export const DOCUMENT_UPLOAD_CONFIG = {
   maxFiles: 1,
-  maxFileSizeBytes: 50 * 1024 * 1024,
-  extensions: ["pdf", "docx"],
+  maxFileSizeBytes: 20 * 1024 * 1024,
+  extensions: ["pdf", "docx", "doc"],
   mimeTypes: [
     "application/pdf",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/msword",
   ],
 } as const;
 
@@ -22,11 +23,11 @@ export const validateDocumentFiles = (files: FileList | File[]): FileValidationR
 
   const file = candidates[0];
   if (file.size === 0) return { valid: false, messageKey: "validation.file.empty" };
-  if (file.size > DOCUMENT_UPLOAD_CONFIG.maxFileSizeBytes) return { valid: false, messageKey: "validation.file.documentMaximum" };
+  if (file.size > DOCUMENT_UPLOAD_CONFIG.maxFileSizeBytes) return { valid: false, messageKey: "validation.file.documentMaximum20MB" };
 
   const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
-  const extensionAllowed = DOCUMENT_UPLOAD_CONFIG.extensions.includes(extension as "pdf" | "docx");
+  const extensionAllowed = DOCUMENT_UPLOAD_CONFIG.extensions.includes(extension as "pdf" | "docx" | "doc");
   const mimeAllowed = !file.type || DOCUMENT_UPLOAD_CONFIG.mimeTypes.includes(file.type as typeof DOCUMENT_UPLOAD_CONFIG.mimeTypes[number]);
-  if (!extensionAllowed || !mimeAllowed) return { valid: false, messageKey: "validation.file.pdfDocxOnly" };
+  if (!extensionAllowed || !mimeAllowed) return { valid: false, messageKey: "validation.file.pdfDocxDocOnly" };
   return { valid: true };
 };
