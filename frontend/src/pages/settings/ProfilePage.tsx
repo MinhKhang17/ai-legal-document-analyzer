@@ -319,78 +319,68 @@ export function ProfilePage() {
               </div>
             </div>
 
-            <div className="grid gap-md sm:grid-cols-2">
-              <div>
-                <label className="block text-sm font-semibold text-on-surface dark:text-slate-200">
-                  {language === 'vi' ? 'Địa chỉ Email' : 'Email Address'}
-                </label>
-                <div className="relative mt-xs">
-                  <input
-                    type="email"
-                    value={user?.email ?? ''}
-                    disabled
-                    className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-md py-sm pr-10 text-sm text-on-surface-variant opacity-80 cursor-not-allowed dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400"
-                  />
-                  <Lock className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-outline dark:text-slate-500" />
-                </div>
-                <p className="mt-xs text-xs text-on-surface-variant dark:text-slate-400">
-                  {language === 'vi' ? 'Email là định danh tài khoản và không thể tự thay đổi.' : 'Email is your account identifier and cannot be changed.'}
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-on-surface dark:text-slate-200">
-                  {language === 'vi' ? 'Vai trò tài khoản' : 'Account Role'}
-                </label>
-                <div className="mt-xs flex h-10 items-center justify-between rounded-xl border border-outline-variant bg-surface-container-low px-md text-sm font-semibold text-on-surface dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200">
-                  <span>{roleLabel}</span>
-                  <ShieldCheck className="h-4 w-4 text-primary dark:text-inverse-primary" />
-                </div>
-              </div>
-            </div>
-
-            {(user?.role === 'EXPERT' || user?.role === 'ADMIN') && (
-              <div className="grid gap-md sm:grid-cols-2">
-                <div>
-                  <label className="block text-sm font-semibold text-on-surface dark:text-slate-200">
-                    {language === 'vi' ? 'Chuyên môn chính' : 'Main Specialty'}
-                  </label>
-                  <input
-                    type="text"
-                    value={specialty}
-                    onChange={(e) => setSpecialty(e.target.value)}
-                    className="mt-xs w-full rounded-xl border border-outline-variant bg-white px-md py-sm text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                    placeholder="VD: Tư vấn hợp đồng lao động, Doanh nghiệp"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-on-surface dark:text-slate-200">
-                    {language === 'vi' ? 'Lĩnh vực hoạt động' : 'Legal Domain'}
-                  </label>
-                  <input
-                    type="text"
-                    value={legalDomain}
-                    onChange={(e) => setLegalDomain(e.target.value)}
-                    className="mt-xs w-full rounded-xl border border-outline-variant bg-white px-md py-sm text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                    placeholder="VD: Luật Lao động, Dân sự, Thương mại"
-                  />
-                </div>
-              </div>
-            )}
-
             <div>
               <label className="block text-sm font-semibold text-on-surface dark:text-slate-200">
-                {language === 'vi' ? 'Giới thiệu bản thân / Ghi chú' : 'Bio / Description'}
+                {language === 'vi' ? 'Địa chỉ Email' : 'Email Address'}
               </label>
-              <textarea
-                rows={3}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="mt-xs w-full rounded-xl border border-outline-variant bg-white p-md text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                placeholder={language === 'vi' ? 'Mô tả ngắn gọn về kinh nghiệm hoặc vị trí của bạn...' : 'Brief overview of your experience or position...'}
-              />
+              <div className="relative mt-xs">
+                <input
+                  type="email"
+                  value={user?.email ?? ''}
+                  disabled
+                  className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-md py-sm pr-10 text-sm text-on-surface-variant opacity-80 cursor-not-allowed dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400"
+                />
+                <Lock className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-outline dark:text-slate-500" />
+              </div>
+              <p className="mt-xs text-xs text-on-surface-variant dark:text-slate-400">
+                {language === 'vi' ? 'Email là định danh tài khoản và không thể tự thay đổi.' : 'Email is your account identifier and cannot be changed.'}
+              </p>
             </div>
+
+            {user?.role === 'EXPERT' && (
+              <>
+                <div className="grid gap-md sm:grid-cols-2">
+                  <div>
+                    <label className="block text-sm font-semibold text-on-surface dark:text-slate-200">
+                      {language === 'vi' ? 'Chuyên môn chính' : 'Main Specialty'}
+                    </label>
+                    <input
+                      type="text"
+                      value={specialty}
+                      onChange={(e) => setSpecialty(e.target.value)}
+                      className="mt-xs w-full rounded-xl border border-outline-variant bg-white px-md py-sm text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                      placeholder="VD: Tư vấn hợp đồng lao động, Doanh nghiệp"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-on-surface dark:text-slate-200">
+                      {language === 'vi' ? 'Lĩnh vực hoạt động' : 'Legal Domain'}
+                    </label>
+                    <input
+                      type="text"
+                      value={legalDomain}
+                      onChange={(e) => setLegalDomain(e.target.value)}
+                      className="mt-xs w-full rounded-xl border border-outline-variant bg-white px-md py-sm text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                      placeholder="VD: Luật Lao động, Dân sự, Thương mại"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-on-surface dark:text-slate-200">
+                    {language === 'vi' ? 'Giới thiệu bản thân / Ghi chú' : 'Bio / Description'}
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className="mt-xs w-full rounded-xl border border-outline-variant bg-white p-md text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                    placeholder={language === 'vi' ? 'Mô tả ngắn gọn về kinh nghiệm hoặc vị trí của bạn...' : 'Brief overview of your experience or position...'}
+                  />
+                </div>
+              </>
+            )}
 
             <div className="flex justify-end pt-sm">
               <Button type="submit" disabled={savingProfile} leftIcon={<Save className="h-4 w-4" />}>
