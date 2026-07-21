@@ -300,24 +300,7 @@ export function KnowledgeBasePage() {
       <section className="mb-xl grid grid-cols-1 items-start gap-gutter xl:grid-cols-[minmax(420px,0.85fr)_minmax(0,1.65fr)] [&>*]:min-w-0">
         <Card title={t("knowledge.uploadEntry")} subtitle={t("knowledge.uploadEntrySubtitle")}>
           <div className="space-y-lg">
-            <div className="rounded-2xl border border-primary/20 bg-primary/5 p-lg dark:border-indigo-400/20 dark:bg-indigo-950/20">
-              <div className="flex items-start gap-md">
-                <span className="rounded-xl bg-primary/10 p-sm text-primary dark:bg-indigo-400/10 dark:text-indigo-300">
-                  <ShieldCheck className="h-5 w-5" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="font-semibold">{t("knowledge.newDocumentDefaults")}</p>
-                  <p className="mt-xs text-sm text-on-surface-variant dark:text-slate-400">
-                    {t("knowledge.newDocumentDefaultsDescription")}
-                  </p>
-                  <div className="mt-sm flex flex-wrap gap-xs">
-                    <Badge tone="amber">{t("knowledge.status.PENDING")}</Badge>
-                    <Badge tone="purple">{t("knowledge.visibility.PRIVATE")}</Badge>
-                    <Badge tone="slate">{t("admin.inactive")}</Badge>
-                  </div>
-                </div>
-              </div>
-            </div>
+           
 
             <label className="block cursor-pointer rounded-2xl border-2 border-dashed border-legal-border bg-surface-container-low px-lg py-xl text-center transition hover:border-primary/60 hover:bg-primary/5 dark:border-slate-700 dark:bg-slate-900/60">
               <input
@@ -491,16 +474,7 @@ export function KnowledgeBasePage() {
             </div>
             <p className="mt-md text-xs text-on-surface-variant">{t("knowledge.filteredResults", { count: totalItems })}</p>
           </div>
-          <div className="mb-lg space-y-sm rounded-2xl border border-primary/20 bg-primary/5 p-lg dark:border-indigo-400/20 dark:bg-indigo-950/20">
-            <h3 className="font-semibold">{t("knowledge.guideTitle")}</h3>
-            <ul className="grid gap-xs text-sm text-on-surface-variant dark:text-slate-300 2xl:grid-cols-2">
-              <li>✓ {t("knowledge.guideSupportedFormats")}</li>
-              <li>✓ {t("knowledge.guideBackgroundProcessing")}</li>
-              <li>✓ {t("knowledge.guidePublish")}</li>
-              <li>✓ {t("knowledge.guideSourceDownload")}</li>
-            </ul>
-            <div className="flex flex-wrap gap-xs"><Badge tone="amber">{t("knowledge.status.PENDING")}</Badge><Badge tone="amber">{t("knowledge.status.PROCESSING")}</Badge><Badge tone="green">{t("knowledge.status.INGESTED")}</Badge><Badge tone="purple">{t("knowledge.status.REVIEWING")}</Badge><Badge tone="green">{t("knowledge.status.PUBLIC")}</Badge><Badge tone="red">{t("knowledge.status.FAILED")}</Badge></div>
-          </div>
+
           {error ? (
             <div role="alert" className="text-sm text-error">{error} <Button variant="secondary" onClick={() => void loadEntries()}>{t("common.retry")}</Button></div>
           ) : loading && entries.length === 0 ? (
