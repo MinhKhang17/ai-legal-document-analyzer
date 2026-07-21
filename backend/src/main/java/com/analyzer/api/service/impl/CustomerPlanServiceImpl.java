@@ -145,6 +145,12 @@ public class CustomerPlanServiceImpl implements CustomerPlanService {
     @Override
     @Transactional
     public CustomerPlanResponseDTO cancelPlan(Long customerId, Long customerPlanId) {
+        return cancelPlanAndActivateFree(customerId, customerPlanId, "Cancelled by customer");
+    }
+
+    @Override
+    @Transactional
+    public CustomerPlanResponseDTO cancelPlanAndActivateFree(Long customerId, Long customerPlanId, String reason) {
         CustomerPlan plan = customerPlanRepository.findById(customerPlanId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy gói của khách hàng với id: " + customerPlanId));
 
@@ -152,9 +158,47 @@ public class CustomerPlanServiceImpl implements CustomerPlanService {
             throw new RuntimeException("Bạn không có quyền hủy gói dịch vụ này");
         }
 
+        SubscriptionPlan currentSubscription = plan.getSubscriptionPlan();
+        if (currentSubscription != null && "FREE".equalsIgnoreCase(currentSubscription.getPlanType())) {
+            plan.setStatus(PlanStatus.ACTIVE);
+            plan.setAutoRenew(false);
+            return customerPlanMapper.toResponseDTO(customerPlanRepository.save(plan));
+        }
+
         plan.setStatus(PlanStatus.CANCELLED);
-        CustomerPlan savedPlan = customerPlanRepository.save(plan);
-        return customerPlanMapper.toResponseDTO(savedPlan);
+        plan.setAutoRenew(false);
+        plan.setCancelReason(reason);
+        customerPlanRepository.save(plan);
+
+        CustomerPlan otherActivePlan = customerPlanRepository
+                .findTopByCustomerIdAndStatusOrderByCreatedAtDesc(customerId, PlanStatus.ACTIVE)
+                .filter(active -> !active.getId().equals(plan.getId()))
+                .orElse(null);
+        if (otherActivePlan != null) {
+            return customerPlanMapper.toResponseDTO(otherActivePlan);
+        }
+
+        SubscriptionPlan freeSubscription = subscriptionPlanRepository.findByPlanTypeIgnoreCase("FREE")
+                .filter(free -> Boolean.TRUE.equals(free.getActive()))
+                .orElseThrow(() -> new RuntimeException("FREE_PLAN_NOT_CONFIGURED"));
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime usageStart = plan.getUsageStartAt() != null ? plan.getUsageStartAt() : now;
+        LocalDateTime usageEnd = plan.getUsageEndAt() != null && plan.getUsageEndAt().isAfter(now)
+                ? plan.getUsageEndAt() : now.plusDays(freeSubscription.getDurationDays());
+        CustomerPlan freePlan = CustomerPlan.builder()
+                .customer(plan.getCustomer())
+                .subscriptionPlan(freeSubscription)
+                .status(PlanStatus.ACTIVE)
+                .usedQuota(plan.getUsedQuota() == null ? 0 : plan.getUsedQuota())
+                .startDate(now)
+                .endDate(now.plusDays(freeSubscription.getDurationDays()))
+                .usageStartAt(usageStart)
+                .usageEndAt(usageEnd)
+                .billingCycleStartAt(now)
+                .billingCycleEndAt(now.plusDays(freeSubscription.getDurationDays()))
+                .autoRenew(false)
+                .build();
+        return customerPlanMapper.toResponseDTO(customerPlanRepository.save(freePlan));
     }
 
     @Override

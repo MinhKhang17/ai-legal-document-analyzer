@@ -1063,3 +1063,22 @@ BUILD SUCCESS
   `/api/v1/subscriptions/refunds/confirm` va `/api/subscription/refunds/confirm`.
 - Sua loi `401 Unauthorized` xay ra tai security filter truoc khi token xac nhan duoc xu ly.
 - Khong mo quyen cho cac API tao, xem, duyet hoac hoan tat refund khac.
+
+---
+
+# Update History - 2026-07-21 - Free Plan Fallback After Cancellation
+
+- User tu huy goi tra phi hoac duoc hoan tien toan phan se co goi FREE `ACTIVE` thay the.
+- Giu `usedQuota` va ky usage hien tai de khong reset lich su su dung khi ha cap.
+- Khong thay goi dang active moi neu refund mot giao dich cu; refund mot phan khong huy goi.
+- Tat auto-renew va luu ly do huy tren goi tra phi.
+
+---
+
+# Update History - 2026-07-21 - Ticket Flow Tests And QA Report
+
+- Them test cho admin assign expert, chan refund ticket bi assign, expert review/request-info/resolve,
+  phan quyen expert va transition tren ticket da dong.
+- Ticket automated tests: `8/8 PASS`; full backend regression: `43/43 PASS`.
+- Them `docs/ticket_flow_test_report_2026-07-21.md` gom ket qua automated va 20 case can test tay
+  tren server.

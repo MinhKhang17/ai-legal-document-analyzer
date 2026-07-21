@@ -14,6 +14,7 @@ import com.analyzer.api.repository.CustomerPlanRepository;
 import com.analyzer.api.repository.PaymentTransactionRepository;
 import com.analyzer.api.repository.UserRepository;
 import com.analyzer.api.repository.subscription.RefundRequestRepository;
+import com.analyzer.api.service.CustomerPlanService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -41,6 +42,8 @@ class RefundServiceImplTest {
     private CustomerPlanRepository customerPlanRepository;
     @Mock
     private UserRepository userRepository;
+    @Mock
+    private CustomerPlanService customerPlanService;
 
     private RefundServiceImpl refundService;
 
@@ -50,7 +53,8 @@ class RefundServiceImplTest {
                 refundRequestRepository,
                 paymentTransactionRepository,
                 customerPlanRepository,
-                userRepository);
+                userRepository,
+                customerPlanService);
     }
 
     @Test
@@ -116,10 +120,8 @@ class RefundServiceImplTest {
 
         assertEquals(RefundStatus.COMPLETED, refund.getStatus());
         assertEquals(PaymentStatus.REFUNDED, transaction.getPaymentStatus());
-        assertEquals(PlanStatus.CANCELLED, plan.getStatus());
-        assertEquals(false, plan.getAutoRenew());
         verify(paymentTransactionRepository).save(transaction);
-        verify(customerPlanRepository).save(plan);
+        verify(customerPlanService).cancelPlanAndActivateFree(7L, 5L, "Refund PAY-11");
     }
 
     @Test
@@ -155,6 +157,7 @@ class RefundServiceImplTest {
         assertEquals(PlanStatus.ACTIVE, plan.getStatus());
         verify(paymentTransactionRepository, never()).save(transaction);
         verify(customerPlanRepository, never()).save(plan);
+        verify(customerPlanService, never()).cancelPlanAndActivateFree(any(), any(), any());
     }
 
     @Test
