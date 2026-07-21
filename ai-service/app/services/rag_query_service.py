@@ -200,13 +200,24 @@ class RagQueryService:
             knowledge_hits,
         )
         if retrieval_issue is not None:
-            return self._build_guard_response(
+            response = self._build_guard_response(
                 request=request,
                 intent_result=retrieval_issue,
                 completeness=completeness,
                 user_hits=user_hits,
                 knowledge_hits=knowledge_hits,
             )
+            if intent_result.intent == LegalQueryIntent.SIGNING_DECISION_SUPPORT:
+                response = response.model_copy(update={
+                    "answer": self._apply_signing_decision_safety(response.answer),
+                    "shouldSuggestTicket": True,
+                    "suggestionType": SuggestionType.SUGGEST_LAWYER.value,
+                    "suggestionReason": self._default_suggestion_reason(
+                        SuggestionType.SUGGEST_LAWYER.value
+                    ),
+                    "userActionHint": "CREATE_TICKET",
+                })
+            return response
 
         available_user_docs, available_system_docs = self._fetch_available_docs(request)
         prompt_user_hits = user_hits
@@ -355,6 +366,9 @@ class RagQueryService:
             used_knowledge_ids = []
             used_user_ids = []
 
+        if intent_result.intent == LegalQueryIntent.SIGNING_DECISION_SUPPORT:
+            answer = self._apply_signing_decision_safety(answer)
+
         effective_confidence = llm_result.confidence_score
         retrieved_citations = [
             self._to_citation(hit) for hit in [*prompt_user_hits, *prompt_knowledge_hits]
@@ -400,6 +414,8 @@ class RagQueryService:
             response_status=response_status,
         )
         if should_suggest_ticket:
+            if intent_result.intent == LegalQueryIntent.SIGNING_DECISION_SUPPORT:
+                suggestion_type = SuggestionType.SUGGEST_LAWYER.value
             user_action_hint = "CREATE_TICKET"
 
         response = RagQueryResponse(
@@ -822,18 +838,28 @@ class RagQueryService:
 
     def _build_guard_response(self, *, request, intent_result, completeness, user_hits, knowledge_hits):
         answer = self._guard_answer(intent_result.intent, completeness.questions_to_ask)
+        is_signing_decision = intent_result.intent == LegalQueryIntent.SIGNING_DECISION_SUPPORT
+        suggestion_type = (
+            SuggestionType.SUGGEST_LAWYER.value
+            if is_signing_decision
+            else intent_result.suggestion_type.value
+        )
         return RagQueryResponse(
             requestId=request.requestId,
             chatSessionId=request.chatSessionId,
             answer=answer,
             confidenceScore=intent_result.confidence,
-            shouldSuggestTicket=False,
-            suggestionType=intent_result.suggestion_type.value,
-            suggestionReason=self._default_suggestion_reason(intent_result.suggestion_type.value),
+            shouldSuggestTicket=is_signing_decision,
+            suggestionType=suggestion_type,
+            suggestionReason=self._default_suggestion_reason(suggestion_type),
             missingInformation=self._missing_information_text(completeness.questions_to_ask),
             riskLevel=intent_result.risk_level.value,
             legalDomain=self._default_legal_domain(intent_result.contract_type),
-            userActionHint=self._map_user_action_hint(intent_result.suggestion_type.value, intent_result.response_status.value),
+            userActionHint=(
+                "CREATE_TICKET"
+                if is_signing_decision
+                else self._map_user_action_hint(suggestion_type, intent_result.response_status.value)
+            ),
             citations=[],
             usedKnowledgeCitationIds=[],
             usedUserCitationIds=[],
@@ -866,6 +892,11 @@ class RagQueryService:
             LegalQueryIntent.PARTIAL_KB_COVERAGE: "Knowledge base hiện chỉ bao phủ một phần vấn đề bạn hỏi, nên kết quả lúc này chỉ có thể mang tính tham khảo hạn chế.",
             LegalQueryIntent.OUTDATED_KNOWLEDGE_BASE: "Nguồn pháp lý truy xuất được có dấu hiệu chưa đủ mới hoặc chưa đủ chắc để trả lời vấn đề này.",
             LegalQueryIntent.CONFLICTING_REFERENCES: "Các căn cứ truy xuất hiện đang mâu thuẫn hoặc chưa thống nhất, nên mình không thể kết luận tự tin ở thời điểm này.",
+            LegalQueryIntent.SIGNING_DECISION_SUPPORT: (
+                "Hệ thống không khuyến khích bạn ký hợp đồng chỉ dựa trên phân tích của AI. "
+                "Thông tin được cung cấp chỉ nhằm hỗ trợ bạn tự ra quyết định và không thay thế việc xem xét của chuyên gia. "
+                "Nếu muốn được hỗ trợ thêm trước khi ký, bạn có thể tạo ticket để chuyên gia xem xét."
+            ),
         }
         answer = mapping.get(intent, "Mình cần thêm thông tin để tiếp tục phân tích.")
         if questions:
@@ -967,6 +998,9 @@ class RagQueryService:
         risk_level: str,
         response_status: str,
     ) -> bool:
+        if intent == LegalQueryIntent.SIGNING_DECISION_SUPPORT:
+            return True
+
         return (
             intent in _TICKET_ELIGIBLE_INTENTS
             and input_complete
@@ -975,6 +1009,17 @@ class RagQueryService:
             and risk_level in {"HIGH", "CRITICAL"}
             and response_status == ResponseStatus.HIGH_RISK_REQUIRE_LAWYER.value
         )
+
+    def _apply_signing_decision_safety(self, answer: str) -> str:
+        notice = (
+            "**Lưu ý trước khi ký:** Hệ thống không khuyến khích bạn ký hợp đồng chỉ dựa trên "
+            "phân tích của AI. Thông tin dưới đây chỉ nhằm hỗ trợ bạn tự ra quyết định và không "
+            "thay thế việc xem xét của chuyên gia."
+        )
+        ticket_option = (
+            "Nếu muốn được hỗ trợ thêm trước khi ký, bạn có thể tạo ticket để chuyên gia xem xét."
+        )
+        return f"{notice}\n\n{answer.strip()}\n\n{ticket_option}"
 
     def _recommendation_section_is_grounded(self, answer: str) -> bool:
         recommendation_match = re.search(

@@ -48,3 +48,15 @@ def test_contract_summary_instruction_requires_per_document_output():
 
     assert "chỉ dùng USER_DOCUMENT_CONTEXT" in prompt
     assert "tóm tắt riêng từng tài liệu" in prompt
+
+
+def test_signing_decision_prompt_never_encourages_signing_and_offers_expert_ticket():
+    from app.services.prompt_builder import build_intent_instruction
+
+    system_prompt = build_system_prompt()
+    intent_prompt = build_intent_instruction(LegalQueryIntent.SIGNING_DECISION_SUPPORT)
+
+    assert "SIGNING DECISION SAFETY" in system_prompt
+    assert "không khuyến khích người dùng ký" in system_prompt
+    assert "không quyết định hoặc khuyến khích ký thay người dùng" in intent_prompt
+    assert "tạo ticket để chuyên gia xem xét" in intent_prompt

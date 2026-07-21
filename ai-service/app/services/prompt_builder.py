@@ -209,7 +209,15 @@ def build_system_prompt() -> str:
         "- Không hợp nhất các bên, số tiền, thời hạn hoặc điều khoản giữa nhiều tài liệu. Mọi dữ kiện phải giữ provenance theo file và citation [USER-x].\n"
         "- Tóm tắt nhiều tài liệu theo từng tài liệu. Khi so sánh phải ghi rõ dữ kiện thuộc tài liệu nào. Khi có khác biệt, mô tả là khác biệt giữa tài liệu, không tự kết luận tài liệu nào đúng hoặc sai.\n"
     )
-    return base_prompt + grounding_rules + document_scope_rules
+    signing_decision_rules = (
+        "\nSIGNING DECISION SAFETY\n"
+        "- Khi người dùng hỏi có nên ký, ký được không, có thể ký không hoặc yêu cầu hệ thống quyết định việc ký, tuyệt đối không trả lời thay họ rằng nên ký hay cứ ký.\n"
+        "- Phải nói rõ hệ thống không khuyến khích người dùng ký chỉ dựa trên câu trả lời của AI.\n"
+        "- Phải nói rõ mọi phân tích chỉ nhằm hỗ trợ người dùng tự ra quyết định, không phải phê duyệt hợp đồng hay thay thế tư vấn chuyên gia.\n"
+        "- Có thể trình bày điểm tương đối ổn, điểm cần làm rõ/đàm phán và rủi ro còn lại, nhưng quyết định ký thuộc về người dùng.\n"
+        "- Cuối câu trả lời phải đề nghị người dùng tạo ticket để chuyên gia xem xét nếu họ muốn được hỗ trợ trước khi ký.\n"
+    )
+    return base_prompt + grounding_rules + document_scope_rules + signing_decision_rules
 
 
 def build_user_prompt(
@@ -474,12 +482,15 @@ def build_intent_instruction(
     elif intent == LegalQueryIntent.SIGNING_DECISION_SUPPORT:
         parts.append(
             "BẠN ĐANG THỰC HIỆN: HỖ TRỢ QUYẾT ĐỊNH KÝ HỢP ĐỒNG\n\n"
+            "Không quyết định hoặc khuyến khích ký thay người dùng. Bắt buộc nói rõ hệ thống không "
+            "khuyến khích ký chỉ dựa trên phân tích AI; thông tin chỉ hỗ trợ người dùng tự ra quyết định.\n\n"
             "Hãy trả lời dạng decision support:\n"
-            "1. ✅ **Điểm chấp nhận được**: Những gì hợp lý\n"
-            "2. ⚠️ **Điểm cần đàm phán**: Những gì nên thay đổi\n"
-            "3. 🚫 **Điểm không nên ký**: Nếu chưa sửa\n"
+            "1. ✅ **Điểm tương đối ổn**: Những gì hợp lý\n"
+            "2. ⚠️ **Điểm cần làm rõ/đàm phán**: Những gì nên thay đổi\n"
+            "3. 🚫 **Rủi ro còn lại trước khi ký**: Những gì chưa được xử lý\n"
             "4. 📋 **Khuyến nghị bước tiếp**: Hành động cụ thể\n\n"
-            "⚠️ Luôn ghi rõ: 'Quyết định cuối cùng thuộc về bạn. Nên tham khảo luật sư nếu giá trị hợp đồng lớn.'\n\n"
+            "Kết thúc bằng lựa chọn tạo ticket để chuyên gia xem xét nếu người dùng muốn được hỗ trợ thêm.\n"
+            "⚠️ Luôn ghi rõ: 'Quyết định cuối cùng thuộc về bạn. Phân tích AI không thay thế tư vấn chuyên gia.'\n\n"
         )
 
     elif intent in (LegalQueryIntent.CLAUSE_DRAFTING, LegalQueryIntent.CLAUSE_REVISION):

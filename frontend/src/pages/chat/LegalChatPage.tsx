@@ -1284,7 +1284,7 @@ export function LegalChatPage() {
                 </button>
               </div>
               {documentActionError && !documentModalOpen && <p className="mt-sm rounded-lg bg-error/10 px-sm py-xs text-xs font-medium text-error" role="alert">{documentActionError}</p>}
-            </section>
+            </div>
             <div className={`flex shrink-0 flex-col gap-sm rounded-lg border px-sm py-sm text-xs font-medium sm:flex-row sm:items-center ${chatBlockedByAttachedDocuments ? "border-amber-200 bg-amber-50/70 text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200" : "border-primary/15 bg-primary/5 text-primary dark:border-inverse-primary/20 dark:bg-blue-950/20 dark:text-blue-200"}`}>
               <div className="flex min-w-0 flex-1 items-start gap-sm">
                 <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/70 dark:bg-slate-900/60"><Bot className="h-3.5 w-3.5" aria-hidden="true" /></span>
@@ -1531,7 +1531,7 @@ export function LegalChatPage() {
                 </div>
               </div>
             </form>
-          </div>
+          </Card>
         </section>
         <aside className="order-1 flex min-w-0 items-start justify-center md:order-2">
           <nav aria-label={t("chat.utilities")} className="flex w-auto max-w-full items-center gap-sm rounded-xl border border-legal-border bg-white p-sm shadow-sm dark:border-slate-700 dark:bg-slate-900 md:sticky md:top-4 md:w-[60px] md:flex-col">
