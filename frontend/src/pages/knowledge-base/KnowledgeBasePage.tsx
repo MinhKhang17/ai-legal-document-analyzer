@@ -1,4 +1,4 @@
-import { ArrowRight, FileText, RefreshCw, ShieldCheck, Upload, UploadCloud } from "lucide-react";
+import { ArrowRight, ArrowUpDown, FileText, RefreshCw, RotateCcw, Search, ShieldCheck, SlidersHorizontal, Upload, UploadCloud } from "lucide-react";
 import type { ChangeEvent } from "react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -52,6 +52,25 @@ const knowledgeCategoryKeys: Record<string, string> = {
   LEGAL_SOURCE: "knowledge.categoryValue.LEGAL_SOURCE",
 };
 
+const knowledgeStatuses = ["PENDING", "UPLOADED", "PROCESSING", "INGESTED", "REVIEWING", "PUBLIC", "ARCHIVED", "FAILED"];
+
+const sortValues = [
+  "updatedAt,desc",
+  "updatedAt,asc",
+  "createdAt,desc",
+  "createdAt,asc",
+  "title,asc",
+  "title,desc",
+  "code,asc",
+  "code,desc",
+  "currentStatus,asc",
+  "currentStatus,desc",
+  "currentVersionNo,desc",
+  "currentVersionNo,asc",
+];
+
+const sortField = (sort: string) => sort.split(",")[0];
+
 export function KnowledgeBasePage() {
   const { t, language } = useI18n();
   const toast = useToast();
@@ -71,6 +90,14 @@ export function KnowledgeBasePage() {
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [page, setPage] = useState(() => parsePageParam(searchParams.get("page")));
+  const [searchInput, setSearchInput] = useState("");
+  const [keyword, setKeyword] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [scopeFilter, setScopeFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [activeFilter, setActiveFilter] = useState("");
+  const [primarySort, setPrimarySort] = useState("updatedAt,desc");
+  const [secondarySort, setSecondarySort] = useState("title,asc");
   const [form, setForm] = useState(emptyForm);
   const [selectedFileName, setSelectedFileName] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -84,7 +111,17 @@ export function KnowledgeBasePage() {
     setError("");
 
     try {
-      const response = await getKnowledgeBaseEntries(page, 20);
+      const sorts = [primarySort, secondarySort]
+        .filter(Boolean)
+        .filter((sort, index, values) => values.findIndex((candidate) => sortField(candidate) === sortField(sort)) === index);
+      const response = await getKnowledgeBaseEntries(page, 20, {
+        keyword,
+        status: statusFilter || undefined,
+        scope: scopeFilter || undefined,
+        category: categoryFilter || undefined,
+        active: activeFilter === "" ? undefined : activeFilter === "true",
+        sort: sorts,
+      });
       setEntries(response.items ?? []);
       setTotalItems(response.totalItems ?? 0);
       setTotalPages(response.totalPages ?? 0);
@@ -94,7 +131,24 @@ export function KnowledgeBasePage() {
     } finally {
       setLoading(false);
     }
-  }, [page, t]);
+  }, [activeFilter, categoryFilter, keyword, page, primarySort, scopeFilter, secondarySort, statusFilter, t]);
+
+  const applySearch = () => {
+    setPage(0);
+    setKeyword(searchInput.trim());
+  };
+
+  const resetFilters = () => {
+    setSearchInput("");
+    setKeyword("");
+    setStatusFilter("");
+    setScopeFilter("");
+    setCategoryFilter("");
+    setActiveFilter("");
+    setPrimarySort("updatedAt,desc");
+    setSecondarySort("title,asc");
+    setPage(0);
+  };
 
   useEffect(() => {
     void loadEntries();
@@ -355,6 +409,88 @@ export function KnowledgeBasePage() {
         </Card>
 
         <Card title={t("knowledge.entries")}>
+          <div className="mb-lg rounded-2xl border border-legal-border bg-surface-container-low p-md dark:border-slate-700 dark:bg-slate-900/60">
+            <div className="mb-md flex items-center gap-sm">
+              <SlidersHorizontal className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-semibold">{t("knowledge.listTools")}</h3>
+            </div>
+            <form
+              className="flex flex-col gap-sm sm:flex-row"
+              onSubmit={(event) => {
+                event.preventDefault();
+                applySearch();
+              }}
+            >
+              <label className="relative min-w-0 flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
+                <input
+                  className="form-field pl-10"
+                  value={searchInput}
+                  onChange={(event) => setSearchInput(event.target.value)}
+                  placeholder={t("knowledge.listSearchPlaceholder")}
+                  aria-label={t("knowledge.listSearchPlaceholder")}
+                />
+              </label>
+              <Button type="submit" leftIcon={<Search className="h-4 w-4" />} disabled={loading}>
+                {t("knowledge.searchButton")}
+              </Button>
+              <Button type="button" variant="secondary" leftIcon={<RotateCcw className="h-4 w-4" />} onClick={resetFilters} disabled={loading}>
+                {t("knowledge.resetFilters")}
+              </Button>
+            </form>
+
+            <div className="mt-md grid gap-sm sm:grid-cols-2 2xl:grid-cols-3">
+              <label className="text-xs font-semibold text-on-surface-variant">
+                {t("table.status")}
+                <select className="form-field mt-xs" value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(0); }}>
+                  <option value="">{t("knowledge.allStatuses")}</option>
+                  {knowledgeStatuses.map((status) => <option key={status} value={status}>{translateEnum(status, knowledgeStatusKeys)}</option>)}
+                </select>
+              </label>
+              <label className="text-xs font-semibold text-on-surface-variant">
+                {t("knowledge.scope")}
+                <select className="form-field mt-xs" value={scopeFilter} onChange={(event) => { setScopeFilter(event.target.value); setPage(0); }}>
+                  <option value="">{t("knowledge.allScopes")}</option>
+                  <option value="GLOBAL">{t("knowledge.scopeValue.GLOBAL")}</option>
+                  <option value="WORKSPACE">{t("knowledge.scopeValue.WORKSPACE")}</option>
+                </select>
+              </label>
+              <label className="text-xs font-semibold text-on-surface-variant">
+                {t("knowledge.category")}
+                <select className="form-field mt-xs" value={categoryFilter} onChange={(event) => { setCategoryFilter(event.target.value); setPage(0); }}>
+                  <option value="">{t("knowledge.allCategories")}</option>
+                  <option value="LEGAL_SOURCE">{t("knowledge.categoryValue.LEGAL_SOURCE")}</option>
+                </select>
+              </label>
+              <label className="text-xs font-semibold text-on-surface-variant">
+                {t("knowledge.ingestedDocuments.active")}
+                <select className="form-field mt-xs" value={activeFilter} onChange={(event) => { setActiveFilter(event.target.value); setPage(0); }}>
+                  <option value="">{t("knowledge.allActivity")}</option>
+                  <option value="true">{t("knowledge.activeOnly")}</option>
+                  <option value="false">{t("knowledge.inactiveOnly")}</option>
+                </select>
+              </label>
+              <label className="text-xs font-semibold text-on-surface-variant">
+                <span className="flex items-center gap-xs"><ArrowUpDown className="h-3.5 w-3.5" />{t("knowledge.primarySort")}</span>
+                <select className="form-field mt-xs" value={primarySort} onChange={(event) => {
+                  const nextPrimarySort = event.target.value;
+                  setPrimarySort(nextPrimarySort);
+                  if (sortField(nextPrimarySort) === sortField(secondarySort)) setSecondarySort("");
+                  setPage(0);
+                }}>
+                  {sortValues.map((sort) => <option key={sort} value={sort}>{t(`knowledge.sort.${sort.replace(",", ".")}`)}</option>)}
+                </select>
+              </label>
+              <label className="text-xs font-semibold text-on-surface-variant">
+                <span className="flex items-center gap-xs"><ArrowUpDown className="h-3.5 w-3.5" />{t("knowledge.secondarySort")}</span>
+                <select className="form-field mt-xs" value={secondarySort} onChange={(event) => { setSecondarySort(event.target.value); setPage(0); }}>
+                  <option value="">{t("knowledge.noSecondarySort")}</option>
+                  {sortValues.filter((sort) => sortField(sort) !== sortField(primarySort)).map((sort) => <option key={sort} value={sort}>{t(`knowledge.sort.${sort.replace(",", ".")}`)}</option>)}
+                </select>
+              </label>
+            </div>
+            <p className="mt-md text-xs text-on-surface-variant">{t("knowledge.filteredResults", { count: totalItems })}</p>
+          </div>
           <div className="mb-lg space-y-sm rounded-2xl border border-primary/20 bg-primary/5 p-lg dark:border-indigo-400/20 dark:bg-indigo-950/20">
             <h3 className="font-semibold">{t("knowledge.guideTitle")}</h3>
             <ul className="grid gap-xs text-sm text-on-surface-variant dark:text-slate-300 2xl:grid-cols-2">

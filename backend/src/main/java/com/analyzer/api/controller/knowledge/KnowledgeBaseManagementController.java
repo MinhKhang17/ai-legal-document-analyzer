@@ -5,6 +5,8 @@ import com.analyzer.api.dto.PageResponse;
 import com.analyzer.api.dto.knowledge.*;
 import com.analyzer.api.entity.KnowledgeBaseEntry;
 import com.analyzer.api.entity.KnowledgeBaseVersion;
+import com.analyzer.api.enums.KnowledgeScope;
+import com.analyzer.api.enums.KnowledgeStatus;
 import com.analyzer.api.exception.common.ResourceNotFoundException;
 import com.analyzer.api.repository.knowledge.KnowledgeBaseEntryRepository;
 import com.analyzer.api.repository.knowledge.KnowledgeBaseVersionRepository;
@@ -108,8 +110,16 @@ public class KnowledgeBaseManagementController {
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponseDTO<PageResponse<KnowledgeBaseEntryResponse>>> listKnowledge(Pageable pageable) {
-        Page<KnowledgeBaseEntryResponse> page = entryRepository.findAll(pageable).map(this::toEntryResponse);
+    public ResponseEntity<ApiResponseDTO<PageResponse<KnowledgeBaseEntryResponse>>> listKnowledge(
+            @RequestParam(name = "q", required = false) String keyword,
+            @RequestParam(required = false) KnowledgeStatus status,
+            @RequestParam(required = false) KnowledgeScope scope,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) Boolean active,
+            Pageable pageable) {
+        Page<KnowledgeBaseEntryResponse> page = entryRepository.searchForAdmin(
+                        normalizeFilter(keyword), status, scope, normalizeFilter(category), active, pageable)
+                .map(this::toEntryResponse);
         return ResponseEntity.ok(ApiResponseDTO.success("Lay danh sach knowledge base thanh cong", toPageResponse(page)));
     }
 
@@ -235,6 +245,10 @@ public class KnowledgeBaseManagementController {
         } catch (NumberFormatException ex) {
             return null;
         }
+    }
+
+    private String normalizeFilter(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     private <T> PageResponse<T> toPageResponse(Page<T> page) {

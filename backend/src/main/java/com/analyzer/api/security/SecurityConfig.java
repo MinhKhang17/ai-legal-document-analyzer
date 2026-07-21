@@ -80,8 +80,7 @@ public class SecurityConfig {
                             "/api/subscription/refunds/confirm",
                             "/api/internal/**",
                             "/api/v1/workspaces/*/documents/*/download",
-                            "/api/v1/workspaces/*/documents/system/download",
-                            "/api/v1/workspaces/**/download**"
+                            "/api/v1/workspaces/*/documents/system/download"
                     ).permitAll()
                     .requestMatchers(
                             "/v3/api-docs",
