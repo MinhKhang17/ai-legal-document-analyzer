@@ -18,7 +18,12 @@ import { parsePageParam, toPageParam } from "../../utils/pagination";
 import { useI18n } from "../../hooks/useI18n";
 import { useToast } from "../../hooks/useToast";
 import type { LawyerTicket } from "../../types/lawyerTicket";
-import { getLegalTicketStatusLabel } from "../../types/legalTicketStatus";
+import {
+  getLegalTicketFilterOptions,
+  getLegalTicketStatusLabel,
+  toLegalTicketFilter,
+  type LegalTicketFilter,
+} from "../../types/legalTicketStatus";
 import { formatDisplayDate, localeForLanguage } from "../../utils/format";
 
 const getRiskTone = (risk?: string | null) => {
@@ -34,6 +39,9 @@ export function LawyerTicketsPage() {
   const locale = localeForLanguage(language);
   const [searchParams, setSearchParams] = useSearchParams();
   const [page, setPage] = useState(() => parsePageParam(searchParams.get('page')));
+  const [statusFilter, setStatusFilter] = useState<LegalTicketFilter>(() =>
+    toLegalTicketFilter(searchParams.get("status")),
+  );
   const [totalPages, setTotalPages] = useState(0);
 
   const [tickets, setTickets] = useState<LawyerTicket[]>([]);
@@ -44,7 +52,11 @@ export function LawyerTicketsPage() {
     setIsLoading(true);
 
     try {
-      const response = await getMyLawyerTickets(page, 10);
+      const response = await getMyLawyerTickets(
+        page,
+        10,
+        statusFilter === "ALL" ? undefined : statusFilter,
+      );
       setTickets(response.items ?? []);
       setTotalItems(response.totalItems ?? 0);
       setTotalPages(response.totalPages ?? 0);
@@ -55,7 +67,7 @@ export function LawyerTicketsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [page, t, toast]);
+  }, [page, statusFilter, t, toast]);
 
   useEffect(() => {
     void loadTickets();
@@ -112,7 +124,7 @@ export function LawyerTicketsPage() {
       </div>
 
       <Card className="p-lg">
-        <div className="mb-5 flex items-center justify-between gap-4">
+        <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-end">
           <div>
             <h2 className="text-xl font-semibold">
               {t("lawyerTickets.ticketQueue")}
@@ -121,12 +133,39 @@ export function LawyerTicketsPage() {
               {t("lawyerTickets.ticketQueueDescription")}
             </p>
           </div>
-
-          <Badge tone="blue">
-            {isLoading
-              ? t("common.loading")
-              : `${tickets.length}/${totalItems}`}
-          </Badge>
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="min-w-56 text-sm font-semibold">
+              <span className="mb-1 block text-xs uppercase tracking-wide text-on-surface-variant">
+                {t("lawyerTickets.statusFilter")}
+              </span>
+              <select
+                className="form-field"
+                value={statusFilter}
+                disabled={isLoading}
+                onChange={(event) => {
+                  const nextFilter = toLegalTicketFilter(event.target.value);
+                  setStatusFilter(nextFilter);
+                  setPage(0);
+                  const next = new URLSearchParams(searchParams);
+                  next.delete("page");
+                  if (nextFilter === "ALL") next.delete("status");
+                  else next.set("status", nextFilter);
+                  setSearchParams(next);
+                }}
+              >
+                {getLegalTicketFilterOptions(t).map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Badge tone="blue">
+              {isLoading
+                ? t("common.loading")
+                : `${tickets.length}/${totalItems}`}
+            </Badge>
+          </div>
         </div>
 
         {isLoading ? (

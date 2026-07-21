@@ -30,11 +30,12 @@ import {
   requestMoreInfoLawyerTicket,
   resolveLawyerTicket,
   startReviewLawyerTicket,
+  uploadLawyerTicketFile,
   type LawyerTicketDetail,
   type LawyerTicketFile,
 } from "../../api/lawyerTicketApi";
-import { getAttachmentPolicy, getTicketConversation, sendTicketConversationMessage, uploadTicketAttachment, downloadTicketAttachment } from "../../services/legalTicket.service";
-import type { AttachmentPolicy, LegalTicketMessage } from "../../types/legalTicket";
+import { getTicketConversation, sendTicketConversationMessage, downloadTicketAttachment } from "../../services/legalTicket.service";
+import type { LegalTicketMessage } from "../../types/legalTicket";
 import { Badge } from "../../components/common/Badge";
 import { Button } from "../../components/common/Button";
 import { Card } from "../../components/common/Card";
@@ -46,6 +47,7 @@ import { useToast } from "../../hooks/useToast";
 import { formatDisplayDate, formatFileSize, localeForLanguage } from "../../utils/format";
 import { ApiRequestError } from "../../services/http";
 import { getLegalTicketStatusLabel } from "../../types/legalTicketStatus";
+import { useAppStore } from "../../store/AppStore";
 
 const getValue = (value?: string | number | null) =>
   value === undefined || value === null || value === "" ? "—" : String(value);
@@ -93,10 +95,19 @@ const canRequestMoreInfo = (status?: string | null) =>
 const canResolveTicket = (status?: string | null) =>
   Boolean(status && ['ASSIGNED_TO_LAWYER', 'IN_REVIEW', 'CUSTOMER_RESPONDED', 'REOPENED'].includes(status));
 
+const readFileAsDataUrl = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(reader.error ?? new Error("FILE_READ_FAILED"));
+    reader.readAsDataURL(file);
+  });
+
 export function LawyerTicketDetailPage() {
   const { t, language } = useI18n();
   const locale = localeForLanguage(language);
   const toast = useToast();
+  const { user } = useAppStore();
   const { ticketId } = useParams();
 
   const [ticket, setTicket] = useState<LawyerTicketDetail | null>(null);
@@ -104,14 +115,13 @@ export function LawyerTicketDetailPage() {
   const [detailError, setDetailError] = useState("");
 
   const [messages, setMessages] = useState<LegalTicketMessage[]>([]);
-  const [attachmentPolicy, setAttachmentPolicy] = useState<AttachmentPolicy | null>(null);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [messageValue, setMessageValue] = useState("");
   const [sendingMessage, setSendingMessage] = useState(false);
 
   const [files, setFiles] = useState<LawyerTicketFile[]>([]);
   const [filesLoading, setFilesLoading] = useState(false);
-  const [uploadingFile] = useState(false);
+  const [uploadingFile, setUploadingFile] = useState(false);
   const [selectedUploadFile, setSelectedUploadFile] = useState<File | null>(null);
   const [uploadValidationError, setUploadValidationError] = useState("");
   const [openingDocumentId, setOpeningDocumentId] = useState("");
@@ -192,19 +202,13 @@ export function LawyerTicketDetailPage() {
   }, [loadTicket, loadMessages, loadFiles]);
 
   const handleSendMessage = useCallback(async () => {
-    if (!ticketId || (!messageValue.trim() && !selectedUploadFile)) return;
+    if (!ticketId || !messageValue.trim()) return;
 
     try {
       setSendingMessage(true);
-      const attachmentIds: string[] = [];
-      if (selectedUploadFile) {
-        const uploaded = await uploadTicketAttachment(selectedUploadFile, `draft_${crypto.randomUUID()}`, () => undefined);
-        attachmentIds.push(uploaded.id);
-      }
-      await sendTicketConversationMessage(ticketId, messageValue.trim(), attachmentIds);
+      await sendTicketConversationMessage(ticketId, messageValue.trim(), []);
 
       setMessageValue("");
-      setSelectedUploadFile(null);
       toast.success(t("lawyerTickets.messages.sendSuccess"));
       await loadMessages();
     } catch (error) {
@@ -213,11 +217,11 @@ export function LawyerTicketDetailPage() {
     } finally {
       setSendingMessage(false);
     }
-  }, [ticketId, messageValue, selectedUploadFile, toast, t, loadMessages, refreshAll]);
+  }, [ticketId, messageValue, toast, t, loadMessages, refreshAll]);
 
   const handleUploadFile = useCallback(
     async (event: ChangeEvent<HTMLInputElement>) => {
-      if (!ticketId || !ticket) return;
+      if (!ticketId || !ticket || !user?.id) return;
 
       const file = event.target.files?.[0];
       event.target.value = "";
@@ -232,16 +236,27 @@ export function LawyerTicketDetailPage() {
       setSelectedUploadFile(file);
       setUploadValidationError("");
 
-      if (attachmentPolicy && file.size > attachmentPolicy.maxAttachmentSizeKb * 1024) {
+      try {
+        setUploadingFile(true);
+        const contentBase64 = await readFileAsDataUrl(file);
+        await uploadLawyerTicketFile(ticketId, {
+          uploadedById: user.id,
+          originalFileName: file.name,
+          fileType: file.type || file.name.split(".").pop() || "application/octet-stream",
+          contentBase64,
+          visibilityScope: "CUSTOMER",
+        });
         setSelectedUploadFile(null);
-        setUploadValidationError(t("ticketComposer.fileTooLarge", {
-          file: file.name,
-          size: Math.ceil(file.size / 1024),
-          max: attachmentPolicy.maxAttachmentSizeKb,
-        }));
+        toast.success(t("lawyerTickets.files.uploadSuccess"), t("toast.successTitle"));
+        await loadFiles();
+      } catch (error) {
+        toast.error(t("lawyerTickets.files.uploadError"), t("toast.errorTitle"));
+        if (error instanceof ApiRequestError && error.status === 409) await refreshAll();
+      } finally {
+        setUploadingFile(false);
       }
     },
-    [ticketId, ticket, attachmentPolicy, t],
+    [ticketId, ticket, user?.id, t, toast, loadFiles, refreshAll],
   );
 
   const handleStartReview = useCallback(async () => {
@@ -338,7 +353,6 @@ export function LawyerTicketDetailPage() {
 
   useEffect(() => {
     void refreshAll();
-    void getAttachmentPolicy().then(setAttachmentPolicy).catch(() => undefined);
     const intervalId = window.setInterval(() => {
       if (!ticketId) return;
       void Promise.allSettled([
@@ -660,7 +674,7 @@ export function LawyerTicketDetailPage() {
               />
               <Button
                 onClick={handleSendMessage}
-                disabled={sendingMessage || (!messageValue.trim() && !selectedUploadFile)}
+                disabled={sendingMessage || !messageValue.trim()}
               >
                 <Send className="mr-2 h-4 w-4" />
                 {t("lawyerTickets.messages.send")}

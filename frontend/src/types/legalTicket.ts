@@ -170,6 +170,12 @@ export interface LegalTicket {
 
   expert_answer?: string;
   expert_internal_note?: string;
+  consultation_fee?: number;
+  commission_rate?: number;
+  platform_fee?: number;
+  expert_payout?: number;
+  expert_payment_status?: "UNPAID" | "PENDING" | "PAID";
+  expert_paid_at?: string;
 
   admin_note?: string;
   rejection_reason?: string;
