@@ -21,10 +21,12 @@ import { useToast } from "../../hooks/useToast";
 
 import { getAccessToken as getSessionAccessToken } from "../../services/authSession";
 import { supportedContractScopeText } from "../../config/supportedContractTypes";
+import { formatFileSize, localeForLanguage } from "../../utils/format";
 const getAccessToken = () => getSessionAccessToken() ?? "";
 
 export function UploadPage() {
   const { t, language } = useI18n();
+  const locale = localeForLanguage(language);
   const toast = useToast();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -76,10 +78,8 @@ export function UploadPage() {
             setSearchParams({ workspaceId: matchedWorkspace.workspaceId });
           }
         }
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : t("upload.loadWorkspacesFailed"),
-        );
+      } catch {
+        setError(t("upload.loadWorkspacesFailed"));
       } finally {
         setLoadingWorkspaces(false);
       }
@@ -102,10 +102,8 @@ export function UploadPage() {
           selectedWorkspaceId,
         );
         setDocuments(data);
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : t("upload.loadDocumentsFailed"),
-        );
+      } catch {
+        setError(t("upload.loadDocumentsFailed"));
       } finally {
         setLoadingDocuments(false);
       }
@@ -154,9 +152,8 @@ export function UploadPage() {
       setWorkspaceName("");
       setWorkspaceDescription("");
       toast.success(t("workspace.createSuccess"), t("toast.successTitle"));
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : t("workspace.createError");
+    } catch {
+      const message = t("workspace.createError");
       setError(message);
       toast.error(message, t("toast.errorTitle"));
     } finally {
@@ -368,7 +365,7 @@ export function UploadPage() {
               )}
 
               <p className="rounded-xl bg-surface-container-low p-sm text-xs text-on-surface-variant dark:bg-slate-800 dark:text-slate-400">
-                {supportedContractScopeText(language)} {language === "vi" ? "Bạn chỉ cần chọn tài liệu; hệ thống sẽ tự nhận diện nội dung khi xử lý." : "Just choose a document; the system detects its content during processing."}
+                {supportedContractScopeText(language)} {t("upload.autoDetectHint")}
               </p>
 
               <FileUploadZone
@@ -395,7 +392,7 @@ export function UploadPage() {
           </Card>
 
           {error && (
-            <div className="rounded-xl border border-error/40 bg-error/10 p-md text-sm text-error">
+            <div role="alert" className="rounded-xl border border-error/40 bg-error/10 p-md text-sm text-error">
               {error}
             </div>
           )}
@@ -437,7 +434,7 @@ export function UploadPage() {
                           {document.originalFileName}
                         </p>
                         <p className="text-sm text-on-surface-variant dark:text-slate-400">
-                          {(document.fileSize / 1024 / 1024).toFixed(2)} MB ·{" "}
+                          {formatFileSize(document.fileSize, locale)} ·{" "}
                           {document.fileType}
                         </p>
                       </div>
@@ -451,7 +448,7 @@ export function UploadPage() {
                       {t("upload.processingStatusDescription")}
                     </div>
                   )}
-                  {document.errorMessage && <p className="mt-sm text-sm text-error">{document.errorMessage}</p>}
+                  {document.errorMessage && <p role="alert" className="mt-sm text-sm text-error">{t("upload.documentProcessingError")}</p>}
                 </div>
               ))}
             </div>

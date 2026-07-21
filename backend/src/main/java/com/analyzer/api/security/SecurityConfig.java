@@ -69,6 +69,7 @@ public class SecurityConfig {
                     .requestMatchers("/api/v1/auth/**").permitAll()
                     .requestMatchers(HttpMethod.POST,
                             "/api/v1/admin/knowledge-base/bulk-ingest-server-file").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/shared/chat/*").permitAll()
                     .requestMatchers(
                             "/api/v1/payment-transactions/vnpay-return",
                             "/api/v1/payment-transactions/vnpay-ipn",

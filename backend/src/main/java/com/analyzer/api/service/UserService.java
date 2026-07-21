@@ -30,4 +30,8 @@ public interface UserService {
      * Restores (re-activates) a soft-deleted user account.
      */
     void restoreUser(Long userId);
+
+    void requestPasswordReset(String email);
+
+    void resetPassword(com.analyzer.api.dto.auth.ResetPasswordRequestDTO request);
 }

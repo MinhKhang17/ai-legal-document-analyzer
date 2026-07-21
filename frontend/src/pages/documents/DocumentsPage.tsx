@@ -11,7 +11,7 @@ import { StatusBadge } from '../../components/common/StatusBadge';
 import { getWorkspaceDocuments, getWorkspaces } from '../../api/workspaceApi';
 import { useI18n } from '../../hooks/useI18n';
 import type { Document, Workspace } from '../../types/workspace';
-import { formatDisplayDateTime } from '../../utils/format';
+import { formatDisplayDateTime, formatFileSize, localeForLanguage } from '../../utils/format';
 
 import { getAccessToken as getSessionAccessToken } from '../../services/authSession';
 const getAccessToken = () => getSessionAccessToken() ?? '';
@@ -22,6 +22,7 @@ type DocumentRow = Document & {
 
 export function DocumentsPage() {
   const { t, language } = useI18n();
+  const locale = localeForLanguage(language);
   const [query, setQuery] = useState('');
   const [documents, setDocuments] = useState<DocumentRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,9 +50,9 @@ export function DocumentsPage() {
         if (active) {
           setDocuments(documentGroups.flat());
         }
-      } catch (err) {
+      } catch {
         if (active) {
-          setError(err instanceof Error ? err.message : t('documents.loadError'));
+          setError(t('documents.loadError'));
         }
       } finally {
         if (active) {
@@ -84,7 +85,7 @@ export function DocumentsPage() {
             {document.originalFileName}
           </p>
           <p className="text-xs text-on-surface-variant dark:text-slate-400">
-            {document.fileType} · {new Intl.NumberFormat(language === 'vi' ? 'vi-VN' : 'en-US').format(document.fileSize)} bytes
+            {document.fileType} · {formatFileSize(document.fileSize, locale)}
           </p>
         </div>
       ),
@@ -102,7 +103,7 @@ export function DocumentsPage() {
     {
       header: t('table.date'),
       cell: (document) =>
-        formatDisplayDateTime(document.uploadedAt, '-', language === 'vi' ? 'vi-VN' : 'en-US'),
+        formatDisplayDateTime(document.uploadedAt, '-', locale),
     },
     {
       header: t('table.actions'),
@@ -118,7 +119,7 @@ export function DocumentsPage() {
 
   const renderContent = () => {
     if (loading) {
-      return <p className="text-sm text-on-surface-variant dark:text-slate-400">{t('documents.loading')}</p>;
+      return <p aria-live="polite" className="text-sm text-on-surface-variant dark:text-slate-400">{t('documents.loading')}</p>;
     }
 
     if (error) {

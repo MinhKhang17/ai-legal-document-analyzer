@@ -31,4 +31,6 @@ public interface EmailService {
 
     void sendKnowledgeIngestedEmailAsync(String toEmail, String recipientName, String title,
                                          String code, String versionId, String jobId, String ingestedAt);
+
+    void sendPasswordResetEmailAsync(String toEmail, String recipientName, String token, int validMinutes);
 }

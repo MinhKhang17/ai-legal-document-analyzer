@@ -199,7 +199,8 @@ public class ChatSessionServiceImpl implements ChatSessionService {
 
     @Override
     @Transactional
-    public ShareChatSessionResponse shareChatSession(Long userId, String chatSessionId) {
+    public ShareChatSessionResponse shareChatSession(Long userId, String chatSessionId,
+                                                     com.analyzer.api.enums.ShareAccessLevel accessLevel) {
         ChatSession chatSession = chatSessionRepository.findById(chatSessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Chat session not found"));
 
@@ -218,6 +219,8 @@ public class ChatSessionServiceImpl implements ChatSessionService {
             chatSession.setIsShared(true);
             chatSession.setSharedAt(LocalDateTime.now());
         }
+        chatSession.setShareAccessLevel(accessLevel == null
+                ? com.analyzer.api.enums.ShareAccessLevel.RESTRICTED : accessLevel);
 
         ChatSession savedSession = chatSessionRepository.save(chatSession);
 
@@ -226,14 +229,23 @@ public class ChatSessionServiceImpl implements ChatSessionService {
                 .shareToken(savedSession.getShareToken())
                 .shareUrl(frontendBaseUrl + "/shared/chat/" + savedSession.getShareToken())
                 .sharedAt(savedSession.getSharedAt())
+                .accessLevel(savedSession.getShareAccessLevel())
+                .authenticationRequired(savedSession.getShareAccessLevel()
+                        != com.analyzer.api.enums.ShareAccessLevel.PUBLIC)
                 .build();
     }
 
     @Override
     @Transactional(readOnly = true)
-    public SharedChatSessionResponse getSharedChatSession(String shareToken) {
+    public SharedChatSessionResponse getSharedChatSession(String shareToken, boolean adminOrExpert) {
         ChatSession chatSession = chatSessionRepository.findByShareTokenAndIsSharedTrue(shareToken)
                 .orElseThrow(() -> new ResourceNotFoundException("Shared chat session not found or no longer shared"));
+
+        com.analyzer.api.enums.ShareAccessLevel accessLevel = chatSession.getShareAccessLevel() == null
+                ? com.analyzer.api.enums.ShareAccessLevel.RESTRICTED : chatSession.getShareAccessLevel();
+        if (accessLevel == com.analyzer.api.enums.ShareAccessLevel.RESTRICTED && !adminOrExpert) {
+            throw new ForbiddenException("This share link is restricted to Admin and Expert accounts");
+        }
 
         List<ChatMessageResponse> messages = chatMessageRepository
                 .findByChatSessionIdOrderByCreatedAtAsc(chatSession.getId())
@@ -248,6 +260,8 @@ public class ChatSessionServiceImpl implements ChatSessionService {
                 .createdAt(chatSession.getCreatedAt())
                 .sharedAt(chatSession.getSharedAt())
                 .messages(messages)
+                .accessLevel(accessLevel)
+                .readOnly(true)
                 .build();
     }
 

@@ -16,7 +16,7 @@ const isSuccessfulPayment = (transaction: PaymentTransaction | null) =>
   transaction?.paymentStatus?.toUpperCase() === "SUCCESS";
 
 export function PaymentResultPage() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const toast = useToast();
   const [searchParams] = useSearchParams();
   const [transaction, setTransaction] = useState<PaymentTransaction | null>(null);
@@ -34,7 +34,7 @@ export function PaymentResultPage() {
       const reference = parseVnPayResultReference(searchParams);
       if (!reference.transactionCode) {
         setTransaction(null);
-        setError("Callback thanh toán không hợp lệ: thiếu mã giao dịch VNPAY.");
+        setError(t("payment.result.missingParams"));
         return;
       }
       const transactions = await getMyPaymentTransactions();
@@ -63,7 +63,8 @@ export function PaymentResultPage() {
       }
     } catch (err) {
       setTransaction(null);
-      const message = err instanceof Error ? err.message : t("payment.result.verifyError");
+      console.error("Failed to verify payment result:", err);
+      const message = t("payment.result.verifyError");
       setError(message);
       toast.error(message, t("toast.errorTitle"));
     } finally {
@@ -79,6 +80,7 @@ export function PaymentResultPage() {
   const reference = parseVnPayResultReference(searchParams);
   const resultState = getPaymentResultState(transaction, Boolean(reference.transactionCode), notFound);
   const stateLabel = t(`payment.result.state.${resultState}`);
+  const locale = language === "vi" ? "vi-VN" : "en-US";
 
   return (
     <div>
@@ -126,7 +128,7 @@ export function PaymentResultPage() {
           <div className="space-y-md">
             <div className="flex flex-wrap gap-xs">
               <Badge tone={success ? "green" : resultState === "PENDING" ? "amber" : "red"}>{stateLabel}</Badge>
-              <Badge tone="blue">{transaction.paymentMethod}</Badge>
+              <Badge tone="blue">{t(`billing.paymentMethod.${transaction.paymentMethod}`)}</Badge>
               {transaction.transactionCode && <Badge tone="purple">{transaction.transactionCode}</Badge>}
             </div>
 
@@ -137,15 +139,15 @@ export function PaymentResultPage() {
               </div>
               <div>
                 <dt className="label-uppercase">{t("payment.result.amount")}</dt>
-                <dd className="mt-xs font-semibold">{formatVndCurrency(transaction.amount)}</dd>
+                 <dd className="mt-xs font-semibold">{formatVndCurrency(transaction.amount, t("billing.free"), locale)}</dd>
               </div>
               <div>
                 <dt className="label-uppercase">{t("payment.result.createdAt")}</dt>
-                <dd className="mt-xs">{formatDisplayDate(transaction.createdAt, "-")}</dd>
+                 <dd className="mt-xs">{formatDisplayDate(transaction.createdAt, "-", locale)}</dd>
               </div>
               <div>
                 <dt className="label-uppercase">{t("payment.result.paidAt")}</dt>
-                <dd className="mt-xs">{formatDisplayDate(transaction.paidAt, t("payment.result.unpaid"))}</dd>
+                 <dd className="mt-xs">{formatDisplayDate(transaction.paidAt, t("payment.result.unpaid"), locale)}</dd>
               </div>
             </dl>
           </div>

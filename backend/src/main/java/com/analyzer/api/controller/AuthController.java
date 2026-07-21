@@ -7,6 +7,8 @@ import com.analyzer.api.dto.user.UserRequestDTO;
 import com.analyzer.api.dto.user.UserResponseDTO;
 import com.analyzer.api.dto.auth.ResendVerificationEmailRequestDTO;
 import com.analyzer.api.dto.auth.RegistrationResponseDTO;
+import com.analyzer.api.dto.auth.ForgotPasswordRequestDTO;
+import com.analyzer.api.dto.auth.ResetPasswordRequestDTO;
 import com.analyzer.api.service.AuthService;
 import com.analyzer.api.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -37,6 +39,23 @@ public class AuthController {
             @RequestBody UserRequestDTO request) {
         RegistrationResponseDTO user = userService.createUser(request);
         return new ResponseEntity<>(ApiResponseDTO.created("Tạo tài khoản thành công", user), HttpStatus.CREATED);
+    }
+
+    @PostMapping("/forgot-password")
+    @Operation(summary = "Request password reset", description = "Returns a generic response to prevent email enumeration.")
+    public ResponseEntity<ApiResponseDTO<Void>> forgotPassword(
+            @Valid @RequestBody ForgotPasswordRequestDTO request) {
+        userService.requestPasswordReset(request.getEmail());
+        return new ResponseEntity<>(ApiResponseDTO.accepted(
+                "Neu email ton tai, huong dan dat lai mat khau se duoc gui", null), HttpStatus.ACCEPTED);
+    }
+
+    @PostMapping("/reset-password")
+    @Operation(summary = "Reset password with a one-time token")
+    public ResponseEntity<ApiResponseDTO<Void>> resetPassword(
+            @Valid @RequestBody ResetPasswordRequestDTO request) {
+        userService.resetPassword(request);
+        return ResponseEntity.ok(ApiResponseDTO.success("Dat lai mat khau thanh cong"));
     }
 
     @PostMapping("/login")

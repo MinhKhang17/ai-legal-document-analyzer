@@ -15,7 +15,6 @@ import {
   queryAiRiskKnowledge,
   queryAiRiskKnowledgeV2,
 } from '../../services/aiRiskKnowledge.service';
-import { AI_SERVICE_UNAVAILABLE_MESSAGE, getReadableErrorMessage, getUniqueErrorMessages } from '../../services/http';
 import { useI18n } from '../../hooks/useI18n';
 import { useToast } from '../../hooks/useToast';
 import type { AiContractAnalysisResponse, AiContractClauseFinding, AiIngestionResult, AiKnowledgeQueryResponse } from '../../types/ai';
@@ -83,13 +82,11 @@ export function RiskReviewPage() {
       setRiskFormats([]);
     }
 
-    const errors = [contractResult, riskResult]
-      .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
-      .map((result) => result.reason);
+    const hasError = [contractResult, riskResult].some((result) => result.status === 'rejected');
 
-    setError(errors.length > 0 ? getUniqueErrorMessages(errors, AI_SERVICE_UNAVAILABLE_MESSAGE) : '');
+    setError(hasError ? t('risk.serviceUnavailableDescription') : '');
     setLoadingFormats(false);
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void loadFormats();
@@ -112,10 +109,10 @@ export function RiskReviewPage() {
       const result = await uploadContractForAnalysis(file, file.name);
       setContractReport(result);
       toast.success(t('risk.contractUploadSuccess'), t('toast.successTitle'));
-    } catch (err) {
-      const message = getReadableErrorMessage(err, AI_SERVICE_UNAVAILABLE_MESSAGE);
+    } catch {
+      const message = t('risk.contractUploadError');
       setError(message);
-      toast.error(message || t('risk.contractUploadError'), t('toast.errorTitle'));
+      toast.error(message, t('toast.errorTitle'));
     } finally {
       setUploadingContract(false);
     }
@@ -132,10 +129,10 @@ export function RiskReviewPage() {
           : await importAiRiskKnowledgeDocument(file, file.name);
       setRiskImportResult(result);
       toast.success(t('risk.importSuccess'), t('toast.successTitle'));
-    } catch (err) {
-      const message = getReadableErrorMessage(err, AI_SERVICE_UNAVAILABLE_MESSAGE);
+    } catch {
+      const message = t('risk.importError');
       setError(message);
-      toast.error(message || t('risk.importError'), t('toast.errorTitle'));
+      toast.error(message, t('toast.errorTitle'));
     } finally {
       setUploadingRiskKnowledge(false);
     }
@@ -159,11 +156,11 @@ export function RiskReviewPage() {
           : await queryAiRiskKnowledge(payload);
       setRiskQueryResult(result);
       toast.success(t('risk.querySuccess'), t('toast.successTitle'));
-    } catch (err) {
+    } catch {
       setRiskQueryResult(null);
-      const message = getReadableErrorMessage(err, AI_SERVICE_UNAVAILABLE_MESSAGE);
+      const message = t('risk.queryError');
       setError(message);
-      toast.error(message || t('risk.queryError'), t('toast.errorTitle'));
+      toast.error(message, t('toast.errorTitle'));
     } finally {
       setQueryingRisk(false);
     }
@@ -218,7 +215,7 @@ export function RiskReviewPage() {
           actions={<Badge tone="amber">{t('risk.directAiService')}</Badge>}
         >
           <p className="mb-md rounded-xl bg-surface-container-low p-sm text-xs text-on-surface-variant dark:bg-slate-800 dark:text-slate-400">
-            {supportedContractScopeText(language)} {language === 'vi' ? 'Bạn chỉ cần tải tài liệu lên.' : 'You only need to upload the document.'}
+            {supportedContractScopeText(language)} {t('risk.uploadOnlyHint')}
           </p>
           <FileUploadZone
             onUpload={handleContractUpload}
@@ -272,12 +269,14 @@ export function RiskReviewPage() {
               value={riskQuery}
               onChange={(event) => setRiskQuery(event.target.value)}
               placeholder={t('risk.queryPlaceholder')}
+              aria-label={t('risk.queryLabel')}
             />
             <select
               className="form-field md:max-w-32"
               value={riskKnowledgeVersion}
               onChange={(event) => setRiskKnowledgeVersion(event.target.value as RiskKnowledgeVersion)}
               disabled={queryingRisk || uploadingRiskKnowledge}
+              aria-label={t('risk.knowledgeVersion')}
             >
               <option value="v2">v2</option>
               <option value="v1">v1</option>
@@ -325,7 +324,10 @@ export function RiskReviewPage() {
               <p className="label-uppercase mb-xs">{t('risk.answerPreview')}</p>
               <p>{riskQueryResult.answer_preview || t('risk.noPreview')}</p>
               <p className="mt-sm text-xs text-on-surface-variant dark:text-slate-400">
-                {riskQueryResult.chunks.length} chunks từ {riskQueryResult.source}
+                {t('risk.chunkSource', {
+                  count: riskQueryResult.chunks.length,
+                  source: riskQueryResult.source,
+                })}
               </p>
             </div>
           )}

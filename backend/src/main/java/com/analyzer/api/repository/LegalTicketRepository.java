@@ -13,6 +13,7 @@ import org.springframework.stereotype.Repository;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.Optional;
+import java.util.List;
 
 @Repository
 public interface LegalTicketRepository extends JpaRepository<LegalTicket, String> {
@@ -35,6 +36,8 @@ public interface LegalTicketRepository extends JpaRepository<LegalTicket, String
 
     @EntityGraph(attributePaths = {"workspace", "document", "createdBy", "assignedLawyer"})
     Page<LegalTicket> findByAssignedLawyerIdAndDeletedFalse(Long lawyerId, Pageable pageable);
+
+    List<LegalTicket> findByAssignedLawyerIdAndDeletedFalse(Long lawyerId);
 
     @EntityGraph(attributePaths = {"workspace", "document", "createdBy", "assignedLawyer"})
     Page<LegalTicket> findByAssignedLawyerIdAndStatusAndDeletedFalse(Long lawyerId, LegalTicketStatus status, Pageable pageable);

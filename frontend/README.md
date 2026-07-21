@@ -88,7 +88,6 @@ Frontend/
     │   ├── chat/
     │   ├── reports/
     │   ├── billing/
-    │   ├── templates/
     │   ├── knowledge-base/
     │   └── admin/
     ├── routes/
@@ -118,9 +117,7 @@ Frontend/
 - `/knowledge-base/:id`
 - `/billing`
 - `/jobs`
-- `/templates`
 - `/admin`
-- `/admin/audit-logs`
 - `/admin/system-health`
 
 ## Feature overview
@@ -131,7 +128,7 @@ The app reconstructs the major exported LexiGuard screens as a cohesive SPA:
 - API-backed customer dashboard, workspace portfolio, project detail, upload, chat, chat history, and billing flows
 - API-backed admin console for users, payments, subscription plans, and legal tickets
 - Direct AI-service pages for knowledge/risk/system health with unavailable states when AI-service is down
-- Document, report, audit log, job, template, comparison, and detail routes that show empty/unavailable states until real backend APIs exist
+- Document, report, audit log, job, comparison, and detail routes that show empty/unavailable states until real backend APIs exist
 - Role-aware navigation and route guards for ADMIN and CUSTOMER
 
 ## Design system
@@ -185,7 +182,7 @@ Production routes must not display fabricated domain data as if it came from the
 - Backend endpoints are configured through `.env`, `.env.example`, and `src/config/api.ts`.
 - Customer workspace, document upload, chat, billing, and admin tables use real backend services where endpoints exist.
 - Direct AI-service pages use `VITE_AI_SERVICE_BASE_URL` and show unavailable states if the service is not reachable.
-- Routes without a real backend/API contract render empty or unavailable states instead of fabricated documents, reports, jobs, audit logs, templates, comparison rows, or findings.
+- Routes without a real backend/API contract render empty or unavailable states instead of fabricated documents, reports, jobs, audit logs, comparison rows, or findings.
 
 ## Accessibility and responsive behavior
 

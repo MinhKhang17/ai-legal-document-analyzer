@@ -1,25 +1,42 @@
-export const formatPercent = (value: number) => `${value.toFixed(value % 1 === 0 ? 0 : 1)}%`;
+export const localeForLanguage = (language: 'en' | 'vi') =>
+  language === 'vi' ? 'vi-VN' : 'en-US';
 
-export const formatNumber = (value: number) =>
-  new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 }).format(value);
+export const formatPercent = (value: number, locale = 'en-US') =>
+  `${new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(value)}%`;
 
-export const formatCurrency = (value: number, currency = 'USD') =>
-  new Intl.NumberFormat('en-US', {
+export const formatNumber = (value: number, locale = 'en-US') =>
+  new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(value);
+
+export const formatCurrency = (value: number, currency = 'USD', locale = 'en-US') =>
+  new Intl.NumberFormat(locale, {
     style: 'currency',
     currency,
     maximumFractionDigits: 0,
   }).format(value);
 
-export const formatVndCurrency = (value: number, freeLabel = 'Miễn phí') => {
+export const formatVndCurrency = (value: number, freeLabel = '-', locale = 'vi-VN') => {
   if (value <= 0) {
     return freeLabel;
   }
 
-  return new Intl.NumberFormat('vi-VN', {
+  return new Intl.NumberFormat(locale, {
     style: 'currency',
     currency: 'VND',
     maximumFractionDigits: 0,
   }).format(value);
+};
+
+export const formatFileSize = (value: number, locale = 'en-US') => {
+  const units = ['B', 'KB', 'MB', 'GB'] as const;
+  const safeValue = Math.max(0, value);
+  const unitIndex = safeValue === 0
+    ? 0
+    : Math.min(Math.floor(Math.log(safeValue) / Math.log(1024)), units.length - 1);
+  const scaledValue = safeValue / 1024 ** unitIndex;
+
+  return `${new Intl.NumberFormat(locale, {
+    maximumFractionDigits: unitIndex === 0 ? 0 : 2,
+  }).format(scaledValue)} ${units[unitIndex]}`;
 };
 
 export const formatDisplayDate = (

@@ -36,9 +36,7 @@ import { AdminTicketsPage } from "../pages/admin/AdminTicketsPage";
 import { AdminTicketDetailPage } from "../pages/admin/AdminTicketDetailPage";
 import { AdminRefundsPage } from "../pages/admin/AdminRefundsPage";
 import { AdminRefundDetailPage } from "../pages/admin/AdminRefundDetailPage";
-import { AuditLogsPage } from "../pages/admin/AuditLogsPage";
 import { SystemHealthPage } from "../pages/admin/SystemHealthPage";
-import { JobsPage } from "../pages/jobs/JobsPage";
 import { ContractDetailPage } from "../pages/contracts/ContractDetailPage";
 import { SettingsPage } from "../pages/settings/SettingsPage";
 import { PaymentResultRedirect } from "../pages/billing/PaymentResultRedirect";
@@ -53,7 +51,6 @@ const ContractAssistantPage = lazy(() => import("../pages/chat/ContractAssistant
 const LegalChatPage = lazy(() => import("../pages/chat/LegalChatPage").then((module) => ({ default: module.LegalChatPage })));
 const ChatHistoryPage = lazy(() => import("../pages/chat/ChatHistoryPage").then((module) => ({ default: module.ChatHistoryPage })));
 const AdminConsolePage = lazy(() => import("../pages/admin/AdminConsolePage").then((module) => ({ default: module.AdminConsolePage })));
-const TemplatesPage = lazy(() => import("../pages/templates/TemplatesPage").then((module) => ({ default: module.TemplatesPage })));
 const MyContractsPage = lazy(() => import("../pages/contracts/MyContractsPage").then((module) => ({ default: module.MyContractsPage })));
 
 export const router = createBrowserRouter([
@@ -245,15 +242,6 @@ export const router = createBrowserRouter([
         element: <Navigate to="/dashboard" replace />,
       },
       {
-        path: "/jobs",
-        element: (
-          <AdminRoute>
-            <JobsPage />
-          </AdminRoute>
-        ),
-      },
-      { path: "/templates", element: <TemplatesPage /> },
-      {
         path: "/contracts",
         element: (
           <CustomerRoute>
@@ -304,14 +292,6 @@ export const router = createBrowserRouter([
       },
       { path: "/admin/refunds", element: <AdminRoute><AdminRefundsPage /></AdminRoute> },
       { path: "/admin/refunds/:id", element: <AdminRoute><AdminRefundDetailPage /></AdminRoute> },
-      {
-        path: "/admin/audit-logs",
-        element: (
-          <AdminRoute>
-            <AuditLogsPage />
-          </AdminRoute>
-        ),
-      },
       {
         path: "/admin/system-health",
         element: (

@@ -16,7 +16,6 @@ import {
   TicketCheck,
   UploadCloud,
   UsersRound,
-  Wrench,
   X,
   type LucideIcon,
 } from 'lucide-react';
@@ -131,19 +130,6 @@ const navItems: NavItem[] = [
     allowedRoles: ['CUSTOMER'],
   },
   {
-    to: '/jobs',
-    labelKey: 'nav.jobs',
-    icon: Activity,
-    section: 'system',
-    allowedRoles: ['ADMIN'],
-  },
-  {
-    to: '/templates',
-    labelKey: 'nav.templates',
-    icon: Wrench,
-    section: 'system',
-  },
-  {
     to: '/settings',
     labelKey: 'nav.settings',
     icon: Settings,
@@ -160,13 +146,6 @@ const navItems: NavItem[] = [
     to: '/admin/tickets',
     labelKey: 'nav.adminTickets',
     icon: TicketCheck,
-    section: 'admin',
-    allowedRoles: ['ADMIN'],
-  },
-  {
-    to: '/admin/audit-logs',
-    labelKey: 'nav.auditLogs',
-    icon: FileClock,
     section: 'admin',
     allowedRoles: ['ADMIN'],
   },

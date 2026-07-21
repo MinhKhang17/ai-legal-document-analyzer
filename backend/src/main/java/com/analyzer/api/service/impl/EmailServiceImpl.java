@@ -104,6 +104,17 @@ public class EmailServiceImpl implements EmailService {
         send(toEmail, "Knowledge base da ingest thanh cong: " + title, body);
     }
 
+    @Override
+    @Async
+    public void sendPasswordResetEmailAsync(String toEmail, String recipientName, String token, int validMinutes) {
+        String resetUrl = frontendBaseUrl + "/reset-password?token=" + token;
+        String body = "Xin chao " + safeName(recipientName) + ",\n\n"
+                + "He thong nhan duoc yeu cau dat lai mat khau cua ban. Link co hieu luc trong "
+                + validMinutes + " phut:\n" + resetUrl
+                + "\n\nNeu ban khong yeu cau, vui long bo qua email nay.";
+        send(toEmail, "Dat lai mat khau LexiGuard", body);
+    }
+
     private boolean send(String toEmail, String subject, String body) {
         if (!mailEnabled || !StringUtils.hasText(mailFrom)) {
             logger.warn("Mail is not configured (app.mail.enabled/from/SMTP_USERNAME missing) - skipping email to {}", toEmail);

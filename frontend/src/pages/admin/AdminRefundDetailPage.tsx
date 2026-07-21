@@ -27,6 +27,7 @@ export function AdminRefundDetailPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [actionError, setActionError] = useState('');
+  const locale = language === 'vi' ? 'vi-VN' : 'en-US';
 
   const load = useCallback(async () => {
     if (!id) {
@@ -40,7 +41,8 @@ export function AdminRefundDetailPage() {
     try {
       setRefund((await getSubscriptionRefund(id)).data ?? null);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : t('refund.errors.loadDetail'));
+      console.error('Failed to load refund detail:', cause);
+      setError(t('refund.errors.loadDetail'));
     } finally {
       setLoading(false);
     }
@@ -101,7 +103,8 @@ export function AdminRefundDetailPage() {
       setNote('');
       toast.success(t('refund.updateSuccess'));
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : t('refund.errors.update');
+      console.error('Failed to update refund request:', cause);
+      const message = t('refund.errors.update');
       if (isSubscriptionRequestError(cause) && cause.status === 409) {
         await refreshAfterConflict();
       }
@@ -137,23 +140,23 @@ export function AdminRefundDetailPage() {
               <div><dt className="label-uppercase">{t('refund.customer')}</dt><dd className="mt-xs">#{refund.requestedById}</dd></div>
               <div><dt className="label-uppercase">{t('refund.transaction')}</dt><dd className="mt-xs">#{refund.paymentTransactionId}</dd></div>
               <div><dt className="label-uppercase">{t('refund.customerPlan')}</dt><dd className="mt-xs">{refund.customerPlanId ? `#${refund.customerPlanId}` : t('common.unknown')}</dd></div>
-              <div><dt className="label-uppercase">{t('refund.amount')}</dt><dd className="mt-xs font-semibold">{formatVndCurrency(refund.amount)}</dd></div>
-              <div><dt className="label-uppercase">Invoice</dt><dd className="mt-xs font-semibold">{refund.invoiceId || '-'}</dd></div>
-              <div><dt className="label-uppercase">Ngân hàng</dt><dd className="mt-xs">{refund.bankName || '-'}</dd></div>
-              <div><dt className="label-uppercase">Số tài khoản</dt><dd className="mt-xs">{refund.accountNumber || '-'}</dd></div>
-              <div><dt className="label-uppercase">Chủ tài khoản</dt><dd className="mt-xs">{refund.accountHolderName || '-'}</dd></div>
-              <div><dt className="label-uppercase">Email confirmation</dt><dd className="mt-xs">{refund.emailConfirmed ? 'Đã xác nhận' : 'Đang chờ người dùng xác nhận'}</dd></div>
-              <div><dt className="label-uppercase">{t('table.created')}</dt><dd className="mt-xs">{formatDisplayDate(refund.createdAt, '-', language === 'vi' ? 'vi-VN' : 'en-US')}</dd></div>
-              <div><dt className="label-uppercase">{t('table.updated')}</dt><dd className="mt-xs">{formatDisplayDate(refund.updatedAt, '-', language === 'vi' ? 'vi-VN' : 'en-US')}</dd></div>
+              <div><dt className="label-uppercase">{t('refund.amount')}</dt><dd className="mt-xs font-semibold">{formatVndCurrency(refund.amount, t('billing.free'), locale)}</dd></div>
+              <div><dt className="label-uppercase">{t('billing.invoice')}</dt><dd className="mt-xs font-semibold">{refund.invoiceId || '-'}</dd></div>
+              <div><dt className="label-uppercase">{t('refund.bankName')}</dt><dd className="mt-xs">{refund.bankName || '-'}</dd></div>
+              <div><dt className="label-uppercase">{t('refund.accountNumber')}</dt><dd className="mt-xs">{refund.accountNumber || '-'}</dd></div>
+              <div><dt className="label-uppercase">{t('refund.accountHolderName')}</dt><dd className="mt-xs">{refund.accountHolderName || '-'}</dd></div>
+              <div><dt className="label-uppercase">{t('refund.emailConfirmation')}</dt><dd className="mt-xs">{refund.emailConfirmed ? t('refund.emailConfirmed') : t('refund.emailPending')}</dd></div>
+              <div><dt className="label-uppercase">{t('table.created')}</dt><dd className="mt-xs">{formatDisplayDate(refund.createdAt, '-', locale)}</dd></div>
+              <div><dt className="label-uppercase">{t('table.updated')}</dt><dd className="mt-xs">{formatDisplayDate(refund.updatedAt, '-', locale)}</dd></div>
               <div className="md:col-span-2"><dt className="label-uppercase">{t('refund.reason')}</dt><dd className="mt-xs whitespace-pre-wrap">{refund.reason}</dd></div>
               <div className="md:col-span-2"><dt className="label-uppercase">{t('refund.adminNote')}</dt><dd className="mt-xs whitespace-pre-wrap">{refund.adminNote || t('refund.noAdminNote')}</dd></div>
-              {refund.legalTicketId && <div className="md:col-span-2"><Link to={`/admin/tickets/${refund.legalTicketId}`}><Button variant="secondary">Mở chat refund với user</Button></Link></div>}
+              {refund.legalTicketId && <div className="md:col-span-2"><Link to={`/admin/tickets/${refund.legalTicketId}`}><Button variant="secondary">{t('refund.openUserConversation')}</Button></Link></div>}
             </dl>
           </Card>
 
           <Card title={t('refund.actions.title')} subtitle={t('refund.actions.description')}>
             {refund.status === 'WAITING_EMAIL_CONFIRMATION' && (
-              <p className="mb-md rounded-lg bg-amber-500/10 p-sm text-sm font-semibold text-amber-700 dark:text-amber-300">Waiting for user email confirmation. Nút tạo refund order đang bị khóa.</p>
+              <p className="mb-md rounded-lg bg-amber-500/10 p-sm text-sm font-semibold text-amber-700 dark:text-amber-300">{t('refund.waitingEmailConfirmationNotice')}</p>
             )}
             {allowedStatuses.length > 0 ? (
               <div className="flex flex-col gap-sm">

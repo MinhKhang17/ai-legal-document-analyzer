@@ -37,6 +37,7 @@ public class UserServiceImpl implements UserService {
     private static final int VERIFICATION_TOKEN_VALID_HOURS = 24;
     private static final String DEFAULT_EXPERT_PASSWORD = "12345678";
     private static final int EXPERT_PASSWORD_CHANGE_DEADLINE_DAYS = 7;
+    private static final int FORGOT_PASSWORD_TOKEN_VALID_MINUTES = 30;
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
@@ -225,5 +226,55 @@ public class UserServiceImpl implements UserService {
 
         user.setActive(true);
         userRepository.save(user);
+    }
+
+    @Override
+    @Transactional
+    public void requestPasswordReset(String email) {
+        if (!StringUtils.hasText(email)) return;
+        userRepository.findByEmail(email.trim().toLowerCase()).ifPresent(user -> {
+            if (user.getForgotPasswordRequestedAt() != null
+                    && user.getForgotPasswordRequestedAt().isAfter(LocalDateTime.now().minusSeconds(60))) {
+                return;
+            }
+            String rawToken = UUID.randomUUID().toString() + UUID.randomUUID();
+            user.setForgotPasswordToken(sha256(rawToken));
+            user.setForgotPasswordRequestedAt(LocalDateTime.now());
+            user.setForgotPasswordTokenExpiry(LocalDateTime.now().plusMinutes(FORGOT_PASSWORD_TOKEN_VALID_MINUTES));
+            userRepository.save(user);
+            emailService.sendPasswordResetEmailAsync(
+                    user.getEmail(), user.getFirstName(), rawToken, FORGOT_PASSWORD_TOKEN_VALID_MINUTES);
+        });
+    }
+
+    @Override
+    @Transactional
+    public void resetPassword(com.analyzer.api.dto.auth.ResetPasswordRequestDTO request) {
+        if (!request.getNewPassword().equals(request.getConfirmNewPassword())) {
+            throw new RuntimeException("Xac nhan mat khau moi khong khop");
+        }
+        User user = userRepository.findByForgotPasswordToken(sha256(request.getToken().trim()))
+                .orElseThrow(() -> new ResourceNotFoundException("Token dat lai mat khau khong hop le"));
+        if (user.getForgotPasswordTokenExpiry() == null
+                || user.getForgotPasswordTokenExpiry().isBefore(LocalDateTime.now())) {
+            clearForgotPasswordToken(user);
+            userRepository.save(user);
+            throw new com.analyzer.api.exception.auth.ExpiredVerificationTokenException(
+                    "Token dat lai mat khau da het han");
+        }
+        if (passwordEncoder.matches(request.getNewPassword(), user.getPassword())) {
+            throw new ConflictException("Mat khau moi khong duoc trung voi mat khau hien tai");
+        }
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        user.setMustChangePassword(false);
+        user.setPasswordResetDeadline(null);
+        clearForgotPasswordToken(user);
+        userRepository.save(user);
+    }
+
+    private void clearForgotPasswordToken(User user) {
+        user.setForgotPasswordToken(null);
+        user.setForgotPasswordTokenExpiry(null);
+        user.setForgotPasswordRequestedAt(null);
     }
 }
