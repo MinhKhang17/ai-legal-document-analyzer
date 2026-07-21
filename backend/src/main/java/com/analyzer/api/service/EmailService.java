@@ -33,4 +33,6 @@ public interface EmailService {
                                          String code, String versionId, String jobId, String ingestedAt);
 
     void sendPasswordResetEmailAsync(String toEmail, String recipientName, String token, int validMinutes);
+
+    boolean sendFinancialEmail(String toEmail, String subject, String body);
 }

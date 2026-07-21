@@ -4,12 +4,17 @@ import com.analyzer.api.dto.PageResponse;
 import com.analyzer.api.dto.revenue.*;
 import com.analyzer.api.entity.LegalTicket;
 import com.analyzer.api.entity.User;
+import com.analyzer.api.entity.ExpertRevenueStatement;
+import com.analyzer.api.entity.ExpertRevenueStatementItem;
 import com.analyzer.api.enums.ExpertPaymentStatus;
 import com.analyzer.api.enums.LegalTicketStatus;
+import com.analyzer.api.enums.RevenueStatementStatus;
 import com.analyzer.api.exception.common.ConflictException;
 import com.analyzer.api.exception.common.ResourceNotFoundException;
 import com.analyzer.api.repository.LegalTicketRepository;
 import com.analyzer.api.repository.UserRepository;
+import com.analyzer.api.repository.ExpertRevenueStatementRepository;
+import com.analyzer.api.repository.ExpertRevenueStatementItemRepository;
 import com.analyzer.api.service.ExpertRevenueService;
 import com.analyzer.api.service.RevenueSettingService;
 import com.analyzer.api.service.TicketCollaborationService;
@@ -28,16 +33,43 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 public class ExpertRevenueServiceImpl implements ExpertRevenueService {
     private final LegalTicketRepository ticketRepository;
     private final UserRepository userRepository;
     private final RevenueSettingService revenueSettingService;
     private final TicketCollaborationService collaborationService;
+    private final RevenuePayrollService revenuePayrollService;
+    private final ExpertRevenueStatementRepository statementRepository;
+    private final ExpertRevenueStatementItemRepository statementItemRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public ExpertRevenueServiceImpl(LegalTicketRepository ticketRepository, UserRepository userRepository,
+            RevenueSettingService revenueSettingService, TicketCollaborationService collaborationService,
+            RevenuePayrollService revenuePayrollService, ExpertRevenueStatementRepository statementRepository,
+            ExpertRevenueStatementItemRepository statementItemRepository) {
+        this.ticketRepository=ticketRepository; this.userRepository=userRepository; this.revenueSettingService=revenueSettingService;
+        this.collaborationService=collaborationService; this.revenuePayrollService=revenuePayrollService;
+        this.statementRepository=statementRepository; this.statementItemRepository=statementItemRepository;
+    }
+    /** Compatibility constructor retained for existing unit tests and external wiring. */
+    public ExpertRevenueServiceImpl(LegalTicketRepository ticketRepository, UserRepository userRepository,
+            RevenueSettingService revenueSettingService, TicketCollaborationService collaborationService) {
+        this(ticketRepository,userRepository,revenueSettingService,collaborationService,null,null,null);
+    }
 
     @Override
     @Transactional(readOnly = true)
     public ExpertRevenueSummaryResponse getSummary(Long expertId) {
+        if(statementRepository!=null){
+            var statements=statementRepository.findByExpertIdOrderByPeriodStartDateDesc(expertId,PageRequest.of(0,1000)).getContent();
+            long resolved=statements.stream().mapToLong(ExpertRevenueStatement::getTicketCount).sum();
+            return ExpertRevenueSummaryResponse.builder().assignedTicketCount(ticketRepository.findByAssignedLawyerIdAndDeletedFalse(expertId).size()).resolvedTicketCount(resolved)
+                .paidTicketCount(statements.stream().filter(s->s.getStatus()==RevenueStatementStatus.PAID).mapToLong(ExpertRevenueStatement::getTicketCount).sum())
+                .pendingPaymentTicketCount(statements.stream().filter(s->s.getStatus()==RevenueStatementStatus.PAYMENT_PENDING).mapToLong(ExpertRevenueStatement::getTicketCount).sum())
+                .totalRevenue(sumStatements(statements,ExpertRevenueStatement::getGrossConsultationFee)).paidRevenue(sumStatements(statements,ExpertRevenueStatement::getPaidAmount))
+                .pendingRevenue(sumStatements(statements,ExpertRevenueStatement::getRemainingAmount)).totalPlatformFee(sumStatements(statements,ExpertRevenueStatement::getTotalPlatformFee))
+                .totalExpertPayout(sumStatements(statements,ExpertRevenueStatement::getFinalPayout)).build();
+        }
         List<LegalTicket> tickets = ticketRepository.findByAssignedLawyerIdAndDeletedFalse(expertId);
         return ExpertRevenueSummaryResponse.builder()
                 .assignedTicketCount(tickets.size())
@@ -57,6 +89,12 @@ public class ExpertRevenueServiceImpl implements ExpertRevenueService {
     @Override
     @Transactional(readOnly = true)
     public PageResponse<ExpertRevenueTicketResponse> getTickets(Long expertId, int page, int size) {
+        if(statementRepository!=null&&statementItemRepository!=null){
+            var statements=statementRepository.findByExpertIdOrderByPeriodStartDateDesc(expertId,PageRequest.of(0,1000)).getContent();
+            var rows=statements.stream().flatMap(s->statementItemRepository.findByStatementIdOrderByRecognizedAtAsc(s.getId()).stream().map(i->toResponse(i,s))).sorted(java.util.Comparator.comparing(ExpertRevenueTicketResponse::getResolvedAt,java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder()))).toList();
+            int safeSize=Math.min(Math.max(size,1),100),from=Math.min(Math.max(page,0)*safeSize,rows.size()),to=Math.min(from+safeSize,rows.size());
+            return PageResponse.<ExpertRevenueTicketResponse>builder().items(rows.subList(from,to)).page(Math.max(page,0)).size(safeSize).totalItems(rows.size()).totalPages((rows.size()+safeSize-1)/safeSize).build();
+        }
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<LegalTicket> pageResult = ticketRepository.findByAssignedLawyerIdAndDeletedFalse(expertId, pageable);
 
@@ -80,11 +118,13 @@ public class ExpertRevenueServiceImpl implements ExpertRevenueService {
         User admin = userRepository.findById(adminId)
                 .orElseThrow(() -> new ResourceNotFoundException("USER_NOT_FOUND"));
 
+        BigDecimal previousPayout = ticket.getExpertPayout();
         ticket.setConsultationFee(request.getConsultationFee());
         ticket.setExpertPaymentStatus(request.getPaymentStatus());
         ticket.setExpertPaidAt(request.getPaymentStatus() == ExpertPaymentStatus.PAID
                 ? LocalDateTime.now() : null);
         applyCommissionSnapshot(ticket);
+        if(revenuePayrollService!=null) revenuePayrollService.reconcileTicketFinancialChange(ticket, previousPayout, admin, "Admin updated consultation fee");
 
         LegalTicket saved = ticketRepository.save(ticket);
         collaborationService.auditTicket(saved, admin, "EXPERT_PAYMENT_UPDATED",
@@ -104,12 +144,14 @@ public class ExpertRevenueServiceImpl implements ExpertRevenueService {
         User admin = userRepository.findById(adminId)
                 .orElseThrow(() -> new ResourceNotFoundException("USER_NOT_FOUND"));
 
+        BigDecimal previousPayout = ticket.getExpertPayout();
         ticket.setConsultationFee(BigDecimal.ZERO);
         ticket.setExpertPaymentStatus(ExpertPaymentStatus.UNPAID);
         ticket.setExpertPaidAt(null);
         ticket.setCommissionRate(null);
         ticket.setPlatformFee(null);
         ticket.setExpertPayout(null);
+        if(revenuePayrollService!=null) revenuePayrollService.reconcileTicketFinancialChange(ticket, previousPayout, admin, "Admin reset ticket financials");
 
         LegalTicket saved = ticketRepository.save(ticket);
         collaborationService.auditTicket(saved, admin, "EXPERT_PAYMENT_RESET", "{}");
@@ -119,6 +161,11 @@ public class ExpertRevenueServiceImpl implements ExpertRevenueService {
     @Override
     @Transactional(readOnly = true)
     public AdminRevenueOverviewResponse getAdminOverview() {
+        if(statementRepository!=null){
+            var statements=statementRepository.findAll();
+            var byExpert=statements.stream().collect(Collectors.groupingBy(s->s.getExpert().getId())).entrySet().stream().map(e->ExpertRevenueBreakdownItem.builder().expertId(e.getKey()).expertName(e.getValue().getFirst().getExpertNameSnapshot()).ticketCount(e.getValue().stream().mapToLong(ExpertRevenueStatement::getTicketCount).sum()).totalConsultationFee(sumStatements(e.getValue(),ExpertRevenueStatement::getGrossConsultationFee)).totalExpertPayout(sumStatements(e.getValue(),ExpertRevenueStatement::getFinalPayout)).build()).toList();
+            return AdminRevenueOverviewResponse.builder().totalTicketCount(statements.stream().mapToLong(ExpertRevenueStatement::getTicketCount).sum()).paidTicketCount(statements.stream().filter(s->s.getStatus()==RevenueStatementStatus.PAID).mapToLong(ExpertRevenueStatement::getTicketCount).sum()).pendingPaymentTicketCount(statements.stream().filter(s->s.getStatus()==RevenueStatementStatus.PAYMENT_PENDING).mapToLong(ExpertRevenueStatement::getTicketCount).sum()).totalConsultationFee(sumStatements(statements,ExpertRevenueStatement::getGrossConsultationFee)).totalPlatformFee(sumStatements(statements,ExpertRevenueStatement::getTotalPlatformFee)).totalExpertPayout(sumStatements(statements,ExpertRevenueStatement::getFinalPayout)).byExpert(byExpert).build();
+        }
         List<LegalTicket> tickets = ticketRepository.findByStatusInAndAssignedLawyerIsNotNullAndDeletedFalse(
                 List.of(LegalTicketStatus.RESOLVED, LegalTicketStatus.CLOSED));
 
@@ -186,4 +233,7 @@ public class ExpertRevenueServiceImpl implements ExpertRevenueService {
                 .paymentStatus(ticket.getExpertPaymentStatus()).resolvedAt(ticket.getResolvedAt())
                 .paidAt(ticket.getExpertPaidAt()).build();
     }
+
+    private ExpertRevenueTicketResponse toResponse(ExpertRevenueStatementItem item,ExpertRevenueStatement statement){return ExpertRevenueTicketResponse.builder().ticketId(item.getTicket().getId()).ticketCode(item.getTicketCode()).ticketStatus(item.getTicketStatusSnapshot()).consultationFee(item.getConsultationFee()).commissionRate(item.getCommissionRateSnapshot()).platformFee(item.getPlatformFee()).expertPayout(item.getExpertPayout()).paymentStatus(statement.getStatus()==RevenueStatementStatus.PAID?ExpertPaymentStatus.PAID:statement.getStatus()==RevenueStatementStatus.PAYMENT_PENDING?ExpertPaymentStatus.PENDING:ExpertPaymentStatus.UNPAID).resolvedAt(item.getRecognizedAt()).paidAt(statement.getPaidAt()).build();}
+    private BigDecimal sumStatements(List<ExpertRevenueStatement> statements,java.util.function.Function<ExpertRevenueStatement,BigDecimal> extractor){return statements.stream().map(extractor).map(v->v==null?BigDecimal.ZERO:v).reduce(BigDecimal.ZERO,BigDecimal::add);}
 }

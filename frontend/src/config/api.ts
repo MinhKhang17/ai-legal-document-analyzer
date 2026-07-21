@@ -15,7 +15,19 @@ const getRequiredEnvValue = (key: string): string => {
 const fromEnv = (key: string) => getRequiredEnvValue(key);
 
 export const fromEnvOrDefault = (key: string, fallback: string): string =>
-  (import.meta.env as EnvMap)[key]?.trim() || fallback;
+  (() => {
+    const configured = (import.meta.env as EnvMap)[key]?.trim();
+    const unresolvedPlaceholders = new Set([
+      key,
+      `$${key}`,
+      `\${${key}}`,
+      `{{${key}}}`,
+    ]);
+
+    return !configured || unresolvedPlaceholders.has(configured)
+      ? fallback
+      : configured;
+  })();
 
 const fillPathParams = (template: string, params: EndpointParams): string =>
   Object.entries(params).reduce(
@@ -215,11 +227,25 @@ export const API_ENDPOINTS = {
       fillPathParams(fromEnvOrDefault("VITE_ADMIN_EXPERT_PAYMENT_API", "/api/v1/admin/tickets/:ticketId/expert-payment"), { ticketId }),
     resetPayment: (ticketId: string) =>
       fillPathParams(fromEnvOrDefault("VITE_ADMIN_EXPERT_PAYMENT_RESET_API", "/api/v1/admin/tickets/:ticketId/expert-payment/reset"), { ticketId }),
+    periods: "/api/v1/expert/revenue/periods",
+    period: (statementId: string) => `/api/v1/expert/revenue/periods/${encodeURIComponent(statementId)}`,
+    periodExport: (statementId: string) => `/api/v1/expert/revenue/periods/${encodeURIComponent(statementId)}/export`,
+    policies: "/api/v1/expert/revenue/commission-policies",
+    notifications: "/api/v1/expert/revenue/commission-notifications",
+    earlyPayouts: "/api/v1/expert/revenue/early-payouts",
   },
 
   adminRevenue: {
     overview: fromEnvOrDefault("VITE_ADMIN_REVENUE_OVERVIEW_API", "/api/v1/admin/revenue/overview"),
     settings: fromEnvOrDefault("VITE_ADMIN_REVENUE_SETTINGS_API", "/api/v1/admin/revenue/settings"),
+    periods: "/api/v1/admin/revenue/periods",
+    period: (id: string) => `/api/v1/admin/revenue/periods/${encodeURIComponent(id)}`,
+    statements: (id: string) => `/api/v1/admin/revenue/periods/${encodeURIComponent(id)}/experts`,
+    statement: (id: string) => `/api/v1/admin/revenue/statements/${encodeURIComponent(id)}`,
+    policies: "/api/v1/admin/revenue/commission-policies",
+    changeRequests: "/api/v1/admin/revenue/commission-change-requests",
+    earlyPayouts: "/api/v1/admin/revenue/early-payouts",
+    audit: "/api/v1/admin/revenue/audit",
   },
 
   aiLegal: {

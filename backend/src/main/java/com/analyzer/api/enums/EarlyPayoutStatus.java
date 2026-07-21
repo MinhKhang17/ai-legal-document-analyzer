@@ -1,0 +1,3 @@
+package com.analyzer.api.enums;
+
+public enum EarlyPayoutStatus { PENDING_ADMIN_REVIEW, NEED_MORE_INFO, EXPERT_RESPONDED, APPROVED, REJECTED, CANCELLED, PAYMENT_PENDING, PAID, EXPIRED }

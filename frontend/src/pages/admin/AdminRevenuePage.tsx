@@ -1,85 +1,38 @@
-import { Banknote, Percent, RefreshCw, WalletCards } from "lucide-react";
+import { Banknote, CalendarRange, Download, Percent, RefreshCw, ShieldCheck, WalletCards } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { Badge } from "../../components/common/Badge";
 import { Button } from "../../components/common/Button";
 import { Card } from "../../components/common/Card";
 import { DataTable, type DataTableColumn } from "../../components/common/DataTable";
+import { Modal } from "../../components/common/Modal";
 import { PageHeader } from "../../components/common/PageHeader";
-import { useI18n } from "../../hooks/useI18n";
+import { API_ENDPOINTS } from "../../config/api";
 import { useToast } from "../../hooks/useToast";
-import { getAdminRevenueOverview, getRevenueSetting, updateRevenueSetting } from "../../services/expertRevenue.service";
-import type { AdminRevenueOverview, ExpertRevenueBreakdown, RevenueSetting } from "../../types/expertRevenue";
-import { formatDisplayDateTime, formatVndCurrency, localeForLanguage } from "../../utils/format";
+import { calculateRevenuePeriod, cancelCommissionPolicy, closeRevenuePeriod, createCommissionChange, downloadRevenueExport, getAdminEarlyPayouts, getAdminPeriodStatements, getAdminRevenuePeriods, getCommissionPolicies, resendCommissionVerification } from "../../services/revenuePayroll.service";
+import type { CommissionApplicationType, CommissionChangeRequest, CommissionPolicy, EarlyPayout, RevenuePeriod, RevenueStatement } from "../../types/expertRevenue";
+import { formatVndCurrency } from "../../utils/format";
 
-const emptyOverview: AdminRevenueOverview = {
-  totalTicketCount: 0, paidTicketCount: 0, pendingPaymentTicketCount: 0,
-  totalConsultationFee: 0, totalPlatformFee: 0, totalExpertPayout: 0, byExpert: [],
-};
-
-export function AdminRevenuePage() {
-  const { t, language } = useI18n();
-  const locale = localeForLanguage(language);
-  const toast = useToast();
-  const [overview, setOverview] = useState(emptyOverview);
-  const [setting, setSetting] = useState<RevenueSetting | null>(null);
-  const [ratePercent, setRatePercent] = useState("20");
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-
-  const load = useCallback(async () => {
-    setLoading(true); setError("");
-    const [overviewResult, settingResult] = await Promise.allSettled([getAdminRevenueOverview(), getRevenueSetting()]);
-    if (overviewResult.status === "fulfilled") setOverview(overviewResult.value);
-    if (settingResult.status === "fulfilled") {
-      setSetting(settingResult.value); setRatePercent(String(Number(settingResult.value.commissionRate) * 100));
-    }
-    if (overviewResult.status === "rejected" || settingResult.status === "rejected") setError(t("adminRevenue.loadError"));
-    setLoading(false);
-  }, [t]);
-
-  useEffect(() => { void load(); }, [load]);
-
-  const saveRate = async () => {
-    const percent = Number(ratePercent);
-    if (!Number.isFinite(percent) || percent < 0 || percent > 100) {
-      setError(t("adminRevenue.invalidRate")); return;
-    }
-    setSaving(true); setError("");
-    try {
-      const updated = await updateRevenueSetting(percent / 100);
-      setSetting(updated); setRatePercent(String(Number(updated.commissionRate) * 100));
-      toast.success(t("adminRevenue.saveSuccess"), t("toast.successTitle"));
-    } catch { setError(t("adminRevenue.saveError")); toast.error(t("adminRevenue.saveError")); }
-    finally { setSaving(false); }
-  };
-
-  const columns = useMemo<DataTableColumn<ExpertRevenueBreakdown>[]>(() => [
-    { header: t("adminRevenue.expert"), cell: (item) => <span className="font-semibold">{item.expertName}</span> },
-    { header: t("adminRevenue.tickets"), cell: (item) => item.ticketCount },
-    { header: t("adminRevenue.consultationFee"), cell: (item) => formatVndCurrency(Number(item.totalConsultationFee), "0 ₫", locale) },
-    { header: t("adminRevenue.expertPayout"), cell: (item) => formatVndCurrency(Number(item.totalExpertPayout), "0 ₫", locale) },
-  ], [locale, t]);
-
-  return <div className="space-y-xl">
-    <PageHeader title={t("adminRevenue.title")} subtitle={t("adminRevenue.subtitle")} actions={<Button onClick={() => void load()} disabled={loading} leftIcon={<RefreshCw className="h-4 w-4" />}>{t("common.refresh")}</Button>} />
-    {error && <div role="alert" className="rounded-xl border border-error/40 bg-error/10 p-md text-sm text-error">{error}</div>}
-    <div className="grid gap-md md:grid-cols-3">
-      <Metric icon={Banknote} label={t("adminRevenue.consultationFee")} value={formatVndCurrency(Number(overview.totalConsultationFee), "0 ₫", locale)} />
-      <Metric icon={Percent} label={t("adminRevenue.platformFee")} value={formatVndCurrency(Number(overview.totalPlatformFee), "0 ₫", locale)} />
-      <Metric icon={WalletCards} label={t("adminRevenue.expertPayout")} value={formatVndCurrency(Number(overview.totalExpertPayout), "0 ₫", locale)} />
-    </div>
-    <div className="grid gap-gutter xl:grid-cols-[minmax(0,1fr)_360px]">
-      <Card title={t("adminRevenue.breakdown")}><DataTable columns={columns} data={overview.byExpert ?? []} getRowKey={(item) => String(item.expertId)} emptyMessage={t("adminRevenue.empty")} /></Card>
-      <Card title={t("adminRevenue.settingTitle")} subtitle={t("adminRevenue.settingHint")}>
-        <label className="block text-sm font-semibold">{t("adminRevenue.commissionRate")}<div className="relative mt-xs"><input className="form-field pr-10" type="number" min="0" max="100" step="0.01" value={ratePercent} onChange={(event) => setRatePercent(event.target.value)} /><span className="absolute right-3 top-1/2 -translate-y-1/2">%</span></div></label>
-        <p className="mt-sm text-xs text-on-surface-variant">{t("adminRevenue.snapshotNotice")}</p>
-        {setting?.updatedAt && <p className="mt-sm text-xs text-on-surface-variant">{t("adminRevenue.lastUpdated")}: {formatDisplayDateTime(setting.updatedAt, "-", locale)} · {setting.updatedByName || "-"}</p>}
-        <Button className="mt-md w-full" onClick={() => void saveRate()} disabled={saving}>{saving ? t("common.loading") : t("actions.save")}</Button>
-      </Card>
-    </div>
-  </div>;
+export function AdminRevenuePage(){
+ const toast=useToast(); const [periods,setPeriods]=useState<RevenuePeriod[]>([]);const [selected,setSelected]=useState("");const [statements,setStatements]=useState<RevenueStatement[]>([]);const [policies,setPolicies]=useState<CommissionPolicy[]>([]);const [payouts,setPayouts]=useState<EarlyPayout[]>([]);const [loading,setLoading]=useState(true);const [busy,setBusy]=useState(false);const [modal,setModal]=useState(false);const [rate,setRate]=useState("20");const [reason,setReason]=useState("");const [application,setApplication]=useState<CommissionApplicationType>("NEXT_MONTH");const [pending,setPending]=useState<CommissionChangeRequest|null>(null);
+ const load=useCallback(async()=>{setLoading(true);try{const [p,policy,early]=await Promise.all([getAdminRevenuePeriods(),getCommissionPolicies(),getAdminEarlyPayouts()]);setPeriods(p.items||[]);setPolicies(policy);setPayouts(early.items||[]);setSelected(v=>v||(p.items?.[0]?.id||""));}catch(e){toast.error(e instanceof Error?e.message:"Không thể tải doanh thu");}finally{setLoading(false);}},[toast]);
+ useEffect(()=>{void load();},[load]);useEffect(()=>{if(selected)getAdminPeriodStatements(selected).then(setStatements).catch(()=>setStatements([]));},[selected]);
+ const period=periods.find(p=>p.id===selected);const active=policies.find(p=>p.status==="ACTIVE");const effective=useMemo(()=>{const d=new Date();if(application==="NEXT_MONTH")return new Date(d.getFullYear(),d.getMonth()+1,1).toLocaleDateString("vi-VN");const q=Math.floor(d.getMonth()/3)+1;return new Date(d.getFullYear()+(q===4?1:0),q===4?0:q*3,1).toLocaleDateString("vi-VN");},[application]);
+ const run=async(action:()=>Promise<unknown>,message:string)=>{setBusy(true);try{await action();toast.success(message);await load();if(selected)setStatements(await getAdminPeriodStatements(selected));}catch(e){toast.error(e instanceof Error?e.message:"Thao tác thất bại");}finally{setBusy(false);}};
+ const submit=async()=>{const value=Number(rate)/100;if(!reason.trim()||!Number.isFinite(value)||value<0||value>1){toast.error("Nhập tỷ lệ và lý do hợp lệ");return;}setBusy(true);try{const request=await createCommissionChange(value,reason,application);setPending(request);setModal(false);toast.success("Đã gửi email xác nhận cho tài khoản admin yêu cầu");}catch(e){toast.error(e instanceof Error?e.message:"Không thể tạo yêu cầu");}finally{setBusy(false);}};
+ const statementColumns=useMemo<DataTableColumn<RevenueStatement>[]>(()=>[
+  {header:"Chuyên gia",cell:s=><Link className="font-semibold text-primary" to={`/admin/revenue/statements/${s.id}`}>{s.expertNameSnapshot}</Link>},{header:"Ticket",cell:s=>s.ticketCount},{header:"Phí tư vấn",cell:s=>money(s.grossConsultationFee)},{header:"Phí nền tảng",cell:s=>money(s.totalPlatformFee)},{header:"Chi trả cuối",cell:s=><b>{money(s.finalPayout)}</b>},{header:"Đã trả",cell:s=>money(s.paidAmount)},{header:"Còn lại",cell:s=>money(s.remainingAmount)},{header:"Trạng thái",cell:s=><Badge tone={tone(s.status)}>{s.status}</Badge>}
+ ],[]);
+ const payoutColumns=useMemo<DataTableColumn<EarlyPayout>[]>(()=>[
+  {header:"Mã",cell:r=><Link className="font-semibold text-primary" to={`/admin/revenue/early-payouts/${r.id}`}>{r.requestCode}</Link>},{header:"Chuyên gia",cell:r=>r.expertName},{header:"Kỳ",cell:r=>r.periodCode},{header:"Yêu cầu",cell:r=>money(r.requestedAmount)},{header:"Trạng thái",cell:r=><Badge tone={tone(r.status)}>{r.status}</Badge>}
+ ],[]);
+ return <div className="space-y-xl"><PageHeader title="Đối soát doanh thu chuyên gia" subtitle="Kỳ doanh thu bất biến theo tháng, hoa hồng có ngày hiệu lực và quy trình chi trả được kiểm soát." actions={<Button disabled={loading} onClick={()=>void load()} leftIcon={<RefreshCw className="h-4 w-4"/>}>Làm mới</Button>}/>
+  {period&&<div className="grid gap-md md:grid-cols-4"><Metric icon={Banknote} label="Tổng phí tư vấn" value={money(period.totalGross)}/><Metric icon={Percent} label="Phí nền tảng" value={money(period.totalPlatformFee)}/><Metric icon={WalletCards} label="Chuyên gia được nhận" value={money(period.totalFinalPayout)}/><Metric icon={CalendarRange} label="Trạng thái kỳ" value={period.status}/></div>}
+  <Card title="Kỳ doanh thu" subtitle="Đóng kỳ sẽ khóa dữ liệu ticket; thay đổi muộn được ghi thành adjustment ở kỳ đang mở."><div className="mb-md flex flex-wrap items-end gap-sm"><label className="text-sm font-semibold">Chọn kỳ<select className="form-field mt-xs min-w-48" value={selected} onChange={e=>setSelected(e.target.value)}>{periods.map(p=><option key={p.id} value={p.id}>{p.periodCode} · {p.status}</option>)}</select></label>{period&&<><Button disabled={busy||!(["OPEN","CALCULATING"].includes(period.status))} onClick={()=>void run(()=>calculateRevenuePeriod(period.id),"Đã tính kỳ")}>Tính/đối soát</Button><Button disabled={busy||period.status!=="CALCULATING"} onClick={()=>void run(()=>closeRevenuePeriod(period.id),"Đã đóng kỳ")}>Xác nhận & đóng kỳ</Button><Button variant="secondary" leftIcon={<Download className="h-4 w-4"/>} onClick={()=>void downloadRevenueExport(`${API_ENDPOINTS.adminRevenue.period(period.id)}/export`,`doanh-thu-${period.periodCode}.xlsx`)}>Xuất XLSX</Button></>}</div><DataTable columns={statementColumns} data={statements} getRowKey={s=>s.id} emptyMessage={loading?"Đang tải...":"Chưa có statement"}/></Card>
+  <div className="grid gap-gutter xl:grid-cols-2"><Card title="Chính sách hoa hồng" subtitle="Không chỉnh trực tiếp policy đang active. Policy mới phải xác nhận email và chỉ có hiệu lực trong tương lai."><div className="mb-md flex items-center justify-between"><div><p className="text-2xl font-bold">{((active?.rate||0)*100).toFixed(2)}%</p><p className="text-xs text-on-surface-variant">Policy hiện hành từ {active?.effectiveFrom||"-"}</p></div><Button onClick={()=>setModal(true)}>Đề xuất thay đổi</Button></div>{pending&&<div className="mb-md rounded-xl border border-amber-500/40 bg-amber-500/10 p-md text-sm"><b>Đang chờ xác nhận email</b><p>Yêu cầu {pending.id}, hết hạn {pending.tokenExpiresAt||"-"}</p><Button className="mt-sm" size="sm" variant="secondary" onClick={()=>void run(()=>resendCommissionVerification(pending.id),"Đã gửi lại email")}>Gửi lại</Button></div>}<div className="space-y-sm">{policies.map(p=><div key={p.id} className="flex items-center justify-between rounded-xl border border-legal-border p-md dark:border-slate-700"><div><b>{(p.rate*100).toFixed(2)}%</b><p className="text-xs text-on-surface-variant">{p.effectiveFrom} → {p.effectiveTo||"không giới hạn"}</p></div><div className="flex items-center gap-sm"><Badge tone={tone(p.status)}>{p.status}</Badge>{p.status==="SCHEDULED"&&<Button size="sm" variant="ghost" onClick={()=>{const note=prompt("Lý do hủy policy");if(note)void run(()=>cancelCommissionPolicy(p.id,note),"Đã hủy policy");}}>Hủy</Button>}</div></div>)}</div></Card>
+  <Card title="Hàng đợi ứng doanh thu" subtitle="Duyệt không đồng nghĩa đã trả; cần chuyển PAYMENT_PENDING rồi mới đánh dấu PAID."><DataTable columns={payoutColumns} data={payouts.filter(p=>!["PAID","REJECTED","CANCELLED","EXPIRED"].includes(p.status))} getRowKey={p=>p.id} emptyMessage="Không có yêu cầu đang chờ"/></Card></div>
+  <Modal open={modal} onClose={()=>setModal(false)} title="Đề xuất thay đổi hoa hồng" footer={<div className="flex justify-end gap-sm"><Button variant="secondary" onClick={()=>setModal(false)}>Hủy</Button><Button disabled={busy} onClick={()=>void submit()} leftIcon={<ShieldCheck className="h-4 w-4"/>}>Gửi email xác nhận</Button></div>}><div className="space-y-md"><label className="block text-sm font-semibold">Tỷ lệ mới (%)<input className="form-field mt-xs" type="number" min="0" max="100" step="0.01" value={rate} onChange={e=>setRate(e.target.value)}/></label><label className="block text-sm font-semibold">Áp dụng<select className="form-field mt-xs" value={application} onChange={e=>setApplication(e.target.value as CommissionApplicationType)}><option value="NEXT_MONTH">Đầu tháng sau</option><option value="NEXT_QUARTER">Đầu quý sau</option></select></label><p className="rounded-lg bg-amber-500/10 p-sm text-sm">Ngày hiệu lực dự kiến: <b>{effective}</b>. Thay đổi không tác động ticket đã snapshot.</p><label className="block text-sm font-semibold">Lý do<textarea className="form-field mt-xs min-h-24" value={reason} onChange={e=>setReason(e.target.value)}/></label></div></Modal>
+ </div>;
 }
-
-function Metric({ icon: Icon, label, value }: { icon: typeof Banknote; label: string; value: string }) {
-  return <Card className="p-lg"><Icon className="h-7 w-7 text-primary" /><p className="mt-md text-xs font-semibold uppercase tracking-wide text-on-surface-variant">{label}</p><p className="mt-xs text-2xl font-bold">{value}</p></Card>;
-}
+function money(v:number){return formatVndCurrency(Number(v||0),"0 ₫","vi-VN");}function tone(status:string):"green"|"amber"|"red"|"blue"|"slate"{if(["PAID","ACTIVE","CLOSED","CONFIRMED"].includes(status))return"green";if(["REJECTED","CANCELLED","EXPIRED"].includes(status))return"red";if(["OPEN","SCHEDULED","PENDING_ADMIN_REVIEW","PAYMENT_PENDING","CALCULATING"].includes(status))return"amber";return"slate";}
+function Metric({icon:Icon,label,value}:{icon:typeof Banknote;label:string;value:string}){return <Card className="p-lg"><Icon className="h-6 w-6 text-primary"/><p className="mt-sm text-xs font-semibold uppercase text-on-surface-variant">{label}</p><p className="mt-xs text-xl font-bold">{value}</p></Card>;}

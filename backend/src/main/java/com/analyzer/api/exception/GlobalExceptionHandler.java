@@ -8,6 +8,8 @@ import org.springframework.security.authentication.DisabledException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.dao.PessimisticLockingFailureException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -187,6 +189,11 @@ public class GlobalExceptionHandler {
                 return new ResponseEntity<>(
                                 ApiResponseDTO.error(HttpStatus.CONFLICT.value(), ex.getMessage()),
                                 HttpStatus.CONFLICT);
+        }
+
+        @ExceptionHandler({ObjectOptimisticLockingFailureException.class, PessimisticLockingFailureException.class})
+        public ResponseEntity<ApiResponseDTO<Void>> handleFinancialConcurrency(Exception ex) {
+                return new ResponseEntity<>(ApiResponseDTO.error(HttpStatus.CONFLICT.value(), "CONCURRENT_MODIFICATION"), HttpStatus.CONFLICT);
         }
 
         @ExceptionHandler(TooManyRequestsException.class)

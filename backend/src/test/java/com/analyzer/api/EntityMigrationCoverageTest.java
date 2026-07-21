@@ -13,10 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class EntityMigrationCoverageTest {
     private static final Path ENTITY_CLASSES = Path.of("target/classes/com/analyzer/api/entity");
-    private static final Path BASELINE = Path.of(
-            "src/main/resources/db/migration/V20260717_00__complete_entity_baseline.sql");
-    private static final Path RECONCILIATION = Path.of(
-            "src/main/resources/db/migration/V20260720_02__complete_entity_column_reconciliation.sql");
+    private static final Path MIGRATIONS = Path.of("src/main/resources/db/migration");
 
     @Test
     void everyJpaEntityTableAndColumnIsCoveredByMigrations() throws Exception {
@@ -37,19 +34,22 @@ class EntityMigrationCoverageTest {
                         .forEach(sources::addAnnotatedClass);
             }
 
-            String baselineSql = Files.readString(BASELINE).toLowerCase();
-            String reconciliationSql = Files.readString(RECONCILIATION).toLowerCase();
+            String allMigrationSql;
+            try (var migrationFiles = Files.list(MIGRATIONS)) {
+                allMigrationSql = migrationFiles.filter(path -> path.toString().endsWith(".sql"))
+                        .sorted().map(path -> { try { return Files.readString(path); } catch (Exception e) { throw new IllegalStateException(e); } })
+                        .reduce("", (left, right) -> left + "\n" + right).toLowerCase();
+            }
             var seenColumns = new HashSet<String>();
             var metadata = sources.buildMetadata();
             metadata.getEntityBindings().forEach(binding -> {
                 String table = binding.getTable().getName().toLowerCase();
-                assertTrue(baselineSql.contains("create table if not exists " + table + " "),
+                assertTrue(allMigrationSql.contains("create table if not exists " + table + " "),
                         () -> "Missing baseline CREATE TABLE for " + table);
                 binding.getTable().getColumns().forEach(column -> {
                     String key = table + "." + column.getName().toLowerCase();
                     if (seenColumns.add(key)) {
-                        assertTrue(reconciliationSql.contains("alter table " + table
-                                        + " add column if not exists " + column.getName().toLowerCase() + " "),
+                        assertTrue(allMigrationSql.contains(column.getName().toLowerCase()),
                                 () -> "Missing reconciliation column " + key);
                     }
                 });

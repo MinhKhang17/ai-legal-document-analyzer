@@ -30,7 +30,6 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 @Service
-@RequiredArgsConstructor
 public class TicketCollaborationServiceImpl implements TicketCollaborationService {
     private static final Set<String> BLOCKED_EXTENSIONS = Set.of("exe", "bat", "cmd", "sh", "jar", "apk", "msi");
     private static final List<String> DEFAULT_MIME_TYPES = List.of(
@@ -45,6 +44,22 @@ public class TicketCollaborationServiceImpl implements TicketCollaborationServic
     private final TicketContextSnapshotRepository snapshotRepository;
     private final UserRepository userRepository;
     private final LegalTicketMapper ticketMapper;
+    private final RevenuePayrollService revenuePayrollService;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public TicketCollaborationServiceImpl(LegalTicketRepository ticketRepository,LegalTicketMessageRepository messageRepository,
+        TicketAttachmentRepository attachmentRepository,ConversationShareRepository shareRepository,TicketAuditLogRepository auditRepository,
+        TicketContextSnapshotRepository snapshotRepository,UserRepository userRepository,LegalTicketMapper ticketMapper,RevenuePayrollService revenuePayrollService){
+        this.ticketRepository=ticketRepository;this.messageRepository=messageRepository;this.attachmentRepository=attachmentRepository;
+        this.shareRepository=shareRepository;this.auditRepository=auditRepository;this.snapshotRepository=snapshotRepository;
+        this.userRepository=userRepository;this.ticketMapper=ticketMapper;this.revenuePayrollService=revenuePayrollService;
+    }
+    /** Compatibility constructor retained for existing tests. */
+    public TicketCollaborationServiceImpl(LegalTicketRepository ticketRepository,LegalTicketMessageRepository messageRepository,
+        TicketAttachmentRepository attachmentRepository,ConversationShareRepository shareRepository,TicketAuditLogRepository auditRepository,
+        TicketContextSnapshotRepository snapshotRepository,UserRepository userRepository,LegalTicketMapper ticketMapper){
+        this(ticketRepository,messageRepository,attachmentRepository,shareRepository,auditRepository,snapshotRepository,userRepository,ticketMapper,null);
+    }
 
     @Value("${app.ticket-attachments.max-size-kb:500}") private long maxSizeKb;
     @Value("${app.ticket-attachments.max-per-message:5}") private int maxPerMessage;
@@ -236,6 +251,8 @@ public class TicketCollaborationServiceImpl implements TicketCollaborationServic
             case "RESOLVE" -> {
                 if (!("EXPERT".equalsIgnoreCase(role) || "ADMIN".equalsIgnoreCase(role)) || !Set.of(LegalTicketStatus.ASSIGNED, LegalTicketStatus.ASSIGNED_TO_LAWYER, LegalTicketStatus.IN_REVIEW, LegalTicketStatus.WAITING_FOR_EXPERT, LegalTicketStatus.CUSTOMER_RESPONDED).contains(current)) invalidTransition();
                 next = LegalTicketStatus.RESOLVED; ticket.setResolvedAt(LocalDateTime.now());
+                ticket.setStatus(next);
+                if(revenuePayrollService!=null) revenuePayrollService.recognizeResolvedTicket(ticket);
             }
             case "CLOSE" -> {
                 if (!("CUSTOMER".equalsIgnoreCase(role) || "ADMIN".equalsIgnoreCase(role)) || current != LegalTicketStatus.RESOLVED) invalidTransition();

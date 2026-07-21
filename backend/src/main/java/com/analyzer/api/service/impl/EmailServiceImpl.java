@@ -115,6 +115,11 @@ public class EmailServiceImpl implements EmailService {
         send(toEmail, "Dat lai mat khau LexiGuard", body);
     }
 
+    @Override
+    public boolean sendFinancialEmail(String toEmail, String subject, String body) {
+        return send(toEmail, subject, body);
+    }
+
     private boolean send(String toEmail, String subject, String body) {
         if (!mailEnabled || !StringUtils.hasText(mailFrom)) {
             logger.warn("Mail is not configured (app.mail.enabled/from/SMTP_USERNAME missing) - skipping email to {}", toEmail);

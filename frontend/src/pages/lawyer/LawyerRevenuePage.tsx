@@ -1,104 +1,29 @@
-import { Banknote, BriefcaseBusiness, CircleDollarSign, Clock3, RefreshCw, WalletCards } from "lucide-react";
+import { Bell, Download, RefreshCw, WalletCards } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
-import { Badge, type BadgeTone } from "../../components/common/Badge";
+import { Link } from "react-router-dom";
+import { Badge } from "../../components/common/Badge";
 import { Button } from "../../components/common/Button";
 import { Card } from "../../components/common/Card";
 import { DataTable, type DataTableColumn } from "../../components/common/DataTable";
+import { Modal } from "../../components/common/Modal";
 import { PageHeader } from "../../components/common/PageHeader";
-import { Pagination } from "../../components/common/Pagination";
-import { useI18n } from "../../hooks/useI18n";
+import { API_ENDPOINTS } from "../../config/api";
 import { useToast } from "../../hooks/useToast";
-import { getExpertRevenueSummary, getExpertRevenueTickets } from "../../services/expertRevenue.service";
-import type { ExpertPaymentStatus, ExpertRevenueSummary, ExpertRevenueTicket } from "../../types/expertRevenue";
-import { getLegalTicketStatusLabel } from "../../types/legalTicketStatus";
-import { formatDisplayDateTime, formatVndCurrency, localeForLanguage } from "../../utils/format";
-import { parsePageParam, toPageParam } from "../../utils/pagination";
+import { cancelEarlyPayout, createEarlyPayout, downloadRevenueExport, getExpertEarlyPayouts, getExpertPolicies, getExpertPolicyNotifications, getExpertStatements, readExpertPolicyNotification, replyEarlyPayout } from "../../services/revenuePayroll.service";
+import type { EarlyPayout, PolicyNotification, RevenueStatement } from "../../types/expertRevenue";
+import { formatVndCurrency } from "../../utils/format";
 
-const paymentTone: Record<ExpertPaymentStatus, BadgeTone> = {
-  UNPAID: "slate",
-  PENDING: "amber",
-  PAID: "green",
-};
-
-const emptySummary: ExpertRevenueSummary = {
-  assignedTicketCount: 0, resolvedTicketCount: 0, paidTicketCount: 0,
-  pendingPaymentTicketCount: 0, totalRevenue: 0, paidRevenue: 0,
-  pendingRevenue: 0, totalPlatformFee: 0, totalExpertPayout: 0,
-};
-
-export function LawyerRevenuePage() {
-  const { t, language } = useI18n();
-  const toast = useToast();
-  const locale = localeForLanguage(language);
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [page, setPage] = useState(() => parsePageParam(searchParams.get("page")));
-  const [summary, setSummary] = useState<ExpertRevenueSummary>(emptySummary);
-  const [tickets, setTickets] = useState<ExpertRevenueTicket[]>([]);
-  const [totalPages, setTotalPages] = useState(0);
-  const [totalItems, setTotalItems] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    const [summaryResult, ticketsResult] = await Promise.allSettled([
-      getExpertRevenueSummary(), getExpertRevenueTickets(page, 10),
-    ]);
-    if (summaryResult.status === "fulfilled") setSummary(summaryResult.value);
-    if (ticketsResult.status === "fulfilled") {
-      setTickets(ticketsResult.value.items ?? []);
-      setTotalPages(ticketsResult.value.totalPages ?? 0);
-      setTotalItems(ticketsResult.value.totalItems ?? 0);
-    }
-    if (summaryResult.status === "rejected" || ticketsResult.status === "rejected") {
-      setError(t("expertRevenue.loadError"));
-      toast.error(t("expertRevenue.loadError"), t("toast.errorTitle"));
-    }
-    setLoading(false);
-  }, [page, t, toast]);
-
-  useEffect(() => { void load(); }, [load]);
-
-  const columns = useMemo<DataTableColumn<ExpertRevenueTicket>[]>(() => [
-    {
-      header: t("expertRevenue.ticket"),
-      cell: (item) => <Link className="font-semibold text-primary" to={`/lawyer/tickets/${item.ticketId}`}>{item.ticketCode || item.ticketId}</Link>,
-    },
-    { header: t("table.status"), cell: (item) => <Badge>{getLegalTicketStatusLabel(item.ticketStatus, t)}</Badge> },
-    { header: t("expertRevenue.consultationFee"), cell: (item) => formatVndCurrency(Number(item.consultationFee ?? 0), "0 ₫", locale) },
-    { header: t("expertRevenue.platformFee"), cell: (item) => formatVndCurrency(Number(item.platformFee ?? 0), "0 ₫", locale) },
-    { header: t("expertRevenue.expertPayout"), cell: (item) => <span className="font-semibold text-emerald-700 dark:text-emerald-300">{formatVndCurrency(Number(item.expertPayout ?? 0), "0 ₫", locale)}</span> },
-    { header: t("expertRevenue.paymentStatus"), cell: (item) => <Badge tone={paymentTone[item.paymentStatus]}>{t(`expertRevenue.payment.${item.paymentStatus}`)}</Badge> },
-    { header: t("expertRevenue.paidAt"), cell: (item) => formatDisplayDateTime(item.paidAt, "-", locale) },
-  ], [locale, t]);
-
-  return <div className="space-y-xl">
-    <PageHeader
-      eyebrow={t("nav.expertRevenue")}
-      title={t("expertRevenue.title")}
-      subtitle={t("expertRevenue.subtitle")}
-      actions={<Button onClick={() => void load()} disabled={loading} leftIcon={<RefreshCw className="h-4 w-4" />}>{t("common.refresh")}</Button>}
-    />
-    {error && <div role="alert" className="rounded-xl border border-error/40 bg-error/10 p-md text-sm text-error">{error}</div>}
-    <div className="grid gap-md sm:grid-cols-2 xl:grid-cols-5">
-      <Metric icon={BriefcaseBusiness} label={t("expertRevenue.assigned")} value={String(summary.assignedTicketCount)} />
-      <Metric icon={Clock3} label={t("expertRevenue.pendingTickets")} value={String(summary.pendingPaymentTicketCount)} />
-      <Metric icon={CircleDollarSign} label={t("expertRevenue.totalRevenue")} value={formatVndCurrency(Number(summary.totalRevenue), "0 ₫", locale)} />
-      <Metric icon={Banknote} label={t("expertRevenue.platformFee")} value={formatVndCurrency(Number(summary.totalPlatformFee), "0 ₫", locale)} />
-      <Metric icon={WalletCards} label={t("expertRevenue.totalPayout")} value={formatVndCurrency(Number(summary.totalExpertPayout), "0 ₫", locale)} highlight />
-    </div>
-    <Card title={t("expertRevenue.ticketBreakdown")} subtitle={t("expertRevenue.ticketBreakdownHint")}>
-      <DataTable columns={columns} data={tickets} getRowKey={(item) => item.ticketId} emptyMessage={loading ? t("common.loading") : t("expertRevenue.empty")} />
-      <Pagination page={page} totalPages={totalPages} totalItems={totalItems} disabled={loading} onPageChange={(nextPage) => {
-        setPage(nextPage); const next = new URLSearchParams(searchParams); next.set("page", toPageParam(nextPage)); setSearchParams(next);
-      }} />
-    </Card>
-    <p className="text-xs text-on-surface-variant">{t("expertRevenue.manualPayoutNotice")}</p>
-  </div>;
+export function LawyerRevenuePage(){
+ const toast=useToast();const [statements,setStatements]=useState<RevenueStatement[]>([]);const [payouts,setPayouts]=useState<EarlyPayout[]>([]);const [notifications,setNotifications]=useState<PolicyNotification[]>([]);const [activeRate,setActiveRate]=useState(0);const [loading,setLoading]=useState(true);const [modal,setModal]=useState(false);const [selected,setSelected]=useState("");const [amount,setAmount]=useState("");const [reason,setReason]=useState("");const [note,setNote]=useState("");
+ const load=useCallback(async()=>{setLoading(true);try{const [s,e,p,n]=await Promise.all([getExpertStatements(),getExpertEarlyPayouts(),getExpertPolicies(),getExpertPolicyNotifications()]);setStatements(s.items||[]);setPayouts(e.items||[]);setActiveRate(p.find(x=>x.status==="ACTIVE")?.rate||0);setNotifications(n);}catch(e){toast.error(e instanceof Error?e.message:"Không thể tải doanh thu");}finally{setLoading(false);}},[toast]);
+ useEffect(()=>{void load();const timer=setInterval(()=>void load(),30000);return()=>clearInterval(timer);},[load]);
+ const totals=useMemo(()=>({estimated:statements.filter(s=>s.status==="DRAFT").reduce((a,s)=>a+s.finalPayout,0),confirmed:statements.filter(s=>s.status==="CONFIRMED").reduce((a,s)=>a+s.finalPayout,0),pending:statements.filter(s=>s.status==="PAYMENT_PENDING").reduce((a,s)=>a+s.remainingAmount,0),paid:statements.reduce((a,s)=>a+s.paidAmount,0),remaining:statements.reduce((a,s)=>a+s.remainingAmount,0)}),[statements]);
+ const cols=useMemo<DataTableColumn<RevenueStatement>[]>(()=>[{header:"Kỳ",cell:s=><Link className="font-semibold text-primary" to={`/lawyer/revenue/${s.id}`}>{s.period.periodCode}</Link>},{header:"Ticket",cell:s=>s.ticketCount},{header:"Phí tư vấn",cell:s=>money(s.grossConsultationFee)},{header:"Phí nền tảng",cell:s=>money(s.totalPlatformFee)},{header:"Khoản được nhận",cell:s=><b>{money(s.finalPayout)}</b>},{header:"Đã trả",cell:s=>money(s.paidAmount)},{header:"Còn lại",cell:s=>money(s.remainingAmount)},{header:"Trạng thái",cell:s=><Badge tone={s.status==="PAID"?"green":s.status==="CONFIRMED"?"blue":"amber"}>{s.status}</Badge>},{header:"",cell:s=><div className="flex gap-xs"><Button size="sm" variant="ghost" onClick={()=>void downloadRevenueExport(API_ENDPOINTS.expertRevenue.periodExport(s.id),`doanh-thu-${s.period.periodCode}.xlsx`)}><Download className="h-4 w-4"/></Button>{s.status==="CONFIRMED"&&s.remainingAmount>0&&<Button size="sm" onClick={()=>{setSelected(s.id);setAmount(String(s.remainingAmount));setModal(true);}}>Ứng tiền</Button>}</div>}],[]);
+ const payoutCols=useMemo<DataTableColumn<EarlyPayout>[]>(()=>[{header:"Mã",cell:p=>p.requestCode},{header:"Kỳ",cell:p=>p.periodCode},{header:"Yêu cầu",cell:p=>money(p.requestedAmount)},{header:"Được duyệt",cell:p=>money(p.approvedAmount||0)},{header:"Trạng thái",cell:p=><Badge>{p.status}</Badge>},{header:"",cell:p=><>{p.status==="NEED_MORE_INFO"&&<Button size="sm" variant="secondary" onClick={async()=>{const reply=prompt("Phản hồi cho Admin");if(reply){await replyEarlyPayout(p.id,reply);await load();}}}>Phản hồi</Button>}{["PENDING_ADMIN_REVIEW","NEED_MORE_INFO","EXPERT_RESPONDED"].includes(p.status)&&<Button size="sm" variant="ghost" onClick={async()=>{await cancelEarlyPayout(p.id);await load();}}>Hủy</Button>}</>}], [load]);
+ const submit=async()=>{try{await createEarlyPayout(selected,Number(amount),reason,note);toast.success("Đã gửi yêu cầu ứng doanh thu");setModal(false);await load();}catch(e){toast.error(e instanceof Error?e.message:"Không thể gửi yêu cầu");}};
+ return <div className="space-y-xl"><PageHeader title="Doanh thu chuyên gia" subtitle={`Hoa hồng hiện tại ${(activeRate*100).toFixed(2)}%. Doanh thu chỉ được ghi nhận khi ticket lần đầu RESOLVED.`} actions={<Button disabled={loading} onClick={()=>void load()} leftIcon={<RefreshCw className="h-4 w-4"/>}>Làm mới</Button>}/><div className="grid gap-md sm:grid-cols-2 xl:grid-cols-5"><Metric label="Ước tính" value={totals.estimated}/><Metric label="Đã xác nhận" value={totals.confirmed}/><Metric label="Chờ thanh toán" value={totals.pending}/><Metric label="Đã thanh toán" value={totals.paid}/><Metric label="Còn lại" value={totals.remaining}/></div>
+ <Card title="Lịch sử kỳ doanh thu" subtitle="Phí tư vấn gộp không phải thu nhập của chuyên gia; khoản thực nhận nằm ở cột Khoản được nhận."><DataTable columns={cols} data={statements} getRowKey={s=>s.id} emptyMessage={loading?"Đang tải...":"Chưa có kỳ doanh thu"}/></Card>
+ <div className="grid gap-gutter xl:grid-cols-2"><Card title="Yêu cầu ứng doanh thu"><DataTable columns={payoutCols} data={payouts} getRowKey={p=>p.id} emptyMessage="Chưa có yêu cầu"/></Card><Card title="Thông báo chính sách" subtitle="Thông báo chỉ để biết, không yêu cầu xác nhận."><div className="space-y-sm">{notifications.length===0?<p className="text-sm text-on-surface-variant">Không có thông báo.</p>:notifications.map(n=><button key={n.id} className="flex w-full items-center gap-sm rounded-xl border border-legal-border p-md text-left dark:border-slate-700" onClick={async()=>{if(!n.readAt){await readExpertPolicyNotification(n.id);await load();}}}><Bell className="h-4 w-4 text-primary"/><span className="flex-1">Hoa hồng {(n.rate*100).toFixed(2)}% từ {n.effectiveFrom}</span>{!n.readAt&&<Badge tone="blue">Mới</Badge>}</button>)}</div></Card></div>
+ <Modal open={modal} onClose={()=>setModal(false)} title="Yêu cầu ứng doanh thu" footer={<div className="flex justify-end gap-sm"><Button variant="secondary" onClick={()=>setModal(false)}>Hủy</Button><Button onClick={()=>void submit()}>Gửi yêu cầu</Button></div>}><div className="space-y-md"><p className="rounded-lg bg-amber-500/10 p-sm text-sm">Hệ thống sẽ giữ trước số tiền yêu cầu. Admin duyệt không đồng nghĩa tiền đã được chuyển.</p><label className="block text-sm font-semibold">Số tiền<input className="form-field mt-xs" type="number" min="1" value={amount} onChange={e=>setAmount(e.target.value)}/></label><label className="block text-sm font-semibold">Lý do<textarea className="form-field mt-xs min-h-20" value={reason} onChange={e=>setReason(e.target.value)}/></label><label className="block text-sm font-semibold">Ghi chú thêm<textarea className="form-field mt-xs min-h-20" value={note} onChange={e=>setNote(e.target.value)}/></label></div></Modal></div>;
 }
-
-function Metric({ icon: Icon, label, value, highlight = false }: { icon: typeof Banknote; label: string; value: string; highlight?: boolean }) {
-  return <Card className="p-lg"><Icon className={`h-7 w-7 ${highlight ? "text-emerald-600" : "text-primary"}`} /><p className="mt-md text-xs font-semibold uppercase tracking-wide text-on-surface-variant">{label}</p><p className="mt-xs text-xl font-bold">{value}</p></Card>;
-}
+function money(v:number){return formatVndCurrency(Number(v||0),"0 ₫","vi-VN");}function Metric({label,value}:{label:string;value:number}){return <Card className="p-lg"><WalletCards className="h-6 w-6 text-primary"/><p className="mt-sm text-xs font-semibold uppercase text-on-surface-variant">{label}</p><p className="mt-xs text-xl font-bold">{money(value)}</p></Card>;}

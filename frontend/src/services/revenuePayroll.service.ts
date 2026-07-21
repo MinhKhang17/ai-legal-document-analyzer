@@ -1,0 +1,36 @@
+import { API_ENDPOINTS, buildApiUrl } from "../config/api";
+import type { CommissionApplicationType, CommissionChangeRequest, CommissionPolicy, EarlyPayout, EarlyPayoutPage, PolicyNotification, RevenuePeriodPage, RevenueStatement, RevenueStatementPage } from "../types/expertRevenue";
+import { buildAuthHeaders, requestApiData } from "./http";
+
+const jsonHeaders={Accept:"application/json","Content-Type":"application/json"};
+const api=<T>(url:string,method="GET",body?:unknown):Promise<T>=>requestApiData(url,{method,headers:buildAuthHeaders(jsonHeaders),credentials:"include",body:body===undefined?undefined:JSON.stringify(body)},"Không thể xử lý yêu cầu doanh thu");
+export const getAdminRevenuePeriods=(page=0,size=20)=>api<RevenuePeriodPage>(`${API_ENDPOINTS.adminRevenue.periods}?page=${page}&size=${size}`);
+export const getAdminPeriodStatements=(periodId:string)=>api<RevenueStatement[]>(API_ENDPOINTS.adminRevenue.statements(periodId));
+export const getAdminStatement=(id:string)=>api<RevenueStatement>(API_ENDPOINTS.adminRevenue.statement(id));
+export const markStatementPaymentPending=(id:string)=>api<RevenueStatement>(`${API_ENDPOINTS.adminRevenue.statement(id)}/payment-pending`,"POST");
+export const markStatementPaid=(id:string,paymentReference:string)=>api<RevenueStatement>(`${API_ENDPOINTS.adminRevenue.statement(id)}/paid`,"POST",{paymentReference,idempotencyKey:crypto.randomUUID()});
+export const calculateRevenuePeriod=(id:string)=>api(API_ENDPOINTS.adminRevenue.period(id)+"/calculate","POST");
+export const closeRevenuePeriod=(id:string)=>api(API_ENDPOINTS.adminRevenue.period(id)+"/close","POST");
+export const createRevenueAdjustment=(periodId:string,expertId:number,ticketId:string|undefined,type:string,amount:number,reason:string)=>api(`${API_ENDPOINTS.adminRevenue.period(periodId)}/adjustments`,"POST",{expertId,ticketId:type&&ticketId?ticketId:undefined,type,amount,reason});
+export const getCommissionPolicies=()=>api<CommissionPolicy[]>(API_ENDPOINTS.adminRevenue.policies);
+export const createCommissionChange=(newRate:number,reason:string,applicationType:CommissionApplicationType)=>api<CommissionChangeRequest>(API_ENDPOINTS.adminRevenue.changeRequests,"POST",{newRate,reason,applicationType});
+export const resendCommissionVerification=(id:string)=>api<CommissionChangeRequest>(`${API_ENDPOINTS.adminRevenue.changeRequests}/${encodeURIComponent(id)}/resend`,"POST");
+export const verifyCommissionChange=(id:string,token:string)=>api<CommissionPolicy>(`${API_ENDPOINTS.adminRevenue.changeRequests}/${encodeURIComponent(id)}/verify`,"POST",{token});
+export const cancelCommissionPolicy=(id:string,note:string)=>api<CommissionPolicy>(`${API_ENDPOINTS.adminRevenue.policies}/${encodeURIComponent(id)}/cancel`,"POST",{note});
+export const getAdminEarlyPayouts=(page=0,size=20)=>api<EarlyPayoutPage>(`${API_ENDPOINTS.adminRevenue.earlyPayouts}?page=${page}&size=${size}`);
+export const getAdminEarlyPayout=(id:string)=>api<EarlyPayout>(`${API_ENDPOINTS.adminRevenue.earlyPayouts}/${encodeURIComponent(id)}`);
+export const earlyPayoutMoreInfo=(id:string,note:string)=>api<EarlyPayout>(`${API_ENDPOINTS.adminRevenue.earlyPayouts}/${encodeURIComponent(id)}/request-more-info`,"POST",{note});
+export const approveEarlyPayout=(id:string,approvedAmount:number,adminNote?:string)=>api<EarlyPayout>(`${API_ENDPOINTS.adminRevenue.earlyPayouts}/${encodeURIComponent(id)}/approve`,"POST",{approvedAmount,adminNote});
+export const rejectEarlyPayout=(id:string,reason:string)=>api<EarlyPayout>(`${API_ENDPOINTS.adminRevenue.earlyPayouts}/${encodeURIComponent(id)}/reject`,"POST",{reason});
+export const markEarlyPayoutPending=(id:string)=>api<EarlyPayout>(`${API_ENDPOINTS.adminRevenue.earlyPayouts}/${encodeURIComponent(id)}/payment-pending`,"POST");
+export const markEarlyPayoutPaid=(id:string,paymentReference:string)=>api<EarlyPayout>(`${API_ENDPOINTS.adminRevenue.earlyPayouts}/${encodeURIComponent(id)}/paid`,"POST",{paymentReference,idempotencyKey:crypto.randomUUID()});
+export const getExpertStatements=(page=0,size=20)=>api<RevenueStatementPage>(`${API_ENDPOINTS.expertRevenue.periods}?page=${page}&size=${size}`);
+export const getExpertStatement=(id:string)=>api<RevenueStatement>(API_ENDPOINTS.expertRevenue.period(id));
+export const getExpertPolicies=()=>api<CommissionPolicy[]>(API_ENDPOINTS.expertRevenue.policies);
+export const getExpertPolicyNotifications=()=>api<PolicyNotification[]>(API_ENDPOINTS.expertRevenue.notifications);
+export const readExpertPolicyNotification=(id:number)=>api<PolicyNotification>(`${API_ENDPOINTS.expertRevenue.notifications}/${id}/read`,"POST");
+export const getExpertEarlyPayouts=(page=0,size=20)=>api<EarlyPayoutPage>(`${API_ENDPOINTS.expertRevenue.earlyPayouts}?page=${page}&size=${size}`);
+export const createEarlyPayout=(statementId:string,requestedAmount:number,reason:string,expertNote?:string)=>api<EarlyPayout>(API_ENDPOINTS.expertRevenue.earlyPayouts,"POST",{statementId,requestedAmount,reason,expertNote,idempotencyKey:crypto.randomUUID()});
+export const cancelEarlyPayout=(id:string)=>api<EarlyPayout>(`${API_ENDPOINTS.expertRevenue.earlyPayouts}/${encodeURIComponent(id)}/cancel`,"POST");
+export const replyEarlyPayout=(id:string,note:string)=>api<EarlyPayout>(`${API_ENDPOINTS.expertRevenue.earlyPayouts}/${encodeURIComponent(id)}/reply`,"POST",{note});
+export async function downloadRevenueExport(url:string,fileName:string){const response=await fetch(buildApiUrl(url),{headers:buildAuthHeaders({Accept:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),credentials:"include"});if(!response.ok)throw new Error("Không thể xuất báo cáo");const objectUrl=URL.createObjectURL(await response.blob());const a=document.createElement("a");a.href=objectUrl;a.download=fileName;a.click();setTimeout(()=>URL.revokeObjectURL(objectUrl),1000);}

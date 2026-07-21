@@ -42,6 +42,7 @@ public class ExpertLegalTicketServiceImpl implements ExpertLegalTicketService {
     private final LegalTicketMapper legalTicketMapper;
     private final EmailService emailService;
     private final ExpertRevenueService expertRevenueService;
+    private final RevenuePayrollService revenuePayrollService;
 
     @Override
     @Transactional(readOnly = true)
@@ -161,6 +162,7 @@ public class ExpertLegalTicketServiceImpl implements ExpertLegalTicketService {
         ticket.setResolvedAt(LocalDateTime.now());
         ticket.setLastLawyerMessageAt(LocalDateTime.now());
         expertRevenueService.applyCommissionSnapshot(ticket);
+        revenuePayrollService.recognizeResolvedTicket(ticket);
 
         // Save Response Message
         LegalTicketMessage msg = LegalTicketMessage.builder()

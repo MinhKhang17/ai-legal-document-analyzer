@@ -1,0 +1,7 @@
+import { useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import { Button } from "../../components/common/Button";
+import { Card } from "../../components/common/Card";
+import { verifyCommissionChange } from "../../services/revenuePayroll.service";
+
+export function CommissionVerificationPage(){const [params]=useSearchParams();const requestId=params.get("requestId")||"";const token=params.get("token")||"";const [state,setState]=useState<"idle"|"busy"|"done"|"error">("idle");const [message,setMessage]=useState("");return <div className="mx-auto max-w-xl py-2xl"><Card title="Xác nhận thay đổi hoa hồng" subtitle="Link email không tự kích hoạt policy. Admin phải đăng nhập và bấm xác nhận POST bên dưới."><div className="space-y-md"><p className="text-sm">Mã yêu cầu: <b>{requestId||"Không hợp lệ"}</b></p>{state==="done"?<div className="rounded-xl bg-emerald-500/10 p-md text-emerald-600">Policy đã được lên lịch. Expert đã nhận thông báo.</div>:<Button disabled={!requestId||!token||state==="busy"} onClick={async()=>{setState("busy");try{await verifyCommissionChange(requestId,token);setState("done");}catch(e){setState("error");setMessage(e instanceof Error?e.message:"Xác nhận thất bại");}}}>Xác nhận chính sách</Button>}{state==="error"&&<p className="text-error">{message}</p>}<Link className="block text-sm text-primary" to="/admin/revenue">Quay lại quản lý doanh thu</Link></div></Card></div>;}

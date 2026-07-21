@@ -47,6 +47,9 @@ import { LawyerTicketsPage } from "../pages/lawyer/LawyerTicketsPage";
 import { LawyerTicketDetailPage } from "../pages/lawyer/LawyerTicketDetailPage";
 import { LawyerRevenuePage } from "../pages/lawyer/LawyerRevenuePage";
 import { AdminRevenuePage } from "../pages/admin/AdminRevenuePage";
+import { AdminEarlyPayoutDetailPage } from "../pages/admin/AdminEarlyPayoutDetailPage";
+import { CommissionVerificationPage } from "../pages/admin/CommissionVerificationPage";
+import { RevenueStatementDetailPage } from "../pages/revenue/RevenueStatementDetailPage";
 import { CreateCustomerTicketPage } from "../pages/tickets/CreateCustomerTicketPage";
 import { SharedChatPage } from "../pages/chat/SharedChatPage";
 import { SharedTicketConversationPage } from "../pages/tickets/SharedTicketConversationPage";
@@ -301,6 +304,9 @@ export const router = createBrowserRouter([
       { path: "/admin/refunds", element: <AdminRoute><AdminRefundsPage /></AdminRoute> },
       { path: "/admin/refunds/:id", element: <AdminRoute><AdminRefundDetailPage /></AdminRoute> },
       { path: "/admin/revenue", element: <AdminRoute><AdminRevenuePage /></AdminRoute> },
+      { path: "/admin/revenue/statements/:statementId", element: <AdminRoute><RevenueStatementDetailPage admin /></AdminRoute> },
+      { path: "/admin/revenue/early-payouts/:id", element: <AdminRoute><AdminEarlyPayoutDetailPage /></AdminRoute> },
+      { path: "/admin/revenue/commission/verify", element: <AdminRoute><CommissionVerificationPage /></AdminRoute> },
       {
         path: "/admin/system-health",
         element: (
@@ -333,6 +339,7 @@ export const router = createBrowserRouter([
           </ExpertRoute>
         ),
       },
+      { path: "/lawyer/revenue/:statementId", element: <ExpertRoute><RevenueStatementDetailPage /></ExpertRoute> },
       { path: "/shared/chat/:shareToken", element: <AdminOrExpertRoute><SharedChatPage /></AdminOrExpertRoute> },
       { path: "/shared-conversation/:token", element: <SharedTicketConversationPage /> },
     ],
