@@ -14,6 +14,9 @@ public class ExpertRevenueTicketResponse {
     private String ticketCode;
     private LegalTicketStatus ticketStatus;
     private BigDecimal consultationFee;
+    private BigDecimal commissionRate;
+    private BigDecimal platformFee;
+    private BigDecimal expertPayout;
     private ExpertPaymentStatus paymentStatus;
     private LocalDateTime resolvedAt;
     private LocalDateTime paidAt;
