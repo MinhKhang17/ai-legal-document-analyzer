@@ -14,6 +14,8 @@ import { LoginPage } from "../pages/auth/LoginPage";
 import { RegisterPage } from "../pages/auth/RegisterPage";
 import { VerifyEmailPage } from "../pages/auth/VerifyEmailPage";
 import { CheckEmailPage } from "../pages/auth/CheckEmailPage";
+import { ForgotPasswordPage } from "../pages/auth/ForgotPasswordPage";
+import { ResetPasswordPage } from "../pages/auth/ResetPasswordPage";
 import { DashboardPage } from "../pages/dashboard/DashboardPage";
 import { ProjectsPage } from "../pages/projects/ProjectsPage";
 import { ProjectDetailPage } from "../pages/projects/ProjectDetailPage";
@@ -39,6 +41,7 @@ import { AdminRefundDetailPage } from "../pages/admin/AdminRefundDetailPage";
 import { SystemHealthPage } from "../pages/admin/SystemHealthPage";
 import { ContractDetailPage } from "../pages/contracts/ContractDetailPage";
 import { SettingsPage } from "../pages/settings/SettingsPage";
+import { AccountSecurityPage } from "../pages/settings/AccountSecurityPage";
 import { PaymentResultRedirect } from "../pages/billing/PaymentResultRedirect";
 import { LawyerTicketsPage } from "../pages/lawyer/LawyerTicketsPage";
 import { LawyerTicketDetailPage } from "../pages/lawyer/LawyerTicketDetailPage";
@@ -59,6 +62,13 @@ export const router = createBrowserRouter([
   {
     path: "/",
     element: <Navigate to="/login" replace />,
+  },
+  {
+    element: <AuthLayout />,
+    children: [
+      { path: "/forgot-password", element: <ForgotPasswordPage /> },
+      { path: "/reset-password", element: <ResetPasswordPage /> },
+    ],
   },
   {
     element: (
@@ -258,6 +268,7 @@ export const router = createBrowserRouter([
         ),
       },
       { path: "/settings", element: <SettingsPage /> },
+      { path: "/settings/security", element: <AccountSecurityPage /> },
       {
         path: "/admin",
         element: (

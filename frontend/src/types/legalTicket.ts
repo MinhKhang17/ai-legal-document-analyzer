@@ -1,9 +1,55 @@
 import type { LegalTicketStatus } from "./legalTicketStatus";
 
-export type LegalTicketType = "SYSTEM_ERROR" | "QUERY_ERROR" | "CONTACT_EXPERT" | "REFUND_REQUEST";
+export const LEGAL_TICKET_TYPES = [
+  "SYSTEM_ERROR",
+  "QUERY_ERROR",
+  "CONTACT_EXPERT",
+  "REFUND_REQUEST",
+] as const;
+
+export type LegalTicketType = (typeof LEGAL_TICKET_TYPES)[number];
+
+export const isLegalTicketType = (value: string): value is LegalTicketType =>
+  LEGAL_TICKET_TYPES.some((ticketType) => ticketType === value);
+
+export const LEGAL_TICKET_RISK_LEVELS = [
+  "NONE",
+  "LOW",
+  "MEDIUM",
+  "HIGH",
+  "CRITICAL",
+  "UNKNOWN",
+] as const;
+
+export type LegalTicketRiskLevel = (typeof LEGAL_TICKET_RISK_LEVELS)[number];
+
+export const isLegalTicketRiskLevel = (value: string): value is LegalTicketRiskLevel =>
+  LEGAL_TICKET_RISK_LEVELS.some((riskLevel) => riskLevel === value);
+
 export type TicketRecipientType = "EXPERT" | "ADMIN";
 export type TicketPriority = "LOW" | "NORMAL" | "HIGH" | "URGENT";
 export type ConversationScope = "SELECTED_RESPONSE" | "RELATED_MESSAGES" | "FULL_CONVERSATION" | "TICKET_CONTEXT_ONLY";
+export type SuggestionType =
+  | "DIRECT_ANSWER"
+  | "ASK_UPLOAD_CONTRACT"
+  | "ASK_CONTRACT_TYPE"
+  | "ASK_USER_ROLE"
+  | "ASK_TARGET_CLAUSE"
+  | "ASK_MORE_FACTS"
+  | "SUGGEST_REVISE_CLAUSE"
+  | "SUGGEST_NEGOTIATION"
+  | "REDIRECT_TO_SUPPORTED_SCOPE"
+  | "REFUSE_AND_REDIRECT"
+  | "NONE"
+  | "ASK_MORE_INFO"
+  | "SUGGEST_LAWYER"
+  | "REQUIRE_LAWYER";
+export type UserActionHint =
+  | "CONTINUE_CHAT"
+  | "PROVIDE_MORE_INFO"
+  | "CREATE_TICKET"
+  | "UPLOAD_CONTRACT"
+  | "CONTACT_LAWYER";
 
 export interface PageResponse<T> {
   items: T[];
@@ -63,79 +109,79 @@ export interface ReopenLegalTicketRequest {
 }
 
 export interface LegalTicket {
-  ticketCode?: string | null;
-  title?: string | null;
-  description?: string | null;
-  recipientType?: TicketRecipientType | null;
-  priority?: TicketPriority | null;
-  conversationScope?: ConversationScope | null;
-  sourceUserMessageId?: string | null;
-  sourceAssistantMessageId?: string | null;
-  focusedDocumentId?: string | null;
+  ticketCode?: string;
+  title?: string;
+  description?: string;
+  recipientType?: TicketRecipientType;
+  priority?: TicketPriority;
+  conversationScope?: ConversationScope;
+  sourceUserMessageId?: string;
+  sourceAssistantMessageId?: string;
+  focusedDocumentId?: string;
   sharedDocumentIds?: string[];
-  contextSnapshot?: TicketContextSnapshot | null;
+  contextSnapshot?: TicketContextSnapshot;
   id: string;
-  ticket_type?: LegalTicketType | null;
-  chat_session_id?: string | null;
-  chat_message_id?: string | null;
+  ticket_type?: LegalTicketType;
+  chat_session_id?: string;
+  chat_message_id?: string;
 
-  request_id: string | null;
+  request_id: string;
 
-  workspace_id: string | null;
-  workspace_name?: string | null;
+  workspace_id?: string;
+  workspace_name?: string;
 
-  document_id: string | null;
-  document_name?: string | null;
+  document_id?: string;
+  document_name?: string;
 
-  created_by_id?: number | null;
-  created_by_name?: string | null;
+  created_by_id?: number;
+  created_by_name?: string;
 
-  question: string | null;
-  answer: string | null;
+  question: string;
+  answer?: string;
 
-  confidence_score: number | null;
-  should_suggest_ticket: boolean | null;
+  confidence_score?: number;
+  should_suggest_ticket?: boolean;
 
-  suggestion_type: string | null;
-  suggestion_reason: string | null;
-  missing_information: string | null;
+  suggestion_type?: SuggestionType;
+  suggestion_reason?: string;
+  missing_information?: string;
 
-  risk_level: string | null;
-  legal_domain: string | null;
-  user_action_hint: string | null;
+  risk_level?: LegalTicketRiskLevel;
+  legal_domain?: string;
+  user_action_hint?: UserActionHint;
 
-  status: LegalTicketStatus | null;
+  status: LegalTicketStatus;
 
-  assigned_lawyer_id?: number | null;
-  assigned_lawyer_name?: string | null;
+  assigned_lawyer_id?: number;
+  assigned_lawyer_name?: string;
 
-  issue_fingerprint?: string | null;
-  customer_note?: string | null;
+  issue_fingerprint?: string;
+  customer_note?: string;
 
-  issue_title?: string | null;
-  issue_summary?: string | null;
+  issue_title?: string;
+  issue_summary?: string;
 
-  problematic_clause?: string | null;
-  clause_reference?: string | null;
-  page_number?: number | null;
+  problematic_clause?: string;
+  clause_reference?: string;
+  page_number?: number;
 
-  ai_evidence?: string | null;
-  recommended_action?: string | null;
+  ai_evidence?: string;
+  recommended_action?: string;
 
-  expert_answer?: string | null;
-  expert_internal_note?: string | null;
+  expert_answer?: string;
+  expert_internal_note?: string;
 
-  admin_note?: string | null;
-  rejection_reason?: string | null;
+  admin_note?: string;
+  rejection_reason?: string;
 
-  assigned_at?: string | null;
-  resolved_at?: string | null;
-  closed_at?: string | null;
-  cancelled_at?: string | null;
-  reopened_at?: string | null;
+  assigned_at?: string;
+  resolved_at?: string;
+  closed_at?: string;
+  cancelled_at?: string;
+  reopened_at?: string;
 
-  created_at: string | null;
-  updated_at: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface LegalTicketMessage {
@@ -201,8 +247,8 @@ export interface ConversationShare {
 export interface TicketSummary {
   ticketId: string;
   confidenceScore: number | null;
-  riskLevel: string | null;
-  suggestionType: string | null;
+  riskLevel: LegalTicketRiskLevel | null;
+  suggestionType: SuggestionType | null;
   suggestionReason: string | null;
   summary: string | null;
 }
