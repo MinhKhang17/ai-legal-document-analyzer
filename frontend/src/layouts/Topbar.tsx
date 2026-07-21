@@ -49,7 +49,7 @@ export function Topbar() {
     if (!isCustomer) return;
     void getMyCustomerPlan().then((response) => setPlanName(response.data?.subscriptionPlan.displayName ?? response.data?.subscriptionPlan.planName ?? 'FREE')).catch(() => setPlanName('FREE'));
   }, [isCustomer]);
-  const profileWorkspacePath = isAdmin ? '/admin' : '/dashboard';
+  const profileWorkspacePath = '/profile';
   const displayName = user
     ? `${user.firstName} ${user.lastName}`.trim() || user.email
     : t('common.guest');

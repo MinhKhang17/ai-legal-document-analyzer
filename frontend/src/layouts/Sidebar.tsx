@@ -11,7 +11,7 @@ import {
   MessageSquareText,
   Receipt,
   CircleDollarSign,
-  Settings,
+  UserRound,
   ShieldCheck,
   TicketCheck,
   UploadCloud,
@@ -131,9 +131,9 @@ const navItems: NavItem[] = [
     allowedRoles: ['CUSTOMER'],
   },
   {
-    to: '/settings',
-    labelKey: 'nav.settings',
-    icon: Settings,
+    to: '/profile',
+    labelKey: 'topbar.profileWorkspace',
+    icon: UserRound,
     section: 'system',
   },
   {
