@@ -112,6 +112,12 @@ public class TicketCollaborationServiceImpl implements TicketCollaborationServic
     @Transactional
     public LegalTicketMessageResponse addMessage(Long userId, String role, String ticketId, CreateTicketMessageRequest request) {
         LegalTicket ticket = requireParticipant(userId, role, ticketId);
+        String clientMessageId = normalizeClientMessageId(request.getClientMessageId());
+        if (clientMessageId != null) {
+            Optional<LegalTicketMessage> existing = messageRepository
+                    .findByTicket_IdAndSender_IdAndClientMessageId(ticketId, userId, clientMessageId);
+            if (existing.isPresent()) return toMessage(existing.get());
+        }
         List<String> ids = request.getAttachmentIds() == null ? List.of() : request.getAttachmentIds().stream().distinct().toList();
         if (ids.size() > maxPerMessage) throw new ConflictException("ATTACHMENT_MESSAGE_LIMIT_EXCEEDED");
         String content = request.getContent() == null ? "" : request.getContent().trim();
@@ -126,6 +132,7 @@ public class TicketCollaborationServiceImpl implements TicketCollaborationServic
         User sender = requireUser(userId);
         LegalTicketMessage message = messageRepository.save(LegalTicketMessage.builder()
                 .ticket(ticket).sender(sender).senderRole(role.toUpperCase(Locale.ROOT))
+                .clientMessageId(clientMessageId)
                 .content(content).replyToMessage(replyTo).messageType(messageType(role))
                 .internalOnly(false).build());
         attachments.forEach(item -> { item.setOwnerType(TicketAttachmentOwnerType.TICKET_MESSAGE); item.setOwnerId(message.getId()); item.setTicketId(ticketId); });
@@ -289,6 +296,11 @@ public class TicketCollaborationServiceImpl implements TicketCollaborationServic
 
     private User requireUser(Long id) { return userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("USER_NOT_FOUND")); }
     private LegalTicketMessageType messageType(String role) { return "EXPERT".equalsIgnoreCase(role) ? LegalTicketMessageType.EXPERT_RESPONSE : "ADMIN".equalsIgnoreCase(role) ? LegalTicketMessageType.ADMIN_NOTE : LegalTicketMessageType.CUSTOMER_REPLY; }
+
+    private String normalizeClientMessageId(String value) {
+        if (value == null || value.isBlank()) return null;
+        return value.trim();
+    }
     private TicketAttachmentResponse toAttachment(TicketAttachment a) { return TicketAttachmentResponse.builder().id(a.getId()).originalFileName(a.getOriginalFileName()).mimeType(a.getMimeType()).sizeBytes(a.getSizeBytes()).scanStatus(a.getScanStatus().name()).uploadStatus(a.getUploadStatus().name()).createdAt(a.getCreatedAt()).downloadUrl("/api/attachments/" + a.getId() + "/download").build(); }
     private LegalTicketMessageResponse toMessage(LegalTicketMessage m) {
         LegalTicketMessageResponse response = ticketMapper.toMessageResponse(m);

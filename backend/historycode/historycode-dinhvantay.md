@@ -1082,3 +1082,22 @@ BUILD SUCCESS
 - Ticket automated tests: `8/8 PASS`; full backend regression: `43/43 PASS`.
 - Them `docs/ticket_flow_test_report_2026-07-21.md` gom ket qua automated va 20 case can test tay
   tren server.
+# 2026-07-21 - Ticket flow deploy verification
+
+- Test trực tiếp bản Vercel bằng tài khoản customer/admin: login, list/detail ticket và giữ session đều PASS.
+- Xác nhận backend chặn assign expert cho refund ticket bằng `REFUND_TICKET_ADMIN_ONLY`.
+- Bổ sung validation assign/reassign: assignee phải là expert active và ticket phải còn ở trạng thái xử lý được.
+- Customer-facing ticket response không còn trả `expert_internal_note`.
+- Thêm 2 regression tests cho assign sai role và assign ticket đã đóng.
+- Kết quả test sau sửa: 45 tests PASS, 0 failures, 0 errors.
+- Ghi nhận việc frontend vẫn hiển thị khối phân công trên refund ticket để team FE ẩn theo `ticket_type`.
+
+## Ticket flow hardening tiếp theo
+
+- Reassign cùng expert trở thành no-op, không cập nhật timestamp và không gửi email trùng.
+- Thêm `clientMessageId` cho message customer/expert và unique index chống retry tạo message trùng.
+- Thêm migration `V20260721_01__ticket_message_idempotency.sql`.
+- Upload Base64 của expert giới hạn mặc định 5 MB, chặn trước decode, kiểm tra magic bytes/MIME/extension.
+- Nếu ghi file thành công nhưng lưu metadata DB thất bại, file vật lý được xóa lại.
+- Thêm regression tests cho no-op reassign, message idempotency, file quá lớn, MIME giả và orphan cleanup.
+- Kết quả regression mới: 50 tests PASS, 0 failures, 0 errors.

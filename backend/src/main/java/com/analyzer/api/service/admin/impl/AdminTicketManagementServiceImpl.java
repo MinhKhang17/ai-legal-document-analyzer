@@ -8,6 +8,7 @@ import com.analyzer.api.entity.User;
 import com.analyzer.api.enums.LegalTicketStatus;
 import com.analyzer.api.enums.LegalTicketMessageType;
 import com.analyzer.api.enums.RiskLevel;
+import com.analyzer.api.enums.RoleName;
 import com.analyzer.api.enums.SuggestionType;
 import com.analyzer.api.exception.common.ConflictException;
 import com.analyzer.api.exception.common.ResourceNotFoundException;
@@ -28,6 +29,15 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AdminTicketManagementServiceImpl implements AdminTicketManagementService {
 
+    private static final List<LegalTicketStatus> ASSIGNABLE_STATUSES = List.of(
+            LegalTicketStatus.DRAFT,
+            LegalTicketStatus.PENDING_ADMIN_REVIEW,
+            LegalTicketStatus.ASSIGNED_TO_LAWYER,
+            LegalTicketStatus.IN_REVIEW,
+            LegalTicketStatus.NEED_MORE_INFO,
+            LegalTicketStatus.CUSTOMER_RESPONDED,
+            LegalTicketStatus.REOPENED);
+
     private final LegalTicketRepository legalTicketRepository;
     private final LegalTicketMessageRepository legalTicketMessageRepository;
     private final DocumentRepository documentRepository;
@@ -44,12 +54,24 @@ public class AdminTicketManagementServiceImpl implements AdminTicketManagementSe
         if (ticket.getTicketType() == com.analyzer.api.enums.LegalTicketType.REFUND_REQUEST) {
             throw new ConflictException("REFUND_TICKET_ADMIN_ONLY");
         }
+        if (!ASSIGNABLE_STATUSES.contains(ticket.getStatus())) {
+            throw new ConflictException("INVALID_STATUS_TRANSITION");
+        }
         if (ticket.getAssignedLawyer() != null && !Boolean.TRUE.equals(request.getForceReassign())) {
             throw new ConflictException("Ticket đã được phân công cho Luật sư ID: " + ticket.getAssignedLawyer().getId());
         }
 
+        if (ticket.getAssignedLawyer() != null
+                && ticket.getAssignedLawyer().getId().equals(request.getLawyerId())) {
+            return legalTicketMapper.toResponse(ticket);
+        }
+
         User lawyer = userRepository.findById(request.getLawyerId())
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy Luật sư ID: " + request.getLawyerId()));
+
+        if (!lawyer.isActive() || lawyer.getRole() == null || lawyer.getRole().getName() != RoleName.EXPERT) {
+            throw new ConflictException("ASSIGNEE_MUST_BE_ACTIVE_EXPERT");
+        }
 
         ticket.setAssignedLawyer(lawyer);
         ticket.setAssignedAt(java.time.LocalDateTime.now());

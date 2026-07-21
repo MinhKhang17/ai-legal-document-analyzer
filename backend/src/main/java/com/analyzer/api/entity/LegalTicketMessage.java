@@ -30,6 +30,9 @@ public class LegalTicketMessage {
     @Column(name = "sender_role")
     private String senderRole;
 
+    @Column(name = "client_message_id", length = 100)
+    private String clientMessageId;
+
     @Column(columnDefinition = "TEXT", nullable = false)
     private String content;
 

@@ -3,9 +3,11 @@ package com.analyzer.api.service.admin.impl;
 import com.analyzer.api.dto.legalticket.AssignLawyerRequest;
 import com.analyzer.api.dto.legalticket.LegalTicketResponse;
 import com.analyzer.api.entity.LegalTicket;
+import com.analyzer.api.entity.Role;
 import com.analyzer.api.entity.User;
 import com.analyzer.api.enums.LegalTicketStatus;
 import com.analyzer.api.enums.LegalTicketType;
+import com.analyzer.api.enums.RoleName;
 import com.analyzer.api.exception.common.ConflictException;
 import com.analyzer.api.mapper.LegalTicketMapper;
 import com.analyzer.api.repository.DocumentRepository;
@@ -24,6 +26,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -47,7 +51,7 @@ class AdminTicketManagementServiceImplTest {
     @Test
     void adminAssignsExpertAndMovesPendingTicketToAssigned() {
         User customer = User.builder().id(10L).email("customer@example.com").firstName("Customer").build();
-        User expert = User.builder().id(20L).email("expert@example.com").firstName("Expert").build();
+        User expert = activeUser(20L, RoleName.EXPERT);
         LegalTicket ticket = LegalTicket.builder().id("ticket_1").createdBy(customer)
                 .ticketType(LegalTicketType.CONTACT_EXPERT).status(LegalTicketStatus.PENDING_ADMIN_REVIEW).build();
         AssignLawyerRequest request = new AssignLawyerRequest();
@@ -75,5 +79,59 @@ class AdminTicketManagementServiceImplTest {
         assertThatThrownBy(() -> service.assignLawyer("ticket_refund", 1L, new AssignLawyerRequest()))
                 .isInstanceOf(ConflictException.class)
                 .hasMessage("REFUND_TICKET_ADMIN_ONLY");
+    }
+
+    @Test
+    void nonExpertUserCannotBeAssigned() {
+        LegalTicket ticket = LegalTicket.builder().id("ticket_customer")
+                .ticketType(LegalTicketType.CONTACT_EXPERT).status(LegalTicketStatus.PENDING_ADMIN_REVIEW).build();
+        AssignLawyerRequest request = new AssignLawyerRequest();
+        request.setLawyerId(30L);
+        when(ticketRepository.findById("ticket_customer")).thenReturn(Optional.of(ticket));
+        when(userRepository.findById(30L)).thenReturn(Optional.of(activeUser(30L, RoleName.CUSTOMER)));
+
+        assertThatThrownBy(() -> service.assignLawyer("ticket_customer", 1L, request))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("ASSIGNEE_MUST_BE_ACTIVE_EXPERT");
+    }
+
+    @Test
+    void closedTicketCannotBeAssigned() {
+        LegalTicket ticket = LegalTicket.builder().id("ticket_closed")
+                .ticketType(LegalTicketType.CONTACT_EXPERT).status(LegalTicketStatus.CLOSED).build();
+        AssignLawyerRequest request = new AssignLawyerRequest();
+        request.setLawyerId(20L);
+        when(ticketRepository.findById("ticket_closed")).thenReturn(Optional.of(ticket));
+
+        assertThatThrownBy(() -> service.assignLawyer("ticket_closed", 1L, request))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("INVALID_STATUS_TRANSITION");
+    }
+
+    @Test
+    void reassigningSameExpertIsNoOp() {
+        User expert = activeUser(20L, RoleName.EXPERT);
+        LegalTicket ticket = LegalTicket.builder().id("ticket_same").assignedLawyer(expert)
+                .ticketType(LegalTicketType.CONTACT_EXPERT).status(LegalTicketStatus.IN_REVIEW).build();
+        AssignLawyerRequest request = new AssignLawyerRequest();
+        request.setLawyerId(20L);
+        when(ticketRepository.findById("ticket_same")).thenReturn(Optional.of(ticket));
+        when(mapper.toResponse(ticket)).thenReturn(new LegalTicketResponse());
+
+        service.reassignLawyer("ticket_same", 1L, request);
+
+        verify(ticketRepository, never()).save(ticket);
+        verifyNoInteractions(emailService);
+    }
+
+    private User activeUser(Long id, RoleName roleName) {
+        return User.builder()
+                .id(id)
+                .email(roleName.name().toLowerCase() + "@example.com")
+                .firstName(roleName.name())
+                .lastName("User")
+                .active(true)
+                .role(Role.builder().name(roleName).build())
+                .build();
     }
 }
