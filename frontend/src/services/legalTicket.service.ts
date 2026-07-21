@@ -19,7 +19,7 @@ import type {
   ConversationScope,
 } from "../types/legalTicket";
 import type { LegalTicketStatus } from "../types/legalTicketStatus";
-import type { LegalTicketType } from "../types/legalTicket";
+import type { LegalTicketRiskLevel, LegalTicketType } from "../types/legalTicket";
 import { normalizeLegalTicketStatus } from "../types/legalTicketStatus";
 import { buildAuthHeaders, requestApiData } from "./http";
 import { getAccessToken } from "./authSession";
@@ -175,7 +175,7 @@ export const getAdminLegalTickets = async (
   page = 0,
   size = 10,
   status?: LegalTicketStatus,
-  riskLevel?: string,
+  riskLevel?: LegalTicketRiskLevel,
   ticketType?: LegalTicketType,
 ): Promise<PageResponse<LegalTicket>> =>
   getJson<PageResponse<LegalTicket>>(

@@ -3,6 +3,8 @@ services:
     image: legal-rag-platform/frontend:dev
     build:
       context: ./frontend
+      args:
+        VITE_API_BASE_URL: ${FRONTEND_API_BASE_URL:-http://localhost:8080}
     ports:
       - "5173:80"
     environment:
