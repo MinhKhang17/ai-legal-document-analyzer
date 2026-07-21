@@ -1054,3 +1054,12 @@ BUILD SUCCESS
 - Tai lieu huong dan fallback bang `sessionStorage`, thu tu khoi phuc auth, giu return URL khi login,
   cau hinh payment-result URL tren deploy va checklist test.
 - Chi cap nhat tai lieu; khong sua frontend hoac business logic backend.
+
+---
+
+# Update History - 2026-07-21 - Public Refund Email Confirmation
+
+- Cho phep truy cap an danh bang GET vao hai endpoint xac nhan hoan tien tu email:
+  `/api/v1/subscriptions/refunds/confirm` va `/api/subscription/refunds/confirm`.
+- Sua loi `401 Unauthorized` xay ra tai security filter truoc khi token xac nhan duoc xu ly.
+- Khong mo quyen cho cac API tao, xem, duyet hoac hoan tat refund khac.
