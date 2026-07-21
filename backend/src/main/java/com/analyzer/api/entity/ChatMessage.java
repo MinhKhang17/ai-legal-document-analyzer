@@ -6,6 +6,7 @@ import com.analyzer.api.enums.ChatMessageType;
 import com.analyzer.api.enums.RiskLevel;
 import com.analyzer.api.enums.SuggestionType;
 import com.analyzer.api.enums.UserActionHint;
+import com.analyzer.api.enums.ChatMode;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -98,6 +99,10 @@ public class ChatMessage {
 
     @Column(name = "context_snapshot_json", columnDefinition = "TEXT")
     private String contextSnapshotJson;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "resolved_mode")
+    private ChatMode resolvedMode;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;

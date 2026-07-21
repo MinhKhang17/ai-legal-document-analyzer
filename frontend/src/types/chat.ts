@@ -55,6 +55,7 @@ export interface WorkspaceChatMessage {
   riskLevel: string | null;
   legalDomain: string | null;
   userActionHint: string | null;
+  resolvedMode?: ChatMode | null;
   promptTokens: number | null;
   completionTokens: number | null;
   totalTokens: number | null;
@@ -67,11 +68,22 @@ export interface WorkspaceChatConversation {
   chatSession: WorkspaceChatSession;
   userMessage: WorkspaceChatMessage;
   assistantMessage: WorkspaceChatMessage;
+  answer?: string;
+  resolvedMode?: ChatMode;
+  sources?: unknown[];
+  riskLevel?: string | null;
+  suggestionType?: string | null;
+  userActionHints?: string[];
+  assistantMessageId?: string;
 }
+
+export type ChatMode = 'AUTO' | 'LEGAL_QA' | 'DOCUMENT_ANALYSIS';
 
 export interface WorkspaceChatRequest {
   message: string;
   documentId?: string;
+  documentIds?: string[];
+  mode?: ChatMode;
 }
 
 export interface DeleteChatSessionResponse {
@@ -109,6 +121,7 @@ export interface ChatSessionDocument {
 }
 
 export type ChatFeedbackRating = 'THUMBS_UP' | 'THUMBS_DOWN';
+export type AiFeedbackType = 'LIKE' | 'DISLIKE';
 export type ChatFeedbackReason = 'INCORRECT' | 'WRONG_CITATION' | 'INCOMPLETE' | 'NOT_HELPFUL' | 'POOR_PHRASING' | 'OTHER';
 
 export interface ChatMessageFeedback {
@@ -121,6 +134,25 @@ export interface ChatMessageFeedback {
   submittedById: number;
   submittedByName: string;
   createdAt: string;
+  updatedAt?: string;
+  messageId?: string;
+  chatSessionId?: string;
+  feedbackType?: AiFeedbackType;
+  reason?: string | null;
+  userEmail?: string;
+  questionSnippet?: string | null;
+  answerSnippet?: string | null;
+  resolvedMode?: ChatMode | null;
+  riskLevel?: string | null;
+  sourceCount?: number;
+}
+
+export interface AiFeedbackSummary {
+  total: number;
+  likes: number;
+  dislikes: number;
+  likeRate: number;
+  dislikeRate: number;
 }
 
 export interface ShareChatSessionResponse { chatSessionId: string; shareToken: string; shareUrl: string; sharedAt: string; }

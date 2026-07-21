@@ -76,8 +76,11 @@ public class SecurityConfig {
                     .requestMatchers(
                             "/api/v1/payment-transactions/vnpay-return",
                             "/api/v1/payment-transactions/vnpay-ipn",
+                            "/api/v1/subscriptions/refunds/confirm",
+                            "/api/subscription/refunds/confirm",
                             "/api/internal/**",
-                            "/api/v1/workspaces/*/documents/*/download"
+                            "/api/v1/workspaces/*/documents/*/download",
+                            "/api/v1/workspaces/*/documents/system/download"
                     ).permitAll()
                     .requestMatchers(
                             "/v3/api-docs",

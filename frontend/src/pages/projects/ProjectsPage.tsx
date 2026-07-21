@@ -10,13 +10,14 @@ import { StatusBadge } from "../../components/common/StatusBadge";
 import { getWorkspaces } from "../../api/workspaceApi";
 import { useI18n } from "../../hooks/useI18n";
 import type { Workspace } from "../../types/workspace";
-import { formatDisplayDateTime } from "../../utils/format";
+import { formatDisplayDateTime, localeForLanguage } from "../../utils/format";
 
 import { getAccessToken as getSessionAccessToken } from "../../services/authSession";
 const getAccessToken = () => getSessionAccessToken() ?? "";
 
 export function ProjectsPage() {
   const { t, language } = useI18n();
+  const locale = localeForLanguage(language);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<"all" | "active">("all");
   const [view, setView] = useState<"grid" | "list">("grid");
@@ -36,9 +37,9 @@ export function ProjectsPage() {
         if (isMounted) {
           setWorkspaces(data);
         }
-      } catch (err) {
+      } catch {
         if (isMounted) {
-          setError(err instanceof Error ? err.message : t("workspace.loadError"));
+          setError(t("workspace.loadError"));
         }
       } finally {
         if (isMounted) {
@@ -52,7 +53,7 @@ export function ProjectsPage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [t]);
 
   const filteredWorkspaces = useMemo(
     () =>
@@ -66,7 +67,7 @@ export function ProjectsPage() {
 
   const columns: DataTableColumn<Workspace>[] = [
     {
-      header: "Workspace",
+      header: t("workspace.columnName"),
       cell: (workspace) => (
         <Link
           to={`/projects/${workspace.workspaceId}`}
@@ -77,7 +78,7 @@ export function ProjectsPage() {
       ),
     },
     {
-      header: "Description",
+      header: t("common.description"),
       cell: (workspace) => workspace.description || t("workspace.noDescription"),
     },
     {
@@ -87,7 +88,7 @@ export function ProjectsPage() {
     {
       header: t("workspace.createdAt"),
       cell: (workspace) =>
-        formatDisplayDateTime(workspace.createdAt, "-", language === "vi" ? "vi-VN" : "en-US"),
+        formatDisplayDateTime(workspace.createdAt, "-", locale),
     },
   ];
 
@@ -163,7 +164,7 @@ export function ProjectsPage() {
       </Card>
 
       {error && (
-        <div className="mb-lg rounded-xl border border-error/40 bg-error/10 p-md text-sm text-error">
+        <div role="alert" className="mb-lg rounded-xl border border-error/40 bg-error/10 p-md text-sm text-error">
           {error}
         </div>
       )}
@@ -195,7 +196,7 @@ export function ProjectsPage() {
             >
               <div className="flex items-start justify-between gap-md">
                 <div>
-                  <h2 className="text-title-lg font-semibold text-primary dark:text-inverse-primary">
+                  <h2 className="truncate text-title-lg font-semibold text-primary dark:text-inverse-primary" title={workspace.name}>
                     {workspace.name}
                   </h2>
                   <p className="mt-xs text-sm text-on-surface-variant dark:text-slate-400">
@@ -207,7 +208,7 @@ export function ProjectsPage() {
               <div className="mt-lg rounded-lg bg-surface-container-low p-md dark:bg-slate-800">
                 <p className="label-uppercase">{t("workspace.createdAt")}</p>
                 <p className="mt-xs text-sm">
-                  {formatDisplayDateTime(workspace.createdAt, "-", language === "vi" ? "vi-VN" : "en-US")}
+                  {formatDisplayDateTime(workspace.createdAt, "-", locale)}
                 </p>
               </div>
               <div className="mt-lg flex flex-wrap gap-sm">

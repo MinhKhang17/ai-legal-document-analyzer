@@ -60,6 +60,9 @@ public interface LegalTicketRepository extends JpaRepository<LegalTicket, String
     @EntityGraph(attributePaths = {"workspace", "document", "createdBy", "assignedLawyer"})
     Page<LegalTicket> findByStatusAndRiskLevelAndTicketTypeAndDeletedFalse(LegalTicketStatus status, RiskLevel riskLevel, LegalTicketType ticketType, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"assignedLawyer"})
+    List<LegalTicket> findByStatusInAndAssignedLawyerIsNotNullAndDeletedFalse(Collection<LegalTicketStatus> statuses);
+
     long countByCreatedByIdAndDeletedFalseAndCreatedAtBetween(Long createdById, LocalDateTime start, LocalDateTime end);
 
     long countByCreatedByIdAndDeletedFalseAndStatusNotInAndCreatedAtBetween(

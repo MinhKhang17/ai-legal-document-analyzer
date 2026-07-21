@@ -16,6 +16,7 @@ import com.analyzer.api.mapper.LegalTicketMapper;
 import com.analyzer.api.repository.*;
 import com.analyzer.api.service.LegalTicketService;
 import com.analyzer.api.service.EmailService;
+import com.analyzer.api.service.ExpertRevenueService;
 import com.analyzer.api.service.SubscriptionQuotaService;
 import com.analyzer.api.service.TicketCollaborationService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -55,6 +56,7 @@ public class LegalTicketServiceImpl implements LegalTicketService {
     private final EmailService emailService;
     private final TicketContextSnapshotRepository snapshotRepository;
     private final TicketCollaborationService collaborationService;
+    private final ExpertRevenueService expertRevenueService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
@@ -310,6 +312,7 @@ public class LegalTicketServiceImpl implements LegalTicketService {
 
         ticket.setStatus(LegalTicketStatus.CLOSED);
         ticket.setClosedAt(LocalDateTime.now());
+        expertRevenueService.applyCommissionSnapshot(ticket);
 
         String feedback = request != null && request.getFeedback() != null ? request.getFeedback() : "";
 

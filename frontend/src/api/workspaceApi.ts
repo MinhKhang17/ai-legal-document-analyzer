@@ -5,7 +5,10 @@ export {
   getWorkspaces,
   uploadDocument,
   downloadWorkspaceDocument,
+  deleteWorkspaceDocument,
 } from "../services/workspace.service";
+
+export { uploadDocumentAxios } from "../services/upload.service";
 
 export type {
   CreateWorkspaceRequest,

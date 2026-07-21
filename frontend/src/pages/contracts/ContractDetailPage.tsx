@@ -15,7 +15,7 @@ import {
   revertContractVersion,
 } from "../../services/contract.service";
 import type { ContractVersion, UserContract } from "../../types/contract";
-import { formatDisplayDate } from "../../utils/format";
+import { formatDisplayDate, localeForLanguage } from "../../utils/format";
 import { getSupportedContractTypeLabel } from "../../config/supportedContractTypes";
 
 const getStatusTone = (status?: string) => {
@@ -28,7 +28,7 @@ export function ContractDetailPage() {
   const { id = "" } = useParams();
   const { t, language } = useI18n();
   const toast = useToast();
-  const locale = language === "vi" ? "vi-VN" : "en-US";
+  const locale = localeForLanguage(language);
   const [contract, setContract] = useState<UserContract | null>(null);
   const [versions, setVersions] = useState<ContractVersion[]>([]);
   const [selectedVersionNo, setSelectedVersionNo] = useState("");
@@ -52,10 +52,7 @@ export function ContractDetailPage() {
       setContract(contractResult.value);
       setSelectedVersionNo(String(contractResult.value.currentVersionNo ?? ""));
     } else {
-      const message =
-        contractResult.reason instanceof Error
-          ? contractResult.reason.message
-          : t("contracts.loadDetailError");
+      const message = t("contracts.loadDetailError");
       setError(message);
       toast.error(message);
       setContract(null);
@@ -100,9 +97,8 @@ export function ContractDetailPage() {
       setReason("");
       toast.success(t("contracts.revertSuccess"));
       await loadContract();
-    } catch (revertError) {
-      const message =
-        revertError instanceof Error ? revertError.message : t("contracts.revertError");
+    } catch {
+      const message = t("contracts.revertError");
       setError(message);
       toast.error(message);
     } finally {
@@ -145,13 +141,13 @@ export function ContractDetailPage() {
       />
 
       {error && (
-        <div className="mb-lg rounded-xl border border-error/40 bg-error/10 p-md text-sm text-error">
+        <div role="alert" className="mb-lg rounded-xl border border-error/40 bg-error/10 p-md text-sm text-error">
           {error}
         </div>
       )}
 
       {loading ? (
-        <Card>{t("common.loading")}</Card>
+        <Card><p aria-live="polite">{t("common.loading")}</p></Card>
       ) : !contract ? (
         <EmptyState
           title={t("contracts.notFound")}
@@ -162,17 +158,13 @@ export function ContractDetailPage() {
           <main className="space-y-gutter">
             <Card
               title={contract.title}
-              subtitle={getSupportedContractTypeLabel(contract.contractType, language) ?? (language === "vi" ? "Ngoài phạm vi hỗ trợ" : "Outside supported scope")}
-              actions={<Badge tone={getStatusTone(contract.status)}>{contract.status}</Badge>}
+              subtitle={getSupportedContractTypeLabel(contract.contractType, language) ?? t("contracts.outsideSupportedScope")}
+              actions={<Badge tone={getStatusTone(contract.status)}>{t(`contracts.status.${contract.status || "UNKNOWN"}`)}</Badge>}
             >
               <dl className="grid gap-md text-sm md:grid-cols-2">
                 <div>
                   <dt className="label-uppercase">{t("contracts.workspace")}</dt>
                   <dd className="mt-xs">{contract.workspaceId}</dd>
-                </div>
-                <div>
-                  <dt className="label-uppercase">{t("contracts.template")}</dt>
-                  <dd className="mt-xs">{contract.templateId ?? "-"}</dd>
                 </div>
                 <div>
                   <dt className="label-uppercase">{t("contracts.currentVersion")}</dt>

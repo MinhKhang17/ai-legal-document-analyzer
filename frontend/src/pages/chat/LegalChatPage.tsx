@@ -35,12 +35,84 @@ import type { ChatMessage, ChatSessionDocument } from "../../types/chat";
 import type { Document, Workspace } from "../../types/workspace";
 import type { WorkspaceChatMessage, WorkspaceChatSession } from "../../types/chat";
 import type { AiCitation } from "../../types/aiFeature";
-import { formatDisplayDateTime } from "../../utils/format";
+import { formatDisplayDateTime, formatNumber, formatPercent } from "../../utils/format";
 import { simulateStreaming } from "../../utils/simulateStreaming";
 import { supportedContractScopeText } from "../../config/supportedContractTypes";
 
 import { getAccessToken as getSessionAccessToken } from "../../services/authSession";
 const getAccessToken = () => getSessionAccessToken() ?? "";
+
+type Translate = (key: string, params?: Record<string, string | number>) => string;
+
+const riskLevelLabelKeys: Record<string, string> = {
+  NONE: "risk.none",
+  LOW: "risk.low",
+  MEDIUM: "risk.medium",
+  HIGH: "risk.high",
+  CRITICAL: "risk.critical",
+  UNKNOWN: "risk.unknown",
+};
+
+const suggestionTypeLabelKeys: Record<string, string> = {
+  DIRECT_ANSWER: "chat.suggestionType.directAnswer",
+  ASK_UPLOAD_CONTRACT: "chat.suggestionType.askUploadContract",
+  ASK_CONTRACT_TYPE: "chat.suggestionType.askContractType",
+  ASK_USER_ROLE: "chat.suggestionType.askUserRole",
+  ASK_TARGET_CLAUSE: "chat.suggestionType.askTargetClause",
+  ASK_MORE_FACTS: "chat.suggestionType.askMoreFacts",
+  SUGGEST_REVISE_CLAUSE: "chat.suggestionType.suggestReviseClause",
+  SUGGEST_NEGOTIATION: "chat.suggestionType.suggestNegotiation",
+  REDIRECT_TO_SUPPORTED_SCOPE: "chat.suggestionType.redirectToSupportedScope",
+  REFUSE_AND_REDIRECT: "chat.suggestionType.refuseAndRedirect",
+  NONE: "chat.suggestionType.none",
+  ASK_MORE_INFO: "chat.suggestionType.askMoreInfo",
+  SUGGEST_LAWYER: "chat.suggestionType.suggestLawyer",
+  REQUIRE_LAWYER: "chat.suggestionType.requireLawyer",
+};
+
+const messageRoleLabelKeys: Record<string, string> = {
+  USER: "chat.role.user",
+  ASSISTANT: "chat.role.assistant",
+  SYSTEM: "chat.role.system",
+};
+
+const messageStatusLabelKeys: Record<string, string> = {
+  SENT: "status.sent",
+  PROCESSING: "status.processing",
+  COMPLETED: "status.completed",
+  FAILED: "status.failed",
+};
+
+const documentStatusLabelKeys: Record<string, string> = {
+  READY: "status.ready",
+  PROCESSING: "status.processing",
+  PENDING: "status.pending",
+  FAILED: "status.failed",
+};
+
+const citationSourceTypeLabelKeys: Record<string, string> = {
+  DOCUMENT: "chat.citationSource.document",
+  KNOWLEDGE_BASE: "chat.citationSource.knowledgeBase",
+  CONTRACT: "chat.citationSource.contract",
+  CHAT_MESSAGE: "chat.citationSource.chatMessage",
+  LEGAL_TICKET: "chat.citationSource.legalTicket",
+};
+
+const localizeEnumValue = (
+  value: string | null | undefined,
+  labelKeys: Record<string, string>,
+  t: Translate,
+) => {
+  if (!value) return "-";
+  const labelKey = labelKeys[value.trim().toUpperCase()];
+  return labelKey ? t(labelKey) : value;
+};
+
+const formatMegabytes = (bytes: number, locale: string) =>
+  `${new Intl.NumberFormat(locale, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(bytes / 1024 / 1024)} MB`;
 
 const formatTimestamp = (
   value: string | null | undefined,
@@ -96,7 +168,9 @@ const normalizedDocumentStatus = (status?: string) => (status ?? "").trim().toUp
 const isDocumentReady = (status?: string) => normalizedDocumentStatus(status) === "READY";
 const isDocumentFailed = (status?: string) => normalizedDocumentStatus(status) === "FAILED";
 
-function DocumentProcessingProgress({ status, language }: { status?: string; language: "en" | "vi" }) {
+function DocumentProcessingProgress({ status }: { status?: string }) {
+  const { t } = useI18n();
+
   if (isDocumentReady(status)) {
     return (
       <div className="mt-xs" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={100}>
@@ -104,7 +178,7 @@ function DocumentProcessingProgress({ status, language }: { status?: string; lan
           <div className="h-full w-full rounded-full bg-emerald-500" />
         </div>
         <p className="mt-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
-          {language === "vi" ? "Đã xử lý xong" : "Processing complete"}
+          {t("chat.documentProcessing.complete")}
         </p>
       </div>
     );
@@ -113,18 +187,18 @@ function DocumentProcessingProgress({ status, language }: { status?: string; lan
   if (isDocumentFailed(status)) {
     return (
       <p className="mt-xs text-[11px] font-medium text-error">
-        {language === "vi" ? "Xử lý thất bại — hãy bỏ file hoặc upload lại." : "Processing failed — remove or upload the file again."}
+        {t("chat.documentProcessing.failed")}
       </p>
     );
   }
 
   return (
-    <div className="mt-xs" role="progressbar" aria-label={language === "vi" ? "Tài liệu đang được xử lý" : "Document is processing"}>
+    <div className="mt-xs" role="progressbar" aria-label={t("chat.documentProcessing.ariaLabel")}>
       <div className="h-1.5 overflow-hidden rounded-full bg-amber-100 dark:bg-amber-950/50">
         <div className="h-full w-2/3 animate-pulse rounded-full bg-amber-500" />
       </div>
       <p className="mt-1 text-[11px] font-medium text-amber-700 dark:text-amber-300">
-        {language === "vi" ? "AI đang xử lý, bạn có thể rời trang." : "AI is processing; you may leave this page."}
+        {t("chat.documentProcessing.hint")}
       </p>
     </div>
   );
@@ -178,6 +252,8 @@ export function LegalChatPage() {
   const [documentActionError, setDocumentActionError] = useState("");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [messageCitations, setMessageCitations] = useState<AiCitation[]>([]);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [sessionToDelete, setSessionToDelete] = useState<WorkspaceChatSession | null>(null);
   const chatScrollContainerRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
   const activeRequestControllerRef = useRef<AbortController | null>(null);
@@ -243,9 +319,9 @@ export function LegalChatPage() {
             setSearchParams({ workspaceId: matchedWorkspace.workspaceId });
           }
         }
-      } catch (err) {
+      } catch {
         if (active) {
-          setError(err instanceof Error ? err.message : t("chat.loadWorkspaceError"));
+          setError(t("chat.loadWorkspaceError"));
         }
       } finally {
         if (active) {
@@ -259,7 +335,7 @@ export function LegalChatPage() {
     return () => {
       active = false;
     };
-  }, [searchParams, setSearchParams]);
+  }, [searchParams, setSearchParams, t]);
 
   useEffect(() => {
     if (!selectedWorkspaceId) {
@@ -310,9 +386,9 @@ export function LegalChatPage() {
           const nextParams: Record<string, string> = { workspaceId: selectedWorkspaceId };
           setSearchParams(nextParams);
         }
-      } catch (err) {
+      } catch {
         if (active) {
-          setError(err instanceof Error ? err.message : t("chat.loadWorkspaceDataError"));
+          setError(t("chat.loadWorkspaceDataError"));
         }
       } finally {
         if (active) {
@@ -326,7 +402,7 @@ export function LegalChatPage() {
     return () => {
       active = false;
     };
-  }, [searchParams, selectedWorkspaceId, setSearchParams]);
+  }, [searchParams, selectedWorkspaceId, setSearchParams, t]);
 
   useEffect(() => {
     if (!selectedSessionId) {
@@ -347,9 +423,9 @@ export function LegalChatPage() {
 
         if (!active) return;
         setMessages(data.items.map((message) => toDisplayMessage(message, language, t("common.justNow"))));
-      } catch (err) {
+      } catch {
         if (active) {
-          setError(err instanceof Error ? err.message : t("chat.loadHistoryError"));
+          setError(t("chat.loadHistoryError"));
         }
       }
     };
@@ -359,7 +435,7 @@ export function LegalChatPage() {
     return () => {
       active = false;
     };
-  }, [language, selectedSessionId]);
+  }, [language, selectedSessionId, t]);
 
   useEffect(() => {
     if (!selectedSessionId) {
@@ -376,8 +452,8 @@ export function LegalChatPage() {
         if (items.some((item) => !["READY", "FAILED"].includes(normalizedDocumentStatus(item.uploadStatus)))) {
           timer = setTimeout(loadAttached, 3000);
         }
-      } catch (err) {
-        if (active) setDocumentActionError(err instanceof Error ? err.message : "Khong the tai tai lieu dinh kem");
+      } catch {
+        if (active) setDocumentActionError(t("chat.documents.loadAttachedError"));
       }
     };
     void loadAttached();
@@ -385,7 +461,7 @@ export function LegalChatPage() {
       active = false;
       if (timer) clearTimeout(timer);
     };
-  }, [selectedSessionId]);
+  }, [selectedSessionId, t]);
 
   useEffect(() => {
     const container = chatScrollContainerRef.current;
@@ -427,8 +503,8 @@ export function LegalChatPage() {
         workspaceId: selectedWorkspaceId,
         sessionId: session.chatSessionId,
       });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : t("chat.sessionCreateError");
+    } catch {
+      const message = t("chat.sessionCreateError");
       setError(message);
       toast.error(message, t("toast.errorTitle"));
       return;
@@ -455,8 +531,8 @@ export function LegalChatPage() {
       setChatSessions((previous) =>
         previous.map((item) => (item.chatSessionId === detail.chatSessionId ? detail : item)),
       );
-    } catch (err) {
-      const message = err instanceof Error ? err.message : t("chat.sessionCreateError");
+    } catch {
+      const message = t("chat.sessionCreateError");
       setSessionActionError(message);
       toast.error(message, t("toast.errorTitle"));
     }
@@ -486,8 +562,8 @@ export function LegalChatPage() {
       setRenameTitle("");
       setSessionActionMessage(t("chat.sessionRenamed"));
       toast.success(t("chat.sessionRenamed"), t("toast.successTitle"));
-    } catch (err) {
-      const message = err instanceof Error ? err.message : t("chat.sessionRenameError");
+    } catch {
+      const message = t("chat.sessionRenameError");
       setSessionActionError(message);
       toast.error(message, t("toast.errorTitle"));
     } finally {
@@ -495,10 +571,17 @@ export function LegalChatPage() {
     }
   };
 
-  const handleDeleteSession = async (chatSessionId: string) => {
-    if (!window.confirm(t("chat.sessionDeleteConfirm"))) {
-      return;
+  const handleDeleteSessionClick = (chatSessionId: string) => {
+    const session = chatSessions.find((s) => s.chatSessionId === chatSessionId);
+    if (session) {
+      setSessionToDelete(session);
+      setIsDeleteModalOpen(true);
     }
+  };
+
+  const handleConfirmDeleteSession = async () => {
+    if (!sessionToDelete) return;
+    const chatSessionId = sessionToDelete.chatSessionId;
 
     setSessionActionBusyId(chatSessionId);
     setSessionActionError("");
@@ -526,12 +609,14 @@ export function LegalChatPage() {
 
       setSessionActionMessage(t("chat.sessionDeleted"));
       toast.success(t("chat.sessionDeleted"), t("toast.successTitle"));
-    } catch (err) {
-      const message = err instanceof Error ? err.message : t("chat.sessionDeleteError");
+    } catch {
+      const message = t("chat.sessionDeleteError");
       setSessionActionError(message);
       toast.error(message, t("toast.errorTitle"));
     } finally {
       setSessionActionBusyId("");
+      setIsDeleteModalOpen(false);
+      setSessionToDelete(null);
     }
   };
 
@@ -541,7 +626,7 @@ export function LegalChatPage() {
     if (normalizedMessage.includes("AI_ANALYSIS_NOT_FOUND") || normalizedMessage.includes("ANALYSIS_NOT_FOUND")) {
       return t("chat.ticketMissingAnalysis");
     }
-    return err.message || t("chat.ticketCreateError");
+    return t("chat.ticketCreateError");
   };
 
   const handleCreateTicket = (assistantMessage: DisplayMessage, userMessage?: DisplayMessage) => {
@@ -602,8 +687,8 @@ export function LegalChatPage() {
       } else {
         setError(t("common.partialDataError"));
       }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : t("chat.messageDetailError");
+    } catch {
+      const message = t("chat.messageDetailError");
       setError(message);
       toast.error(message, t("toast.errorTitle"));
     } finally {
@@ -618,7 +703,7 @@ export function LegalChatPage() {
 
   const handleOpenDocumentModal = async () => {
     if (!selectedWorkspaceId) {
-      toast.warning(language === "vi" ? "Vui lòng chọn workspace trước." : "Select a workspace first.");
+      toast.warning(t("chat.pickWorkspaceFirst"));
       return;
     }
     setOpeningDocumentModal(true);
@@ -629,7 +714,7 @@ export function LegalChatPage() {
         const session = await createChatSession(
           getAccessToken(),
           selectedWorkspaceId,
-          language === "vi" ? "Phiên làm việc mới" : "New conversation",
+          t("chat.newConversation"),
         );
         sessionId = session.chatSessionId;
         setChatSessions((current) => [session, ...current]);
@@ -637,8 +722,8 @@ export function LegalChatPage() {
       setSelectedSessionId(sessionId);
       setSearchParams({ workspaceId: selectedWorkspaceId, sessionId });
       setDocumentModalOpen(true);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Không thể mở trình thêm tài liệu";
+    } catch {
+      const message = t("chat.documents.openModalError");
       setError(message);
       toast.error(message);
     } finally {
@@ -653,9 +738,9 @@ export function LegalChatPage() {
     try {
       await attachChatSessionDocument(getAccessToken(), selectedSessionId, documentId);
       await refreshAttachedDocuments();
-      toast.success(language === "vi" ? "Da them tai lieu vao phien chat." : "Document attached.");
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Khong the them tai lieu";
+      toast.success(t("chat.documents.attachedSuccess"));
+    } catch {
+      const message = t("chat.documents.attachError");
       setDocumentActionError(message);
       toast.error(message);
     } finally {
@@ -673,10 +758,10 @@ export function LegalChatPage() {
       await attachChatSessionDocument(getAccessToken(), selectedSessionId, uploaded.documentId);
       await refreshAttachedDocuments();
       setUploadFile(null);
-      toast.success(language === "vi" ? "Da upload va them tai lieu. He thong dang xu ly file." : "Uploaded and attached. Processing started.");
+      toast.success(t("chat.documents.uploadedAttachedSuccess"));
     } catch (err) {
-      const raw = err instanceof Error ? err.message : "Upload that bai";
-      const message = /quota|storage|limit/i.test(raw) ? (language === "vi" ? "Quota da het. Vui long nang cap goi hoac xoa bot tai lieu." : "Quota is exhausted.") : raw;
+      const raw = err instanceof Error ? err.message : t("chat.documents.uploadError");
+      const message = /quota|storage|limit/i.test(raw) ? t("chat.documents.quotaExhausted") : t("chat.documents.uploadError");
       setDocumentActionError(message);
       toast.error(message);
     } finally {
@@ -690,9 +775,9 @@ export function LegalChatPage() {
     try {
       await detachChatSessionDocument(getAccessToken(), selectedSessionId, documentId);
       setAttachedDocuments((current) => current.filter((item) => item.documentId !== documentId));
-      toast.success(language === "vi" ? "Đã bỏ tài liệu khỏi phiên chat." : "Document detached from chat.");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Khong the go tai lieu");
+      toast.success(t("chat.documents.detachedSuccess"));
+    } catch {
+      toast.error(t("chat.documents.detachError"), t("toast.errorTitle"));
     } finally {
       setDocumentActionBusy(false);
     }
@@ -706,8 +791,8 @@ export function LegalChatPage() {
       anchor.download = document.originalFileName;
       anchor.click();
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Khong the tai tai lieu");
+    } catch {
+      toast.error(t("chat.documents.downloadError"), t("toast.errorTitle"));
     }
   };
 
@@ -734,8 +819,8 @@ export function LegalChatPage() {
 
     if (chatBlockedByAttachedDocuments) {
       const message = failedAttachedDocuments.length > 0
-        ? (language === "vi" ? "Có tài liệu đính kèm xử lý thất bại. Hãy bỏ tài liệu đó hoặc upload lại trước khi chat." : "An attached document failed processing. Remove it or upload it again before chatting.")
-        : (language === "vi" ? "Vui lòng đợi tất cả tài liệu đính kèm xử lý xong trước khi chat." : "Please wait until all attached documents finish processing before chatting.");
+        ? t("chat.documents.failedBlockMessage")
+        : t("chat.documents.processingBlockMessage");
       setError(message);
       toast.error(message);
       return;
@@ -755,7 +840,7 @@ export function LegalChatPage() {
         content: "",
         timestamp: formatTimestamp(null, language, t("common.justNow")),
         status: "thinking",
-        statusMessage: language === "vi" ? "Đang phân tích câu hỏi và nguồn tài liệu…" : "Analyzing your question and sources…",
+        statusMessage: t("chat.status.analyzing"),
       },
     ]);
     setInput("");
@@ -817,12 +902,12 @@ export function LegalChatPage() {
           ? {
               ...item,
               status: "cancelled",
-              statusMessage: language === "vi" ? "Đã dừng trả lời." : "Response stopped.",
+              statusMessage: t("chat.status.stopped"),
             }
           : item));
         return;
       }
-      const message = err instanceof Error ? err.message : t("chat.messageSendError");
+      const message = t("chat.messageSendError");
       setError(message);
       setMessages((previous) => previous.map((item) => item.id === assistantMessageId
         ? { ...item, status: "error", errorMessage: message }
@@ -842,10 +927,15 @@ export function LegalChatPage() {
   };
 
   return (
-    <div>
+    <div className="flex min-h-0 flex-col lg:h-full lg:flex-1">
       <PageHeader
-        title={`${language === "vi" ? "Phiên chat" : "Chat session"}: ${selectedSession?.title ?? (language === "vi" ? "Cuộc trò chuyện mới" : "New conversation")}`}
-        subtitle={`${language === "vi" ? "Dự án" : "Workspace"}: ${selectedWorkspace?.name ?? "—"}`}
+        title={t("chat.pageTitle", {
+          title: selectedSession?.title ?? t("chat.newConversation"),
+        })}
+        subtitle={t("chat.workspaceContext", {
+          workspace: selectedWorkspace?.name ?? "—",
+        })}
+        className="mb-md shrink-0"
         actions={
           <>
             {selectedSessionId && (
@@ -853,20 +943,20 @@ export function LegalChatPage() {
                 variant="secondary"
                 leftIcon={<Download className="h-4 w-4" />}
                 disabled={!canExportMarkdown || exportingMarkdown}
-                title={!canExportMarkdown ? (language === "vi" ? "Phiên chưa có kết quả phân tích để xuất" : "No analysis content to export") : undefined}
+                title={!canExportMarkdown ? t("chat.exportUnavailable") : undefined}
                 onClick={async () => {
                   setExportingMarkdown(true);
                   try {
                     await exportChatSessionMarkdown(getAccessToken(), selectedSessionId);
-                    toast.success(language === "vi" ? "Đã tải bản phân tích Markdown." : "Markdown analysis downloaded.");
-                  } catch (exportError) {
-                    toast.error(exportError instanceof Error ? exportError.message : "Unable to export Markdown.");
+                    toast.success(t("chat.exportSuccess"));
+                  } catch {
+                    toast.error(t("chat.exportError"), t("toast.errorTitle"));
                   } finally {
                     setExportingMarkdown(false);
                   }
                 }}
               >
-                {exportingMarkdown ? (language === "vi" ? "Đang xuất…" : "Exporting…") : "Export Markdown"}
+                {exportingMarkdown ? t("chat.exporting") : t("chat.exportMarkdown")}
               </Button>
             )}
             {selectedSessionId && (
@@ -880,15 +970,15 @@ export function LegalChatPage() {
                     const shared = await shareChatSession(getAccessToken(), selectedSessionId);
                     setShareUrl(shared.shareUrl);
                     await navigator.clipboard.writeText(shared.shareUrl);
-                    toast.success(language === "vi" ? "Đã sao chép liên kết chia sẻ." : "Share link copied.");
-                  } catch (shareError) {
-                    toast.error(shareError instanceof Error ? shareError.message : "Unable to share chat.");
+                    toast.success(t("chat.shareSuccess"));
+                  } catch {
+                    toast.error(t("chat.shareError"), t("toast.errorTitle"));
                   } finally {
                     setSharing(false);
                   }
                 }}
               >
-                {language === "vi" ? "Chia sẻ" : "Share"}
+                {t("actions.share")}
               </Button>
             )}
             <Button
@@ -916,24 +1006,24 @@ export function LegalChatPage() {
       />
 
       {error && (
-        <div className="mb-lg rounded-xl border border-error/40 bg-error/10 p-md text-sm text-error">
+        <div className="mb-md shrink-0 rounded-xl border border-error/40 bg-error/10 p-md text-sm text-error" role="alert">
           {error}
         </div>
       )}
 
-      <div className="grid gap-md xl:grid-cols-[minmax(0,1fr)_60px]">
-        {activeDrawer && <button type="button" aria-label={language === "vi" ? "Đóng bảng thông tin" : "Close drawer"} className="fixed inset-0 z-30 bg-slate-950/30" onClick={() => setActiveDrawer(null)} />}
+      <div className="grid min-h-0 flex-1 gap-md md:grid-cols-[minmax(0,1fr)_60px]">
+        {activeDrawer && <button type="button" aria-label={t("chat.drawer.close")} className="fixed inset-0 z-30 bg-slate-950/30" onClick={() => setActiveDrawer(null)} />}
         <aside className={`fixed inset-y-0 right-0 z-40 w-[min(400px,calc(100vw-24px))] overflow-y-auto border-l border-legal-border bg-white p-md shadow-2xl transition-transform dark:border-slate-700 dark:bg-slate-950 ${activeDrawer ? "translate-x-0" : "translate-x-full"}`}>
-          <div className="mb-md flex items-center justify-between"><p className="font-semibold">{activeDrawer === "session" ? (language === "vi" ? "Thông tin phiên chat" : "Chat information") : activeDrawer === "documents" ? (language === "vi" ? "Tài liệu workspace" : "Workspace documents") : (language === "vi" ? "Tùy chọn trò chuyện" : "Chat options")}</p><Button size="icon" variant="ghost" aria-label={t("actions.close")} onClick={() => setActiveDrawer(null)}><X className="h-5 w-5" /></Button></div>
-          <Card className={activeDrawer === "session" ? "" : "hidden"} title={language === "vi" ? "Thông tin phiên chat" : "Chat session information"}>
+          <div className="mb-md flex items-center justify-between"><p className="font-semibold">{activeDrawer === "session" ? t("chat.drawer.session") : activeDrawer === "documents" ? t("chat.drawer.documents") : t("chat.drawer.options")}</p><Button size="icon" variant="ghost" aria-label={t("actions.close")} onClick={() => setActiveDrawer(null)}><X className="h-5 w-5" /></Button></div>
+          <Card className={activeDrawer === "session" ? "" : "hidden"} title={t("chat.drawer.sessionInformation")}>
             <div className="space-y-md">
               <dl className="space-y-sm text-sm">
-                <div className="flex justify-between gap-md"><dt className="text-on-surface-variant">ID phiên chat</dt><dd className="max-w-40 truncate font-medium" title={selectedSessionId}>{selectedSessionId || "—"}</dd></div>
-                <div className="flex justify-between gap-md"><dt className="text-on-surface-variant">{language === "vi" ? "Dự án" : "Workspace"}</dt><dd className="text-right font-medium">{selectedWorkspace?.name ?? "—"}</dd></div>
-                <div className="flex justify-between gap-md"><dt className="text-on-surface-variant">{language === "vi" ? "Tạo lúc" : "Created"}</dt><dd className="text-right font-medium">{selectedSession ? formatDisplayDateTime(selectedSession.createdAt, locale) : "—"}</dd></div>
-                <div className="flex justify-between gap-md"><dt className="text-on-surface-variant">{language === "vi" ? "Cập nhật cuối" : "Last update"}</dt><dd className="text-right font-medium">{selectedSession ? formatDisplayDateTime(selectedSession.updatedAt, locale) : "—"}</dd></div>
+                <div className="flex justify-between gap-md"><dt className="text-on-surface-variant">{t("chat.sessionIdLabel")}</dt><dd className="max-w-40 truncate font-medium" title={selectedSessionId}>{selectedSessionId || "—"}</dd></div>
+                <div className="flex justify-between gap-md"><dt className="text-on-surface-variant">{t("chatHistory.workspaceFilter")}</dt><dd className="text-right font-medium">{selectedWorkspace?.name ?? "—"}</dd></div>
+                <div className="flex justify-between gap-md"><dt className="text-on-surface-variant">{t("workspace.createdAt")}</dt><dd className="text-right font-medium">{selectedSession ? formatDisplayDateTime(selectedSession.createdAt, "—", locale) : "—"}</dd></div>
+                <div className="flex justify-between gap-md"><dt className="text-on-surface-variant">{t("chatHistory.lastUpdated")}</dt><dd className="text-right font-medium">{selectedSession ? formatDisplayDateTime(selectedSession.updatedAt, "—", locale) : "—"}</dd></div>
               </dl>
-              <p className="label-uppercase">{language === "vi" ? "Chuyển dự án" : "Switch workspace"}</p>
+              <p className="label-uppercase">{t("chat.switchWorkspace")}</p>
               <select
                 className="form-field"
                 value={selectedWorkspaceId}
@@ -975,19 +1065,19 @@ export function LegalChatPage() {
                       className="text-sm font-semibold text-primary hover:underline dark:text-inverse-primary"
                       to={`/projects/${selectedWorkspace.workspaceId}`}
                     >
-                      Open detail
+                      {t("actions.viewDetails")}
                     </Link>
                   </div>
                 </div>
               ) : (
                 <p className="text-sm text-on-surface-variant dark:text-slate-400">
-                  Create a workspace first or choose one with uploaded documents.
+                  {t("chat.createWorkspaceFirst")}
                 </p>
               )}
             </div>
           </Card>
 
-          <Card className={activeDrawer === "documents" ? "" : "hidden"} title={t("chat.documentsInWorkspace")} actions={<Button size="sm" leftIcon={<Paperclip className="h-4 w-4" />} disabled={!selectedWorkspaceId || openingDocumentModal} onClick={() => void handleOpenDocumentModal()}>{openingDocumentModal ? (language === "vi" ? "Đang mở…" : "Opening…") : (language === "vi" ? "Thêm tài liệu" : "Add document")}</Button>}>
+          <Card className={activeDrawer === "documents" ? "" : "hidden"} title={t("chat.documentsInWorkspace")} actions={<Button size="sm" leftIcon={<Paperclip className="h-4 w-4" />} disabled={!selectedWorkspaceId || openingDocumentModal} onClick={() => void handleOpenDocumentModal()}>{openingDocumentModal ? t("chat.documents.opening") : t("chat.documents.add")}</Button>}>
             <div className="space-y-md">
               {loadingContext && (
                 <p className="text-sm text-on-surface-variant dark:text-slate-400">
@@ -997,8 +1087,8 @@ export function LegalChatPage() {
 
               {attachedDocuments.length === 0 && !loadingContext ? (
                 <div className="rounded-lg border border-dashed border-outline-variant p-md text-sm text-on-surface-variant dark:border-slate-700 dark:text-slate-400">
-                  <p className="font-semibold text-on-surface dark:text-slate-200">{language === "vi" ? "Đang hỏi đáp bằng kho tri thức hệ thống" : "Using the system knowledge base"}</p>
-                  <p className="mt-xs">{language === "vi" ? "Bạn có thể hỏi kiến thức pháp lý do admin đã công khai, hoặc nhấn “Thêm tài liệu” để hỏi theo tài liệu riêng." : "Ask about legal knowledge published by admins, or select Add document to include your own documents."}</p>
+                  <p className="font-semibold text-on-surface dark:text-slate-200">{t("chat.systemKnowledge.title")}</p>
+                  <p className="mt-xs">{t("chat.systemKnowledge.description")}</p>
                 </div>
               ) : (
                 attachedDocuments.map((document) => (
@@ -1012,15 +1102,15 @@ export function LegalChatPage() {
                           {document.originalFileName}
                         </p>
                         <p className="text-sm text-on-surface-variant dark:text-slate-400">
-                          {(document.size / 1024 / 1024).toFixed(2)} MB · {document.contentType || "-"}
+                          {formatMegabytes(document.size, locale)} · {document.contentType || "-"}
                         </p>
                       </div>
                     </div>
                     <div className="mt-md flex items-center justify-between gap-sm">
-                      <Badge tone={document.uploadStatus.toUpperCase() === "READY" ? "green" : document.uploadStatus.toUpperCase() === "FAILED" ? "red" : "amber"}>{document.uploadStatus}</Badge>
-                      <Button size="sm" variant="danger" leftIcon={<Trash2 className="h-4 w-4" />} disabled={documentActionBusy} onClick={() => void handleDetachDocument(document.documentId)}>{language === "vi" ? "Bỏ tài liệu" : "Remove document"}</Button>
+                      <Badge tone={document.uploadStatus.toUpperCase() === "READY" ? "green" : document.uploadStatus.toUpperCase() === "FAILED" ? "red" : "amber"}>{localizeEnumValue(document.uploadStatus, documentStatusLabelKeys, t)}</Badge>
+                      <Button size="sm" variant="danger" leftIcon={<Trash2 className="h-4 w-4" />} disabled={documentActionBusy} onClick={() => void handleDetachDocument(document.documentId)}>{t("chat.documents.remove")}</Button>
                     </div>
-                    <DocumentProcessingProgress status={document.uploadStatus} language={language} />
+                    <DocumentProcessingProgress status={document.uploadStatus} />
                   </article>
                 ))
               )}
@@ -1107,7 +1197,7 @@ export function LegalChatPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            aria-label={language === "vi" ? `Mở thao tác cho ${session.title}` : `Open actions for ${session.title}`}
+                            aria-label={t("chat.openSessionActions", { title: session.title })}
                             aria-expanded={sessionMenuOpenId === session.chatSessionId}
                             onClick={() => setSessionMenuOpenId((current) => current === session.chatSessionId ? "" : session.chatSessionId)}
                           >
@@ -1134,7 +1224,7 @@ export function LegalChatPage() {
                                 disabled={sessionActionBusyId === session.chatSessionId}
                                 onClick={() => {
                                   setSessionMenuOpenId("");
-                                  void handleDeleteSession(session.chatSessionId);
+                                  handleDeleteSessionClick(session.chatSessionId);
                                 }}
                               >
                                 <Trash2 className="h-4 w-4" />{t("chat.deleteSession")}
@@ -1152,29 +1242,63 @@ export function LegalChatPage() {
 
         </aside>
 
+
         <section className="order-1 min-w-0 space-y-gutter">
           <Card
             className="relative flex min-h-[680px] flex-col overflow-hidden border-legal-border p-0 xl:h-[calc(100vh-3rem)] xl:max-h-[900px]"
           >
             <div className="border-b border-legal-border bg-white p-md dark:border-slate-700 dark:bg-slate-900">
               <div className="mb-sm flex items-center justify-between gap-md">
-                <p className="text-sm font-semibold">{language === "vi" ? `Tài liệu đang sử dụng trong phiên chat (${attachedDocuments.length})` : `Documents used in this chat (${attachedDocuments.length})`}</p>
-                <Badge tone="gold">RAG</Badge>
+                <p className="text-sm font-semibold">{t("chat.documents.usedCount", { count: formatNumber(attachedDocuments.length, locale) })}</p>
+                <Badge tone={attachedDocuments.length > 0 ? "blue" : "green"}>
+                  {attachedDocuments.length > 0
+                    ? (language === "vi" ? "Phân tích tài liệu" : "Document analysis")
+                    : (language === "vi" ? "Hỏi đáp pháp luật" : "Legal Q&A")}
+                </Badge>
               </div>
-              <div className="flex gap-sm overflow-x-auto pb-xs">
+              <div className="mt-sm flex gap-sm overflow-x-auto pb-xs">
                 {attachedDocuments.map((document) => (
-                  <div key={document.documentId} className="min-w-[240px] max-w-[300px] flex-1 rounded-xl border border-legal-border bg-surface-container-low p-sm dark:border-slate-700 dark:bg-slate-800">
+                  <article key={document.documentId} className="min-w-[min(17rem,78vw)] max-w-[19rem] flex-1 rounded-lg border border-legal-border bg-surface-container-low p-sm dark:border-slate-700 dark:bg-slate-800">
                     <div className="flex items-center gap-sm">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-50 text-error dark:bg-red-950/40"><FileText className="h-5 w-5" /></div>
-                      <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold" title={document.originalFileName}>{document.originalFileName}</p><p className="text-xs text-on-surface-variant">{(document.size / 1024 / 1024).toFixed(2)} MB</p></div>
-                      <button type="button" className="rounded-md p-xs text-on-surface-variant hover:bg-surface-container-high hover:text-error" aria-label="Detach document" disabled={documentActionBusy} onClick={() => void handleDetachDocument(document.documentId)}><X className="h-4 w-4" /></button>
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary dark:bg-slate-700 dark:text-inverse-primary"><FileText className="h-4 w-4" aria-hidden="true" /></div>
+                      <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold" title={document.originalFileName}>{document.originalFileName}</p><p className="truncate text-xs text-on-surface-variant dark:text-slate-400">{formatMegabytes(document.size, locale)}</p></div>
+                      <button type="button" className="shrink-0 rounded-md p-xs text-on-surface-variant transition hover:bg-surface-container-high hover:text-error disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-400 dark:hover:bg-slate-700" aria-label={t("chat.documents.detachAria", { name: document.originalFileName })} disabled={documentActionBusy} onClick={() => void handleDetachDocument(document.documentId)}><X className="h-4 w-4" aria-hidden="true" /></button>
                     </div>
-                    <DocumentProcessingProgress status={document.uploadStatus} language={language} />
-                  </div>
+                    <DocumentProcessingProgress status={document.uploadStatus} />
+                  </article>
                 ))}
-                <button type="button" onClick={() => void handleOpenDocumentModal()} disabled={!selectedWorkspaceId || openingDocumentModal} className="flex min-h-16 shrink-0 items-center justify-center gap-sm rounded-xl border border-dashed border-primary/40 bg-primary/5 px-md text-sm font-semibold text-primary transition hover:bg-primary/10 disabled:opacity-50"><Plus className="h-4 w-4" />{language === "vi" ? "Thêm tài liệu" : "Add document"}</button>
+                <button
+                  type="button"
+                  onClick={() => void handleOpenDocumentModal()}
+                  disabled={!selectedWorkspaceId || openingDocumentModal}
+                  className="group flex min-w-[min(15rem,78vw)] max-w-[17rem] shrink-0 items-center gap-sm rounded-lg border border-outline-variant bg-surface-container-low px-sm py-sm text-left text-primary transition hover:border-primary/50 hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-inverse-primary dark:hover:border-inverse-primary/50 dark:hover:bg-slate-700"
+                  aria-describedby="chat-add-document-hint"
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-white shadow-sm transition group-hover:bg-primary-container dark:bg-inverse-primary dark:text-slate-950">
+                    {openingDocumentModal ? <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Plus className="h-4 w-4" aria-hidden="true" />}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold">{openingDocumentModal ? t("chat.documents.opening") : t("chat.documents.add")}</span>
+                    <span id="chat-add-document-hint" className="block truncate text-xs font-normal text-on-surface-variant dark:text-slate-400">{t("chat.documents.addHint")}</span>
+                  </span>
+                </button>
               </div>
-              <div className={`mt-sm flex items-center gap-sm rounded-lg px-md py-sm text-xs font-medium ${chatBlockedByAttachedDocuments ? "bg-amber-50 text-amber-800 dark:bg-amber-950/30 dark:text-amber-200" : "bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-200"}`}><Bot className="h-4 w-4 shrink-0" /><span className="min-w-0 flex-1">{chatBlockedByAttachedDocuments ? (failedAttachedDocuments.length > 0 ? (language === "vi" ? "Chat đang khóa vì có tài liệu xử lý thất bại. Hãy bỏ tài liệu đó hoặc upload lại." : "Chat is blocked because an attached document failed processing. Remove it or upload it again.") : (language === "vi" ? `Đang xử lý ${unavailableAttachedDocuments.length} tài liệu đính kèm. Chat sẽ mở khi tất cả tài liệu sẵn sàng.` : `Processing ${unavailableAttachedDocuments.length} attached document(s). Chat will unlock when all are ready.`)) : attachedDocuments.length > 0 ? (language === "vi" ? `AI đang trả lời dựa trên ${attachedDocuments.length} tài liệu đã chọn và kiến thức pháp luật được cập nhật.` : `AI is answering from ${attachedDocuments.length} selected document(s) and the published legal knowledge base.`) : (language === "vi" ? "Không có tài liệu đính kèm: AI đang trả lời bằng kho tri thức pháp luật do admin công khai." : "No documents attached: AI is answering from the admin-published legal knowledge base.")}</span><button type="button" className="shrink-0 font-semibold hover:underline" onClick={() => setActiveDrawer("documents")}>{language === "vi" ? "Xem nguồn" : "View sources"}</button></div>
+              {documentActionError && !documentModalOpen && <p className="mt-sm rounded-lg bg-error/10 px-sm py-xs text-xs font-medium text-error" role="alert">{documentActionError}</p>}
+            </div>
+            <div className={`flex shrink-0 flex-col gap-sm rounded-lg border px-sm py-sm text-xs font-medium sm:flex-row sm:items-center ${chatBlockedByAttachedDocuments ? "border-amber-200 bg-amber-50/70 text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200" : "border-primary/15 bg-primary/5 text-primary dark:border-inverse-primary/20 dark:bg-blue-950/20 dark:text-blue-200"}`}>
+              <div className="flex min-w-0 flex-1 items-start gap-sm">
+                <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/70 dark:bg-slate-900/60"><Bot className="h-3.5 w-3.5" aria-hidden="true" /></span>
+                <span className="min-w-0 leading-5">
+                  {chatBlockedByAttachedDocuments
+                    ? failedAttachedDocuments.length > 0
+                      ? t("chat.documents.bannerFailed")
+                      : t("chat.documents.bannerProcessing", { count: formatNumber(unavailableAttachedDocuments.length, locale) })
+                    : attachedDocuments.length > 0
+                      ? t("chat.documents.bannerGrounded", { count: formatNumber(attachedDocuments.length, locale) })
+                      : t("chat.documents.bannerSystemKnowledge")}
+                </span>
+              </div>
+              <button type="button" className="self-start rounded-md px-sm py-xs font-semibold underline-offset-4 transition hover:bg-white/70 hover:underline sm:self-auto dark:hover:bg-slate-900/60" onClick={() => setActiveDrawer("documents")}>{t("chat.viewSources")}</button>
             </div>
             <div
               ref={chatScrollContainerRef}
@@ -1184,13 +1308,18 @@ export function LegalChatPage() {
                 shouldAutoScrollRef.current = nearBottom;
                 if (nearBottom) setShowNewResponseButton(false);
               }}
-              className="min-h-0 flex-1 space-y-md overflow-y-auto bg-surface-container-low/60 p-lg dark:bg-slate-950/40"
+              className="min-h-0 flex-1 space-y-md overflow-y-auto overflow-x-hidden px-xs py-sm sm:px-md"
             >
                 {messages.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-outline-variant p-lg text-sm text-on-surface-variant dark:border-slate-700 dark:text-slate-400">
-                    {selectedWorkspaceId
-                      ? t("chat.askToStart")
-                      : t("chat.pickWorkspaceFirst")}
+                  <div className="flex min-h-full items-center justify-center py-lg">
+                    <div className="w-full max-w-xl rounded-xl border border-legal-border bg-white/80 p-xl text-center shadow-sm dark:border-slate-700 dark:bg-slate-900/80">
+                      <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-primary dark:bg-slate-800 dark:text-inverse-primary"><Bot className="h-5 w-5" aria-hidden="true" /></span>
+                      <p className="mt-md text-sm font-medium text-on-surface-variant dark:text-slate-300">
+                        {selectedWorkspaceId
+                          ? t("chat.askToStart")
+                          : t("chat.pickWorkspaceFirst")}
+                      </p>
+                    </div>
                   </div>
                 ) : (
                   messages.map((message, messageIndex) => {
@@ -1208,15 +1337,15 @@ export function LegalChatPage() {
                     return (
                     <article
                       key={message.id}
-                      className="flex items-start gap-md"
+                      className="mx-auto flex w-full max-w-6xl items-start gap-md"
                     >
                       <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white ${assistant ? "bg-primary" : "bg-blue-600"}`}>
                         {assistant ? <Bot className="h-5 w-5" aria-hidden="true" /> : <UserRound className="h-5 w-5" aria-hidden="true" />}
                       </div>
-                      <div className="min-w-0 max-w-[82%]">
-                        <div className="mb-xs flex items-center justify-between gap-lg text-xs"><span className="font-semibold text-on-surface dark:text-slate-100">{assistant ? "LexiGuard AI" : (language === "vi" ? "Bạn" : "You")}</span><span className="text-on-surface-variant">{message.timestamp}</span></div>
+                      <div className="min-w-0 max-w-[88%] overflow-hidden sm:max-w-[82%]">
+                        <div className="mb-xs flex items-center justify-between gap-lg text-xs"><span className="font-semibold text-on-surface dark:text-slate-100">{assistant ? "LexiGuard AI" : t("chat.role.user")}</span><span className="text-on-surface-variant">{message.timestamp}</span></div>
                         <div
-                          className={`rounded-xl border p-md text-sm leading-6 shadow-sm ${
+                          className={`min-w-0 overflow-hidden rounded-xl border p-md text-sm leading-6 shadow-sm [overflow-wrap:anywhere] ${
                             assistant
                               ? "border-legal-border bg-white text-on-surface dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                               : "border-blue-100 bg-blue-50 text-on-surface dark:border-blue-900 dark:bg-blue-950/40 dark:text-slate-100"
@@ -1224,7 +1353,7 @@ export function LegalChatPage() {
                         >
                         {assistant && isThinking ? (
                           <div className="flex items-center gap-sm" role="status" aria-live="polite">
-                            <span>{message.statusMessage ?? (language === "vi" ? "Đang suy nghĩ" : "Thinking")}</span>
+                            <span>{message.statusMessage ?? t("chat.thinking")}</span>
                             <span className="flex gap-1" aria-hidden="true">
                               {[0, 1, 2].map((index) => <span key={index} className="h-1.5 w-1.5 rounded-full bg-primary motion-safe:animate-pulse" style={{ animationDelay: `${index * 160}ms` }} />)}
                             </span>
@@ -1233,7 +1362,7 @@ export function LegalChatPage() {
                           <div className="space-y-sm">
                             <p className="font-medium text-error">{t("chat.responseFailed")}</p>
                             <p className="text-sm text-on-surface-variant dark:text-slate-400">
-                              {message.errorMessage ?? message.content}
+                              {t("chat.messageSendError")}
                             </p>
                             {lastSubmissionRef.current && (
                               <Button
@@ -1256,26 +1385,26 @@ export function LegalChatPage() {
                           <>
                             <ChatMessageContent
                               content={message.content}
-                              className={assistant ? "text-on-surface dark:text-slate-100" : "text-white"}
+                              className="text-on-surface dark:text-slate-100"
                             />
                             {message.status === "streaming" && <span className="ml-1 inline-block h-4 w-0.5 bg-primary motion-safe:animate-pulse" aria-hidden="true" />}
-                            {message.status === "cancelled" && <p className="mt-sm text-xs font-medium text-on-surface-variant">{message.statusMessage ?? (language === "vi" ? "Đã dừng trả lời." : "Response stopped.")}</p>}
+                            {message.status === "cancelled" && <p className="mt-sm text-xs font-medium text-on-surface-variant">{message.statusMessage ?? t("chat.status.stopped")}</p>}
                             {assistant && isCompleted && !message.id.startsWith('local-') && <ChatMessageFeedbackControls messageId={message.id} language={language} />}
                             {shouldShowTicketAction && (
                               <div className="mt-md rounded-lg border border-legal-border bg-surface-container-low p-sm dark:border-slate-700 dark:bg-slate-800">
                                 <div className="flex flex-wrap gap-xs">
                                   {message.riskLevel && (
                                     <Badge tone={message.riskLevel.toUpperCase() === "HIGH" ? "red" : "amber"}>
-                                      {message.riskLevel}
+                                      {localizeEnumValue(message.riskLevel, riskLevelLabelKeys, t)}
                                     </Badge>
                                   )}
                                   {typeof message.confidenceScore === "number" && (
                                     <Badge tone="blue">
-                                      {t("chat.confidence")} {Math.round(message.confidenceScore * 100)}%
+                                      {t("chat.confidence")} {formatPercent(message.confidenceScore * 100, locale)}
                                     </Badge>
                                   )}
                                   {message.suggestionType && (
-                                    <Badge tone="purple">{message.suggestionType}</Badge>
+                                    <Badge tone="purple">{localizeEnumValue(message.suggestionType, suggestionTypeLabelKeys, t)}</Badge>
                                   )}
                                 </div>
                                 {message.suggestionReason && (
@@ -1331,12 +1460,12 @@ export function LegalChatPage() {
                 className="absolute bottom-36 left-1/2 z-10 flex -translate-x-1/2 items-center gap-xs rounded-full border border-primary/30 bg-white px-md py-sm text-xs font-semibold text-primary shadow-lg hover:bg-primary/5 dark:bg-slate-900"
               >
                 <ArrowDown className="h-4 w-4" />
-                {language === "vi" ? "Xem câu trả lời mới" : "View new response"}
+                {t("chat.viewNewResponse")}
               </button>
             )}
 
             <form
-              className="border-t border-legal-border bg-white p-md dark:border-slate-700 dark:bg-slate-900"
+              className="shrink-0"
               onSubmit={(event) => {
                 event.preventDefault();
                 void handleSend();
@@ -1345,8 +1474,8 @@ export function LegalChatPage() {
               {chatBlockedByAttachedDocuments && (
                 <p className="mb-sm rounded-lg bg-amber-50 px-md py-sm text-xs font-semibold text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
                   {failedAttachedDocuments.length > 0
-                    ? (language === "vi" ? "Không thể gửi tin nhắn: hãy bỏ tài liệu lỗi hoặc upload lại." : "Cannot send: remove the failed document or upload it again.")
-                    : (language === "vi" ? "Không thể gửi tin nhắn trong khi tài liệu đính kèm đang được xử lý." : "Messages cannot be sent while attached documents are processing.")}
+                    ? t("chat.documents.failedBlockMessage")
+                    : t("chat.documents.processingBlockMessage")}
                 </p>
               )}
               <label className="sr-only" htmlFor="legal-chat-input">
@@ -1367,7 +1496,9 @@ export function LegalChatPage() {
                       if (input.trim() && selectedWorkspaceId && !sending && !chatBlockedByAttachedDocuments) void handleSend();
                     }
                   }}
-                  placeholder={t("chat.inputPlaceholder")}
+                  placeholder={attachedDocuments.length > 0
+                    ? (language === "vi" ? "Hỏi về tài liệu hoặc vấn đề pháp lý liên quan..." : "Ask about the document or a related legal issue...")
+                    : (language === "vi" ? "Nhập câu hỏi pháp luật của bạn..." : "Enter your legal question...")}
                   disabled={!selectedWorkspaceId || chatBlockedByAttachedDocuments}
                 />
                 {sending ? (
@@ -1375,8 +1506,8 @@ export function LegalChatPage() {
                     type="button"
                     size="icon"
                     variant="danger"
-                    aria-label={language === "vi" ? "Dừng trả lời" : "Stop response"}
-                    title={language === "vi" ? "Dừng trả lời" : "Stop response"}
+                    aria-label={t("chat.stopResponse")}
+                    title={t("chat.stopResponse")}
                     onClick={handleStopResponse}
                   >
                     <Square className="h-4 w-4 fill-current" />
@@ -1393,20 +1524,20 @@ export function LegalChatPage() {
                 )}
                 </div>
                 <div className="mt-sm flex flex-wrap gap-xs border-t border-legal-border pt-sm dark:border-slate-800">
-                  <Button type="button" size="sm" variant="ghost" leftIcon={<Paperclip className="h-4 w-4" />} onClick={() => void handleOpenDocumentModal()}>{language === "vi" ? "Thêm tài liệu" : "Add document"}</Button>
-                  <Button type="button" size="sm" variant="ghost" onClick={() => setInput(language === "vi" ? "Hãy trích xuất các điều khoản quan trọng trong tài liệu." : "Extract the important clauses from the document.")}>{language === "vi" ? "Trích xuất điều khoản" : "Extract clauses"}</Button>
-                  <Button type="button" size="sm" variant="ghost" onClick={() => setInput(language === "vi" ? "Hãy tóm tắt tài liệu này." : "Summarize this document.")}>{language === "vi" ? "Tóm tắt tài liệu" : "Summarize"}</Button>
-                  <Button type="button" size="sm" variant="ghost" leftIcon={<MoreHorizontal className="h-4 w-4" />} onClick={() => setActiveDrawer("settings")}>{language === "vi" ? "Khác" : "More"}</Button>
+                  <Button type="button" size="sm" variant="ghost" leftIcon={<Paperclip className="h-4 w-4" />} onClick={() => void handleOpenDocumentModal()}>{t("chat.documents.add")}</Button>
+                  <Button type="button" size="sm" variant="ghost" onClick={() => setInput(t("chat.quick.extractPrompt"))}>{t("chat.quick.extract")}</Button>
+                  <Button type="button" size="sm" variant="ghost" onClick={() => setInput(t("chat.quick.summarizePrompt"))}>{t("chat.quick.summarize")}</Button>
+                  <Button type="button" size="sm" variant="ghost" leftIcon={<MoreHorizontal className="h-4 w-4" />} onClick={() => setActiveDrawer("settings")}>{t("chat.more")}</Button>
                 </div>
               </div>
             </form>
           </Card>
         </section>
-        <aside className="order-2 flex items-start justify-center">
-          <nav aria-label={language === "vi" ? "Tiện ích trò chuyện" : "Chat utilities"} className="sticky top-6 flex w-[60px] flex-col items-center gap-sm rounded-xl border border-legal-border bg-white p-sm shadow-sm dark:border-slate-700 dark:bg-slate-900">
-            <Button size="icon" variant={activeDrawer === "session" ? "primary" : "ghost"} aria-label={language === "vi" ? "Thông tin phiên chat" : "Chat information"} title={language === "vi" ? "Thông tin phiên chat" : "Chat information"} onClick={() => setActiveDrawer((current) => current === "session" ? null : "session")}><Info className="h-5 w-5" /></Button>
-            <Button size="icon" variant={activeDrawer === "documents" ? "primary" : "ghost"} aria-label={language === "vi" ? "Tài liệu workspace" : "Workspace documents"} title={language === "vi" ? "Tài liệu workspace" : "Workspace documents"} onClick={() => setActiveDrawer((current) => current === "documents" ? null : "documents")}><Files className="h-5 w-5" /></Button>
-            <Button size="icon" variant={activeDrawer === "settings" ? "primary" : "ghost"} aria-label={language === "vi" ? "Tùy chọn trò chuyện" : "Chat options"} title={language === "vi" ? "Tùy chọn trò chuyện" : "Chat options"} onClick={() => setActiveDrawer((current) => current === "settings" ? null : "settings")}><Settings className="h-5 w-5" /></Button>
+        <aside className="order-1 flex min-w-0 items-start justify-center md:order-2">
+          <nav aria-label={t("chat.utilities")} className="flex w-auto max-w-full items-center gap-sm rounded-xl border border-legal-border bg-white p-sm shadow-sm dark:border-slate-700 dark:bg-slate-900 md:sticky md:top-4 md:w-[60px] md:flex-col">
+            <Button size="icon" variant={activeDrawer === "session" ? "primary" : "ghost"} aria-label={t("chat.drawer.sessionInformation")} title={t("chat.drawer.sessionInformation")} onClick={() => setActiveDrawer((current) => current === "session" ? null : "session")}><Info className="h-5 w-5" /></Button>
+            <Button size="icon" variant={activeDrawer === "documents" ? "primary" : "ghost"} aria-label={t("chat.drawer.documents")} title={t("chat.drawer.documents")} onClick={() => setActiveDrawer((current) => current === "documents" ? null : "documents")}><Files className="h-5 w-5" /></Button>
+            <Button size="icon" variant={activeDrawer === "settings" ? "primary" : "ghost"} aria-label={t("chat.drawer.options")} title={t("chat.drawer.options")} onClick={() => setActiveDrawer((current) => current === "settings" ? null : "settings")}><Settings className="h-5 w-5" /></Button>
           </nav>
         </aside>
       </div>
@@ -1418,7 +1549,7 @@ export function LegalChatPage() {
         userMessageId={ticketDraft.user?.id}
         assistantMessageId={ticketDraft.assistant.id}
         requestId={ticketDraft.assistant.requestId ?? undefined}
-        question={ticketDraft.user?.content ?? ticketDraft.assistant.suggestionReason ?? "Cần hỗ trợ xác minh câu trả lời AI"}
+        question={ticketDraft.user?.content ?? ticketDraft.assistant.suggestionReason ?? t("chat.ticketVerificationFallback")}
         answer={ticketDraft.assistant.content}
         documents={attachedDocuments.map((document) => ({ id: document.documentId, name: document.originalFileName }))}
         focusedDocumentId={selectedDocumentId || undefined}
@@ -1430,41 +1561,46 @@ export function LegalChatPage() {
 
       <Modal
         open={documentModalOpen}
-        title={language === "vi" ? "Thêm tài liệu vào phiên chat" : "Add documents to chat"}
+        title={t("chat.documentModal.title")}
         onClose={() => setDocumentModalOpen(false)}
-        footer={<Button variant="secondary" onClick={() => setDocumentModalOpen(false)}>{t("actions.close")}</Button>}
+        footer={<div className="flex w-full justify-end"><Button variant="secondary" onClick={() => setDocumentModalOpen(false)}>{t("actions.close")}</Button></div>}
       >
         <div className="space-y-lg">
           {documentActionError && <p className="rounded-lg bg-error/10 p-sm text-sm text-error">{documentActionError}</p>}
-          <section>
-            <p className="font-semibold">{language === "vi" ? "Upload tài liệu mới" : "Upload new document"}</p>
-            <p className="mt-xs text-xs text-on-surface-variant">{language === "vi" ? "File được lưu vào workspace và tự động gắn vào phiên chat. Quota được kiểm tra trước khi upload." : "The file is saved to the workspace and attached to this session."}</p>
-            <div className="mt-sm space-y-sm">
-              <p className="text-xs text-on-surface-variant">{supportedContractScopeText(language)} {language === "vi" ? "Chỉ cần chọn file, không cần khai báo loại hợp đồng." : "Choose a file; no contract-type selection is required."}</p>
-              <div className="flex flex-col gap-sm sm:flex-row">
-                <input className="form-field" type="file" onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)} />
-                <Button disabled={!uploadFile || documentActionBusy} onClick={() => void handleUploadAndAttach()}>{documentActionBusy ? (language === "vi" ? "Đang xử lý…" : "Processing…") : (language === "vi" ? "Upload và thêm" : "Upload & attach")}</Button>
-              </div>
+          <section className="space-y-sm">
+            <div className="space-y-xs">
+              <p className="font-semibold">{t("chat.documentModal.uploadTitle")}</p>
+              <p className="text-xs text-on-surface-variant dark:text-slate-400">{t("chat.documentModal.uploadDescription")}</p>
+            </div>
+            <p className="text-xs text-on-surface-variant dark:text-slate-400">{supportedContractScopeText(language)} {t("chat.documentModal.autoDetectHint")}</p>
+            <div className="grid gap-sm sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+              <input
+                className="form-field h-11 min-w-0 px-0 py-0 pr-md text-sm file:mr-md file:h-full file:border-0 file:border-r file:border-outline-variant file:bg-surface-container-low file:px-md file:text-sm file:font-semibold file:text-primary dark:file:border-slate-700 dark:file:bg-slate-800 dark:file:text-inverse-primary"
+                type="file"
+                aria-label={t("chat.documentModal.uploadTitle")}
+                onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)}
+              />
+              <Button className="h-11 w-full sm:min-w-40 sm:w-auto" disabled={!uploadFile || documentActionBusy} onClick={() => void handleUploadAndAttach()}>{documentActionBusy ? t("chat.documentModal.processing") : t("chat.documentModal.uploadAndAttach")}</Button>
             </div>
           </section>
-          <section>
-            <p className="font-semibold">{language === "vi" ? "Chọn từ workspace" : "Choose from workspace"}</p>
-            <div className="mt-sm max-h-72 space-y-sm overflow-y-auto">
+          <section className="space-y-sm">
+            <p className="font-semibold">{t("chat.documentModal.chooseFromWorkspace")}</p>
+            <div className="max-h-72 space-y-sm overflow-y-auto">
               {workspaceDocuments.length === 0 ? <p className="text-sm text-on-surface-variant">{t("chat.noDocuments")}</p> : workspaceDocuments.map((document) => {
                 const attached = attachedDocuments.some((item) => item.documentId === document.documentId);
-                return <div key={document.documentId} className="flex items-center justify-between gap-md rounded-lg border border-legal-border p-sm dark:border-slate-700">
+                return <div key={document.documentId} className="flex flex-col gap-sm rounded-lg border border-legal-border p-sm dark:border-slate-700 sm:flex-row sm:items-center sm:justify-between sm:gap-md">
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-semibold" title={document.originalFileName}>{document.originalFileName}</p>
                     <div className="mt-xs"><StatusBadge status={document.status} /></div>
-                    <DocumentProcessingProgress status={document.status} language={language} />
-                    {document.errorMessage && <p className="mt-xs text-xs text-error">{document.errorMessage}</p>}
+                    <DocumentProcessingProgress status={document.status} />
+                    {document.errorMessage && <p className="mt-xs text-xs text-error">{t("upload.documentProcessingError")}</p>}
                   </div>
-                  <div className="flex gap-xs">
-                    <Button size="icon" variant="ghost" aria-label="Download" onClick={() => void handleDownloadWorkspaceDocument(document)}><Download className="h-4 w-4" /></Button>
+                  <div className="flex flex-wrap justify-end gap-xs">
+                    <Button size="icon" variant="ghost" aria-label={t("actions.download")} onClick={() => void handleDownloadWorkspaceDocument(document)}><Download className="h-4 w-4" /></Button>
                     {attached ? (
-                      <Button size="sm" variant="danger" leftIcon={<Trash2 className="h-4 w-4" />} disabled={documentActionBusy} onClick={() => void handleDetachDocument(document.documentId)}>{language === "vi" ? "Bỏ khỏi chat" : "Remove"}</Button>
+                      <Button size="sm" variant="danger" leftIcon={<Trash2 className="h-4 w-4" />} disabled={documentActionBusy} onClick={() => void handleDetachDocument(document.documentId)}>{t("chat.documentModal.removeFromChat")}</Button>
                     ) : (
-                      <Button size="sm" variant="secondary" disabled={documentActionBusy} onClick={() => void handleAttachDocument(document.documentId)}>{language === "vi" ? "Thêm" : "Attach"}</Button>
+                      <Button size="sm" variant="secondary" disabled={documentActionBusy} onClick={() => void handleAttachDocument(document.documentId)}>{t("chat.documentModal.attach")}</Button>
                     )}
                   </div>
                 </div>;
@@ -1476,12 +1612,12 @@ export function LegalChatPage() {
 
       <Modal
         open={Boolean(shareUrl)}
-        title={language === 'vi' ? 'Liên kết chia sẻ chỉ đọc' : 'Read-only share link'}
+        title={t("chat.shareModal.title")}
         onClose={() => setShareUrl('')}
         footer={<Button variant="secondary" onClick={() => setShareUrl('')}>{t('actions.close')}</Button>}
       >
-        <p className="text-sm text-on-surface-variant dark:text-slate-400">{language === 'vi' ? 'Chỉ Admin và Expert đã đăng nhập mới truy cập được.' : 'Only signed-in Admin and Expert users can access this link.'}</p>
-        <div className="mt-md flex gap-sm"><input className="form-field" readOnly value={shareUrl} /><Button onClick={() => void navigator.clipboard.writeText(shareUrl)}>{language === 'vi' ? 'Sao chép' : 'Copy'}</Button></div>
+        <p className="text-sm text-on-surface-variant dark:text-slate-400">{t("chat.shareModal.description")}</p>
+        <div className="mt-md flex gap-sm"><input className="form-field" readOnly value={shareUrl} /><Button onClick={() => void navigator.clipboard.writeText(shareUrl)}>{t("chat.shareModal.copy")}</Button></div>
       </Modal>
 
       <Modal
@@ -1501,15 +1637,15 @@ export function LegalChatPage() {
             <dl className="grid gap-md sm:grid-cols-2">
               <div><dt className="label-uppercase">{t("chat.messageId")}</dt><dd className="mt-xs break-all font-semibold">{messageDetail.messageId}</dd></div>
               <div><dt className="label-uppercase">{t("chat.sessionIdLabel")}</dt><dd className="mt-xs break-all">{messageDetail.chatSessionId}</dd></div>
-              <div><dt className="label-uppercase">{t("chat.role")}</dt><dd className="mt-xs">{messageDetail.role}</dd></div>
-              <div><dt className="label-uppercase">{t("chat.status")}</dt><dd className="mt-xs"><Badge tone="slate">{messageDetail.status}</Badge></dd></div>
+              <div><dt className="label-uppercase">{t("chat.role")}</dt><dd className="mt-xs">{localizeEnumValue(messageDetail.role, messageRoleLabelKeys, t)}</dd></div>
+              <div><dt className="label-uppercase">{t("chat.status")}</dt><dd className="mt-xs"><Badge tone="slate">{localizeEnumValue(messageDetail.status, messageStatusLabelKeys, t)}</Badge></dd></div>
               <div><dt className="label-uppercase">{t("chat.model")}</dt><dd className="mt-xs">{messageDetail.aiModel ?? '-'}</dd></div>
               <div><dt className="label-uppercase">{t("chat.requestId")}</dt><dd className="mt-xs break-all">{messageDetail.requestId ?? '-'}</dd></div>
-              <div><dt className="label-uppercase">{t("chat.promptTokens")}</dt><dd className="mt-xs">{messageDetail.promptTokens ?? '-'}</dd></div>
-              <div><dt className="label-uppercase">{t("chat.completionTokens")}</dt><dd className="mt-xs">{messageDetail.completionTokens ?? '-'}</dd></div>
-              <div><dt className="label-uppercase">{t("chat.totalTokens")}</dt><dd className="mt-xs">{messageDetail.totalTokens ?? '-'}</dd></div>
-              <div><dt className="label-uppercase">{t("chat.confidence")}</dt><dd className="mt-xs">{typeof messageDetail.confidenceScore === 'number' ? `${Math.round(messageDetail.confidenceScore * 100)}%` : '-'}</dd></div>
-              <div><dt className="label-uppercase">{t("chat.riskLevel")}</dt><dd className="mt-xs">{messageDetail.riskLevel ?? '-'}</dd></div>
+              <div><dt className="label-uppercase">{t("chat.promptTokens")}</dt><dd className="mt-xs">{typeof messageDetail.promptTokens === "number" ? formatNumber(messageDetail.promptTokens, locale) : "-"}</dd></div>
+              <div><dt className="label-uppercase">{t("chat.completionTokens")}</dt><dd className="mt-xs">{typeof messageDetail.completionTokens === "number" ? formatNumber(messageDetail.completionTokens, locale) : "-"}</dd></div>
+              <div><dt className="label-uppercase">{t("chat.totalTokens")}</dt><dd className="mt-xs">{typeof messageDetail.totalTokens === "number" ? formatNumber(messageDetail.totalTokens, locale) : "-"}</dd></div>
+              <div><dt className="label-uppercase">{t("chat.confidence")}</dt><dd className="mt-xs">{typeof messageDetail.confidenceScore === "number" ? formatPercent(messageDetail.confidenceScore * 100, locale) : "-"}</dd></div>
+              <div><dt className="label-uppercase">{t("chat.riskLevel")}</dt><dd className="mt-xs">{localizeEnumValue(messageDetail.riskLevel, riskLevelLabelKeys, t)}</dd></div>
               <div><dt className="label-uppercase">{t("chat.legalDomain")}</dt><dd className="mt-xs">{messageDetail.legalDomain ?? '-'}</dd></div>
             </dl>
             {messageDetail.suggestionReason && (
@@ -1532,13 +1668,52 @@ export function LegalChatPage() {
                       <p className="mt-xs text-on-surface-variant dark:text-slate-400">
                         {citation.excerpt || citation.uri || "-"}
                       </p>
-                      <div className="mt-sm flex flex-wrap gap-xs">
-                        {citation.sourceType && <Badge>{citation.sourceType}</Badge>}
-                        {typeof citation.score === "number" && (
-                          <Badge tone="blue">{Math.round(citation.score * 100)}%</Badge>
-                        )}
-                        {typeof citation.pageNumber === "number" && (
-                          <Badge tone="gold">{t("common.page")} {citation.pageNumber}</Badge>
+                      <div className="mt-sm flex flex-wrap items-center justify-between gap-xs">
+                        <div className="flex flex-wrap gap-xs">
+                          {citation.sourceType && <Badge>{localizeEnumValue(citation.sourceType, citationSourceTypeLabelKeys, t)}</Badge>}
+                          {typeof citation.score === "number" && (
+                            <Badge tone="blue">{formatPercent(citation.score * 100, locale)}</Badge>
+                          )}
+                          {typeof citation.pageNumber === "number" && (
+                            <Badge tone="gold">{t("common.page")} {formatNumber(citation.pageNumber, locale)}</Badge>
+                          )}
+                        </div>
+                        {citation.uri && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            leftIcon={<Download className="h-4 w-4" />}
+                            onClick={async () => {
+                              try {
+                                const response = await fetch(citation.uri!, {
+                                  headers: {
+                                    Authorization: `Bearer ${getAccessToken()}`,
+                                  },
+                                });
+                                if (!response.ok) throw new Error("Tải file thất bại");
+                                const blob = await response.blob();
+                                const blobUrl = URL.createObjectURL(blob);
+                                const anchor = document.createElement("a");
+                                anchor.href = blobUrl;
+                                let fileName = citation.label || "document";
+                                if (citation.uri!.includes("filename=")) {
+                                  const match = citation.uri!.match(/filename=([^&]+)/);
+                                  if (match) {
+                                    fileName = decodeURIComponent(match[1]);
+                                  }
+                                }
+                                anchor.download = fileName;
+                                anchor.click();
+                                window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+                              } catch (downloadError) {
+                                toast.error(
+                                  downloadError instanceof Error ? downloadError.message : "Unable to download document."
+                                );
+                              }
+                            }}
+                          >
+                            {language === "vi" ? "Tải xuống" : "Download"}
+                          </Button>
                         )}
                       </div>
                     </article>
@@ -1551,6 +1726,42 @@ export function LegalChatPage() {
           <p className="text-sm text-on-surface-variant dark:text-slate-400">{t("chat.noMessageDetail")}</p>
         )}
       </Modal>
+
+      {/* Custom Chat Session Delete Confirmation Modal */}
+      {isDeleteModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/70 p-md" role="dialog" aria-modal="true">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-slate-800 bg-[#202123] p-lg shadow-2xl text-left">
+            <h3 className="text-lg font-bold text-white">
+              {t("chat.deleteSessionModalTitle")}
+            </h3>
+            <p className="mt-md text-sm text-slate-300">
+              {t("chat.deleteSessionModalBodyPrefix")}
+              <strong className="font-semibold text-white">{sessionToDelete?.title || t("chat.defaultSession")}</strong>
+              {t("chat.deleteSessionModalBodySuffix")}
+            </p>
+            <div className="flex justify-end gap-sm mt-lg">
+              <button
+                type="button"
+                className="px-lg py-sm rounded-full border border-slate-600 text-slate-200 hover:bg-slate-800 text-sm font-semibold transition"
+                onClick={() => {
+                  setIsDeleteModalOpen(false);
+                  setSessionToDelete(null);
+                }}
+              >
+                {t("actions.cancel")}
+              </button>
+              <button
+                type="button"
+                className="px-lg py-sm rounded-full bg-[#ff003c] text-white hover:bg-red-700 text-sm font-semibold transition disabled:opacity-50"
+                onClick={() => void handleConfirmDeleteSession()}
+                disabled={sessionActionBusyId === (sessionToDelete?.chatSessionId ?? "")}
+              >
+                {t("actions.delete")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

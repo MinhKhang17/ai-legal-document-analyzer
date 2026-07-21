@@ -58,6 +58,8 @@ public class DataInitializer implements CommandLineRunner {
                                         "ALTER TABLE customer_plans DROP COLUMN IF EXISTS used_chat_messages CASCADE");
                         jdbcTemplate.execute(
                                         "ALTER TABLE customer_plans DROP COLUMN IF EXISTS used_expert_reviews CASCADE");
+                        jdbcTemplate.execute("ALTER TABLE chat_sessions ADD COLUMN IF NOT EXISTS share_access_level VARCHAR(255) DEFAULT 'RESTRICTED'");
+                        jdbcTemplate.execute("UPDATE chat_sessions SET share_access_level = 'RESTRICTED' WHERE share_access_level IS NULL");
                         logger.info("Legacy columns cleaned up successfully.");
                 } catch (Exception ex) {
                         logger.warn("Failed to clean up legacy columns: {}", ex.getMessage());

@@ -36,6 +36,8 @@ export const API_ENDPOINTS = {
     logout: fromEnv("VITE_AUTH_LOGOUT_API"),
     verifyEmail: fromEnvOrDefault("VITE_AUTH_VERIFY_EMAIL_API", "/api/v1/auth/verify-email"),
     resendVerification: fromEnvOrDefault("VITE_AUTH_RESEND_VERIFICATION_API", "/api/v1/auth/resend-verification"),
+    forgotPassword: fromEnvOrDefault("VITE_AUTH_FORGOT_PASSWORD_API", "/api/v1/auth/forgot-password"),
+    resetPassword: fromEnvOrDefault("VITE_AUTH_RESET_PASSWORD_API", "/api/v1/auth/reset-password"),
   },
 
   workspaces: {
@@ -47,6 +49,8 @@ export const API_ENDPOINTS = {
         fillPathParams(fromEnv("VITE_WORKSPACE_DOCUMENTS_API"), { workspaceId }),
       documentDownload: (workspaceId: string, documentId: string) =>
         `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/documents/${encodeURIComponent(documentId)}/download`,
+      documentDelete: (workspaceId: string, documentId: string) =>
+        `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/documents/${encodeURIComponent(documentId)}`,
   },
 
   chat: {
@@ -129,6 +133,10 @@ export const API_ENDPOINTS = {
     changePassword: fromEnvOrDefault("VITE_CHANGE_PASSWORD_API", "/api/v1/users/change-password"),
     adminExperts: fromEnvOrDefault("VITE_ADMIN_EXPERTS_API", "/api/v1/admin/users/experts"),
     resendExpertActivation: fromEnvOrDefault("VITE_ADMIN_EXPERT_RESEND_API", "/api/v1/admin/users/experts/resend-activation"),
+    delete: (userId: number | string) =>
+      fillPathParams(fromEnvOrDefault("VITE_ADMIN_USER_DELETE_API", "/api/v1/admin/users/:userId"), { userId }),
+    restore: (userId: number | string) =>
+      fillPathParams(fromEnvOrDefault("VITE_ADMIN_USER_RESTORE_API", "/api/v1/admin/users/:userId/restore"), { userId }),
   },
 
   adminDocuments: {
@@ -200,6 +208,20 @@ export const API_ENDPOINTS = {
       }),
   },
 
+  expertRevenue: {
+    summary: fromEnvOrDefault("VITE_EXPERT_REVENUE_API", "/api/v1/expert/revenue"),
+    tickets: fromEnvOrDefault("VITE_EXPERT_REVENUE_TICKETS_API", "/api/v1/expert/revenue/tickets"),
+    updatePayment: (ticketId: string) =>
+      fillPathParams(fromEnvOrDefault("VITE_ADMIN_EXPERT_PAYMENT_API", "/api/v1/admin/tickets/:ticketId/expert-payment"), { ticketId }),
+    resetPayment: (ticketId: string) =>
+      fillPathParams(fromEnvOrDefault("VITE_ADMIN_EXPERT_PAYMENT_RESET_API", "/api/v1/admin/tickets/:ticketId/expert-payment/reset"), { ticketId }),
+  },
+
+  adminRevenue: {
+    overview: fromEnvOrDefault("VITE_ADMIN_REVENUE_OVERVIEW_API", "/api/v1/admin/revenue/overview"),
+    settings: fromEnvOrDefault("VITE_ADMIN_REVENUE_SETTINGS_API", "/api/v1/admin/revenue/settings"),
+  },
+
   aiLegal: {
     ticketAssessment: (ticketId: string) =>
       fillPathParams(fromEnv("VITE_AI_TICKET_ASSESSMENT_API"), { ticketId }),
@@ -261,11 +283,6 @@ export const API_ENDPOINTS = {
   },
 
   contracts: {
-    templates: fromEnv("VITE_CONTRACT_TEMPLATES_API"),
-    templateDetail: (templateId: number | string) =>
-      fillPathParams(fromEnv("VITE_CONTRACT_TEMPLATE_DETAIL_API"), {
-        templateId,
-      }),
     generate: fromEnv("VITE_CONTRACT_GENERATE_API"),
     base: fromEnv("VITE_CONTRACTS_API"),
     my: fromEnv("VITE_MY_CONTRACTS_API"),

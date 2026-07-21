@@ -41,6 +41,20 @@ export interface LoginRequest {
   password: string;
 }
 
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export type ForgotPasswordResponse = ApiResponse<null>;
+
+export interface ResetPasswordRequest {
+  token: string;
+  newPassword: string;
+  confirmNewPassword: string;
+}
+
+export type ResetPasswordResponse = ApiResponse<null>;
+
 export interface LoginJwtResponse {
   accessToken: string;
   tokenType?: string;

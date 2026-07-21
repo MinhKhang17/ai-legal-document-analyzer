@@ -125,3 +125,19 @@ export async function downloadWorkspaceDocument(accessToken: string, workspaceId
   if (!response.ok) throw new Error("Khong the tai tai lieu");
   return URL.createObjectURL(await response.blob());
 }
+
+export async function deleteWorkspaceDocument(
+  accessToken: string,
+  workspaceId: string,
+  documentId: string,
+): Promise<void> {
+  await requestApiData<void>(
+    API_ENDPOINTS.workspaces.documentDelete(workspaceId, documentId),
+    {
+      method: "DELETE",
+      headers: buildBearerHeaders(accessToken),
+      credentials: "include",
+    },
+    "Xóa tài liệu thất bại",
+  );
+}

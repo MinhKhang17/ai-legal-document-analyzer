@@ -7,7 +7,9 @@ import com.analyzer.api.dto.user.UserResponseDTO;
 import com.analyzer.api.entity.RefreshToken;
 import com.analyzer.api.entity.User;
 import com.analyzer.api.exception.auth.ExpiredVerificationTokenException;
+import com.analyzer.api.exception.auth.InvalidRefreshTokenException;
 import com.analyzer.api.exception.common.ResourceNotFoundException;
+import com.analyzer.api.exception.common.ConflictException;
 import com.analyzer.api.mapper.UserMapper;
 import com.analyzer.api.repository.RefreshTokenRepository;
 import com.analyzer.api.repository.UserRepository;
@@ -53,6 +55,7 @@ public class AuthServiceImpl implements AuthService {
     public JwtResponseDTO login(LoginRequestDTO loginRequest, HttpServletResponse response) {
         userRepository.findByEmail(loginRequest.getEmail().trim().toLowerCase()).ifPresent(user -> {
             if (!user.isEmailVerified()) throw new ForbiddenException("EMAIL_NOT_VERIFIED");
+            if (!user.isActive()) throw new ForbiddenException("Tài khoản của bạn đã bị vô hiệu hóa hoặc ngừng hoạt động.");
         });
         // 1. Authenticate credentials
         Authentication authentication = authenticationManager.authenticate(
@@ -107,23 +110,23 @@ public class AuthServiceImpl implements AuthService {
         // 1. Read Refresh Token from HttpOnly Cookie
         String refreshTokenStr = jwtTokenProvider.getRefreshTokenFromCookies(request);
         if (refreshTokenStr == null || refreshTokenStr.isBlank()) {
-            throw new RuntimeException("Refresh token không tìm thấy trong cookie");
+            throw new InvalidRefreshTokenException("Refresh token không tìm thấy trong cookie");
         }
 
         // 2. Look up in database
         RefreshToken refreshToken = refreshTokenRepository.findByToken(refreshTokenStr)
-                .orElseThrow(() -> new RuntimeException("Refresh token không hợp lệ"));
+                .orElseThrow(() -> new InvalidRefreshTokenException("Refresh token không hợp lệ"));
 
         // 3. Check if revoked
         if (refreshToken.isRevoked()) {
-            throw new RuntimeException("Refresh token đã bị thu hồi");
+            throw new InvalidRefreshTokenException("Refresh token đã bị thu hồi");
         }
 
         // 4. Check if expired
         if (refreshToken.isExpired()) {
             refreshToken.setRevoked(true);
             refreshTokenRepository.save(refreshToken);
-            throw new RuntimeException("Refresh token đã hết hạn. Vui lòng đăng nhập lại");
+            throw new InvalidRefreshTokenException("Refresh token đã hết hạn. Vui lòng đăng nhập lại");
         }
 
         User user = refreshToken.getUser();
@@ -212,8 +215,15 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public void verifyEmail(String token) {
-        User user = userRepository.findByEmailVerificationToken(sha256(token))
-                .orElseThrow(() -> new ResourceNotFoundException("Token xác thực không hợp lệ"));
+        String tokenHash = sha256(token);
+        var userWithActiveToken = userRepository.findByEmailVerificationToken(tokenHash);
+        if (userWithActiveToken.isEmpty()) {
+            if (userRepository.findByEmailVerificationLastUsedToken(tokenHash).isPresent()) {
+                throw new ConflictException("TOKEN_ALREADY_USED");
+            }
+            throw new ResourceNotFoundException("TOKEN_INVALID");
+        }
+        User user = userWithActiveToken.get();
 
         if (user.isEmailVerified()) {
             return;
@@ -221,13 +231,14 @@ public class AuthServiceImpl implements AuthService {
 
         if (user.getEmailVerificationTokenExpiry() == null
                 || user.getEmailVerificationTokenExpiry().isBefore(LocalDateTime.now())) {
-            throw new ExpiredVerificationTokenException(
-                    "Token xác thực đã hết hạn. Vui lòng yêu cầu gửi lại email xác thực.");
+            throw new ExpiredVerificationTokenException("TOKEN_EXPIRED");
         }
 
         user.setEmailVerified(true);
         user.setActive(true);
         user.setEmailVerifiedAt(LocalDateTime.now());
+        user.setEmailVerificationLastUsedToken(tokenHash);
+        user.setEmailVerificationTokenUsedAt(LocalDateTime.now());
         user.setEmailVerificationToken(null);
         user.setEmailVerificationTokenExpiry(null);
         userRepository.save(user);

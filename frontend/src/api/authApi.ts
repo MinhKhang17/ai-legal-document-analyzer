@@ -1,13 +1,25 @@
-export { getCurrentUser, login, logout, refreshAccessToken, register } from '../services/auth.service';
+export {
+  getCurrentUser,
+  login,
+  logout,
+  refreshAccessToken,
+  register,
+  requestPasswordReset,
+  resetPassword,
+} from '../services/auth.service';
 export type {
   ApiResponse,
   AuthMeResponse,
   CurrentUser,
+  ForgotPasswordRequest,
+  ForgotPasswordResponse,
   LoginJwtResponse,
   LoginRequest,
   LoginResponse,
   RefreshResponse,
   RegisterRequest,
   RegisterResponse,
+  ResetPasswordRequest,
+  ResetPasswordResponse,
   UserRole,
 } from '../types/auth';

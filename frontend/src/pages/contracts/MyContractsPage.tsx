@@ -13,7 +13,6 @@ import { useI18n } from "../../hooks/useI18n";
 import { useToast } from "../../hooks/useToast";
 import {
   generateContract,
-  getAllContractTemplates,
   getMyContracts,
   saveContract,
 } from "../../services/contract.service";
@@ -21,12 +20,12 @@ import { getStoredAccessToken } from "../../services/http";
 import { getWorkspaces } from "../../services/workspace.service";
 import type {
   ContractGenerationJob,
-  ContractTemplate,
   UserContract,
 } from "../../types/contract";
 import type { Workspace } from "../../types/workspace";
-import { formatDisplayDate } from "../../utils/format";
+import { formatDisplayDate, localeForLanguage } from "../../utils/format";
 import { normalizeWorkspaceId } from "../../utils/workspaceId";
+import { getSupportedContractTypeLabel } from "../../config/supportedContractTypes";
 
 const getStatusTone = (status?: string) => {
   if (status === "ACTIVE" || status === "COMPLETED" || status === "GENERATED") return "green";
@@ -38,14 +37,12 @@ const getStatusTone = (status?: string) => {
 const initialGenerationForm = () => ({
   requestId: `contract-${Date.now()}`,
   workspaceId: "",
-  templateId: "",
   sourceDocumentId: "",
   inputJson: "{}",
 });
 
 const initialSaveForm = {
   workspaceId: "",
-  templateId: "",
   generationJobId: "",
   sourceDocumentId: "",
   title: "",
@@ -57,12 +54,11 @@ export function MyContractsPage() {
   const { t, language } = useI18n();
   const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
-  const locale = language === "vi" ? "vi-VN" : "en-US";
+  const locale = localeForLanguage(language);
   const [contracts, setContracts] = useState<UserContract[]>([]);
   const [page, setPage] = useState(() => parsePageParam(searchParams.get("page")));
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
-  const [templates, setTemplates] = useState<ContractTemplate[]>([]);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [latestJob, setLatestJob] = useState<ContractGenerationJob | null>(null);
   const [generationForm, setGenerationForm] = useState(initialGenerationForm);
@@ -77,9 +73,8 @@ export function MyContractsPage() {
     setError("");
 
     const token = getStoredAccessToken();
-    const [contractsResult, templatesResult, workspacesResult] = await Promise.allSettled([
+    const [contractsResult, workspacesResult] = await Promise.allSettled([
       getMyContracts(page, 20),
-      getAllContractTemplates(),
       token ? getWorkspaces(token) : Promise.resolve([]),
     ]);
 
@@ -88,15 +83,11 @@ export function MyContractsPage() {
       setTotalItems(contractsResult.value.totalItems ?? 0);
       setTotalPages(contractsResult.value.totalPages ?? 0);
     } else {
-      const message =
-        contractsResult.reason instanceof Error
-          ? contractsResult.reason.message
-          : t("contracts.loadError");
+      const message = t("contracts.loadError");
       setError(message);
       toast.error(message);
     }
 
-    setTemplates(templatesResult.status === "fulfilled" ? templatesResult.value : []);
     setWorkspaces(workspacesResult.status === "fulfilled" ? workspacesResult.value : []);
     setLoading(false);
   }, [page, toast, t]);
@@ -116,12 +107,6 @@ export function MyContractsPage() {
     return normalizedValue;
   };
 
-  const parseOptionalNumber = (value: string) => {
-    if (!value.trim()) return null;
-    const parsed = Number(value);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-  };
-
   const handleGenerate = async () => {
     const workspaceId = parseWorkspaceId(generationForm.workspaceId);
     if (workspaceId === null) return;
@@ -138,7 +123,6 @@ export function MyContractsPage() {
       const job = await generateContract({
         requestId: generationForm.requestId.trim(),
         workspaceId,
-        templateId: parseOptionalNumber(generationForm.templateId),
         sourceDocumentId: generationForm.sourceDocumentId.trim() || null,
         inputJson: generationForm.inputJson,
       });
@@ -146,15 +130,13 @@ export function MyContractsPage() {
       setSaveForm((current) => ({
         ...current,
         workspaceId: String(job.workspaceId),
-        templateId: job.templateId ? String(job.templateId) : current.templateId,
         generationJobId: job.id,
         sourceDocumentId: job.sourceDocumentId ?? current.sourceDocumentId,
         content: job.outputDraft ?? current.content,
       }));
       toast.success(t("contracts.generateSuccess"));
-    } catch (generateError) {
-      const message =
-        generateError instanceof Error ? generateError.message : t("contracts.generateError");
+    } catch {
+      const message = t("contracts.generateError");
       setError(message);
       toast.error(message);
     } finally {
@@ -177,7 +159,6 @@ export function MyContractsPage() {
     try {
       await saveContract({
         workspaceId,
-        templateId: parseOptionalNumber(saveForm.templateId),
         generationJobId: saveForm.generationJobId.trim() || null,
         sourceDocumentId: saveForm.sourceDocumentId.trim() || null,
         title: saveForm.title.trim(),
@@ -187,8 +168,8 @@ export function MyContractsPage() {
       toast.success(t("contracts.saveSuccess"));
       setSaveForm(initialSaveForm);
       await loadContracts();
-    } catch (saveError) {
-      const message = saveError instanceof Error ? saveError.message : t("contracts.saveError");
+    } catch {
+      const message = t("contracts.saveError");
       setError(message);
       toast.error(message);
     } finally {
@@ -208,10 +189,10 @@ export function MyContractsPage() {
         </Link>
       ),
     },
-    { header: t("contracts.type"), cell: (contract) => contract.contractType },
+    { header: t("contracts.type"), cell: (contract) => getSupportedContractTypeLabel(contract.contractType, language) ?? t("contracts.outsideSupportedScope") },
     {
       header: t("table.status"),
-      cell: (contract) => <Badge tone={getStatusTone(contract.status)}>{contract.status}</Badge>,
+      cell: (contract) => <Badge tone={getStatusTone(contract.status)}>{t(`contracts.status.${contract.status || "UNKNOWN"}`)}</Badge>,
     },
     { header: t("contracts.version"), cell: (contract) => contract.currentVersionNo ?? "-" },
     {
@@ -238,7 +219,7 @@ export function MyContractsPage() {
       />
 
       {error && (
-        <div className="mb-lg rounded-xl border border-error/40 bg-error/10 p-md text-sm text-error">
+        <div role="alert" className="mb-lg rounded-xl border border-error/40 bg-error/10 p-md text-sm text-error">
           {error}
         </div>
       )}
@@ -271,7 +252,7 @@ export function MyContractsPage() {
           {latestJob && (
             <Card
               title={t("contracts.latestGenerationJob")}
-              actions={<Badge tone={getStatusTone(latestJob.status)}>{latestJob.status}</Badge>}
+              actions={<Badge tone={getStatusTone(latestJob.status)}>{t(`contracts.status.${latestJob.status || "UNKNOWN"}`)}</Badge>}
             >
               <dl className="grid gap-md text-sm md:grid-cols-2">
                 <div>
@@ -283,17 +264,13 @@ export function MyContractsPage() {
                   <dd className="mt-xs break-all">{latestJob.requestId}</dd>
                 </div>
                 <div>
-                  <dt className="label-uppercase">{t("contracts.template")}</dt>
-                  <dd className="mt-xs">{latestJob.templateId ?? "-"}</dd>
-                </div>
-                <div>
                   <dt className="label-uppercase">{t("contracts.created")}</dt>
                   <dd className="mt-xs">{formatDisplayDate(latestJob.createdAt, "-", locale)}</dd>
                 </div>
               </dl>
               {latestJob.errorMessage && (
                 <p className="mt-md rounded-lg bg-error/10 p-md text-sm text-error">
-                  {latestJob.errorMessage}
+                  {t("contracts.generationJobFailed")}
                 </p>
               )}
             </Card>
@@ -333,27 +310,6 @@ export function MyContractsPage() {
                   {workspaces.map((workspace) => (
                     <option key={workspace.workspaceId} value={workspace.workspaceId}>
                       {workspace.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="block text-sm font-semibold">
-                {t("contracts.template")}
-                <select
-                  className="form-field mt-xs"
-                  value={generationForm.templateId}
-                  onChange={(event) =>
-                    setGenerationForm((current) => ({
-                      ...current,
-                      templateId: event.target.value,
-                    }))
-                  }
-                >
-                  <option value="">{t("contracts.noTemplate")}</option>
-                  {templates.map((template) => (
-                    <option key={template.id} value={template.id}>
-                      {template.name}
                     </option>
                   ))}
                 </select>
@@ -428,41 +384,19 @@ export function MyContractsPage() {
                 />
               </label>
 
-              <div className="grid gap-md sm:grid-cols-2">
-                <label className="block text-sm font-semibold">
-                  {t("contracts.type")}
-                  <input
-                    className="form-field mt-xs"
-                    value={saveForm.contractType}
-                    onChange={(event) =>
-                      setSaveForm((current) => ({
-                        ...current,
-                        contractType: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label className="block text-sm font-semibold">
-                  {t("contracts.template")}
-                  <select
-                    className="form-field mt-xs"
-                    value={saveForm.templateId}
-                    onChange={(event) =>
-                      setSaveForm((current) => ({
-                        ...current,
-                        templateId: event.target.value,
-                      }))
-                    }
-                  >
-                    <option value="">{t("contracts.none")}</option>
-                    {templates.map((template) => (
-                      <option key={template.id} value={template.id}>
-                        {template.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
+              <label className="block text-sm font-semibold">
+                {t("contracts.type")}
+                <input
+                  className="form-field mt-xs"
+                  value={saveForm.contractType}
+                  onChange={(event) =>
+                    setSaveForm((current) => ({
+                      ...current,
+                      contractType: event.target.value,
+                    }))
+                  }
+                />
+              </label>
 
               <label className="block text-sm font-semibold">
                 {t("contracts.generationJobId")}

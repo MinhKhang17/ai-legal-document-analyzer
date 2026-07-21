@@ -26,9 +26,57 @@ import { formatDisplayDate } from "../../utils/format";
 import { getAdminChatFeedback } from "../../api/chatApi";
 import { getAccessToken } from "../../services/authSession";
 import type { ChatMessageFeedback } from "../../types/chat";
+import { AdminAiFeedbackPanel } from "../../components/admin/AdminAiFeedbackPanel";
 
 const surveyTypes: FeedbackSurveyType[] = ["SATISFACTION", "PRODUCT", "BUG", "USABILITY"];
 const surveyStatuses: FeedbackSurveyStatus[] = ["DRAFT", "ACTIVE", "CLOSED", "ARCHIVED"];
+
+const surveyTypeKeys: Record<string, string> = {
+  SATISFACTION: "feedback.surveyType.SATISFACTION",
+  PRODUCT: "feedback.surveyType.PRODUCT",
+  BUG: "feedback.surveyType.BUG",
+  USABILITY: "feedback.surveyType.USABILITY",
+};
+
+const surveyStatusKeys: Record<string, string> = {
+  DRAFT: "feedback.surveyStatus.DRAFT",
+  ACTIVE: "feedback.surveyStatus.ACTIVE",
+  CLOSED: "feedback.surveyStatus.CLOSED",
+  ARCHIVED: "feedback.surveyStatus.ARCHIVED",
+};
+
+const reportStatusKeys: Record<string, string> = {
+  OPEN: "feedback.reportStatus.OPEN",
+  UNDER_REVIEW: "feedback.reportStatus.UNDER_REVIEW",
+  RESOLVED: "feedback.reportStatus.RESOLVED",
+  REJECTED: "feedback.reportStatus.REJECTED",
+};
+
+const reportTypeKeys: Record<string, string> = {
+  AI_OUTPUT: "feedback.reportTypeValue.AI_OUTPUT",
+};
+
+const sourceTypeKeys: Record<string, string> = {
+  CHAT: "feedback.sourceTypeValue.CHAT",
+};
+
+const targetTypeKeys: Record<string, string> = {
+  GENERAL: "feedback.targetTypeValue.GENERAL",
+};
+
+const ratingKeys: Record<string, string> = {
+  THUMBS_UP: "feedback.rating.THUMBS_UP",
+  THUMBS_DOWN: "feedback.rating.THUMBS_DOWN",
+};
+
+const feedbackReasonKeys: Record<string, string> = {
+  INCORRECT: "chat.feedback.reason.INCORRECT",
+  WRONG_CITATION: "chat.feedback.reason.WRONG_CITATION",
+  INCOMPLETE: "chat.feedback.reason.INCOMPLETE",
+  NOT_HELPFUL: "chat.feedback.reason.NOT_HELPFUL",
+  POOR_PHRASING: "chat.feedback.reason.POOR_PHRASING",
+  OTHER: "chat.feedback.reason.OTHER",
+};
 
 const emptySurveyForm = {
   code: "",
@@ -73,6 +121,12 @@ export function AdminFeedbackPage() {
   const toast = useToast();
   const { user } = useAppStore();
   const locale = language === "vi" ? "vi-VN" : "en-US";
+  const numberFormatter = new Intl.NumberFormat(locale);
+  const translateEnum = (value: string | null | undefined, keys: Record<string, string>, fallback = "-") => {
+    if (!value) return fallback;
+    const key = keys[value];
+    return key ? t(key) : value;
+  };
   const [surveys, setSurveys] = useState<FeedbackSurvey[]>([]);
   const [reports, setReports] = useState<AiReport[]>([]);
   const [chatRatings, setChatRatings] = useState<ChatMessageFeedback[]>([]);
@@ -97,10 +151,7 @@ export function AdminFeedbackPage() {
     if (surveysResult.status === "fulfilled") {
       setSurveys(surveysResult.value.items ?? []);
     } else {
-      const message =
-        surveysResult.reason instanceof Error
-          ? surveysResult.reason.message
-          : t("feedback.loadSurveysError");
+      const message = t("feedback.loadSurveysError");
       setError(message);
       toast.error(message);
       setSurveys([]);
@@ -176,9 +227,8 @@ export function AdminFeedbackPage() {
       selectSurvey(savedSurvey);
       toast.success(selectedSurvey ? t("feedback.surveyUpdated") : t("feedback.surveyCreated"));
       await loadFeedback();
-    } catch (saveError) {
-      const message =
-        saveError instanceof Error ? saveError.message : t("feedback.surveySaveError");
+    } catch {
+      const message = t("feedback.surveySaveError");
       setError(message);
       toast.error(message);
     } finally {
@@ -218,9 +268,8 @@ export function AdminFeedbackPage() {
       setReportForm(emptyReportForm);
       toast.success(t("feedback.reportCreated"));
       await loadFeedback();
-    } catch (reportError) {
-      const message =
-        reportError instanceof Error ? reportError.message : t("feedback.reportCreateError");
+    } catch {
+      const message = t("feedback.reportCreateError");
       setError(message);
       toast.error(message);
     } finally {
@@ -238,11 +287,11 @@ export function AdminFeedbackPage() {
         </div>
       ),
     },
-    { header: t("contracts.type"), cell: (survey) => survey.surveyType },
-    { header: t("feedback.target"), cell: (survey) => survey.targetType },
+    { header: t("contracts.type"), cell: (survey) => translateEnum(survey.surveyType, surveyTypeKeys) },
+    { header: t("feedback.target"), cell: (survey) => translateEnum(survey.targetType, targetTypeKeys) },
     {
       header: t("table.status"),
-      cell: (survey) => <Badge tone={getSurveyTone(survey.status)}>{survey.status}</Badge>,
+      cell: (survey) => <Badge tone={getSurveyTone(survey.status)}>{translateEnum(survey.status, surveyStatusKeys)}</Badge>,
     },
     {
       header: t("table.updated"),
@@ -273,15 +322,15 @@ export function AdminFeedbackPage() {
         <div>
           <p className="font-semibold">{report.summary}</p>
           <p className="text-xs text-on-surface-variant dark:text-slate-400">
-            {report.sourceType} / {report.sourceReferenceId}
+            {translateEnum(report.sourceType, sourceTypeKeys)} / {report.sourceReferenceId}
           </p>
         </div>
       ),
     },
-    { header: t("contracts.type"), cell: (report) => report.reportType },
+    { header: t("contracts.type"), cell: (report) => translateEnum(report.reportType, reportTypeKeys) },
     {
       header: t("table.status"),
-      cell: (report) => <Badge tone={getReportTone(report.status)}>{report.status}</Badge>,
+      cell: (report) => <Badge tone={getReportTone(report.status)}>{translateEnum(report.status, reportStatusKeys)}</Badge>,
     },
     {
       header: t("contracts.created"),
@@ -290,10 +339,10 @@ export function AdminFeedbackPage() {
   ];
 
   const ratingColumns: DataTableColumn<ChatMessageFeedback>[] = [
-    { header: language === 'vi' ? 'Khách hàng' : 'Customer', cell: (item) => item.submittedByName || `#${item.submittedById}` },
-    { header: language === 'vi' ? 'Đánh giá' : 'Rating', cell: (item) => <Badge tone={item.rating === 'THUMBS_UP' ? 'green' : 'red'}>{item.rating}</Badge> },
-    { header: language === 'vi' ? 'Câu trả lời AI' : 'AI answer', cell: (item) => <p className="max-w-md line-clamp-3">{item.messageContent}</p> },
-    { header: language === 'vi' ? 'Lý do / góp ý' : 'Reasons / comment', cell: (item) => <span>{[...(item.reasons ?? []), item.comment].filter(Boolean).join(', ') || '-'}</span> },
+    { header: t('feedback.ratings.customer'), cell: (item) => item.submittedByName || `#${item.submittedById}` },
+    { header: t('feedback.ratings.rating'), cell: (item) => <Badge tone={item.rating === 'THUMBS_UP' ? 'green' : 'red'}>{translateEnum(item.rating, ratingKeys)}</Badge> },
+    { header: t('feedback.ratings.answer'), cell: (item) => <p className="max-w-md line-clamp-3">{item.messageContent}</p> },
+    { header: t('feedback.ratings.reasons'), cell: (item) => <span>{[...(item.reasons ?? []).map((reason) => translateEnum(reason, feedbackReasonKeys)), item.comment].filter(Boolean).join(', ') || '-'}</span> },
     { header: t('table.date'), cell: (item) => formatDisplayDate(item.createdAt, '-', locale) },
   ];
 
@@ -329,12 +378,16 @@ export function AdminFeedbackPage() {
         </div>
       )}
 
+      <div className="mb-gutter">
+        <AdminAiFeedbackPanel language={language} />
+      </div>
+
       <div className="grid gap-gutter xl:grid-cols-[minmax(0,1fr)_420px]">
         <main className="space-y-gutter">
-          <Card title={language === 'vi' ? 'Đánh giá câu trả lời AI' : 'AI answer ratings'} actions={<Badge tone="blue">{chatRatings.length}</Badge>}>
-            <DataTable columns={ratingColumns} data={chatRatings} getRowKey={(item) => item.id} emptyMessage={language === 'vi' ? 'Chưa có đánh giá.' : 'No ratings yet.'} />
+          <Card title={t('feedback.ratings.title')} actions={<Badge tone="blue">{numberFormatter.format(chatRatings.length)}</Badge>}>
+            <DataTable columns={ratingColumns} data={chatRatings} getRowKey={(item) => item.id} emptyMessage={t('feedback.ratings.empty')} />
           </Card>
-          <Card title={t("feedback.surveys")} actions={<Badge tone="blue">{surveys.length}</Badge>}>
+          <Card title={t("feedback.surveys")} actions={<Badge tone="blue">{numberFormatter.format(surveys.length)}</Badge>}>
             {loading ? (
               <p className="text-sm text-on-surface-variant dark:text-slate-400">
                 {t("feedback.loadingSurveys")}
@@ -350,7 +403,7 @@ export function AdminFeedbackPage() {
             )}
           </Card>
 
-          <Card title={t("feedback.aiReports")} actions={<Badge tone="blue">{reports.length}</Badge>}>
+          <Card title={t("feedback.aiReports")} actions={<Badge tone="blue">{numberFormatter.format(reports.length)}</Badge>}>
             <DataTable
               columns={reportColumns}
               data={reports}
@@ -404,7 +457,7 @@ export function AdminFeedbackPage() {
                   >
                     {surveyTypes.map((type) => (
                       <option key={type} value={type}>
-                        {type}
+                        {translateEnum(type, surveyTypeKeys)}
                       </option>
                     ))}
                   </select>
@@ -424,7 +477,7 @@ export function AdminFeedbackPage() {
                   >
                     {surveyStatuses.map((status) => (
                       <option key={status} value={status}>
-                        {status}
+                        {translateEnum(status, surveyStatusKeys)}
                       </option>
                     ))}
                   </select>

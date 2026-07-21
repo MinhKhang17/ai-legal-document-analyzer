@@ -31,9 +31,64 @@ import { useRef } from "react";
 import { getAccessToken as getSessionAccessToken } from "../../services/authSession";
 const getAccessToken = () => getSessionAccessToken() ?? "";
 
-const formatTimestamp = (value: string | null | undefined, language: "en" | "vi") => {
+type Translate = (key: string, params?: Record<string, string | number>) => string;
+
+const riskLevelLabelKeys: Record<string, string> = {
+  NONE: "risk.none",
+  LOW: "risk.low",
+  MEDIUM: "risk.medium",
+  HIGH: "risk.high",
+  CRITICAL: "risk.critical",
+  UNKNOWN: "risk.unknown",
+};
+
+const suggestionTypeLabelKeys: Record<string, string> = {
+  DIRECT_ANSWER: "chat.suggestionType.directAnswer",
+  ASK_UPLOAD_CONTRACT: "chat.suggestionType.askUploadContract",
+  ASK_CONTRACT_TYPE: "chat.suggestionType.askContractType",
+  ASK_USER_ROLE: "chat.suggestionType.askUserRole",
+  ASK_TARGET_CLAUSE: "chat.suggestionType.askTargetClause",
+  ASK_MORE_FACTS: "chat.suggestionType.askMoreFacts",
+  SUGGEST_REVISE_CLAUSE: "chat.suggestionType.suggestReviseClause",
+  SUGGEST_NEGOTIATION: "chat.suggestionType.suggestNegotiation",
+  REDIRECT_TO_SUPPORTED_SCOPE: "chat.suggestionType.redirectToSupportedScope",
+  REFUSE_AND_REDIRECT: "chat.suggestionType.refuseAndRedirect",
+  NONE: "chat.suggestionType.none",
+  ASK_MORE_INFO: "chat.suggestionType.askMoreInfo",
+  SUGGEST_LAWYER: "chat.suggestionType.suggestLawyer",
+  REQUIRE_LAWYER: "chat.suggestionType.requireLawyer",
+};
+
+const messageRoleLabelKeys: Record<string, string> = {
+  USER: "chat.role.user",
+  ASSISTANT: "chat.role.assistant",
+  SYSTEM: "chat.role.system",
+};
+
+const messageStatusLabelKeys: Record<string, string> = {
+  SENT: "status.sent",
+  PROCESSING: "status.processing",
+  COMPLETED: "status.completed",
+  FAILED: "status.failed",
+};
+
+const localizeEnumValue = (
+  value: string | null | undefined,
+  labelKeys: Record<string, string>,
+  t: Translate,
+) => {
+  if (!value) return "-";
+  const labelKey = labelKeys[value.trim().toUpperCase()];
+  return labelKey ? t(labelKey) : value;
+};
+
+const formatTimestamp = (
+  value: string | null | undefined,
+  language: "en" | "vi",
+  justNowLabel: string,
+) => {
   if (!value) {
-    return language === "vi" ? "Vừa xong" : "Just now";
+    return justNowLabel;
   }
 
   return new Intl.DateTimeFormat(language === "vi" ? "vi-VN" : "en-US", {
@@ -45,11 +100,12 @@ const formatTimestamp = (value: string | null | undefined, language: "en" | "vi"
 const toDisplayMessage = (
   message: WorkspaceChatMessage,
   language: "en" | "vi",
+  justNowLabel: string,
 ): ChatMessage => ({
   id: message.messageId,
   role: message.role.toLowerCase() === "assistant" ? "assistant" : "user",
   content: message.content,
-  timestamp: formatTimestamp(message.createdAt, language),
+  timestamp: formatTimestamp(message.createdAt, language, justNowLabel),
   status: message.status.toLowerCase() === "failed"
     ? "error"
     : message.status.toLowerCase() === "processing"
@@ -67,11 +123,15 @@ const toDisplayMessage = (
   userActionHint: message.userActionHint,
 });
 
-const createOptimisticUserMessage = (message: string, language: "en" | "vi"): ChatMessage => ({
+const createOptimisticUserMessage = (
+  message: string,
+  language: "en" | "vi",
+  justNowLabel: string,
+): ChatMessage => ({
   id: `local-user-${Date.now()}`,
   role: "user",
   content: message,
-  timestamp: formatTimestamp(null, language),
+  timestamp: formatTimestamp(null, language, justNowLabel),
   status: "completed",
 });
 
@@ -103,6 +163,8 @@ export function ContractAssistantPage() {
   const [messageDetailOpen, setMessageDetailOpen] = useState(false);
   const [messageDetail, setMessageDetail] = useState<WorkspaceChatMessage | null>(null);
   const [messageDetailLoading, setMessageDetailLoading] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [sessionToDelete, setSessionToDelete] = useState<WorkspaceChatSession | null>(null);
   const lastSubmissionRef = useRef<{
     workspaceId: string;
     sessionId: string;
@@ -136,9 +198,9 @@ export function ContractAssistantPage() {
         if (sandbox && active) {
           setSandboxWorkspaceId(sandbox.workspaceId);
         }
-      } catch (err) {
+      } catch {
         if (active) {
-          setError(err instanceof Error ? err.message : "Không thể khởi tạo trợ lý");
+          setError(t("chat.contractAssistantInitError"));
         }
       } finally {
         if (active) {
@@ -152,7 +214,7 @@ export function ContractAssistantPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [t]);
 
   // Phase 2: Load chat sessions once sandbox workspace is resolved
   useEffect(() => {
@@ -188,9 +250,9 @@ export function ContractAssistantPage() {
         } else {
           setSearchParams({});
         }
-      } catch (err) {
+      } catch {
         if (active) {
-          setError(err instanceof Error ? err.message : "Không thể tải danh sách phiên chat");
+          setError(t("chat.loadSessionsError"));
         }
       } finally {
         if (active) {
@@ -204,7 +266,7 @@ export function ContractAssistantPage() {
     return () => {
       active = false;
     };
-  }, [sandboxWorkspaceId, searchParams, setSearchParams]);
+  }, [sandboxWorkspaceId, searchParams, setSearchParams, t]);
 
   // Phase 3: Load messages once a session is selected
   useEffect(() => {
@@ -225,10 +287,10 @@ export function ContractAssistantPage() {
         );
 
         if (!active) return;
-        setMessages(data.items.map((message) => toDisplayMessage(message, language)));
-      } catch (err) {
+        setMessages(data.items.map((message) => toDisplayMessage(message, language, t("common.justNow"))));
+      } catch {
         if (active) {
-          setError(err instanceof Error ? err.message : "Không thể tải lịch sử chat");
+          setError(t("chat.loadHistoryError"));
         }
       }
     };
@@ -238,7 +300,7 @@ export function ContractAssistantPage() {
     return () => {
       active = false;
     };
-  }, [language, selectedSessionId]);
+  }, [language, selectedSessionId, t]);
 
   const handleCreateSession = async () => {
     if (!sandboxWorkspaceId) {
@@ -249,13 +311,16 @@ export function ContractAssistantPage() {
       const session = await createChatSession(
         getAccessToken(),
         sandboxWorkspaceId,
-        `Trợ lý hợp đồng ${new Date().toLocaleString()}`,
+        t("chat.sessionDefaultTitle").replace(
+          "{time}",
+          new Date().toLocaleString(language === "vi" ? "vi-VN" : "en-US"),
+        ),
       );
       setChatSessions((previous) => [session, ...previous.filter((item) => item.chatSessionId !== session.chatSessionId)]);
       setSelectedSessionId(session.chatSessionId);
       setSearchParams({ sessionId: session.chatSessionId });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : t("chat.sessionCreateError");
+    } catch {
+      const message = t("chat.sessionCreateError");
       setError(message);
       toast.error(message, t("toast.errorTitle"));
       return;
@@ -276,8 +341,8 @@ export function ContractAssistantPage() {
       setChatSessions((previous) =>
         previous.map((item) => (item.chatSessionId === detail.chatSessionId ? detail : item)),
       );
-    } catch (err) {
-      const message = err instanceof Error ? err.message : t("chat.sessionCreateError");
+    } catch {
+      const message = t("chat.sessionCreateError");
       setSessionActionError(message);
       toast.error(message, t("toast.errorTitle"));
     }
@@ -307,8 +372,8 @@ export function ContractAssistantPage() {
       setRenameTitle("");
       setSessionActionMessage(t("chat.sessionRenamed"));
       toast.success(t("chat.sessionRenamed"), t("toast.successTitle"));
-    } catch (err) {
-      const message = err instanceof Error ? err.message : t("chat.sessionRenameError");
+    } catch {
+      const message = t("chat.sessionRenameError");
       setSessionActionError(message);
       toast.error(message, t("toast.errorTitle"));
     } finally {
@@ -316,10 +381,17 @@ export function ContractAssistantPage() {
     }
   };
 
-  const handleDeleteSession = async (chatSessionId: string) => {
-    if (!window.confirm(t("chat.sessionDeleteConfirm"))) {
-      return;
+  const handleDeleteSessionClick = (chatSessionId: string) => {
+    const session = chatSessions.find((s) => s.chatSessionId === chatSessionId);
+    if (session) {
+      setSessionToDelete(session);
+      setIsDeleteModalOpen(true);
     }
+  };
+
+  const handleConfirmDeleteSession = async () => {
+    if (!sessionToDelete) return;
+    const chatSessionId = sessionToDelete.chatSessionId;
 
     setSessionActionBusyId(chatSessionId);
     setSessionActionError("");
@@ -343,12 +415,14 @@ export function ContractAssistantPage() {
 
       setSessionActionMessage(t("chat.sessionDeleted"));
       toast.success(t("chat.sessionDeleted"), t("toast.successTitle"));
-    } catch (err) {
-      const message = err instanceof Error ? err.message : t("chat.sessionDeleteError");
+    } catch {
+      const message = t("chat.sessionDeleteError");
       setSessionActionError(message);
       toast.error(message, t("toast.errorTitle"));
     } finally {
       setSessionActionBusyId("");
+      setIsDeleteModalOpen(false);
+      setSessionToDelete(null);
     }
   };
 
@@ -377,7 +451,7 @@ export function ContractAssistantPage() {
       toast.success(`${t("chat.ticketCreated")} ${ticket.id}.`, t("toast.successTitle"));
       setTicketDraft(null);
     } catch (err) {
-      const message = err instanceof Error ? err.message : t("chat.ticketCreateError");
+      const message = t("chat.ticketCreateError");
       setError(message);
       toast.error(message, t("toast.errorTitle"));
       throw err;
@@ -399,8 +473,8 @@ export function ContractAssistantPage() {
     try {
       const detail = await getChatMessageDetail(getAccessToken(), messageId);
       setMessageDetail(detail);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : t("chat.messageDetailError");
+    } catch {
+      const message = t("chat.messageDetailError");
       setError(message);
       toast.error(message, t("toast.errorTitle"));
     } finally {
@@ -421,7 +495,7 @@ export function ContractAssistantPage() {
       return;
     }
 
-    const optimisticUserMessage = createOptimisticUserMessage(question, language);
+    const optimisticUserMessage = createOptimisticUserMessage(question, language, t("common.justNow"));
     const assistantMessageId = `local-assistant-${Date.now()}`;
 
     setMessages((previous) => [
@@ -462,13 +536,13 @@ export function ContractAssistantPage() {
         setMessages((previous) => [
           ...previous,
           {
-            ...toDisplayMessage(conversation.assistantMessage, language),
+            ...toDisplayMessage(conversation.assistantMessage, language, t("common.justNow")),
             id: conversation.assistantMessage.messageId ?? assistantMessageId,
           },
         ]);
       }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : t("chat.messageSendError");
+    } catch {
+      const message = t("chat.messageSendError");
       setError(message);
       toast.error(message, t("toast.errorTitle"));
     } finally {
@@ -623,14 +697,14 @@ export function ContractAssistantPage() {
                           size="icon"
                           aria-label={t("chat.deleteSession")}
                           disabled={sessionActionBusyId === session.chatSessionId}
-                          onClick={() => void handleDeleteSession(session.chatSessionId)}
+                          onClick={() => handleDeleteSessionClick(session.chatSessionId)}
                         >
                           <Trash2 className="h-4 w-4 text-error" />
                         </Button>
                       </div>
                     </div>
                     <p className="mt-xs text-xs text-on-surface-variant dark:text-slate-400">
-                      {t("chat.updated")} {formatTimestamp(session.updatedAt, language)}
+                      {t("chat.updated")} {formatTimestamp(session.updatedAt, language, t("common.justNow"))}
                     </p>
                   </article>
                 ))
@@ -648,7 +722,7 @@ export function ContractAssistantPage() {
                 ? `${t("chat.sessionIdLabel")}: ${selectedSessionId}`
                 : t("chat.noSessionSelected")
             }
-            actions={<Badge tone="gold">AI Chat</Badge>}
+            actions={<Badge tone="gold">{t("chat.aiChatBadge")}</Badge>}
           >
             <div className="flex-1 space-y-md overflow-y-auto bg-surface-container-low/60 p-lg dark:bg-slate-950/40">
               {messages.length === 0 ? (
@@ -687,7 +761,7 @@ export function ContractAssistantPage() {
                           <div className="space-y-sm">
                             <p className="font-medium text-error">{t("chat.responseFailed")}</p>
                             <p className="text-sm text-on-surface-variant dark:text-slate-400">
-                              {message.errorMessage ?? message.content}
+                              {t("chat.messageSendError")}
                             </p>
                             {lastSubmissionRef.current && (
                               <Button
@@ -714,16 +788,16 @@ export function ContractAssistantPage() {
                                 <div className="flex flex-wrap gap-xs">
                                   {message.riskLevel && (
                                     <Badge tone={message.riskLevel.toUpperCase() === "HIGH" ? "red" : "amber"}>
-                                      {message.riskLevel}
+                                      {localizeEnumValue(message.riskLevel, riskLevelLabelKeys, t)}
                                     </Badge>
                                   )}
                                   {typeof message.confidenceScore === "number" && (
                                     <Badge tone="blue">
-                                      Confidence {Math.round(message.confidenceScore * 100)}%
+                                      {t("chat.confidence")} {Math.round(message.confidenceScore * 100)}%
                                     </Badge>
                                   )}
                                   {message.suggestionType && (
-                                    <Badge tone="purple">{message.suggestionType}</Badge>
+                                    <Badge tone="purple">{localizeEnumValue(message.suggestionType, suggestionTypeLabelKeys, t)}</Badge>
                                   )}
                                 </div>
                                 {message.suggestionReason && (
@@ -817,7 +891,7 @@ export function ContractAssistantPage() {
         userMessageId={ticketDraft.user?.id}
         assistantMessageId={ticketDraft.assistant.id}
         requestId={ticketDraft.assistant.requestId ?? undefined}
-        question={ticketDraft.user?.content ?? ticketDraft.assistant.suggestionReason ?? "Cần hỗ trợ xác minh câu trả lời AI"}
+        question={ticketDraft.user?.content ?? ticketDraft.assistant.suggestionReason ?? t("chat.ticketVerificationFallback")}
         answer={ticketDraft.assistant.content}
         documents={[]}
         citationIds={Array.from(ticketDraft.assistant.content.matchAll(/\[((?:KB|USER)-\d+)]/gi), (match) => match[1].toUpperCase())}
@@ -843,15 +917,15 @@ export function ContractAssistantPage() {
             <dl className="grid gap-md sm:grid-cols-2">
               <div><dt className="label-uppercase">{t("chat.messageId")}</dt><dd className="mt-xs break-all font-semibold">{messageDetail.messageId}</dd></div>
               <div><dt className="label-uppercase">{t("chat.sessionIdLabel")}</dt><dd className="mt-xs break-all">{messageDetail.chatSessionId}</dd></div>
-              <div><dt className="label-uppercase">{t("chat.role")}</dt><dd className="mt-xs">{messageDetail.role}</dd></div>
-              <div><dt className="label-uppercase">{t("chat.status")}</dt><dd className="mt-xs"><Badge tone="slate">{messageDetail.status}</Badge></dd></div>
+              <div><dt className="label-uppercase">{t("chat.role")}</dt><dd className="mt-xs">{localizeEnumValue(messageDetail.role, messageRoleLabelKeys, t)}</dd></div>
+              <div><dt className="label-uppercase">{t("chat.status")}</dt><dd className="mt-xs"><Badge tone="slate">{localizeEnumValue(messageDetail.status, messageStatusLabelKeys, t)}</Badge></dd></div>
               <div><dt className="label-uppercase">{t("chat.model")}</dt><dd className="mt-xs">{messageDetail.aiModel ?? '-'}</dd></div>
               <div><dt className="label-uppercase">{t("chat.requestId")}</dt><dd className="mt-xs break-all">{messageDetail.requestId ?? '-'}</dd></div>
               <div><dt className="label-uppercase">{t("chat.promptTokens")}</dt><dd className="mt-xs">{messageDetail.promptTokens ?? '-'}</dd></div>
               <div><dt className="label-uppercase">{t("chat.completionTokens")}</dt><dd className="mt-xs">{messageDetail.completionTokens ?? '-'}</dd></div>
               <div><dt className="label-uppercase">{t("chat.totalTokens")}</dt><dd className="mt-xs">{messageDetail.totalTokens ?? '-'}</dd></div>
               <div><dt className="label-uppercase">{t("chat.confidence")}</dt><dd className="mt-xs">{typeof messageDetail.confidenceScore === 'number' ? `${Math.round(messageDetail.confidenceScore * 100)}%` : '-'}</dd></div>
-              <div><dt className="label-uppercase">{t("chat.riskLevel")}</dt><dd className="mt-xs">{messageDetail.riskLevel ?? '-'}</dd></div>
+              <div><dt className="label-uppercase">{t("chat.riskLevel")}</dt><dd className="mt-xs">{localizeEnumValue(messageDetail.riskLevel, riskLevelLabelKeys, t)}</dd></div>
               <div><dt className="label-uppercase">{t("chat.legalDomain")}</dt><dd className="mt-xs">{messageDetail.legalDomain ?? '-'}</dd></div>
             </dl>
             {messageDetail.suggestionReason && (
@@ -865,6 +939,42 @@ export function ContractAssistantPage() {
           <p className="text-sm text-on-surface-variant dark:text-slate-400">{t("chat.noMessageDetail")}</p>
         )}
       </Modal>
+
+      {/* Custom Chat Session Delete Confirmation Modal */}
+      {isDeleteModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/70 p-md" role="dialog" aria-modal="true">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-slate-800 bg-[#202123] p-lg shadow-2xl text-left">
+            <h3 className="text-lg font-bold text-white">
+              {t("chat.deleteSessionModalTitle")}
+            </h3>
+            <p className="mt-md text-sm text-slate-300">
+              {t("chat.deleteSessionModalBodyPrefix")}
+              <strong className="font-semibold text-white">{sessionToDelete?.title || t("chat.defaultSession")}</strong>
+              {t("chat.deleteSessionModalBodySuffix")}
+            </p>
+            <div className="flex justify-end gap-sm mt-lg">
+              <button
+                type="button"
+                className="px-lg py-sm rounded-full border border-slate-600 text-slate-200 hover:bg-slate-800 text-sm font-semibold transition"
+                onClick={() => {
+                  setIsDeleteModalOpen(false);
+                  setSessionToDelete(null);
+                }}
+              >
+                {t("actions.cancel")}
+              </button>
+              <button
+                type="button"
+                className="px-lg py-sm rounded-full bg-[#ff003c] text-white hover:bg-red-700 text-sm font-semibold transition disabled:opacity-50"
+                onClick={() => void handleConfirmDeleteSession()}
+                disabled={sessionActionBusyId === (sessionToDelete?.chatSessionId ?? "")}
+              >
+                {t("actions.delete")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { useAppStore } from "../../store/AppStore";
 import { getCurrentUser, login } from "../../api/authApi";
 import type { CurrentUser } from "../../types/auth";
 import { clearAccessToken, setAccessToken } from "../../services/authSession";
+import { getSafeAuthReturnPath } from "../../utils/authReturnPath";
 
 const getStringStateValue = (state: unknown, key: string): string => {
   if (typeof state === "object" && state !== null) {
@@ -47,6 +48,12 @@ export function LoginPage() {
   const initialNotice =
     getStringStateValue(location.state, "noticeMessage") ||
     getStringStateValue(location.state, "message");
+  const requestedRedirect =
+    getStringStateValue(location.state, "redirectTo") ||
+    getStringStateValue(location.state, "from");
+  const safeRedirect = requestedRedirect.startsWith("/") && !requestedRedirect.startsWith("//")
+    ? requestedRedirect
+    : "";
   const [error, setError] = useState(initialError);
   const [notice, setNotice] = useState(initialNotice);
   const [emailNotVerified, setEmailNotVerified] = useState(false);
@@ -102,7 +109,14 @@ export function LoginPage() {
 
             signIn(accessToken, currentUser);
 
-            if (currentUser.role === "ADMIN") {
+            const returnPath = getSafeAuthReturnPath(
+              safeRedirect,
+              currentUser.role,
+            );
+
+            if (returnPath) {
+              navigate(returnPath, { replace: true });
+            } else if (currentUser.role === "ADMIN") {
               navigate("/admin", { replace: true });
             } else if (currentUser.role === "EXPERT") {
               navigate("/lawyer/tickets", { replace: true });
@@ -112,9 +126,9 @@ export function LoginPage() {
           } catch (error) {
             clearAccessToken();
             void signOut({ remote: false });
-            const message = error instanceof Error ? error.message : t("auth.loginFailed");
-            setEmailNotVerified(message.includes("EMAIL_NOT_VERIFIED"));
-            setError(message === "EMAIL_NOT_VERIFIED" ? "Tài khoản chưa xác thực email." : message);
+            const isEmailNotVerified = error instanceof Error && error.message.includes("EMAIL_NOT_VERIFIED");
+            setEmailNotVerified(isEmailNotVerified);
+            setError(isEmailNotVerified ? t("auth.emailNotVerified") : t("auth.loginFailed"));
           } finally {
             setLoading(false);
           }
@@ -133,7 +147,7 @@ export function LoginPage() {
               id="email"
               className="form-field h-10 py-2 pl-9 text-sm"
               type="email"
-              placeholder="name@company.com"
+              placeholder={t("auth.emailPlaceholder")}
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               required
@@ -146,12 +160,12 @@ export function LoginPage() {
             <label className="label-uppercase text-[9px]" htmlFor="password">
               {t("auth.password")}
             </label>
-            <a
+            <Link
               className="text-[10px] font-semibold text-primary hover:underline dark:text-inverse-primary"
-              href="#forgot"
+              to="/forgot-password"
             >
               {t("auth.forgotPassword")}
-            </a>
+            </Link>
           </div>
           <div className="relative">
             <Lock
@@ -203,7 +217,7 @@ export function LoginPage() {
             {error}
           </p>
         )}
-        {emailNotVerified && <Button type="button" variant="secondary" className="w-full" onClick={() => navigate("/auth/check-email", { state: { email: email.trim(), maskedEmail: email.trim() } })}>Gửi lại email xác thực</Button>}
+        {emailNotVerified && <Button type="button" variant="secondary" className="w-full" onClick={() => navigate("/auth/check-email", { state: { email: email.trim(), maskedEmail: email.trim() } })}>{t("auth.resendVerificationEmail")}</Button>}
         {notice && !error && (
           <p className="rounded-md bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700">
             {notice}

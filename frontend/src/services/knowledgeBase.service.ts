@@ -45,11 +45,27 @@ const postJson = <TResponse>(
     errorMessage,
   );
 
+export interface KnowledgeBaseListFilters {
+  keyword?: string;
+  status?: string;
+  scope?: string;
+  category?: string;
+  active?: boolean;
+  sort?: string[];
+}
+
 export const getKnowledgeBaseEntries = async (
   page = 0,
   size = 10,
+  filters: KnowledgeBaseListFilters = {},
 ): Promise<PageResponse<KnowledgeBaseEntry>> => {
   const query = new URLSearchParams({ page: String(page), size: String(size) });
+  if (filters.keyword?.trim()) query.set("q", filters.keyword.trim());
+  if (filters.status) query.set("status", filters.status);
+  if (filters.scope) query.set("scope", filters.scope);
+  if (filters.category) query.set("category", filters.category);
+  if (typeof filters.active === "boolean") query.set("active", String(filters.active));
+  filters.sort?.filter(Boolean).forEach((sort) => query.append("sort", sort));
   return getJson<PageResponse<KnowledgeBaseEntry>>(
     `${API_ENDPOINTS.knowledgeBase.list}?${query.toString()}`,
     "Không thể tải danh sách knowledge base",

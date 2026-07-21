@@ -3,9 +3,19 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "../../components/common/Button";
 import { Card } from "../../components/common/Card";
+import { useI18n } from "../../hooks/useI18n";
 import { resendVerificationEmail, verifyEmail } from "../../services/auth.service";
 
+const verificationErrorMessage = (error: unknown) => {
+  const message = error instanceof Error ? error.message : "";
+  if (message.includes("TOKEN_EXPIRED")) return "Liên kết đã hết hạn.";
+  if (message.includes("TOKEN_ALREADY_USED")) return "Liên kết đã được sử dụng.";
+  if (message.includes("TOKEN_INVALID")) return "Liên kết không hợp lệ.";
+  return message || "Không thể xác thực email.";
+};
+
 export function VerifyEmailPage() {
+  const { t } = useI18n();
   const [params] = useSearchParams();
   const token = params.get("token")?.trim() ?? "";
   const [state, setState] = useState<"loading" | "success" | "error">("loading");
@@ -17,30 +27,30 @@ export function VerifyEmailPage() {
   useEffect(() => {
     if (!token) {
       setState("error");
-      setMessage("Liên kết xác thực không hợp lệ vì thiếu token.");
+      setMessage(t("auth.verifyEmail.missingToken"));
       return;
     }
     let active = true;
     void verifyEmail(token)
       .then(() => { if (active) setState("success"); })
-      .catch((error: unknown) => {
+      .catch((error) => {
         if (active) {
           setState("error");
-          setMessage(error instanceof Error ? error.message : "Không thể xác thực email.");
+          setMessage(verificationErrorMessage(error));
         }
       });
     return () => { active = false; };
-  }, [token]);
+  }, [t, token]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-ivory p-lg dark:bg-slate-950">
       <Card className="w-full max-w-lg text-center">
         {state === "loading" ? (
-          <><div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-outline-variant border-t-primary" /><h1 className="mt-md text-xl font-bold">Đang xác thực email…</h1></>
+          <><div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-outline-variant border-t-primary" aria-hidden="true" /><h1 aria-live="polite" className="mt-md text-xl font-bold">{t("auth.verifyEmail.loading")}</h1></>
         ) : state === "success" ? (
-          <><CheckCircle2 className="mx-auto h-12 w-12 text-success" /><h1 className="mt-md text-xl font-bold">Xác thực email thành công</h1><p className="mt-sm text-sm text-on-surface-variant">Tài khoản của bạn đã sẵn sàng sử dụng.</p><Link to="/login"><Button className="mt-lg">Đăng nhập</Button></Link></>
+          <><CheckCircle2 className="mx-auto h-12 w-12 text-success" aria-hidden="true" /><h1 className="mt-md text-xl font-bold">{t("auth.verifyEmail.successTitle")}</h1><p className="mt-sm text-sm text-on-surface-variant">{t("auth.verifyEmail.successDescription")}</p><Link to="/login"><Button className="mt-lg">{t("actions.signIn")}</Button></Link></>
         ) : (
-          <><XCircle className="mx-auto h-12 w-12 text-error" /><h1 className="mt-md text-xl font-bold">Không thể xác thực email</h1><p className="mt-sm text-sm text-error">{message}</p><div className="mt-lg text-left"><label className="text-sm font-semibold">Gửi lại email xác thực<input className="form-field mt-xs" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="email@example.com" /></label><Button className="mt-sm" disabled={resending || !email.trim()} onClick={async () => { setResending(true); try { await resendVerificationEmail(email.trim()); setResendMessage('Nếu email hợp lệ, liên kết mới đã được gửi.'); } catch (error) { setResendMessage(error instanceof Error ? error.message : 'Không thể gửi lại email.'); } finally { setResending(false); } }}>{resending ? 'Đang gửi…' : 'Gửi lại liên kết'}</Button>{resendMessage && <p className="mt-sm text-xs text-on-surface-variant">{resendMessage}</p>}</div><Link to="/login"><Button className="mt-lg" variant="secondary">Về trang đăng nhập</Button></Link></>
+          <><XCircle className="mx-auto h-12 w-12 text-error" aria-hidden="true" /><h1 className="mt-md text-xl font-bold">{t("auth.verifyEmail.errorTitle")}</h1><p role="alert" className="mt-sm text-sm text-error">{message}</p><div className="mt-lg text-left"><label className="text-sm font-semibold">{t("auth.verifyEmail.resendLabel")}<input className="form-field mt-xs" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder={t("auth.checkEmail.emailPlaceholder")} /></label><Button className="mt-sm" disabled={resending || !email.trim()} onClick={async () => { setResending(true); try { await resendVerificationEmail(email.trim()); setResendMessage(t("auth.verifyEmail.resendSuccess")); } catch { setResendMessage(t("auth.verifyEmail.resendError")); } finally { setResending(false); } }}>{resending ? t("auth.verifyEmail.resending") : t("auth.verifyEmail.resendAction")}</Button>{resendMessage && <p role="status" className="mt-sm text-xs text-on-surface-variant">{resendMessage}</p>}</div><Link to="/login"><Button className="mt-lg" variant="secondary">{t("auth.checkEmail.backToLogin")}</Button></Link></>
         )}
       </Card>
     </div>

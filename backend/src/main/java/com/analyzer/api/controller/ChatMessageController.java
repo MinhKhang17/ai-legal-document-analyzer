@@ -77,6 +77,14 @@ public class ChatMessageController {
         return ResponseEntity.ok(ApiResponseDTO.success("Feedback submitted successfully", data));
     }
 
+    @DeleteMapping("/chat-messages/{messageId}/feedback")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    @Operation(summary = "Remove feedback from an AI assistant message")
+    public ResponseEntity<ApiResponseDTO<Void>> removeFeedback(@PathVariable String messageId) {
+        chatMessageService.removeFeedback(getCurrentUserId(), messageId);
+        return ResponseEntity.ok(ApiResponseDTO.success("Feedback removed successfully", null));
+    }
+
     private Long getCurrentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated() ||

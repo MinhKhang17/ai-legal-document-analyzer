@@ -1,4 +1,4 @@
-import { Bell, LogOut, Menu, Search, Shield, UserRound } from 'lucide-react';
+import { LogOut, Menu, Search, Shield, UserRound } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '../components/common/Button';
@@ -18,13 +18,22 @@ const routeLabels: Array<{ prefix: string; key: string }> = [
   { prefix: '/chat/history', key: 'nav.chatHistory' },
   { prefix: '/chat', key: 'nav.legalChat' },
   { prefix: '/knowledge-base', key: 'nav.knowledgeBase' },
+  { prefix: '/billing/refunds', key: 'nav.refunds' },
   { prefix: '/billing/subscribe', key: 'nav.billingSubscribe' },
   { prefix: '/billing', key: 'nav.billing' },
-  { prefix: '/jobs', key: 'nav.jobs' },
-  { prefix: '/templates', key: 'nav.templates' },
   { prefix: '/admin/system-health', key: 'nav.systemHealth' },
-  { prefix: '/admin/audit-logs', key: 'nav.auditLogs' },
+  { prefix: '/admin/tickets', key: 'nav.adminTickets' },
+  { prefix: '/admin/feedback', key: 'nav.feedback' },
+  { prefix: '/admin/refunds', key: 'nav.refunds' },
+  { prefix: '/admin/revenue', key: 'nav.adminRevenue' },
   { prefix: '/admin', key: 'nav.admin' },
+  { prefix: '/lawyer/tickets', key: 'nav.lawyerTickets' },
+  { prefix: '/lawyer/revenue', key: 'nav.expertRevenue' },
+  { prefix: '/shared/chat', key: 'sharedChat.title' },
+  { prefix: '/shared-conversation', key: 'sharedTicket.title' },
+  { prefix: '/tickets', key: 'nav.legalTickets' },
+  { prefix: '/contracts', key: 'nav.contracts' },
+  { prefix: '/settings', key: 'nav.settings' },
 ];
 
 export function Topbar() {
@@ -43,7 +52,7 @@ export function Topbar() {
   const profileWorkspacePath = isAdmin ? '/admin' : '/dashboard';
   const displayName = user
     ? `${user.firstName} ${user.lastName}`.trim() || user.email
-    : "Guest";
+    : t('common.guest');
   const displayEmail = user?.email ?? "";
   const initialsSource = user ? `${user.firstName} ${user.lastName}`.trim() : "";
   const avatarInitials = initialsSource.length > 1
@@ -67,7 +76,7 @@ export function Topbar() {
           <div className="hidden min-w-0 flex-1 items-center gap-md md:flex">
             <div className="relative max-w-lg flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-outline" aria-hidden="true" />
-              <input className="w-full rounded-xl border border-outline-variant bg-surface-container-low py-sm pl-10 pr-md text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10 dark:border-slate-700 dark:bg-slate-900" placeholder={t('topbar.search')} type="search" />
+              <input className="w-full rounded-xl border border-outline-variant bg-surface-container-low py-sm pl-10 pr-md text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10 dark:border-slate-700 dark:bg-slate-900" aria-label={t('topbar.searchLabel')} placeholder={t('topbar.search')} type="search" />
             </div>
             {isAdmin && (
               <div className="hidden items-center gap-md xl:flex">
@@ -93,14 +102,10 @@ export function Topbar() {
           <div className="hidden md:block">
             <ThemeToggle />
           </div>
-          <Button variant="ghost" size="icon" className="relative" aria-label={t('topbar.notifications')}>
-            <Bell className="h-5 w-5" />
-            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-error" />
-          </Button>
           <Dropdown
             label={
               <span className="flex items-center gap-sm">
-                {isCustomer && <span className="hidden rounded-full bg-primary/10 px-sm py-xs text-[10px] font-bold uppercase text-primary md:inline">{planName}</span>}
+                {isCustomer && <span className="hidden rounded-full border border-primary/30 bg-surface-container-high px-sm py-xs text-[10px] font-bold uppercase text-primary dark:border-inverse-primary/40 dark:bg-slate-800 dark:text-inverse-primary md:inline">{planName}</span>}
                 <span className="hidden text-sm font-semibold md:inline">{displayName}</span>
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">{avatarInitials}</span>
               </span>
@@ -117,7 +122,7 @@ export function Topbar() {
             {isCustomer && (
               <button className="flex w-full items-center gap-sm rounded-lg px-sm py-sm text-left text-sm hover:bg-surface-container-low dark:hover:bg-slate-800" type="button" onClick={() => navigate('/billing')}>
                 <Shield className="h-4 w-4" aria-hidden="true" />
-                Billing · {planName}
+                {t('nav.billing')} · {planName}
               </button>
             )}
             <button

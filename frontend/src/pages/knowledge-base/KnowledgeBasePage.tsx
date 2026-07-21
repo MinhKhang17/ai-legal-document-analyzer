@@ -1,4 +1,4 @@
-import { ArrowRight, FileText, RefreshCw, ShieldCheck, Upload, UploadCloud } from "lucide-react";
+import { ArrowRight, ArrowUpDown, FileText, RefreshCw, RotateCcw, Search, ShieldCheck, SlidersHorizontal, Upload, UploadCloud } from "lucide-react";
 import type { ChangeEvent } from "react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -32,16 +32,72 @@ const emptyForm = {
   rawContent: "",
 };
 
+const knowledgeStatusKeys: Record<string, string> = {
+  PENDING: "knowledge.status.PENDING",
+  UPLOADED: "knowledge.status.PENDING",
+  PROCESSING: "knowledge.status.PROCESSING",
+  INGESTED: "knowledge.status.INGESTED",
+  REVIEWING: "knowledge.status.REVIEWING",
+  PUBLIC: "knowledge.status.PUBLIC",
+  ARCHIVED: "knowledge.status.ARCHIVED",
+  FAILED: "knowledge.status.FAILED",
+};
+
+const knowledgeScopeKeys: Record<string, string> = {
+  GLOBAL: "knowledge.scopeValue.GLOBAL",
+  WORKSPACE: "knowledge.scopeValue.WORKSPACE",
+};
+
+const knowledgeCategoryKeys: Record<string, string> = {
+  LEGAL_SOURCE: "knowledge.categoryValue.LEGAL_SOURCE",
+};
+
+const knowledgeStatuses = ["PENDING", "UPLOADED", "PROCESSING", "INGESTED", "REVIEWING", "PUBLIC", "ARCHIVED", "FAILED"];
+
+const sortValues = [
+  "updatedAt,desc",
+  "updatedAt,asc",
+  "createdAt,desc",
+  "createdAt,asc",
+  "title,asc",
+  "title,desc",
+  "code,asc",
+  "code,desc",
+  "currentStatus,asc",
+  "currentStatus,desc",
+  "currentVersionNo,desc",
+  "currentVersionNo,asc",
+];
+
+const sortField = (sort: string) => sort.split(",")[0];
+
 export function KnowledgeBasePage() {
   const { t, language } = useI18n();
   const toast = useToast();
   const { user } = useAppStore();
   const [searchParams, setSearchParams] = useSearchParams();
   const locale = language === "vi" ? "vi-VN" : "en-US";
+  const fileSizeFormatter = new Intl.NumberFormat(locale, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  const translateEnum = (value: string | null | undefined, keys: Record<string, string>) => {
+    if (!value) return t("common.unknown");
+    const key = keys[value];
+    return key ? t(key) : value;
+  };
   const [entries, setEntries] = useState<KnowledgeBaseEntry[]>([]);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [page, setPage] = useState(() => parsePageParam(searchParams.get("page")));
+  const [searchInput, setSearchInput] = useState("");
+  const [keyword, setKeyword] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [scopeFilter, setScopeFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [activeFilter, setActiveFilter] = useState("");
+  const [primarySort, setPrimarySort] = useState("updatedAt,desc");
+  const [secondarySort, setSecondarySort] = useState("title,asc");
   const [form, setForm] = useState(emptyForm);
   const [selectedFileName, setSelectedFileName] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -55,17 +111,44 @@ export function KnowledgeBasePage() {
     setError("");
 
     try {
-      const response = await getKnowledgeBaseEntries(page, 20);
+      const sorts = [primarySort, secondarySort]
+        .filter(Boolean)
+        .filter((sort, index, values) => values.findIndex((candidate) => sortField(candidate) === sortField(sort)) === index);
+      const response = await getKnowledgeBaseEntries(page, 20, {
+        keyword,
+        status: statusFilter || undefined,
+        scope: scopeFilter || undefined,
+        category: categoryFilter || undefined,
+        active: activeFilter === "" ? undefined : activeFilter === "true",
+        sort: sorts,
+      });
       setEntries(response.items ?? []);
       setTotalItems(response.totalItems ?? 0);
       setTotalPages(response.totalPages ?? 0);
-    } catch (loadError) {
-      const message = loadError instanceof Error ? loadError.message : t("knowledge.loadError");
+    } catch {
+      const message = t("knowledge.loadError");
       setError(message);
     } finally {
       setLoading(false);
     }
-  }, [page, t]);
+  }, [activeFilter, categoryFilter, keyword, page, primarySort, scopeFilter, secondarySort, statusFilter, t]);
+
+  const applySearch = () => {
+    setPage(0);
+    setKeyword(searchInput.trim());
+  };
+
+  const resetFilters = () => {
+    setSearchInput("");
+    setKeyword("");
+    setStatusFilter("");
+    setScopeFilter("");
+    setCategoryFilter("");
+    setActiveFilter("");
+    setPrimarySort("updatedAt,desc");
+    setSecondarySort("title,asc");
+    setPage(0);
+  };
 
   useEffect(() => {
     void loadEntries();
@@ -84,7 +167,7 @@ export function KnowledgeBasePage() {
           await loadEntries();
           setActiveJob(null);
         } else if (job.status === "FAILED") {
-          toast.error(job.errorMessage || t("knowledge.backgroundIngestFailed"));
+          toast.error(t("knowledge.backgroundIngestFailed"));
           await loadEntries();
           setActiveJob(null);
         }
@@ -133,13 +216,13 @@ export function KnowledgeBasePage() {
         });
         setActiveJob(job);
       }
-      toast.success(startIngest ? t("knowledge.backgroundIngestStarted") : (language === "vi" ? "Đã lưu bản nháp riêng tư." : "Private draft saved."));
+      toast.success(startIngest ? t("knowledge.backgroundIngestStarted") : t("knowledge.privateDraftSaved"));
       setForm(emptyForm);
       setSelectedFileName("");
       setSelectedFile(null);
       await loadEntries();
-    } catch (uploadError) {
-      const message = uploadError instanceof Error ? uploadError.message : t("knowledge.uploadError");
+    } catch {
+      const message = t("knowledge.uploadError");
       setActiveJob(null);
       setError(message);
       toast.error(message);
@@ -184,9 +267,9 @@ export function KnowledgeBasePage() {
       ),
     },
     { header: t("knowledge.code"), cell: (entry) => entry.code },
-    { header: t("knowledge.category"), cell: (entry) => entry.category },
-    { header: t("knowledge.scope"), cell: (entry) => <Badge>{entry.scope}</Badge> },
-    { header: t("table.status"), cell: (entry) => <div><Badge>{entry.currentStatus === "UPLOADED" ? "PENDING" : entry.currentStatus || t("common.unknown")}</Badge>{!entry.active && <p className="mt-xs text-xs text-on-surface-variant">Chưa đưa vào retrieval</p>}</div> },
+    { header: t("knowledge.category"), cell: (entry) => translateEnum(entry.category, knowledgeCategoryKeys) },
+    { header: t("knowledge.scope"), cell: (entry) => <Badge>{translateEnum(entry.scope, knowledgeScopeKeys)}</Badge> },
+    { header: t("table.status"), cell: (entry) => <div><Badge>{translateEnum(entry.currentStatus, knowledgeStatusKeys)}</Badge>{!entry.active && <p className="mt-xs text-xs text-on-surface-variant">{t("knowledge.inactiveForRetrieval")}</p>}</div> },
     { header: t("knowledge.ingestedDocuments.active"), cell: (entry) => <Badge tone={entry.active ? "green" : "slate"}>{entry.active ? t("admin.active") : t("admin.inactive")}</Badge> },
     { header: t("table.updated"), cell: (entry) => formatDisplayDate(entry.updatedAt, "-", locale) },
   ];
@@ -214,10 +297,10 @@ export function KnowledgeBasePage() {
         </div>
       )}
 
-      <section className="mb-xl grid gap-gutter xl:grid-cols-[1.35fr_0.65fr]">
+      <section className="mb-xl grid grid-cols-1 items-start gap-gutter xl:grid-cols-[minmax(420px,0.85fr)_minmax(0,1.65fr)] [&>*]:min-w-0">
         <Card title={t("knowledge.uploadEntry")} subtitle={t("knowledge.uploadEntrySubtitle")}>
-          <div className="space-y-md">
-            <div className="rounded-2xl border border-primary/20 bg-primary/5 p-md dark:border-indigo-400/20 dark:bg-indigo-950/20">
+          <div className="space-y-lg">
+            <div className="rounded-2xl border border-primary/20 bg-primary/5 p-lg dark:border-indigo-400/20 dark:bg-indigo-950/20">
               <div className="flex items-start gap-md">
                 <span className="rounded-xl bg-primary/10 p-sm text-primary dark:bg-indigo-400/10 dark:text-indigo-300">
                   <ShieldCheck className="h-5 w-5" />
@@ -228,15 +311,15 @@ export function KnowledgeBasePage() {
                     {t("knowledge.newDocumentDefaultsDescription")}
                   </p>
                   <div className="mt-sm flex flex-wrap gap-xs">
-                    <Badge tone="amber">PENDING</Badge>
-                    <Badge tone="purple">PRIVATE</Badge>
-                    <Badge tone="slate">INACTIVE</Badge>
+                    <Badge tone="amber">{t("knowledge.status.PENDING")}</Badge>
+                    <Badge tone="purple">{t("knowledge.visibility.PRIVATE")}</Badge>
+                    <Badge tone="slate">{t("admin.inactive")}</Badge>
                   </div>
                 </div>
               </div>
             </div>
 
-            <label className="block cursor-pointer rounded-2xl border-2 border-dashed border-legal-border bg-surface-container-low p-lg text-center transition hover:border-primary/60 hover:bg-primary/5 dark:border-slate-700 dark:bg-slate-900/60">
+            <label className="block cursor-pointer rounded-2xl border-2 border-dashed border-legal-border bg-surface-container-low px-lg py-xl text-center transition hover:border-primary/60 hover:bg-primary/5 dark:border-slate-700 dark:bg-slate-900/60">
               <input
                 className="sr-only"
                 type="file"
@@ -268,28 +351,28 @@ export function KnowledgeBasePage() {
               <label className="text-sm font-semibold">
                 {t("knowledge.scope")}
                 <select className="form-field mt-xs" value={form.scope} onChange={(event) => setForm((previous) => ({ ...previous, scope: event.target.value }))}>
-                  <option value="GLOBAL">GLOBAL</option>
-                  <option value="WORKSPACE">WORKSPACE</option>
+                  <option value="GLOBAL">{t("knowledge.scopeValue.GLOBAL")}</option>
+                  <option value="WORKSPACE">{t("knowledge.scopeValue.WORKSPACE")}</option>
                 </select>
               </label>
             </div>
             <label className="block text-sm font-semibold">
-              {language === "vi" ? "Mô tả ngắn (tùy chọn)" : "Short description (optional)"}
+              {t("knowledge.shortDescriptionOptional")}
               <textarea className="form-field mt-xs min-h-24" maxLength={500} value={form.description} onChange={(event) => setForm((previous) => ({ ...previous, description: event.target.value }))} />
             </label>
             {selectedFile && (
               <div className="grid gap-sm rounded-xl border border-legal-border p-md text-sm dark:border-slate-700 sm:grid-cols-2">
-                <p><span className="text-on-surface-variant">File:</span> <strong>{selectedFile.name}</strong></p>
-                <p><span className="text-on-surface-variant">Content type:</span> {selectedFile.type || "application/octet-stream"}</p>
-                <p><span className="text-on-surface-variant">Dung lượng:</span> {(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
-                <p><span className="text-on-surface-variant">Uploaded at:</span> {new Date().toLocaleString(locale)}</p>
+                <p><span className="text-on-surface-variant">{t("common.file")}:</span> <strong>{selectedFile.name}</strong></p>
+                <p><span className="text-on-surface-variant">{t("knowledge.contentType")}:</span> {selectedFile.type || "application/octet-stream"}</p>
+                <p><span className="text-on-surface-variant">{t("knowledge.fileSize")}:</span> {fileSizeFormatter.format(selectedFile.size / 1024 / 1024)} MB</p>
+                <p><span className="text-on-surface-variant">{t("documents.uploadedAt")}:</span> {new Date().toLocaleString(locale)}</p>
               </div>
             )}
-            <div className="flex flex-wrap justify-end gap-sm border-t border-legal-border pt-md dark:border-slate-700">
-              <Button variant="secondary" onClick={() => { setForm(emptyForm); setSelectedFile(null); setSelectedFileName(""); }} disabled={saving}>Hủy</Button>
-              <Button variant="secondary" onClick={() => void handleUpload(false)} disabled={saving}>{saving ? (language === "vi" ? "Đang gửi tới backend..." : "Submitting to backend...") : "Lưu nháp"}</Button>
+            <div className="flex flex-wrap justify-end gap-sm border-t border-legal-border pt-lg dark:border-slate-700">
+              <Button variant="secondary" onClick={() => { setForm(emptyForm); setSelectedFile(null); setSelectedFileName(""); }} disabled={saving}>{t("actions.cancel")}</Button>
+              <Button variant="secondary" onClick={() => void handleUpload(false)} disabled={saving}>{saving ? t("knowledge.submitting") : t("knowledge.saveDraft")}</Button>
               <Button leftIcon={<Upload className="h-4 w-4" />} onClick={() => void handleUpload(true)} disabled={saving || !selectedFile}>
-                {saving ? (language === "vi" ? "Đang gửi tới backend..." : "Submitting to backend...") : "Bắt đầu ingest"}
+                {saving ? t("knowledge.submitting") : t("knowledge.startIngest")}
               </Button>
             </div>
 
@@ -299,11 +382,11 @@ export function KnowledgeBasePage() {
                   <div>
                     <p className="font-semibold">{t("knowledge.ingestProgress")}</p>
                     <p className="text-on-surface-variant dark:text-slate-400">
-                      {activeJob.status === "PROCESSING" ? t("knowledge.ingestRunningInBackground") : activeJob.status === "INGESTED" ? t("knowledge.backgroundIngestSuccess") : activeJob.errorMessage || t("knowledge.backgroundIngestFailed")}
+                      {activeJob.status === "PROCESSING" ? t("knowledge.ingestRunningInBackground") : activeJob.status === "INGESTED" ? t("knowledge.backgroundIngestSuccess") : t("knowledge.backgroundIngestFailed")}
                     </p>
                   </div>
                   <Badge tone={activeJob.status === "INGESTED" ? "green" : activeJob.status === "FAILED" ? "red" : "amber"}>
-                    {activeJob.status} · {activeJob.progressPercent ?? 0}%
+                    {translateEnum(activeJob.status, knowledgeStatusKeys)} · {activeJob.progressPercent ?? 0}%
                   </Badge>
                 </div>
                 <div className="mt-sm h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
@@ -320,21 +403,103 @@ export function KnowledgeBasePage() {
               <ArrowRight className="h-4 w-4" />
               <div><span className="font-semibold text-on-surface dark:text-slate-200">2</span><br />{t("knowledge.ingest")}</div>
               <ArrowRight className="h-4 w-4" />
-              <div><span className="font-semibold text-on-surface dark:text-slate-200">3</span><br />{language === "vi" ? "Duyệt & công khai" : "Approve & publish"}</div>
+              <div><span className="font-semibold text-on-surface dark:text-slate-200">3</span><br />{t("knowledge.approvePublishStep")}</div>
             </div>
           </div>
         </Card>
 
-        <Card title={t("knowledge.entries")} actions={<Badge tone="blue">{totalItems}</Badge>}>
-          <div className="mb-md space-y-md rounded-2xl border border-primary/20 bg-primary/5 p-md dark:border-indigo-400/20 dark:bg-indigo-950/20">
-            <h3 className="font-semibold">Hướng dẫn nhập tài liệu</h3>
-            <ul className="space-y-xs text-sm text-on-surface-variant dark:text-slate-300">
-              <li>✓ PDF, DOC, DOCX, TXT, Markdown, CSV, JSON</li>
-              <li>✓ AI xử lý nền; bạn có thể rời trang</li>
-              <li>✓ Khi admin duyệt, tài liệu được công khai và dùng cho RAG ngay</li>
-              <li>✓ Có thể tải lại file gốc sau khi upload</li>
+        <Card title={t("knowledge.entries")}>
+          <div className="mb-lg rounded-2xl border border-legal-border bg-surface-container-low p-md dark:border-slate-700 dark:bg-slate-900/60">
+            <div className="mb-md flex items-center gap-sm">
+              <SlidersHorizontal className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-semibold">{t("knowledge.listTools")}</h3>
+            </div>
+            <form
+              className="flex flex-col gap-sm sm:flex-row"
+              onSubmit={(event) => {
+                event.preventDefault();
+                applySearch();
+              }}
+            >
+              <label className="relative min-w-0 flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
+                <input
+                  className="form-field pl-10"
+                  value={searchInput}
+                  onChange={(event) => setSearchInput(event.target.value)}
+                  placeholder={t("knowledge.listSearchPlaceholder")}
+                  aria-label={t("knowledge.listSearchPlaceholder")}
+                />
+              </label>
+              <Button type="submit" leftIcon={<Search className="h-4 w-4" />} disabled={loading}>
+                {t("knowledge.searchButton")}
+              </Button>
+              <Button type="button" variant="secondary" leftIcon={<RotateCcw className="h-4 w-4" />} onClick={resetFilters} disabled={loading}>
+                {t("knowledge.resetFilters")}
+              </Button>
+            </form>
+
+            <div className="mt-md grid gap-sm sm:grid-cols-2 2xl:grid-cols-3">
+              <label className="text-xs font-semibold text-on-surface-variant">
+                {t("table.status")}
+                <select className="form-field mt-xs" value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(0); }}>
+                  <option value="">{t("knowledge.allStatuses")}</option>
+                  {knowledgeStatuses.map((status) => <option key={status} value={status}>{translateEnum(status, knowledgeStatusKeys)}</option>)}
+                </select>
+              </label>
+              <label className="text-xs font-semibold text-on-surface-variant">
+                {t("knowledge.scope")}
+                <select className="form-field mt-xs" value={scopeFilter} onChange={(event) => { setScopeFilter(event.target.value); setPage(0); }}>
+                  <option value="">{t("knowledge.allScopes")}</option>
+                  <option value="GLOBAL">{t("knowledge.scopeValue.GLOBAL")}</option>
+                  <option value="WORKSPACE">{t("knowledge.scopeValue.WORKSPACE")}</option>
+                </select>
+              </label>
+              <label className="text-xs font-semibold text-on-surface-variant">
+                {t("knowledge.category")}
+                <select className="form-field mt-xs" value={categoryFilter} onChange={(event) => { setCategoryFilter(event.target.value); setPage(0); }}>
+                  <option value="">{t("knowledge.allCategories")}</option>
+                  <option value="LEGAL_SOURCE">{t("knowledge.categoryValue.LEGAL_SOURCE")}</option>
+                </select>
+              </label>
+              <label className="text-xs font-semibold text-on-surface-variant">
+                {t("knowledge.ingestedDocuments.active")}
+                <select className="form-field mt-xs" value={activeFilter} onChange={(event) => { setActiveFilter(event.target.value); setPage(0); }}>
+                  <option value="">{t("knowledge.allActivity")}</option>
+                  <option value="true">{t("knowledge.activeOnly")}</option>
+                  <option value="false">{t("knowledge.inactiveOnly")}</option>
+                </select>
+              </label>
+              <label className="text-xs font-semibold text-on-surface-variant">
+                <span className="flex items-center gap-xs"><ArrowUpDown className="h-3.5 w-3.5" />{t("knowledge.primarySort")}</span>
+                <select className="form-field mt-xs" value={primarySort} onChange={(event) => {
+                  const nextPrimarySort = event.target.value;
+                  setPrimarySort(nextPrimarySort);
+                  if (sortField(nextPrimarySort) === sortField(secondarySort)) setSecondarySort("");
+                  setPage(0);
+                }}>
+                  {sortValues.map((sort) => <option key={sort} value={sort}>{t(`knowledge.sort.${sort.replace(",", ".")}`)}</option>)}
+                </select>
+              </label>
+              <label className="text-xs font-semibold text-on-surface-variant">
+                <span className="flex items-center gap-xs"><ArrowUpDown className="h-3.5 w-3.5" />{t("knowledge.secondarySort")}</span>
+                <select className="form-field mt-xs" value={secondarySort} onChange={(event) => { setSecondarySort(event.target.value); setPage(0); }}>
+                  <option value="">{t("knowledge.noSecondarySort")}</option>
+                  {sortValues.filter((sort) => sortField(sort) !== sortField(primarySort)).map((sort) => <option key={sort} value={sort}>{t(`knowledge.sort.${sort.replace(",", ".")}`)}</option>)}
+                </select>
+              </label>
+            </div>
+            <p className="mt-md text-xs text-on-surface-variant">{t("knowledge.filteredResults", { count: totalItems })}</p>
+          </div>
+          <div className="mb-lg space-y-sm rounded-2xl border border-primary/20 bg-primary/5 p-lg dark:border-indigo-400/20 dark:bg-indigo-950/20">
+            <h3 className="font-semibold">{t("knowledge.guideTitle")}</h3>
+            <ul className="grid gap-xs text-sm text-on-surface-variant dark:text-slate-300 2xl:grid-cols-2">
+              <li>✓ {t("knowledge.guideSupportedFormats")}</li>
+              <li>✓ {t("knowledge.guideBackgroundProcessing")}</li>
+              <li>✓ {t("knowledge.guidePublish")}</li>
+              <li>✓ {t("knowledge.guideSourceDownload")}</li>
             </ul>
-            <div className="flex flex-wrap gap-xs"><Badge tone="amber">PENDING</Badge><Badge tone="amber">PROCESSING</Badge><Badge tone="green">INGESTED</Badge><Badge tone="purple">REVIEWING</Badge><Badge tone="green">PUBLIC</Badge><Badge tone="red">FAILED</Badge></div>
+            <div className="flex flex-wrap gap-xs"><Badge tone="amber">{t("knowledge.status.PENDING")}</Badge><Badge tone="amber">{t("knowledge.status.PROCESSING")}</Badge><Badge tone="green">{t("knowledge.status.INGESTED")}</Badge><Badge tone="purple">{t("knowledge.status.REVIEWING")}</Badge><Badge tone="green">{t("knowledge.status.PUBLIC")}</Badge><Badge tone="red">{t("knowledge.status.FAILED")}</Badge></div>
           </div>
           {error ? (
             <div role="alert" className="text-sm text-error">{error} <Button variant="secondary" onClick={() => void loadEntries()}>{t("common.retry")}</Button></div>

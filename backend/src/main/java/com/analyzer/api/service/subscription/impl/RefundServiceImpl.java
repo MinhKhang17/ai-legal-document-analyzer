@@ -165,15 +165,25 @@ public class RefundServiceImpl implements RefundService {
     @Override
     @Transactional
     public RefundResponseDTO confirmRefundEmail(String token) {
-        RefundRequest refund = refundRequestRepository.findByConfirmationTokenHash(sha256(token))
-                .orElseThrow(() -> new ResourceNotFoundException("REFUND_CONFIRMATION_TOKEN_INVALID"));
-        if (refund.getConfirmationExpiresAt() == null || LocalDateTime.now().isAfter(refund.getConfirmationExpiresAt())) {
-            throw new ConflictException("REFUND_CONFIRMATION_TOKEN_EXPIRED");
+        String tokenHash = sha256(token);
+        var refundWithActiveToken = refundRequestRepository.findByConfirmationTokenHash(tokenHash);
+        if (refundWithActiveToken.isEmpty()) {
+            if (refundRequestRepository.findByConfirmationUsedTokenHash(tokenHash).isPresent()) {
+                throw new ConflictException("TOKEN_ALREADY_USED");
+            }
+            throw new ResourceNotFoundException("TOKEN_INVALID");
         }
-        if (refund.getStatus() == RefundStatus.EMAIL_CONFIRMED || refund.getEmailConfirmedAt() != null) return toResponse(refund);
+        RefundRequest refund = refundWithActiveToken.get();
+        if (refund.getConfirmationExpiresAt() == null || LocalDateTime.now().isAfter(refund.getConfirmationExpiresAt())) {
+            throw new ConflictException("TOKEN_EXPIRED");
+        }
+        if (refund.getStatus() == RefundStatus.EMAIL_CONFIRMED || refund.getEmailConfirmedAt() != null) {
+            throw new ConflictException("TOKEN_ALREADY_USED");
+        }
         if (refund.getStatus() != RefundStatus.WAITING_EMAIL_CONFIRMATION) throw new ConflictException("REFUND_CONFIRMATION_NOT_ALLOWED");
         refund.setStatus(RefundStatus.EMAIL_CONFIRMED);
         refund.setEmailConfirmedAt(LocalDateTime.now());
+        refund.setConfirmationUsedTokenHash(tokenHash);
         refund.setConfirmationTokenHash(null);
         refund.setAdminNote("Email confirmed; admin can create refund order");
         return toResponse(refundRequestRepository.save(refund));

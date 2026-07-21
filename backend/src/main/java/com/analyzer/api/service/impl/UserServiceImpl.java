@@ -206,6 +206,30 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
+    public void softDeleteUser(Long userId, Long currentAdminId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với id: " + userId));
+
+        if (user.getId().equals(currentAdminId)) {
+            throw new ForbiddenException("Bạn không thể tự vô hiệu hóa / xóa tài khoản Admin của chính mình");
+        }
+
+        user.setActive(false);
+        userRepository.save(user);
+    }
+
+    @Override
+    @Transactional
+    public void restoreUser(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với id: " + userId));
+
+        user.setActive(true);
+        userRepository.save(user);
+    }
+
+    @Override
+    @Transactional
     public void requestPasswordReset(String email) {
         if (!StringUtils.hasText(email)) return;
         userRepository.findByEmail(email.trim().toLowerCase()).ifPresent(user -> {

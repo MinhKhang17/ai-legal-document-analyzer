@@ -104,6 +104,140 @@ VAGUE_QUESTIONS = {
         "Any problems?",
         "Check it",
     ],
+
+    # ═══════════════════════════════════════════════════
+    # CÂU HỎI MỚI BỔ SUNG ĐỂ TRAIN AI
+    # ═══════════════════════════════════════════════════
+
+    "Đặt cọc & Bảo đảm": [
+        "Phân tích phần đặt cọc",
+        "Tiền cọc có hợp lý không?",
+        "Đặt cọc bao nhiêu?",
+        "Mức đặt cọc có đúng quy định không?",
+        "Điều kiện hoàn trả cọc thế nào?",
+        "Khi nào bị mất cọc?",
+        "Tiền cọc có được trả lại không?",
+        "Cọc 3 tháng có nhiều quá không?",
+        "Có quy định về phạt cọc không?",
+        "Thiếu điều khoản hoàn trả cọc",
+        "So sánh mức cọc với Điều 328 BLDS",
+        "Tiền cọc có tính vào tháng cuối không?",
+    ],
+
+    "Thanh toán": [
+        "Phương thức thanh toán có rủi ro gì?",
+        "Lãi chậm thanh toán bao nhiêu?",
+        "Thời hạn thanh toán thế nào?",
+        "Thanh toán trước hay sau?",
+        "Lãi suất chậm trả có hợp lý không?",
+        "Giá thuê có được tăng không?",
+        "Cách tính tiền thuê trong hợp đồng",
+        "Chậm thanh toán thì bị phạt bao nhiêu?",
+        "Giá thuê đã bao gồm VAT chưa?",
+    ],
+
+    "Chấm dứt hợp đồng": [
+        "Nếu tôi muốn chấm dứt sớm thì sao?",
+        "Điều kiện chấm dứt hợp đồng?",
+        "Muốn hủy hợp đồng phải làm gì?",
+        "Báo trước bao lâu để chấm dứt?",
+        "Đơn phương chấm dứt có được không?",
+        "Hậu quả khi chấm dứt sớm?",
+        "Chủ nhà có quyền đuổi không?",
+        "Muốn dừng thuê sớm mà không mất cọc?",
+        "Hết hạn hợp đồng thì sao?",
+        "Gia hạn hợp đồng thế nào?",
+    ],
+
+    "Quyền và nghĩa vụ": [
+        "Quyền của bên thuê có đầy đủ không?",
+        "Nghĩa vụ của tôi là gì?",
+        "Quyền và nghĩa vụ có cân bằng không?",
+        "Bên cho thuê có quyền gì?",
+        "Tôi có quyền sửa chữa nhà không?",
+        "Ai chịu trách nhiệm sửa chữa?",
+        "Chủ nhà có được vào nhà không?",
+        "Có được cho thuê lại không?",
+        "Trách nhiệm của mỗi bên",
+        "Có điều khoản bất lợi cho tôi không?",
+    ],
+
+    "Phạt vi phạm": [
+        "Mức phạt này có hợp lý không?",
+        "Phạt vi phạm bao nhiêu phần trăm?",
+        "Mức phạt tối đa là bao nhiêu?",
+        "Phạt vi phạm có kèm bồi thường không?",
+        "Có bị phạt khi chấm dứt sớm không?",
+        "Điều khoản phạt có đúng luật không?",
+        "Phạt 8% có đúng quy định không?",
+    ],
+
+    "Bất khả kháng": [
+        "Có điều khoản bất khả kháng không?",
+        "Dịch bệnh có phải bất khả kháng không?",
+        "Thiên tai thì xử lý sao?",
+        "Nếu xảy ra sự kiện bất ngờ thì sao?",
+        "Thiếu điều khoản bất khả kháng",
+        "Force majeure trong hợp đồng",
+    ],
+
+    "Thuế và phí": [
+        "Ai chịu thuế cho thuê?",
+        "Thuế cho thuê nhà bao nhiêu?",
+        "Có phí phát sinh nào không?",
+        "Chi phí điện nước tính sao?",
+        "Phí quản lý ai trả?",
+        "Thuế VAT tính thế nào?",
+        "Chi phí ngoài hợp đồng?",
+    ],
+
+    "Tranh chấp": [
+        "Nếu xảy ra tranh chấp thì xử lý sao?",
+        "Giải quyết tranh chấp thế nào?",
+        "Phương thức giải quyết tranh chấp?",
+        "Tòa án nào có thẩm quyền?",
+        "Có được đưa ra trọng tài không?",
+        "Cần chứng cứ gì khi tranh chấp?",
+        "Thời hiệu khởi kiện bao lâu?",
+        "Hòa giải trước khi kiện?",
+    ],
+
+    "So sánh với pháp luật": [
+        "Hợp đồng có đúng luật không?",
+        "So sánh với Bộ luật Dân sự 2015",
+        "Có phù hợp quy định pháp luật không?",
+        "Điều khoản nào trái luật?",
+        "Có vi phạm Luật Nhà ở không?",
+        "Theo pháp luật thì thế nào?",
+        "Căn cứ pháp lý nào áp dụng?",
+    ],
+
+    "Câu hỏi tiếp nối": [
+        "Giải thích rõ hơn phần đó",
+        "Còn gì nữa không?",
+        "Phần đó là sao?",
+        "Nói thêm về điểm này",
+        "Chi tiết hơn được không?",
+        "Tại sao lại rủi ro?",
+        "Ý bạn là gì?",
+        "Liên quan đến điều gì?",
+        "Phân tích sâu hơn được không?",
+        "Có ví dụ cụ thể không?",
+    ],
+
+    "Tư vấn và hành động": [
+        "Tôi nên làm gì?",
+        "Có nên ký không?",
+        "Tôi nên sửa điều gì?",
+        "Cần bổ sung gì?",
+        "Nên thương lượng lại điều gì?",
+        "Làm sao để bảo vệ quyền lợi?",
+        "Tôi cần chuẩn bị gì trước khi ký?",
+        "Điều khoản nào nên thêm vào?",
+        "Có nên nhờ luật sư không?",
+        "Sửa hợp đồng chỗ nào?",
+        "Đề xuất sửa đổi?",
+    ],
 }
 
 def test_vague_question(question: str, user_id: str = "user_demo") -> Dict[str, Any]:

@@ -1,0 +1,123 @@
+FLOW 12 - DOANH THU / THANH TOÁN CHO EXPERT
+
+LƯU Ý QUAN TRỌNG (khác các flow 01-11):
+- Backend API cho flow này ĐÃ có thật trong code và đã có test.
+- Frontend ĐÃ có màn hình, route và service tích hợp các API revenue.
+- Expert dùng `/lawyer/revenue`; Admin dùng `/admin/revenue` và card thanh toán trong `/admin/tickets/:ticketId`.
+- Chi tiết API, business logic, edge case: xem `backend/docs/expert_revenue_api.md`.
+
+CẬP NHẬT 2026-07-21 — backend đã thêm hoa hồng tự động + các API admin mới:
+- `ExpertRevenueTicketResponse` giờ có thêm `commissionRate`, `platformFee`, `expertPayout` (bên cạnh `consultationFee` cũ) — FE nên hiển thị cả 3 field này, không chỉ `consultationFee`.
+- `GET /api/v1/expert/revenue/tickets` đổi từ trả `List<...>` sang `PageResponse<...>` (nhận thêm query param `page`/`size`) — đây là breaking change nếu FE đã từng code tạm theo response cũ.
+- `ExpertRevenueSummaryResponse` có thêm `totalPlatformFee`, `totalExpertPayout`.
+- 3 API mới cho Admin (ngoài phạm vi trang expert ở dưới, cần màn hình admin riêng):
+  - `GET /api/v1/admin/revenue/settings`, `PATCH /api/v1/admin/revenue/settings` — xem/sửa tỷ lệ hoa hồng chung.
+  - `GET /api/v1/admin/revenue/overview` — tổng quan doanh thu toàn hệ thống, có breakdown theo từng expert.
+  - `POST /api/v1/admin/tickets/{id}/expert-payment/reset` — xoá sạch phí/hoa hồng của 1 ticket để mở khoá reassign lawyer (xem flow 05, mục edge cases). Chặn nếu ticket đã `PAID`.
+- `reassign-lawyer` (flow 05) giờ có thể trả 409 nếu ticket đã có dữ liệu tài chính — xem chi tiết ở flow 05.
+- Chi tiết đầy đủ: xem lại `backend/docs/expert_revenue_api.md` (đã cập nhật cùng ngày).
+
+Mục tiêu:
+- Cho Admin nhập/chỉnh phí tư vấn (`consultationFee`) và trạng thái thanh toán cho expert trên 1 ticket đã có expert phụ trách.
+- Cho Expert xem tổng quan doanh thu và danh sách ticket kèm phí/trạng thái thanh toán của mình.
+
+Actor:
+- `ADMIN` (ghi)
+- `EXPERT` (chỉ đọc)
+
+Điểm bắt đầu (đề xuất):
+- Admin: thêm 1 block/card trong route đã có `/admin/tickets/:ticketId` (file `AdminTicketDetailPage.tsx`), không cần route mới.
+- Expert: route mới, đề xuất `/lawyer/revenue`.
+
+Điều kiện tiên quyết:
+- Admin chỉ thao tác được khi ticket đã có `assignedLawyer` (BE trả lỗi 409 nếu chưa gán expert — xem mục 4.1 file `expert_revenue_api.md`).
+- Expert chỉ thấy dữ liệu của chính mình (BE tự lọc theo token, không cần FE truyền expertId).
+
+Luồng chính (đề xuất):
+1. Admin mở chi tiết 1 ticket đã gán expert (`AdminTicketDetailPage`).
+2. FE hiển thị card "Thanh toán chuyên gia" với: input số tiền (`consultationFee`), select trạng thái (`UNPAID`/`PENDING`/`PAID`).
+3. Admin nhập và bấm lưu → FE gọi `PATCH /api/v1/admin/tickets/{id}/expert-payment`.
+4. FE hiển thị lại giá trị đã lưu (không có field nào khác được BE trả về ngoài những gì đã gửi + `paidAt`).
+5. Expert mở trang doanh thu (`/lawyer/revenue`).
+6. FE gọi `GET /api/v1/expert/revenue` (tổng quan) và `GET /api/v1/expert/revenue/tickets` (danh sách) song song.
+7. FE hiển thị 3-4 thẻ tổng quan (tổng ticket được gán, đã resolve, đã trả, đang chờ trả + tổng tiền) và 1 bảng liệt kê từng ticket.
+
+Sơ đồ text:
+- Admin: `mở ticket detail -> nhập phí + trạng thái -> lưu -> PATCH expert-payment -> hiển thị lại`
+- Expert: `mở trang doanh thu -> GET summary + GET tickets song song -> hiển thị thẻ tổng quan + bảng`
+
+Màn hình / component (đề xuất, tái dùng component có sẵn):
+- Admin: thêm 1 `Card` mới vào `frontend/src/pages/admin/AdminTicketDetailPage.tsx` (khu vực aside, cạnh các card hành động khác như assign-lawyer/reject/approve).
+- Expert: trang mới `frontend/src/pages/lawyer/LawyerRevenuePage.tsx`, tái dùng `Card`/`Badge`/`DataTable`/`PageHeader`/`EmptyState` giống `LawyerTicketsPage.tsx`.
+
+Dữ liệu / state (đề xuất):
+- Admin card: `consultationFee` (number/string input), `paymentStatus` (select), `saving`, `error`.
+- Expert page: `summary` (`ExpertRevenueSummaryResponse`), `tickets` (`ExpertRevenueTicketResponse[]`), `loading`, `error`.
+
+Validation:
+- `consultationFee` phải >= 0 (BE validate `@DecimalMin("0.00")`, FE nên chặn trước khi gửi để tránh round-trip lỗi 400).
+- `paymentStatus` bắt buộc chọn 1 trong 3 giá trị enum, không có giá trị mặc định rỗng.
+
+API / service tích hợp:
+- FE sử dụng `frontend/src/services/expertRevenue.service.ts`, endpoint constants trong `frontend/src/config/api.ts` và cấu hình mẫu trong `frontend/.env.example`.
+- BE:
+  - `PATCH /api/v1/admin/tickets/{id}/expert-payment` — quyền `ADMIN`
+  - `GET /api/v1/expert/revenue` — quyền `EXPERT`
+  - `GET /api/v1/expert/revenue/tickets?page=&size=` — quyền `EXPERT` (đã phân trang từ 2026-07-21)
+  - `GET /api/v1/admin/revenue/settings`, `PATCH /api/v1/admin/revenue/settings` — quyền `ADMIN` (cấu hình % hoa hồng)
+  - `GET /api/v1/admin/revenue/overview` — quyền `ADMIN` (tổng quan toàn hệ thống + breakdown theo expert)
+  - `POST /api/v1/admin/tickets/{id}/expert-payment/reset` — quyền `ADMIN` (xoá phí/hoa hồng để mở khoá reassign, chặn nếu đã `PAID`)
+
+UI states:
+- Admin card: ẩn hoàn toàn hoặc disable nếu ticket chưa có `assignedLawyer` (tránh gọi API rồi nhận lỗi 409).
+- Expert page: empty state nếu `assignedTicketCount = 0`; loading skeleton trong lúc gọi song song 2 API.
+- Cả 2 phía: hiển thị badge màu theo `paymentStatus` (`UNPAID` = xám, `PENDING` = vàng, `PAID` = xanh) — theo đúng tone convention đã dùng ở `AdminTicketsPage.tsx` (`Badge tone=...`).
+
+Edge cases (bắt buộc FE xử lý theo đúng hành vi BE, xem chi tiết mục 4 trong `expert_revenue_api.md`):
+- BE không chặn set phí cho ticket chưa resolve — FE nên cảnh báo mềm ("phí sẽ chỉ tính vào doanh thu sau khi ticket được resolve/close") thay vì coi là lỗi.
+- **(Cập nhật 2026-07-21)** Reassign lawyer (ở flow 05) giờ bị **chặn hẳn** (409) nếu ticket đã có phí/hoa hồng — không còn tình trạng "âm thầm giữ số cũ" như trước. Nếu FE muốn cho phép admin reassign ticket đã resolve, cần thêm nút "Reset thanh toán" gọi `POST /api/v1/admin/tickets/{id}/expert-payment/reset` (đặt cạnh nút reassign ở `AdminTicketDetailPage`), có thể kèm modal xác nhận vì hành động này xoá sạch dữ liệu tài chính đã nhập.
+- `GET /expert/revenue/tickets` đã phân trang (`page`/`size`), FE nên dùng component `Pagination` có sẵn (giống `AdminTicketsPage.tsx`) thay vì tự virtualize. Riêng `GET /expert/revenue` (summary) vẫn luôn tính trên toàn bộ ticket của expert, không phân trang (đúng bản chất API tổng hợp).
+- Set `PAID` nhiều lần sẽ cập nhật lại `paidAt` mỗi lần — FE nên hiển thị rõ `paidAt` hiện tại để admin biết đang ghi đè.
+
+Business rules:
+- Chỉ ticket loại `CONTACT_EXPERT`/`SYSTEM_ERROR`/`QUERY_ERROR` có thể có `assignedLawyer` → chỉ các loại này xuất hiện trong doanh thu. `REFUND_REQUEST` không bao giờ có expert.
+- Doanh thu tính theo status hiện tại (`RESOLVED`/`CLOSED`) của ticket tại thời điểm gọi API, không phải lịch sử.
+
+Quyền:
+- Card thanh toán chỉ hiển thị/thao tác được khi user hiện tại có role `ADMIN`.
+- Trang doanh thu chỉ truy cập được khi role `EXPERT` (dùng guard route giống các route `/lawyer/*` khác).
+
+File nguồn tham chiếu:
+- BE:
+  - `backend/src/main/java/com/analyzer/api/controller/admin/AdminTicketManagementController.java`
+  - `backend/src/main/java/com/analyzer/api/controller/lawyer/ExpertRevenueController.java`
+  - `backend/src/main/java/com/analyzer/api/service/impl/ExpertRevenueServiceImpl.java`
+  - `backend/src/main/java/com/analyzer/api/dto/revenue/*`
+  - `backend/docs/expert_revenue_api.md` (tài liệu chi tiết logic + edge case)
+- FE: chưa có file nào — đây là phần cần tạo mới.
+
+Điểm chưa rõ:
+- `CHƯA XÁC ĐỊNH`: đơn vị tiền tệ hiển thị (VND giả định theo phần billing khác của hệ thống, nhưng API không trả field currency).
+- ĐÃ CÓ (cập nhật 2026-07-21): Admin giờ có `GET /api/v1/admin/revenue/overview` để xem tổng doanh thu toàn hệ thống + breakdown theo expert — FE nên làm thêm 1 màn/tab admin riêng cho endpoint này (không nằm trong luồng ticket detail ở trên).
+- ĐÃ CÓ (cập nhật 2026-07-21): hệ thống đã có % hoa hồng platform (`commissionRate`), cấu hình qua `GET`/`PATCH /api/v1/admin/revenue/settings`. FE cần thêm 1 form nhỏ cho admin chỉnh tỷ lệ này (input percent 0-100%, gửi lên dạng số thập phân 0-1).
+
+Checklist FE:
+- Không gọi API thanh toán khi ticket chưa có `assignedLawyer`.
+- Hiển thị rõ ràng phí hiện tại chỉ tính vào doanh thu khi ticket đã resolve/close.
+- Format tiền theo `formatVndCurrency` (đã có sẵn ở `frontend/src/utils/format.ts`, đang dùng ở `AdminConsolePage.tsx`) để đồng bộ với các màn hình billing khác.
+- Thêm i18n key mới vào cả 2 object `en`/`vi` trong `frontend/src/utils/i18n.ts` (đây là file tập trung duy nhất, không có JSON locale riêng).
+
+Tiêu chí hoàn thành:
+- Admin xem, nhập, lưu được phí + trạng thái thanh toán trên 1 ticket đã gán expert.
+- Expert xem được tổng quan doanh thu và danh sách ticket kèm phí của mình.
+
+HIỆN TRẠNG:
+- Backend đầy đủ, có test (`ExpertRevenueServiceImplTest.java`).
+- Frontend đã có trang doanh thu Expert, tổng quan/cấu hình doanh thu Admin và thao tác thanh toán theo ticket.
+
+SUY LUẬN:
+- Tính năng bị bỏ lại phía sau các flow ticket khác (04, 05, 06) — có thể do ưu tiên xử lý ticket được làm trước, phần thanh toán/doanh thu chưa tới lượt.
+
+ĐỀ XUẤT:
+- FE nên làm flow này sau khi đã ổn định flow 05/06 (admin duyệt ticket, lawyer xử lý ticket), vì phụ thuộc trực tiếp vào ticket đã có `assignedLawyer` và trạng thái `RESOLVED`/`CLOSED`.
+- Nên chốt với backend/product câu hỏi về hoa hồng % trước khi làm UI, vì nếu có sẽ đổi schema response (`ExpertRevenueTicketResponse` sẽ có thêm field) — tránh phải sửa UI 2 lần.

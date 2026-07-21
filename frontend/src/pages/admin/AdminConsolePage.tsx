@@ -1,5 +1,5 @@
-import { Cpu, Database, Monitor, Moon, MoreHorizontal, Palette, Receipt, RefreshCw, ShieldCheck, Sun, UserPlus, UsersRound } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Cpu, Database, Monitor, Moon, MoreHorizontal, Palette, Receipt, RefreshCw, RotateCcw, ShieldCheck, Sun, Trash2, UserPlus, UsersRound } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AdminMetricCard } from '../../components/admin/AdminMetricCard';
 import { Badge } from '../../components/common/Badge';
@@ -9,6 +9,7 @@ import { DataTable, type DataTableColumn } from '../../components/common/DataTab
 import { EmptyState } from '../../components/common/EmptyState';
 import { Modal } from '../../components/common/Modal';
 import { PageHeader } from '../../components/common/PageHeader';
+import { Pagination } from '../../components/common/Pagination';
 import { ProgressBar } from '../../components/common/ProgressBar';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { Tabs } from '../../components/common/Tabs';
@@ -23,14 +24,16 @@ import {
   getSubscriptionPlans,
   updateSubscriptionPlan,
 } from '../../services/subscription.service';
-import { createExpert, getAdminExperts, getUserDetail, getUsers, resendExpertActivation, type BackendUser } from '../../services/user.service';
+import { createExpert, deleteUser, getAdminExperts, getUserDetail, getUsers, resendExpertActivation, restoreUser, type BackendUser } from '../../services/user.service';
 import { useAppStore, type ThemeMode } from '../../store/AppStore';
 import type { LegalTicket } from '../../types/legalTicket';
 import { getLegalTicketStatusLabel } from '../../types/legalTicketStatus';
 import type { PaymentTransaction } from '../../types/paymentTransaction';
 import type { SubscriptionPlan, SubscriptionPlanRequest } from '../../types/subscription';
 import type { WorkspaceUser } from '../../types/user';
-import { formatDisplayDate, formatVndCurrency } from '../../utils/format';
+import { getAdminTicketLoadErrorMessage, getSafeApiErrorStatus } from '../../utils/adminTicketError';
+import { formatDisplayDate, formatNumber, formatVndCurrency, localeForLanguage } from '../../utils/format';
+import { clampPage } from '../../utils/pagination';
 
 type AdminTabId = 'users' | 'plans' | 'tickets' | 'workspace' | 'language' | 'theme' | 'security' | 'aiConfig';
 
@@ -52,6 +55,7 @@ const themeOptions: Array<{ mode: ThemeMode; labelKey: string; icon: typeof Sun 
 ];
 
 const legalTextSizes = ['16px', '18px', '20px'] as const;
+const ADMIN_TICKET_PAGE_SIZE = 10;
 
 const emptyPlanForm: SubscriptionPlanRequest = {
   planName: '',
@@ -93,13 +97,13 @@ const getInitials = (user: BackendUser) => {
     .slice(0, 2);
 };
 
-const toWorkspaceUser = (user: BackendUser): WorkspaceUser => ({
+const toWorkspaceUser = (user: BackendUser, lastAccess: string): WorkspaceUser => ({
   id: String(user.id),
   name: `${user.firstName} ${user.lastName}`.trim() || user.email,
   email: user.email,
   role: user.role,
   status: user.active ? 'active' : 'offline',
-  lastAccess: 'Backend does not provide last access',
+  lastAccess,
   initials: getInitials(user),
 });
 
@@ -107,7 +111,7 @@ export function AdminConsolePage() {
   const { t, language } = useI18n();
   const toast = useToast();
   const { theme, setTheme } = useAppStore();
-  const locale = language === 'vi' ? 'vi-VN' : 'en-US';
+  const locale = localeForLanguage(language);
   const [activeTab, setActiveTab] = useState<AdminTabId>('users');
   const [legalTextSize, setLegalTextSize] = useState<(typeof legalTextSizes)[number]>('18px');
   const [backendUsers, setBackendUsers] = useState<BackendUser[]>([]);
@@ -115,6 +119,11 @@ export function AdminConsolePage() {
   const [paymentTransactions, setPaymentTransactions] = useState<PaymentTransaction[]>([]);
   const [subscriptionPlans, setSubscriptionPlans] = useState<SubscriptionPlan[]>([]);
   const [legalTickets, setLegalTickets] = useState<LegalTicket[]>([]);
+  const [ticketPage, setTicketPage] = useState(0);
+  const [ticketPageSize, setTicketPageSize] = useState(ADMIN_TICKET_PAGE_SIZE);
+  const [ticketTotalItems, setTicketTotalItems] = useState(0);
+  const [ticketTotalPages, setTicketTotalPages] = useState(0);
+  const [isLoadingTickets, setIsLoadingTickets] = useState(true);
   const [isLoadingAdminData, setIsLoadingAdminData] = useState(true);
   const [adminError, setAdminError] = useState<string | null>(null);
   const [selectedUserDetail, setSelectedUserDetail] = useState<BackendUser | null>(null);
@@ -132,26 +141,65 @@ export function AdminConsolePage() {
   const [createExpertOpen, setCreateExpertOpen] = useState(false);
   const [savingExpert, setSavingExpert] = useState(false);
   const [expertForm, setExpertForm] = useState({ firstName: '', lastName: '', email: '', specialty: '', legalDomain: '', description: '' });
+  const [isDeleteUserModalOpen, setIsDeleteUserModalOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<WorkspaceUser | null>(null);
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+  const ticketRequestSequenceRef = useRef(0);
+
+  const loadAdminTickets = useCallback(async () => {
+    const requestSequence = ++ticketRequestSequenceRef.current;
+    setIsLoadingTickets(true);
+    setTicketError(null);
+
+    try {
+      const response = await getAdminLegalTickets(ticketPage, ticketPageSize);
+      if (requestSequence !== ticketRequestSequenceRef.current) return;
+
+      const safePage = clampPage(response.page, response.totalPages);
+      setTicketPage(response.page);
+      setTicketPageSize(response.size);
+      setTicketTotalItems(response.totalItems ?? 0);
+      setTicketTotalPages(response.totalPages ?? 0);
+
+      if (safePage !== response.page) {
+        setTicketPage(safePage);
+        return;
+      }
+
+      setLegalTickets(response.items ?? []);
+    } catch (loadError) {
+      if (requestSequence !== ticketRequestSequenceRef.current) return;
+
+      const message = getAdminTicketLoadErrorMessage(loadError, t);
+      console.error('Failed to load admin console tickets', {
+        status: getSafeApiErrorStatus(loadError),
+      });
+      setTicketError(message);
+    } finally {
+      if (requestSequence === ticketRequestSequenceRef.current) {
+        setIsLoadingTickets(false);
+      }
+    }
+  }, [t, ticketPage, ticketPageSize]);
 
   const loadAdminData = useCallback(async () => {
     setIsLoadingAdminData(true);
     setAdminError(null);
 
-    const [usersResult, paymentsResult, plansResult, ticketsResult, expertsResult] = await Promise.allSettled([
+    const [usersResult, paymentsResult, plansResult, expertsResult] = await Promise.allSettled([
       getUsers(),
       getAllPaymentTransactions(),
       getSubscriptionPlans(),
-      getAdminLegalTickets(),
       getAdminExperts(),
     ]);
 
     if (usersResult.status === 'fulfilled') {
       setBackendUsers(usersResult.value);
-      setAdminUsers(usersResult.value.map(toWorkspaceUser));
+      setAdminUsers(usersResult.value.map((user) => toWorkspaceUser(user, t('admin.users.lastAccessUnavailable'))));
     } else {
       setBackendUsers([]);
       setAdminUsers([]);
-      setAdminError(usersResult.reason instanceof Error ? usersResult.reason.message : t('admin.errors.loadUsers'));
+      setAdminError(t('admin.errors.loadUsers'));
     }
 
     if (paymentsResult.status === 'fulfilled') {
@@ -159,10 +207,7 @@ export function AdminConsolePage() {
     } else {
       setPaymentTransactions([]);
       setAdminError((previous) => {
-        const nextMessage =
-          paymentsResult.reason instanceof Error
-            ? paymentsResult.reason.message
-            : t('admin.errors.loadPayments');
+        const nextMessage = t('admin.errors.loadPayments');
         return previous ? `${previous} ${nextMessage}` : nextMessage;
       });
     }
@@ -172,19 +217,9 @@ export function AdminConsolePage() {
     } else {
       setSubscriptionPlans([]);
       setAdminError((previous) => {
-        const nextMessage =
-          plansResult.reason instanceof Error
-            ? plansResult.reason.message
-            : t('admin.errors.loadPlans');
+        const nextMessage = t('admin.errors.loadPlans');
         return previous ? `${previous} ${nextMessage}` : nextMessage;
       });
-    }
-
-    if (ticketsResult.status === 'fulfilled') {
-      setLegalTickets(ticketsResult.value.items ?? []);
-    } else {
-      setLegalTickets([]);
-      setTicketError(ticketsResult.reason instanceof Error ? ticketsResult.reason.message : t('admin.errors.loadTickets'));
     }
 
     if (expertsResult.status === 'fulfilled') {
@@ -200,6 +235,13 @@ export function AdminConsolePage() {
   useEffect(() => {
     void loadAdminData();
   }, [loadAdminData]);
+
+  useEffect(() => {
+    void loadAdminTickets();
+    return () => {
+      ticketRequestSequenceRef.current += 1;
+    };
+  }, [loadAdminTickets]);
 
   const activeUsersCount = useMemo(
     () => adminUsers.filter((user) => user.status === 'active').length,
@@ -218,8 +260,8 @@ export function AdminConsolePage() {
     try {
       const user = await getUserDetail(userId);
       setSelectedUserDetail(user);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : t('admin.userDetailError');
+    } catch {
+      const message = t('admin.userDetailError');
       setAdminError(message);
       toast.error(message, t('toast.errorTitle'));
     } finally {
@@ -229,7 +271,7 @@ export function AdminConsolePage() {
 
   const handleCreateExpert = async () => {
     if (!expertForm.firstName.trim() || !expertForm.lastName.trim() || !expertForm.email.trim() || !expertForm.specialty.trim() || !expertForm.legalDomain.trim()) {
-      toast.warning(language === 'vi' ? 'Vui lòng nhập họ, tên, email, chuyên môn và lĩnh vực pháp lý.' : 'First name, last name, email, specialty and legal domain are required.');
+      toast.warning(t('admin.expert.requiredFields'), t('toast.warningTitle'));
       return;
     }
     setSavingExpert(true);
@@ -237,19 +279,56 @@ export function AdminConsolePage() {
       await createExpert({ ...expertForm, active: true });
       setCreateExpertOpen(false);
       setExpertForm({ firstName: '', lastName: '', email: '', specialty: '', legalDomain: '', description: '' });
-      toast.success(language === 'vi' ? 'Đã tạo Expert với mật khẩu tạm 12345678; Expert phải đổi trong 7 ngày.' : 'Expert created with temporary password 12345678; it must be changed within 7 days.');
+      toast.success(t('admin.expert.createSuccess'), t('toast.successTitle'));
       await loadAdminData();
-    } catch (error) { toast.error(error instanceof Error ? error.message : 'Unable to create expert.'); }
+    } catch { toast.error(t('admin.expert.createError'), t('toast.errorTitle')); }
     finally { setSavingExpert(false); }
   };
 
   const handleResendExpert = async (email: string) => {
-    if (!window.confirm(language === 'vi' ? `Reset mật khẩu tạm và gửi lại email cho ${email}?` : `Reset temporary password and resend activation to ${email}?`)) return;
+    if (!window.confirm(t('admin.expert.resendConfirm', { email }))) return;
     try {
       await resendExpertActivation(email);
-      toast.success(language === 'vi' ? 'Đã gửi lại thông tin kích hoạt.' : 'Activation details resent.');
+      toast.success(t('admin.expert.resendSuccess'), t('toast.successTitle'));
       await loadAdminData();
-    } catch (error) { toast.error(error instanceof Error ? error.message : 'Unable to resend activation.'); }
+    } catch { toast.error(t('admin.expert.resendError'), t('toast.errorTitle')); }
+  };
+
+  const handleSoftDeleteUserClick = (user: WorkspaceUser) => {
+    setUserToDelete(user);
+    setIsDeleteUserModalOpen(true);
+  };
+
+  const handleConfirmSoftDeleteUser = async () => {
+    if (!userToDelete) return;
+    setDeletingUserId(userToDelete.id);
+    try {
+      await deleteUser(userToDelete.id);
+      toast.success(
+        language === 'vi' ? 'Đã xóa (vô hiệu hóa) người dùng thành công.' : 'User deactivated successfully.',
+        t('toast.successTitle'),
+      );
+      await loadAdminData();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to deactivate user.', t('toast.errorTitle'));
+    } finally {
+      setDeletingUserId(null);
+      setIsDeleteUserModalOpen(false);
+      setUserToDelete(null);
+    }
+  };
+
+  const handleRestoreUser = async (userId: string) => {
+    try {
+      await restoreUser(userId);
+      toast.success(
+        language === 'vi' ? 'Đã khôi phục tài khoản người dùng thành công.' : 'User restored successfully.',
+        t('toast.successTitle'),
+      );
+      await loadAdminData();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to restore user.', t('toast.errorTitle'));
+    }
   };
 
   const resetPlanForm = () => {
@@ -277,7 +356,7 @@ export function AdminConsolePage() {
       planForm.expertTicketLimit,
     ];
     if ((planForm.billingCycleDays ?? planForm.durationDays) <= 0 || numericLimits.some((value) => value < 0)) {
-      setPlanError(language === 'vi' ? 'Chu kỳ phải lớn hơn 0 và mọi giới hạn phải từ 0 trở lên.' : 'Billing cycle must be positive and every limit must be non-negative.');
+      setPlanError(t('admin.planLimitsInvalid'));
       return;
     }
 
@@ -302,8 +381,8 @@ export function AdminConsolePage() {
       setPlanActionMessage(message);
       toast.success(message, t('toast.successTitle'));
       resetPlanForm();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : t('admin.planSaveError');
+    } catch {
+      const message = t('admin.planSaveError');
       setPlanError(message);
       toast.error(message, t('toast.errorTitle'));
     } finally {
@@ -357,8 +436,8 @@ export function AdminConsolePage() {
       const message = t('admin.planDeleted');
       setPlanActionMessage(message);
       toast.success(message, t('toast.successTitle'));
-    } catch (error) {
-      const message = error instanceof Error ? error.message : t('admin.planDeleteError');
+    } catch {
+      const message = t('admin.planDeleteError');
       setPlanError(message);
       toast.error(message, t('toast.errorTitle'));
     } finally {
@@ -391,8 +470,8 @@ export function AdminConsolePage() {
       const message = `${t('admin.ticketAssigned')} ${ticketId}.`;
       setTicketActionMessage(message);
       toast.success(message, t('toast.successTitle'));
-    } catch (error) {
-      const message = error instanceof Error ? error.message : t('admin.ticketAssignError');
+    } catch {
+      const message = t('admin.ticketAssignError');
       setTicketError(message);
       toast.error(message, t('toast.errorTitle'));
     } finally {
@@ -413,7 +492,7 @@ export function AdminConsolePage() {
         </div>
       ),
     },
-    { header: t('table.role'), cell: (user) => user.role },
+    { header: t('table.role'), cell: (user) => t(`role.${user.role.toLowerCase()}`) },
     {
       header: t('table.status'),
       headerClassName: 'text-center align-middle',
@@ -430,16 +509,46 @@ export function AdminConsolePage() {
     { header: t('admin.users.lastAccess'), cell: (user) => <span className="whitespace-nowrap">{user.lastAccess}</span> },
     {
       header: t('table.actions'),
-      cell: (user) => (
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label={t('admin.users.userActions')}
-          onClick={() => void handleOpenUserDetail(user.id)}
-        >
-          <MoreHorizontal className="h-4 w-4" />
-        </Button>
-      ),
+      cell: (user) => {
+        const rawUser = backendUsers.find((b) => String(b.id) === user.id);
+        const isActive = rawUser ? rawUser.active : user.status === 'active';
+        return (
+          <div className="flex items-center gap-xs">
+            <Button
+              variant="ghost"
+              size="icon"
+              title={language === 'vi' ? 'Xem chi tiết' : 'View details'}
+              aria-label={t('admin.users.userActions')}
+              onClick={() => void handleOpenUserDetail(user.id)}
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+            {isActive ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                title={language === 'vi' ? 'Xóa người dùng (Soft Delete)' : 'Deactivate user'}
+                aria-label={language === 'vi' ? 'Xóa người dùng' : 'Deactivate user'}
+                className="text-error hover:bg-error/10"
+                onClick={() => handleSoftDeleteUserClick(user)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            ) : (
+              <Button
+                variant="ghost"
+                size="icon"
+                title={language === 'vi' ? 'Khôi phục người dùng' : 'Restore user'}
+                aria-label={language === 'vi' ? 'Khôi phục người dùng' : 'Restore user'}
+                className="text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/30"
+                onClick={() => void handleRestoreUser(user.id)}
+              >
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        );
+      },
     },
   ];
 
@@ -453,16 +562,16 @@ export function AdminConsolePage() {
       ),
     },
     { header: t('admin.plan'), cell: (transaction) => transaction.planName },
-    { header: t('billing.amount'), cell: (transaction) => formatVndCurrency(transaction.amount, t('billing.free')) },
-    { header: t('table.status'), cell: (transaction) => <Badge tone={transaction.paymentStatus === 'SUCCESS' ? 'green' : transaction.paymentStatus === 'FAILED' ? 'red' : 'amber'}>{transaction.paymentStatus}</Badge> },
+    { header: t('billing.amount'), cell: (transaction) => formatVndCurrency(transaction.amount, t('billing.free'), locale) },
+    { header: t('table.status'), cell: (transaction) => <Badge tone={transaction.paymentStatus === 'SUCCESS' ? 'green' : transaction.paymentStatus === 'FAILED' ? 'red' : 'amber'}>{t(`billing.paymentStatus.${transaction.paymentStatus ?? 'UNKNOWN'}`)}</Badge> },
     { header: t('table.date'), cell: (transaction) => formatDisplayDate(transaction.createdAt, '-', locale) },
   ];
 
   const planColumns: DataTableColumn<SubscriptionPlan>[] = [
     { header: t('billing.planName'), cell: (plan) => <span className="font-semibold">{plan.planName}</span> },
-    { header: t('billing.planType'), cell: (plan) => plan.planType },
-    { header: t('billing.price'), cell: (plan) => formatVndCurrency(plan.price, t('billing.free')) },
-    { header: t('billing.maxQuota'), cell: (plan) => plan.maxQuota.toLocaleString() },
+    { header: t('billing.planType'), cell: (plan) => ['FREE', 'STANDARD', 'PREMIUM'].includes(plan.planType.toUpperCase()) ? t(`billing.planType.${plan.planType.toUpperCase()}`) : t('billing.planType.UNKNOWN') },
+    { header: t('billing.price'), cell: (plan) => formatVndCurrency(plan.price, t('billing.free'), locale) },
+    { header: t('billing.maxQuota'), cell: (plan) => formatNumber(plan.maxQuota, locale) },
     { header: t('admin.duration'), cell: (plan) => `${plan.durationDays} ${t('billing.days')}` },
     { header: t('table.status'), cell: (plan) => <Badge tone={plan.active ? 'green' : 'slate'}>{plan.active ? t('admin.active') : t('admin.inactive')}</Badge> },
     {
@@ -555,13 +664,13 @@ export function AdminConsolePage() {
             title={t('admin.users')}
             actions={
               <div className="flex items-center gap-sm">
-                <Badge tone="blue">{isLoadingAdminData ? '...' : `${adminUsers.length} users`}</Badge>
+                <Badge tone="blue">{isLoadingAdminData ? '...' : t('admin.userCount', { count: adminUsers.length })}</Badge>
                 <Button
                   size="sm"
                   leftIcon={<UserPlus className="h-4 w-4" />}
                   onClick={() => setCreateExpertOpen(true)}
                 >
-                  {language === 'vi' ? 'Tạo Expert' : 'Create Expert'}
+                  {t('admin.expert.create')}
                 </Button>
               </div>
             }
@@ -687,17 +796,17 @@ export function AdminConsolePage() {
           </div>
           <div className="grid gap-md md:grid-cols-2">
             {([
-              ['aiTokenLimit', 'AI token limit'],
-              ['workspaceLimit', 'Workspace limit'],
-              ['documentPerWorkspaceLimit', 'Documents / workspace'],
-              ['storageLimitMb', 'Storage limit (MB)'],
-              ['maxFileSizeMb', 'Max file size (MB)'],
-              ['maxAttachedDocumentsPerSession', 'Attached docs / session'],
-              ['contractDraftLimit', 'Contract draft limit'],
-              ['expertTicketLimit', 'Expert ticket limit'],
+              ['aiTokenLimit', 'billing.limit.aiTokens'],
+              ['workspaceLimit', 'billing.limit.workspaces'],
+              ['documentPerWorkspaceLimit', 'billing.limit.documentsPerWorkspace'],
+              ['storageLimitMb', 'billing.limit.storageMb'],
+              ['maxFileSizeMb', 'billing.limit.maxFileSize'],
+              ['maxAttachedDocumentsPerSession', 'billing.limit.attachmentsPerSession'],
+              ['contractDraftLimit', 'billing.limit.draftContracts'],
+              ['expertTicketLimit', 'billing.limit.expertTickets'],
             ] as const).map(([field, label]) => (
               <label key={field} className="text-sm font-semibold">
-                {label}
+                {t(label)}
                 <input
                   className="form-field mt-xs"
                   type="number"
@@ -716,12 +825,12 @@ export function AdminConsolePage() {
             ] as const).map(([field, label]) => (
               <label key={field} className="flex items-center gap-sm text-sm font-semibold">
                 <input type="checkbox" checked={planForm[field]} onChange={(event) => setPlanForm((previous) => ({ ...previous, [field]: event.target.checked }))} />
-                Cho phép {label}
+                {t('admin.allowTicketType', { type: t(`legalTickets.type.${label}`) })}
               </label>
             ))}
           </div>
           <label className="block text-sm font-semibold">
-            Features (mỗi dòng một tính năng)
+            {t('admin.planFeatures')}
             <textarea
               className="form-field mt-xs min-h-24"
               value={planForm.features.join('\n')}
@@ -764,26 +873,48 @@ export function AdminConsolePage() {
 
   const renderTicketsTab = () => (
     <div className="grid gap-gutter xl:grid-cols-[1.2fr_0.8fr]">
-      <Card title={t('admin.tabs.tickets')} subtitle={t('admin.tickets.persistedSubtitle')}>
+      <Card
+        aria-busy={isLoadingTickets}
+        title={t('admin.tabs.tickets')}
+        subtitle={t('admin.tickets.persistedSubtitle')}
+        actions={<Badge tone="blue">{ticketTotalItems}</Badge>}
+      >
         {ticketError && (
-          <p className="mb-md rounded-lg bg-error-container px-md py-sm text-sm font-semibold text-risk-high-text dark:bg-red-950/40 dark:text-red-200">
-            {ticketError}
-          </p>
+          <div
+            className="mb-md rounded-lg bg-error-container px-md py-sm text-sm font-semibold text-risk-high-text dark:bg-red-950/40 dark:text-red-200"
+            role="alert"
+          >
+            {ticketError}{' '}
+            <Button variant="secondary" size="sm" onClick={() => void loadAdminTickets()}>
+              {t('common.retry')}
+            </Button>
+          </div>
         )}
         {ticketActionMessage && (
           <p className="mb-md rounded-lg bg-emerald-50 px-md py-sm text-sm font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200">
             {ticketActionMessage}
           </p>
         )}
-        {isLoadingAdminData ? (
-          <p className="text-sm text-on-surface-variant dark:text-slate-400">{t('admin.loadingTickets')}</p>
+        {isLoadingTickets && legalTickets.length === 0 ? (
+          <p className="text-sm text-on-surface-variant dark:text-slate-400" aria-live="polite" role="status">
+            {t('admin.loadingTickets')}
+          </p>
         ) : (
-          <DataTable
-            columns={ticketColumns}
-            data={legalTickets}
-            getRowKey={(ticket) => ticket.id}
-            emptyMessage={t('admin.noTickets')}
-          />
+          <>
+            <DataTable
+              columns={ticketColumns}
+              data={legalTickets}
+              getRowKey={(ticket) => ticket.id}
+              emptyMessage={t('admin.noTickets')}
+            />
+            <Pagination
+              page={ticketPage}
+              totalPages={ticketTotalPages}
+              totalItems={ticketTotalItems}
+              disabled={isLoadingTickets}
+              onPageChange={setTicketPage}
+            />
+          </>
         )}
       </Card>
 
@@ -1043,8 +1174,8 @@ export function AdminConsolePage() {
             <Button
               variant="secondary"
               leftIcon={<RefreshCw className="h-4 w-4" />}
-              onClick={() => void loadAdminData()}
-              disabled={isLoadingAdminData}
+              onClick={() => void Promise.all([loadAdminData(), loadAdminTickets()])}
+              disabled={isLoadingAdminData || isLoadingTickets}
             >
               {t('billing.refresh')}
             </Button>
@@ -1107,12 +1238,12 @@ export function AdminConsolePage() {
             </div>
             <div>
               <dt className="label-uppercase">{t('table.role')}</dt>
-              <dd className="mt-xs">{selectedUserDetail.role}</dd>
+              <dd className="mt-xs">{t(`role.${selectedUserDetail.role.toLowerCase()}`)}</dd>
             </div>
             {selectedUserDetail.role === 'EXPERT' && (
               <div className="sm:col-span-2">
                 <p className="text-sm text-on-surface-variant dark:text-slate-400">{selectedUserDetail.specialty || '-'} · {selectedUserDetail.legalDomain || '-'}</p>
-                <Button className="mt-sm" variant="secondary" onClick={() => void handleResendExpert(selectedUserDetail.email)}>{language === 'vi' ? 'Gửi lại kích hoạt' : 'Resend activation'}</Button>
+                <Button className="mt-sm" variant="secondary" onClick={() => void handleResendExpert(selectedUserDetail.email)}>{t('admin.expert.resend')}</Button>
               </div>
             )}
           </dl>
@@ -1121,17 +1252,53 @@ export function AdminConsolePage() {
         )}
       </Modal>
 
-      <Modal open={createExpertOpen} title={language === 'vi' ? 'Tạo tài khoản Expert' : 'Create Expert account'} onClose={() => setCreateExpertOpen(false)} footer={<><Button variant="secondary" onClick={() => setCreateExpertOpen(false)}>{t('actions.close')}</Button><Button onClick={() => void handleCreateExpert()} disabled={savingExpert}>{savingExpert ? (language === 'vi' ? 'Đang tạo…' : 'Creating…') : (language === 'vi' ? 'Tạo Expert' : 'Create Expert')}</Button></>}>
-        <p className="mb-md text-sm text-on-surface-variant dark:text-slate-400">{language === 'vi' ? 'Không cần nhập mật khẩu. Hệ thống dùng mật khẩu tạm mặc định và yêu cầu Expert đổi trong 7 ngày.' : 'No password input is needed. The system issues a temporary password that must be changed within 7 days.'}</p>
+      <Modal open={createExpertOpen} title={t('admin.expert.createTitle')} onClose={() => setCreateExpertOpen(false)} footer={<><Button variant="secondary" onClick={() => setCreateExpertOpen(false)}>{t('actions.close')}</Button><Button onClick={() => void handleCreateExpert()} disabled={savingExpert}>{savingExpert ? t('admin.expert.creating') : t('admin.expert.create')}</Button></>}>
+        <p className="mb-md text-sm text-on-surface-variant dark:text-slate-400">{t('admin.expert.temporaryPasswordNotice')}</p>
         <div className="grid gap-md sm:grid-cols-2">
-          <label className="text-sm font-semibold">{language === 'vi' ? 'Họ' : 'First name'}<input className="form-field mt-xs" value={expertForm.firstName} onChange={(e) => setExpertForm((v) => ({ ...v, firstName: e.target.value }))} /></label>
-          <label className="text-sm font-semibold">{language === 'vi' ? 'Tên' : 'Last name'}<input className="form-field mt-xs" value={expertForm.lastName} onChange={(e) => setExpertForm((v) => ({ ...v, lastName: e.target.value }))} /></label>
-          <label className="text-sm font-semibold sm:col-span-2">Email<input className="form-field mt-xs" type="email" value={expertForm.email} onChange={(e) => setExpertForm((v) => ({ ...v, email: e.target.value }))} /></label>
-          <label className="text-sm font-semibold">{language === 'vi' ? 'Chuyên môn' : 'Specialty'}<input className="form-field mt-xs" value={expertForm.specialty} onChange={(e) => setExpertForm((v) => ({ ...v, specialty: e.target.value }))} /></label>
-          <label className="text-sm font-semibold">{language === 'vi' ? 'Lĩnh vực pháp lý' : 'Legal domain'}<input className="form-field mt-xs" value={expertForm.legalDomain} onChange={(e) => setExpertForm((v) => ({ ...v, legalDomain: e.target.value }))} /></label>
-          <label className="text-sm font-semibold sm:col-span-2">{language === 'vi' ? 'Mô tả kinh nghiệm' : 'Experience description'}<textarea className="form-field mt-xs min-h-24" value={expertForm.description} onChange={(e) => setExpertForm((v) => ({ ...v, description: e.target.value }))} /></label>
+          <label className="text-sm font-semibold">{t('auth.firstName')}<input className="form-field mt-xs" value={expertForm.firstName} onChange={(e) => setExpertForm((v) => ({ ...v, firstName: e.target.value }))} /></label>
+          <label className="text-sm font-semibold">{t('auth.lastName')}<input className="form-field mt-xs" value={expertForm.lastName} onChange={(e) => setExpertForm((v) => ({ ...v, lastName: e.target.value }))} /></label>
+          <label className="text-sm font-semibold sm:col-span-2">{t('auth.corporateEmail')}<input className="form-field mt-xs" type="email" value={expertForm.email} onChange={(e) => setExpertForm((v) => ({ ...v, email: e.target.value }))} /></label>
+          <label className="text-sm font-semibold">{t('admin.expert.specialty')}<input className="form-field mt-xs" value={expertForm.specialty} onChange={(e) => setExpertForm((v) => ({ ...v, specialty: e.target.value }))} /></label>
+          <label className="text-sm font-semibold">{t('admin.expert.legalDomain')}<input className="form-field mt-xs" value={expertForm.legalDomain} onChange={(e) => setExpertForm((v) => ({ ...v, legalDomain: e.target.value }))} /></label>
+          <label className="text-sm font-semibold sm:col-span-2">{t('admin.expert.experienceDescription')}<textarea className="form-field mt-xs min-h-24" value={expertForm.description} onChange={(e) => setExpertForm((v) => ({ ...v, description: e.target.value }))} /></label>
         </div>
       </Modal>
+
+      {/* Custom Soft Delete User Confirmation Modal */}
+      {isDeleteUserModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/70 p-md" role="dialog" aria-modal="true">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-slate-800 bg-[#202123] p-lg shadow-2xl text-left">
+            <h3 className="text-lg font-bold text-white">
+              {t("admin.users.deleteConfirmTitle")}
+            </h3>
+            <p className="mt-md text-sm text-slate-300">
+              {t("admin.users.deleteConfirmPrefix")}
+              <strong className="font-semibold text-white">{userToDelete?.name || userToDelete?.email}</strong>
+              {t("admin.users.deleteConfirmSuffix")}
+            </p>
+            <div className="flex justify-end gap-sm mt-lg">
+              <button
+                type="button"
+                className="px-lg py-sm rounded-full border border-slate-600 text-slate-200 hover:bg-slate-800 text-sm font-semibold transition"
+                onClick={() => {
+                  setIsDeleteUserModalOpen(false);
+                  setUserToDelete(null);
+                }}
+              >
+                {t("actions.cancel")}
+              </button>
+              <button
+                type="button"
+                className="px-lg py-sm rounded-full bg-[#ff003c] text-white hover:bg-red-700 text-sm font-semibold transition disabled:opacity-50"
+                onClick={() => void handleConfirmSoftDeleteUser()}
+                disabled={deletingUserId === userToDelete?.id}
+              >
+                {t("actions.delete")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

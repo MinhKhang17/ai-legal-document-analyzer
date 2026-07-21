@@ -31,7 +31,7 @@ import { useToast } from "../../hooks/useToast";
 import type { AiCitation, AiFeatureSummary, AiRiskAssessment } from "../../types/aiFeature";
 import type { AdminTicketFile, AttachmentPolicy, LegalTicket, LegalTicketMessage } from "../../types/legalTicket";
 import { getLegalTicketStatusLabel } from "../../types/legalTicketStatus";
-import { formatDisplayDate } from "../../utils/format";
+import { formatDisplayDate, formatFileSize, localeForLanguage } from "../../utils/format";
 import { ApiRequestError } from "../../services/http";
 
 export function CustomerTicketDetailPage() {
@@ -52,7 +52,7 @@ export function CustomerTicketDetailPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [auxiliaryError, setAuxiliaryError] = useState("");
-  const locale = language === "vi" ? "vi-VN" : "en-US";
+  const locale = localeForLanguage(language);
   const canReply = Boolean(ticket?.status && ['ASSIGNED', 'ASSIGNED_TO_LAWYER', 'IN_REVIEW', 'NEED_MORE_INFO', 'WAITING_FOR_USER', 'WAITING_FOR_EXPERT', 'CUSTOMER_RESPONDED', 'REOPENED'].includes(ticket.status));
   const reopenReference = ticket?.resolved_at ?? ticket?.closed_at;
   const canReopen = Boolean(ticket && (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') && reopenReference && new Date(reopenReference).getTime() + 7 * 24 * 60 * 60 * 1000 >= Date.now());
@@ -110,7 +110,7 @@ export function CustomerTicketDetailPage() {
       const objectUrl = await downloadCustomerTicketFile(id, file.documentId);
       const anchor = document.createElement('a'); anchor.href = objectUrl; anchor.download = file.originalFileName; anchor.click();
       window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-    } catch (downloadError) { toast.error(downloadError instanceof Error ? downloadError.message : 'Unable to download file.'); }
+    } catch { toast.error(t("legalTickets.detail.downloadError"), t("toast.errorTitle")); }
   };
 
   const openAttachment = async (attachmentId: string, fileName: string) => {
@@ -119,8 +119,8 @@ export function CustomerTicketDetailPage() {
       const anchor = document.createElement("a");
       anchor.href = objectUrl; anchor.download = fileName; anchor.click();
       window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-    } catch (downloadError) {
-      toast.error(downloadError instanceof Error ? downloadError.message : "Không thể tải file đính kèm.");
+    } catch {
+      toast.error(t("legalTickets.detail.downloadError"), t("toast.errorTitle"));
     }
   };
 
@@ -135,7 +135,7 @@ export function CustomerTicketDetailPage() {
       await loadTicket();
     } catch (actionError) {
       console.error("Failed to update customer legal ticket", actionError);
-      const message = actionError instanceof Error ? actionError.message : t("legalTickets.detail.actionError");
+      const message = t("legalTickets.detail.actionError");
       setError(message);
       toast.error(message, t("toast.errorTitle"));
       if (actionError instanceof ApiRequestError && actionError.status === 409) await loadTicket(false);
@@ -159,8 +159,8 @@ export function CustomerTicketDetailPage() {
       setReply(""); setPendingFiles([]); setUploadProgress({});
       toast.success(t("legalTickets.detail.replySuccess"));
       await loadTicket(false);
-    } catch (replyError) {
-      const messageText = replyError instanceof Error ? replyError.message : t("legalTickets.detail.actionError");
+    } catch {
+      const messageText = t("legalTickets.detail.actionError");
       setError(messageText); toast.error(messageText);
     } finally { setSaving(false); }
   };
@@ -169,13 +169,19 @@ export function CustomerTicketDetailPage() {
     if (!list || !attachmentPolicy) return;
     const selected = Array.from(list);
     if (pendingFiles.length + selected.length > attachmentPolicy.maxAttachmentsPerMessage) {
-      setError(`Tối đa ${attachmentPolicy.maxAttachmentsPerMessage} tệp mỗi tin nhắn.`); return;
+      setError(t("ticketComposer.tooManyFiles", { count: attachmentPolicy.maxAttachmentsPerMessage })); return;
     }
     for (const file of selected) {
       if (file.size > attachmentPolicy.maxAttachmentSizeKb * 1024) {
-        setError(`Tệp ${file.name} có dung lượng ${Math.ceil(file.size / 1024)} KB. Dung lượng tối đa là ${attachmentPolicy.maxAttachmentSizeKb} KB.`); return;
+        setError(t("ticketComposer.fileTooLarge", {
+          file: file.name,
+          size: Math.ceil(file.size / 1024),
+          max: attachmentPolicy.maxAttachmentSizeKb,
+        })); return;
       }
-      if (!attachmentPolicy.allowedMimeTypes.includes(file.type)) { setError(`Tệp ${file.name} không đúng loại được phép.`); return; }
+      if (!attachmentPolicy.allowedMimeTypes.includes(file.type)) {
+        setError(t("ticketComposer.invalidFileType", { file: file.name })); return;
+      }
     }
     setPendingFiles((current) => [...current, ...selected]); setError("");
   };
@@ -186,8 +192,8 @@ export function CustomerTicketDetailPage() {
       const expiresAt = new Date(Date.now() + 7 * 86400000).toISOString().replace("Z", "");
       const share = await createTicketConversationShare(id, ticket?.conversationScope ?? "SELECTED_RESPONSE", expiresAt);
       await navigator.clipboard.writeText(share.shareUrl);
-      toast.success("Đã tạo và sao chép link chia sẻ, hết hạn sau 7 ngày.");
-    } catch (shareError) { toast.error(shareError instanceof Error ? shareError.message : "Không thể tạo link chia sẻ."); }
+      toast.success(t("legalTickets.detail.shareSuccess"), t("toast.successTitle"));
+    } catch { toast.error(t("legalTickets.detail.shareError"), t("toast.errorTitle")); }
   };
 
   return (
@@ -205,13 +211,13 @@ export function CustomerTicketDetailPage() {
             <Button variant="secondary" leftIcon={<RefreshCw className="h-4 w-4" />} onClick={() => void loadTicket()} disabled={loading}>
               {t("common.refresh")}
             </Button>
-            {ticket?.chat_session_id && <Button variant="secondary" leftIcon={<Share2 className="h-4 w-4" />} onClick={() => void createShare()}>Chia sẻ</Button>}
+            {ticket?.chat_session_id && <Button variant="secondary" leftIcon={<Share2 className="h-4 w-4" />} onClick={() => void createShare()}>{t("actions.share")}</Button>}
           </>
         }
       />
 
       {error && (
-        <div className="mb-lg rounded-xl border border-error/40 bg-error/10 p-md text-sm text-error">
+        <div role="alert" className="mb-lg rounded-xl border border-error/40 bg-error/10 p-md text-sm text-error">
           {error}
         </div>
       )}
@@ -222,7 +228,7 @@ export function CustomerTicketDetailPage() {
       )}
 
       {loading ? (
-        <Card>{t("legalTickets.detail.loading")}</Card>
+        <Card><p aria-live="polite">{t("legalTickets.detail.loading")}</p></Card>
       ) : !ticket ? (
         <div className="space-y-md">
           <EmptyState
@@ -257,7 +263,7 @@ export function CustomerTicketDetailPage() {
               </p>
               {assessment && (
                 <div className="mt-md flex flex-wrap gap-xs">
-                  <Badge>{assessment.riskLevel || t("risk.none")}</Badge>
+                  <Badge>{assessment.riskLevel ? t(`risk.${assessment.riskLevel.toLowerCase()}`) : t("risk.none")}</Badge>
                   {typeof assessment.confidenceScore === "number" && <Badge tone="blue">{Math.round(assessment.confidenceScore * 100)}%</Badge>}
                 </div>
               )}
@@ -271,7 +277,7 @@ export function CustomerTicketDetailPage() {
                   messages.map((message) => (
                     <article key={message.id} className="rounded-lg border border-legal-border p-md text-sm dark:border-slate-700">
                       <div className="flex items-center justify-between gap-sm">
-                        <p className="font-semibold">{message.sender_name || message.sender_role}</p>
+                        <p className="font-semibold">{message.sender_name || t(`role.${message.sender_role.toLowerCase()}`)}</p>
                         <p className="text-xs text-on-surface-variant dark:text-slate-400">{formatDisplayDate(message.created_at, "-", locale)}</p>
                       </div>
                       <p className="mt-sm whitespace-pre-line">{message.content}</p>
@@ -282,9 +288,9 @@ export function CustomerTicketDetailPage() {
               </div>
               {canReply && <div className="mt-md space-y-sm">
                 <textarea className="form-field min-h-24" value={reply} onChange={(event) => setReply(event.target.value)} placeholder={t("legalTickets.detail.replyPlaceholder")} />
-                {attachmentPolicy && <p className="text-xs text-on-surface-variant">Dung lượng tối đa {attachmentPolicy.maxAttachmentSizeKb} KB mỗi tệp. Tối đa {attachmentPolicy.maxAttachmentsPerMessage} tệp mỗi tin nhắn.</p>}
-                {pendingFiles.map((file) => <div key={`${file.name}-${file.lastModified}`} className="rounded-lg border border-legal-border p-sm text-sm"><div className="flex items-center gap-sm"><span className="min-w-0 flex-1 truncate">{file.name} · {Math.ceil(file.size / 1024)} KB</span><button type="button" disabled={saving} onClick={() => setPendingFiles((current) => current.filter((item) => item !== file))}><X className="h-4 w-4" /></button></div>{typeof uploadProgress[file.name] === "number" && <div className="mt-xs h-1.5 overflow-hidden rounded bg-slate-200"><div className="h-full bg-primary" style={{ width: `${uploadProgress[file.name]}%` }} /></div>}</div>)}
-                <div className="flex gap-sm"><label className="inline-flex cursor-pointer items-center gap-xs rounded-lg border border-legal-border px-md py-sm text-sm font-semibold"><Paperclip className="h-4 w-4" />Thêm file<input type="file" multiple className="hidden" accept=".jpg,.jpeg,.png,.webp,.pdf,.docx,.txt" onChange={(event) => selectAttachments(event.target.files)} /></label><Button leftIcon={<Send className="h-4 w-4" />} onClick={() => void handleReply()} disabled={saving || (!reply.trim() && pendingFiles.length === 0)}>{t("legalTickets.detail.send")}</Button></div>
+                {attachmentPolicy && <p className="text-xs text-on-surface-variant">{t("ticketComposer.attachmentPolicy", { size: attachmentPolicy.maxAttachmentSizeKb, count: attachmentPolicy.maxAttachmentsPerMessage })}</p>}
+                {pendingFiles.map((file) => <div key={`${file.name}-${file.lastModified}`} className="rounded-lg border border-legal-border p-sm text-sm"><div className="flex items-center gap-sm"><span className="min-w-0 flex-1 truncate" title={file.name}>{file.name} · {formatFileSize(file.size, locale)}</span><button type="button" aria-label={t("ticketComposer.removeFile", { file: file.name })} disabled={saving} onClick={() => setPendingFiles((current) => current.filter((item) => item !== file))}><X className="h-4 w-4" aria-hidden="true" /></button></div>{typeof uploadProgress[file.name] === "number" && <div className="mt-xs h-1.5 overflow-hidden rounded bg-slate-200"><div className="h-full bg-primary" style={{ width: `${uploadProgress[file.name]}%` }} /></div>}</div>)}
+                <div className="flex gap-sm"><label className="inline-flex cursor-pointer items-center gap-xs rounded-lg border border-legal-border px-md py-sm text-sm font-semibold"><Paperclip className="h-4 w-4" aria-hidden="true" />{t("legalTickets.detail.addFiles")}<input type="file" multiple className="hidden" accept=".jpg,.jpeg,.png,.webp,.pdf,.docx,.txt" onChange={(event) => selectAttachments(event.target.files)} /></label><Button leftIcon={<Send className="h-4 w-4" />} onClick={() => void handleReply()} disabled={saving || (!reply.trim() && pendingFiles.length === 0)}>{t("legalTickets.detail.send")}</Button></div>
               </div>}
             </Card>
 
@@ -303,13 +309,13 @@ export function CustomerTicketDetailPage() {
               )}
             </Card>
 
-            <Card title={language === 'vi' ? 'Tệp được chia sẻ' : 'Shared files'}>
-              {files.length === 0 ? <p className="text-sm text-on-surface-variant">{language === 'vi' ? 'Chưa có tệp nào được chia sẻ với bạn.' : 'No files have been shared with you.'}</p> : <div className="space-y-sm">{files.map((file) => <div key={file.documentId} className="flex items-center justify-between gap-md rounded-lg border border-legal-border p-md dark:border-slate-700"><div><p className="font-semibold">{file.originalFileName}</p><p className="text-xs text-on-surface-variant">{file.fileType} · {Math.ceil(file.fileSize / 1024)} KB</p></div><Button size="sm" variant="secondary" leftIcon={<Download className="h-4 w-4" />} onClick={() => void openFile(file)}>{language === 'vi' ? 'Tải xuống' : 'Download'}</Button></div>)}</div>}
+            <Card title={t("ticketComposer.sharedDocuments")}>
+              {files.length === 0 ? <p className="text-sm text-on-surface-variant">{t("legalTickets.detail.noSharedFiles")}</p> : <div className="space-y-sm">{files.map((file) => <div key={file.documentId} className="flex items-center justify-between gap-md rounded-lg border border-legal-border p-md dark:border-slate-700"><div className="min-w-0"><p className="truncate font-semibold" title={file.originalFileName}>{file.originalFileName}</p><p className="text-xs text-on-surface-variant">{file.fileType} · {formatFileSize(file.fileSize, locale)}</p></div><Button size="sm" variant="secondary" leftIcon={<Download className="h-4 w-4" />} onClick={() => void openFile(file)}>{t("actions.download")}</Button></div>)}</div>}
             </Card>
           </main>
 
           <aside className="space-y-gutter">
-            {ticket.contextSnapshot && <Card title="Context bất biến từ AI"><div className="space-y-md text-sm"><div><p className="label-uppercase">Câu hỏi</p><p className="mt-xs whitespace-pre-line">{ticket.contextSnapshot.userQuestion}</p></div><div><p className="label-uppercase">Câu trả lời AI</p><p className="mt-xs max-h-64 overflow-y-auto whitespace-pre-line text-on-surface-variant">{ticket.contextSnapshot.assistantAnswer || "—"}</p></div><div><p className="label-uppercase">Tài liệu được chia sẻ</p><pre className="mt-xs max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-surface-container-low p-sm text-xs">{ticket.contextSnapshot.documentSnapshotJson || "[]"}</pre></div><p className="break-all text-xs text-on-surface-variant">Hash: {ticket.contextSnapshot.contentHash}</p></div></Card>}
+            {ticket.contextSnapshot && <Card title={t("sharedTicket.immutableContext")}><div className="space-y-md text-sm"><div><p className="label-uppercase">{t("sharedTicket.userQuestion")}</p><p className="mt-xs whitespace-pre-line">{ticket.contextSnapshot.userQuestion}</p></div><div><p className="label-uppercase">{t("sharedTicket.aiAnswer")}</p><p className="mt-xs max-h-64 overflow-y-auto whitespace-pre-line text-on-surface-variant">{ticket.contextSnapshot.assistantAnswer || "—"}</p></div><div><p className="label-uppercase">{t("ticketComposer.sharedDocuments")}</p><pre className="mt-xs max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-surface-container-low p-sm text-xs">{ticket.contextSnapshot.documentSnapshotJson || "[]"}</pre></div><p className="break-all text-xs text-on-surface-variant">{t("legalTickets.detail.contentHash")}: {ticket.contextSnapshot.contentHash}</p></div></Card>}
             <Card title={t("legalTickets.detail.actions")}>
               <div className="flex flex-col gap-sm">
                 {ticket.status === 'PENDING_ADMIN_REVIEW' && <Button variant="secondary" disabled={saving} onClick={() => void runAction(() => cancelLegalTicket(id, { reason: t("legalTickets.detail.cancelReason") }), t("legalTickets.detail.cancelSuccess"))}>

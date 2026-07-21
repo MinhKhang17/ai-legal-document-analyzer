@@ -25,6 +25,7 @@ from app.schemas import (
     TokenUsageBreakdown,
 )
 from app.services.completeness_checker import check_completeness
+from app.services.llm_intent_detector import detect_intent_smart
 from app.services.conversation_memory_service import ConversationMemoryService, PreparedConversationMemory
 from app.services.conversation_context import (
     LegalConversationContextStore,
@@ -118,12 +119,25 @@ class RagQueryService:
         return request.chatHistory
 
     def query(self, request: RagQueryRequest) -> RagQueryResponse:
-        from app.services.contract_generation_service import ContractGenerationService, is_contract_generation_intent
+        # ── Step 0a: Export chat to DOCX shortcut ──
+        from app.services.contract_generation_service import (
+            ContractGenerationService,
+            is_contract_generation_intent,
+            is_export_docx_intent,
+        )
 
         follow_up = is_follow_up_query(request.question)
         previous_snapshot = self.context_store.latest(request.chatSessionId) if follow_up else None
         bounded_history_text = self._request_history_text(request)
 
+        if is_export_docx_intent(request.question):
+            gen_service = ContractGenerationService(
+                retrieval_service=self.retrieval_service,
+                llm_client=self.llm_client,
+            )
+            return gen_service.export_chat_to_docx(request)
+
+        # ── Step 0b: Contract generation shortcut ──
         if is_contract_generation_intent(request.question) and not follow_up:
             gen_service = ContractGenerationService(
                 retrieval_service=self.retrieval_service,
@@ -133,12 +147,14 @@ class RagQueryService:
             return gen_service.generate_contract(request)
 
         user_hits, legal_search_query, knowledge_hits = self._retrieve(request)
+        logger.info("DEBUG RAG QUERY: request=%s, user_hits_count=%d", request.model_dump(exclude={"chatHistory", "conversationSummaryJson"}), len(user_hits))
         if self._needs_document_selection(request, user_hits):
             return self._build_document_selection_response(request, user_hits, knowledge_hits)
-        if follow_up and previous_snapshot is None:
+        if follow_up and previous_snapshot is None and not bounded_history_text.strip():
             return self._build_missing_snapshot_response(request, user_hits, knowledge_hits)
 
-        intent_result = detect_intent(
+        # ── Step 2: Detect intent ──
+        intent_result = detect_intent_smart(
             request.question,
             has_user_chunks=bool(user_hits),
             has_knowledge_chunks=bool(knowledge_hits),
@@ -184,13 +200,24 @@ class RagQueryService:
             knowledge_hits,
         )
         if retrieval_issue is not None:
-            return self._build_guard_response(
+            response = self._build_guard_response(
                 request=request,
                 intent_result=retrieval_issue,
                 completeness=completeness,
                 user_hits=user_hits,
                 knowledge_hits=knowledge_hits,
             )
+            if intent_result.intent == LegalQueryIntent.SIGNING_DECISION_SUPPORT:
+                response = response.model_copy(update={
+                    "answer": self._apply_signing_decision_safety(response.answer),
+                    "shouldSuggestTicket": True,
+                    "suggestionType": SuggestionType.SUGGEST_LAWYER.value,
+                    "suggestionReason": self._default_suggestion_reason(
+                        SuggestionType.SUGGEST_LAWYER.value
+                    ),
+                    "userActionHint": "CREATE_TICKET",
+                })
+            return response
 
         available_user_docs, available_system_docs = self._fetch_available_docs(request)
         prompt_user_hits = user_hits
@@ -295,8 +322,10 @@ class RagQueryService:
         llm_result = self.llm_client.generate(system_prompt=system_prompt, user_prompt=user_prompt)
         if llm_result.error or not llm_result.answer:
             raise LlmGenerationError(llm_result.error or "LLM returned an empty answer")
-        answer = sanitize_response(llm_result.answer or self._build_fallback_answer(user_hits, knowledge_hits))
-        answer, removed_recommendations = self._filter_ungrounded_recommendation_items(answer)
+        raw_answer = sanitize_response(llm_result.answer or self._build_fallback_answer(user_hits, knowledge_hits))
+        logger.info("DEBUG RAW ANSWER:\n%s", raw_answer)
+        answer, removed_recommendations = self._filter_ungrounded_recommendation_items(raw_answer)
+        logger.info("DEBUG FILTERED ANSWER:\n%s", answer)
         if removed_recommendations:
             logger.warning(
                 "Removed %s ungrounded recommendation item(s) for request %s",
@@ -336,6 +365,9 @@ class RagQueryService:
             citations = []
             used_knowledge_ids = []
             used_user_ids = []
+
+        if intent_result.intent == LegalQueryIntent.SIGNING_DECISION_SUPPORT:
+            answer = self._apply_signing_decision_safety(answer)
 
         effective_confidence = llm_result.confidence_score
         retrieved_citations = [
@@ -382,12 +414,14 @@ class RagQueryService:
             response_status=response_status,
         )
         if should_suggest_ticket:
+            if intent_result.intent == LegalQueryIntent.SIGNING_DECISION_SUPPORT:
+                suggestion_type = SuggestionType.SUGGEST_LAWYER.value
             user_action_hint = "CREATE_TICKET"
 
         response = RagQueryResponse(
             requestId=request.requestId,
             chatSessionId=request.chatSessionId,
-            answer=answer,
+            answer=self._enrich_answer_with_download_links(answer, request.workspaceId, prompt_knowledge_hits),
             confidenceScore=effective_confidence,
             shouldSuggestTicket=should_suggest_ticket,
             suggestionType=suggestion_type,
@@ -596,6 +630,7 @@ class RagQueryService:
                 top_k=request.topKKnowledgeChunks,
                 query_text=build_legal_text_query(request.question, chat_history=bounded_history_text),
             )
+        logger.info("DEBUG RAG RETRIEVAL: question=%s, preliminary_intent=%s, legal_search_query=%s, knowledge_hits_count=%d", request.question, preliminary_intent, legal_search_query, len(knowledge_hits))
         return user_hits, legal_search_query, knowledge_hits
 
     def _summary_requires_legal_kb(self, question: str) -> bool:
@@ -803,18 +838,28 @@ class RagQueryService:
 
     def _build_guard_response(self, *, request, intent_result, completeness, user_hits, knowledge_hits):
         answer = self._guard_answer(intent_result.intent, completeness.questions_to_ask)
+        is_signing_decision = intent_result.intent == LegalQueryIntent.SIGNING_DECISION_SUPPORT
+        suggestion_type = (
+            SuggestionType.SUGGEST_LAWYER.value
+            if is_signing_decision
+            else intent_result.suggestion_type.value
+        )
         return RagQueryResponse(
             requestId=request.requestId,
             chatSessionId=request.chatSessionId,
             answer=answer,
             confidenceScore=intent_result.confidence,
-            shouldSuggestTicket=False,
-            suggestionType=intent_result.suggestion_type.value,
-            suggestionReason=self._default_suggestion_reason(intent_result.suggestion_type.value),
+            shouldSuggestTicket=is_signing_decision,
+            suggestionType=suggestion_type,
+            suggestionReason=self._default_suggestion_reason(suggestion_type),
             missingInformation=self._missing_information_text(completeness.questions_to_ask),
             riskLevel=intent_result.risk_level.value,
             legalDomain=self._default_legal_domain(intent_result.contract_type),
-            userActionHint=self._map_user_action_hint(intent_result.suggestion_type.value, intent_result.response_status.value),
+            userActionHint=(
+                "CREATE_TICKET"
+                if is_signing_decision
+                else self._map_user_action_hint(suggestion_type, intent_result.response_status.value)
+            ),
             citations=[],
             usedKnowledgeCitationIds=[],
             usedUserCitationIds=[],
@@ -847,6 +892,11 @@ class RagQueryService:
             LegalQueryIntent.PARTIAL_KB_COVERAGE: "Knowledge base hiện chỉ bao phủ một phần vấn đề bạn hỏi, nên kết quả lúc này chỉ có thể mang tính tham khảo hạn chế.",
             LegalQueryIntent.OUTDATED_KNOWLEDGE_BASE: "Nguồn pháp lý truy xuất được có dấu hiệu chưa đủ mới hoặc chưa đủ chắc để trả lời vấn đề này.",
             LegalQueryIntent.CONFLICTING_REFERENCES: "Các căn cứ truy xuất hiện đang mâu thuẫn hoặc chưa thống nhất, nên mình không thể kết luận tự tin ở thời điểm này.",
+            LegalQueryIntent.SIGNING_DECISION_SUPPORT: (
+                "Hệ thống không khuyến khích bạn ký hợp đồng chỉ dựa trên phân tích của AI. "
+                "Thông tin được cung cấp chỉ nhằm hỗ trợ bạn tự ra quyết định và không thay thế việc xem xét của chuyên gia. "
+                "Nếu muốn được hỗ trợ thêm trước khi ký, bạn có thể tạo ticket để chuyên gia xem xét."
+            ),
         }
         answer = mapping.get(intent, "Mình cần thêm thông tin để tiếp tục phân tích.")
         if questions:
@@ -948,6 +998,9 @@ class RagQueryService:
         risk_level: str,
         response_status: str,
     ) -> bool:
+        if intent == LegalQueryIntent.SIGNING_DECISION_SUPPORT:
+            return True
+
         return (
             intent in _TICKET_ELIGIBLE_INTENTS
             and input_complete
@@ -957,33 +1010,46 @@ class RagQueryService:
             and response_status == ResponseStatus.HIGH_RISK_REQUIRE_LAWYER.value
         )
 
+    def _apply_signing_decision_safety(self, answer: str) -> str:
+        notice = (
+            "**Lưu ý trước khi ký:** Hệ thống không khuyến khích bạn ký hợp đồng chỉ dựa trên "
+            "phân tích của AI. Thông tin dưới đây chỉ nhằm hỗ trợ bạn tự ra quyết định và không "
+            "thay thế việc xem xét của chuyên gia."
+        )
+        ticket_option = (
+            "Nếu muốn được hỗ trợ thêm trước khi ký, bạn có thể tạo ticket để chuyên gia xem xét."
+        )
+        return f"{notice}\n\n{answer.strip()}\n\n{ticket_option}"
+
     def _recommendation_section_is_grounded(self, answer: str) -> bool:
         recommendation_match = re.search(
-            r"(?:khuyến nghị|recommendations?)\s*:?\**\s*(.*)$",
+            r"(?:^\s*###+\s*(?:khuyến nghị|recommendations?)|^\s*(?:\*\*|__)(?:khuyến nghị|recommendations?)(?:\*\*|__):?|^\s*(?:khuyến nghị|recommendations?)\s*:)\s*(.*)$",
             answer,
-            flags=re.IGNORECASE | re.DOTALL,
+            flags=re.IGNORECASE | re.MULTILINE | re.DOTALL,
         )
         if recommendation_match is None:
             return True
-        section = recommendation_match.group(1)
+        section = recommendation_match.group(1).strip()
+        if not section:
+            return True
         bullet_blocks = re.split(r"(?m)(?=^\s*(?:[-*•]|\d+[.)])\s+)", section)
         actual_bullets = [
             block for block in bullet_blocks if re.match(r"^\s*(?:[-*•]|\d+[.)])\s+", block)
         ]
         if actual_bullets:
             return all(re.search(r"\[KB-\d+\]", block, flags=re.IGNORECASE) for block in actual_bullets)
-        return bool(re.search(r"\[KB-\d+\]", section, flags=re.IGNORECASE))
+        return True
 
     def _filter_ungrounded_recommendation_items(self, answer: str) -> tuple[str, int]:
         heading = re.search(
-            r"(?:khuyến nghị|recommendations?)\s*:?\**",
+            r"(?:^\s*###+\s*(?:khuyến nghị|recommendations?)|^\s*(?:\*\*|__)(?:khuyến nghị|recommendations?)(?:\*\*|__):?|^\s*(?:khuyến nghị|recommendations?)\s*:)",
             answer,
-            flags=re.IGNORECASE,
+            flags=re.IGNORECASE | re.MULTILINE,
         )
         if heading is None:
             return answer, 0
 
-        prefix = answer[: heading.end()]
+        prefix = answer[: heading.start()]
         section = answer[heading.end() :]
         blocks = re.split(r"(?m)(?=^\s*(?:[-*•]|\d+[.)])\s+)", section)
         kept: list[str] = []
@@ -994,7 +1060,12 @@ class RagQueryService:
                 removed += 1
                 continue
             kept.append(block)
-        return (prefix + "".join(kept)).rstrip(), removed
+
+        remaining_section = "".join(kept).strip()
+        if not remaining_section:
+            return prefix.rstrip(), removed
+
+        return (answer[: heading.end()] + "".join(kept)).rstrip(), removed
 
     def _grounding_failure_answer(self, has_invalid_citation: bool) -> str:
         if has_invalid_citation:
@@ -1077,3 +1148,39 @@ class RagQueryService:
             clauseNumber=hit.clauseNumber,
             sectionTitle=hit.sectionTitle,
         )
+
+    def _enrich_answer_with_download_links(
+        self, answer: str, workspace_id: str, knowledge_hits: list[RagChunkHit]
+    ) -> str:
+        if not answer or not knowledge_hits or not workspace_id:
+            return answer
+
+        kb_map = {}
+        for hit in knowledge_hits:
+            if hit.citationId:
+                file_target = (
+                    (hit.fileName or "").strip()
+                    or (hit.lawName or "").strip()
+                    or (hit.title or "").strip()
+                    or (hit.knowledgeDocumentId or "").strip()
+                )
+                if file_target:
+                    kb_map[hit.citationId] = file_target
+
+        logger.info("DEBUG ENRICH DOWNLOAD LINKS: kb_map=%s, answer_has_kb=%s", kb_map, "[KB-" in answer)
+        if not kb_map:
+            return answer
+
+        import re
+        from urllib.parse import quote
+
+        def _replace_tag(match):
+            tag = match.group(1)
+            if tag in kb_map:
+                filename = kb_map[tag]
+                encoded = quote(filename)
+                download_url = f"/api/v1/workspaces/{workspace_id}/documents/system/download?filename={encoded}"
+                return f"[[{tag} 📥 Tải về]]({download_url})"
+            return match.group(0)
+
+        return re.sub(r"\[(KB-\d+)\]", _replace_tag, answer)

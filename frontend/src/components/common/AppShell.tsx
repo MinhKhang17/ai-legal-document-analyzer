@@ -1,15 +1,21 @@
-import { Link, Outlet } from 'react-router-dom';
+import { Link, Outlet, useLocation } from 'react-router-dom';
 import { DashboardLayout } from '../../layouts/DashboardLayout';
+import { useI18n } from '../../hooks/useI18n';
 import { useAppStore } from '../../store/AppStore';
 
 export function AppShell() {
-  const { user, language } = useAppStore();
+  const location = useLocation();
+  const { user } = useAppStore();
+  const { t, language } = useI18n();
+  const passwordDeadline = user?.passwordResetDeadline
+    ? new Date(user.passwordResetDeadline).toLocaleString(language === 'vi' ? 'vi-VN' : 'en-US')
+    : t('auth.temporaryPasswordDefaultDeadline');
   return (
     <DashboardLayout>
-      {user?.mustChangePassword && (
+      {user?.mustChangePassword && location.pathname !== '/settings/security' && (
         <div className="mb-lg rounded-xl border border-warning/40 bg-warning/10 p-md text-sm">
-          <p className="font-semibold">{language === 'vi' ? 'Bạn đang dùng mật khẩu tạm.' : 'You are using a temporary password.'}</p>
-          <p className="mt-xs text-on-surface-variant dark:text-slate-300">{language === 'vi' ? `Hãy đổi mật khẩu trước ${user.passwordResetDeadline ? new Date(user.passwordResetDeadline).toLocaleString('vi-VN') : 'thời hạn 7 ngày'}.` : `Change it before ${user.passwordResetDeadline ? new Date(user.passwordResetDeadline).toLocaleString('en-US') : 'the 7-day deadline'}.`} <Link className="font-semibold text-primary underline" to="/settings">{language === 'vi' ? 'Đổi ngay' : 'Change now'}</Link></p>
+          <p className="font-semibold">{t('auth.temporaryPasswordNotice')}</p>
+          <p className="mt-xs text-on-surface-variant dark:text-slate-300">{t('auth.temporaryPasswordDeadline', { deadline: passwordDeadline })} <Link className="font-semibold text-primary underline" to="/settings/security">{t('auth.changePasswordNow')}</Link></p>
         </div>
       )}
       <Outlet />

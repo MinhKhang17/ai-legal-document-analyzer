@@ -1,14 +1,12 @@
-import { Check, KeyRound, Languages, Monitor, Moon, Palette, Sun } from 'lucide-react';
-import { useState } from 'react';
+import { Check, ChevronRight, Languages, Monitor, Moon, Palette, ShieldCheck, Sun } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Card } from '../../components/common/Card';
-import { Button } from '../../components/common/Button';
 import { PageHeader } from '../../components/common/PageHeader';
 import { useI18n } from '../../hooks/useI18n';
 import { useToast } from '../../hooks/useToast';
 import { useAppStore, type Language, type ThemeMode } from '../../store/AppStore';
 import { cn } from '../../utils/cn';
 import { translate } from '../../utils/i18n';
-import { changePassword } from '../../services/user.service';
 
 const themeOptions: Array<{ mode: ThemeMode; labelKey: string; icon: typeof Sun }> = [
   { mode: 'light', labelKey: 'theme.light', icon: Sun },
@@ -25,24 +23,6 @@ export function SettingsPage() {
   const { t } = useI18n();
   const toast = useToast();
   const { language, setLanguage, theme, setTheme } = useAppStore();
-  const [passwordForm, setPasswordForm] = useState({ oldPassword: '', newPassword: '', confirmNewPassword: '' });
-  const [changingPassword, setChangingPassword] = useState(false);
-
-  const handleChangePassword = async () => {
-    if (!passwordForm.oldPassword.trim() || passwordForm.newPassword.length < 8 || passwordForm.newPassword !== passwordForm.confirmNewPassword) {
-      toast.warning(language === 'vi' ? 'Mật khẩu mới phải có ít nhất 8 ký tự và phần xác nhận phải trùng khớp.' : 'New password must have at least 8 characters and confirmation must match.');
-      return;
-    }
-    setChangingPassword(true);
-    try {
-      await changePassword(passwordForm);
-      setPasswordForm({ oldPassword: '', newPassword: '', confirmNewPassword: '' });
-      toast.success(language === 'vi' ? 'Đổi mật khẩu thành công.' : 'Password changed successfully.');
-      window.setTimeout(() => window.location.reload(), 600);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Unable to change password.');
-    } finally { setChangingPassword(false); }
-  };
 
   return (
     <div>
@@ -139,14 +119,24 @@ export function SettingsPage() {
         </Card>
       </div>
 
-      <Card className="mt-gutter" title={language === 'vi' ? 'Đổi mật khẩu' : 'Change password'} subtitle={language === 'vi' ? 'Tài khoản Expert phải đổi mật khẩu tạm trước thời hạn 7 ngày.' : 'Expert accounts must replace the temporary password within 7 days.'} actions={<KeyRound className="h-5 w-5 text-primary" />}>
-        <div className="grid gap-md md:grid-cols-3">
-          <label className="text-sm font-semibold">{language === 'vi' ? 'Mật khẩu hiện tại' : 'Current password'}<input className="form-field mt-xs" type="password" autoComplete="current-password" value={passwordForm.oldPassword} onChange={(e) => setPasswordForm((v) => ({ ...v, oldPassword: e.target.value }))} /></label>
-          <label className="text-sm font-semibold">{language === 'vi' ? 'Mật khẩu mới' : 'New password'}<input className="form-field mt-xs" type="password" autoComplete="new-password" value={passwordForm.newPassword} onChange={(e) => setPasswordForm((v) => ({ ...v, newPassword: e.target.value }))} /></label>
-          <label className="text-sm font-semibold">{language === 'vi' ? 'Xác nhận mật khẩu mới' : 'Confirm new password'}<input className="form-field mt-xs" type="password" autoComplete="new-password" value={passwordForm.confirmNewPassword} onChange={(e) => setPasswordForm((v) => ({ ...v, confirmNewPassword: e.target.value }))} /></label>
-        </div>
-        <Button className="mt-md" onClick={() => void handleChangePassword()} disabled={changingPassword}>{changingPassword ? (language === 'vi' ? 'Đang đổi…' : 'Changing…') : (language === 'vi' ? 'Đổi mật khẩu' : 'Change password')}</Button>
-      </Card>
+      <Link
+        to="/settings/security"
+        className="group mt-gutter flex items-center gap-md rounded-xl border border-legal-border bg-white p-lg shadow-paper transition hover:border-primary/40 hover:bg-surface-container-low focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:border-slate-700 dark:bg-slate-900 dark:shadow-none dark:hover:border-inverse-primary/50 dark:hover:bg-slate-800"
+        aria-label={t('settings.security.open')}
+      >
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-white dark:bg-inverse-primary/10 dark:text-inverse-primary dark:group-hover:bg-inverse-primary dark:group-hover:text-slate-950">
+          <ShieldCheck className="h-5 w-5" aria-hidden="true" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-base font-semibold text-on-surface dark:text-slate-100">
+            {t('settings.security.title')}
+          </span>
+          <span className="mt-xs block text-sm leading-5 text-on-surface-variant dark:text-slate-400">
+            {t('settings.security.entryDescription')}
+          </span>
+        </span>
+        <ChevronRight className="h-5 w-5 shrink-0 text-outline transition-transform group-hover:translate-x-0.5 group-hover:text-primary dark:text-slate-500 dark:group-hover:text-inverse-primary" aria-hidden="true" />
+      </Link>
     </div>
   );
 }

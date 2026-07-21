@@ -14,6 +14,8 @@ import { LoginPage } from "../pages/auth/LoginPage";
 import { RegisterPage } from "../pages/auth/RegisterPage";
 import { VerifyEmailPage } from "../pages/auth/VerifyEmailPage";
 import { CheckEmailPage } from "../pages/auth/CheckEmailPage";
+import { ForgotPasswordPage } from "../pages/auth/ForgotPasswordPage";
+import { ResetPasswordPage } from "../pages/auth/ResetPasswordPage";
 import { DashboardPage } from "../pages/dashboard/DashboardPage";
 import { ProjectsPage } from "../pages/projects/ProjectsPage";
 import { ProjectDetailPage } from "../pages/projects/ProjectDetailPage";
@@ -36,24 +38,23 @@ import { AdminTicketsPage } from "../pages/admin/AdminTicketsPage";
 import { AdminTicketDetailPage } from "../pages/admin/AdminTicketDetailPage";
 import { AdminRefundsPage } from "../pages/admin/AdminRefundsPage";
 import { AdminRefundDetailPage } from "../pages/admin/AdminRefundDetailPage";
-import { AuditLogsPage } from "../pages/admin/AuditLogsPage";
 import { SystemHealthPage } from "../pages/admin/SystemHealthPage";
-import { JobsPage } from "../pages/jobs/JobsPage";
 import { ContractDetailPage } from "../pages/contracts/ContractDetailPage";
 import { SettingsPage } from "../pages/settings/SettingsPage";
+import { AccountSecurityPage } from "../pages/settings/AccountSecurityPage";
 import { PaymentResultRedirect } from "../pages/billing/PaymentResultRedirect";
 import { LawyerTicketsPage } from "../pages/lawyer/LawyerTicketsPage";
 import { LawyerTicketDetailPage } from "../pages/lawyer/LawyerTicketDetailPage";
+import { LawyerRevenuePage } from "../pages/lawyer/LawyerRevenuePage";
+import { AdminRevenuePage } from "../pages/admin/AdminRevenuePage";
 import { CreateCustomerTicketPage } from "../pages/tickets/CreateCustomerTicketPage";
 import { SharedChatPage } from "../pages/chat/SharedChatPage";
 import { SharedTicketConversationPage } from "../pages/tickets/SharedTicketConversationPage";
 
 const RiskReviewPage = lazy(() => import("../pages/editor/RiskReviewPage").then((module) => ({ default: module.RiskReviewPage })));
-const ContractAssistantPage = lazy(() => import("../pages/chat/ContractAssistantPage").then((module) => ({ default: module.ContractAssistantPage })));
 const LegalChatPage = lazy(() => import("../pages/chat/LegalChatPage").then((module) => ({ default: module.LegalChatPage })));
 const ChatHistoryPage = lazy(() => import("../pages/chat/ChatHistoryPage").then((module) => ({ default: module.ChatHistoryPage })));
 const AdminConsolePage = lazy(() => import("../pages/admin/AdminConsolePage").then((module) => ({ default: module.AdminConsolePage })));
-const TemplatesPage = lazy(() => import("../pages/templates/TemplatesPage").then((module) => ({ default: module.TemplatesPage })));
 const MyContractsPage = lazy(() => import("../pages/contracts/MyContractsPage").then((module) => ({ default: module.MyContractsPage })));
 
 export const router = createBrowserRouter([
@@ -62,6 +63,13 @@ export const router = createBrowserRouter([
   {
     path: "/",
     element: <Navigate to="/login" replace />,
+  },
+  {
+    element: <AuthLayout />,
+    children: [
+      { path: "/forgot-password", element: <ForgotPasswordPage /> },
+      { path: "/reset-password", element: <ResetPasswordPage /> },
+    ],
   },
   {
     element: (
@@ -148,11 +156,7 @@ export const router = createBrowserRouter([
       },
       {
         path: "/chat/contract-assistant",
-        element: (
-          <CustomerRoute>
-            <ContractAssistantPage />
-          </CustomerRoute>
-        ),
+        element: <Navigate to="/chat" replace />,
       },
       {
         path: "/chat",
@@ -245,15 +249,6 @@ export const router = createBrowserRouter([
         element: <Navigate to="/dashboard" replace />,
       },
       {
-        path: "/jobs",
-        element: (
-          <AdminRoute>
-            <JobsPage />
-          </AdminRoute>
-        ),
-      },
-      { path: "/templates", element: <TemplatesPage /> },
-      {
         path: "/contracts",
         element: (
           <CustomerRoute>
@@ -270,6 +265,7 @@ export const router = createBrowserRouter([
         ),
       },
       { path: "/settings", element: <SettingsPage /> },
+      { path: "/settings/security", element: <AccountSecurityPage /> },
       {
         path: "/admin",
         element: (
@@ -304,14 +300,7 @@ export const router = createBrowserRouter([
       },
       { path: "/admin/refunds", element: <AdminRoute><AdminRefundsPage /></AdminRoute> },
       { path: "/admin/refunds/:id", element: <AdminRoute><AdminRefundDetailPage /></AdminRoute> },
-      {
-        path: "/admin/audit-logs",
-        element: (
-          <AdminRoute>
-            <AuditLogsPage />
-          </AdminRoute>
-        ),
-      },
+      { path: "/admin/revenue", element: <AdminRoute><AdminRevenuePage /></AdminRoute> },
       {
         path: "/admin/system-health",
         element: (
@@ -333,6 +322,14 @@ export const router = createBrowserRouter([
         element: (
           <ExpertRoute>
             <LawyerTicketDetailPage />
+          </ExpertRoute>
+        ),
+      },
+      {
+        path: "/lawyer/revenue",
+        element: (
+          <ExpertRoute>
+            <LawyerRevenuePage />
           </ExpertRoute>
         ),
       },

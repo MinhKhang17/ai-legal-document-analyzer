@@ -121,12 +121,8 @@ export function RegisterPage() {
                 ...registration.data,
               },
             });
-          } catch (error) {
-            setSubmitError(
-              error instanceof Error && error.message.length > 0
-                ? error.message
-                : t('auth.registrationFailed'),
-            );
+          } catch {
+            setSubmitError(t('auth.registrationFailed'));
           } finally {
             setIsSubmitting(false);
           }

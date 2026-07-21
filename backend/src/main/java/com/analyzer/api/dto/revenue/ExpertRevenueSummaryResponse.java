@@ -14,4 +14,6 @@ public class ExpertRevenueSummaryResponse {
     private BigDecimal totalRevenue;
     private BigDecimal paidRevenue;
     private BigDecimal pendingRevenue;
+    private BigDecimal totalPlatformFee;
+    private BigDecimal totalExpertPayout;
 }

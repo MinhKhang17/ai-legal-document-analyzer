@@ -22,7 +22,9 @@ import com.analyzer.api.enums.ChatMessageRole;
 import com.analyzer.api.enums.ChatMessageStatus;
 import com.analyzer.api.enums.ChatMessageType;
 import com.analyzer.api.enums.ChatSessionStatus;
+import com.analyzer.api.enums.ChatMode;
 import com.analyzer.api.enums.CitationSourceType;
+import com.analyzer.api.enums.AiFeedbackType;
 import com.analyzer.api.enums.FeedbackReason;
 import com.analyzer.api.enums.FeedbackRating;
 import com.analyzer.api.exception.common.*;
@@ -245,16 +247,45 @@ public class ChatMessageServiceImpl implements ChatMessageService {
             throw new ForbiddenException("Only AI assistant messages can be rated");
         }
 
-        ChatMessageFeedback feedback = chatMessageFeedbackRepository.findByChatMessageId(messageId)
-                .orElseGet(() -> ChatMessageFeedback.builder().chatMessage(chatMessage).build());
-        feedback.setRating(request.getRating());
-        feedback.setReasons(request.getRating() == FeedbackRating.THUMBS_DOWN
+        AiFeedbackType feedbackType = resolveFeedbackType(request);
+        FeedbackRating legacyRating = feedbackType == AiFeedbackType.LIKE
+                ? FeedbackRating.THUMBS_UP
+                : FeedbackRating.THUMBS_DOWN;
+        ChatMessageFeedback feedback = chatMessageFeedbackRepository.findByChatMessageIdAndUserId(messageId, userId)
+                .orElseGet(() -> ChatMessageFeedback.builder()
+                        .chatMessage(chatMessage)
+                        .chatSession(chatMessage.getChatSession())
+                        .user(chatMessage.getUser())
+                        .build());
+        feedback.setFeedbackType(feedbackType);
+        feedback.setRating(legacyRating);
+        feedback.setReasons(legacyRating == FeedbackRating.THUMBS_DOWN
                 ? joinReasons(request.getReasons())
                 : null);
+        feedback.setReason(request.getReason());
         feedback.setComment(request.getComment());
 
         ChatMessageFeedback saved = chatMessageFeedbackRepository.save(feedback);
         return toChatMessageFeedbackResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public void removeFeedback(Long userId, String messageId) {
+        ChatMessage chatMessage = chatMessageRepository.findById(messageId)
+                .orElseThrow(() -> new ResourceNotFoundException("Message not found"));
+        if (chatMessage.getRole() != ChatMessageRole.ASSISTANT || !chatMessage.getUser().getId().equals(userId)) {
+            throw new ForbiddenException("You do not have permission to remove feedback from this message");
+        }
+        chatMessageFeedbackRepository.findByChatMessageIdAndUserId(messageId, userId)
+                .ifPresent(chatMessageFeedbackRepository::delete);
+    }
+
+    private static AiFeedbackType resolveFeedbackType(ChatMessageFeedbackRequest request) {
+        if (request.getFeedbackType() != null) return request.getFeedbackType();
+        if (request.getRating() == FeedbackRating.THUMBS_UP) return AiFeedbackType.LIKE;
+        if (request.getRating() == FeedbackRating.THUMBS_DOWN) return AiFeedbackType.DISLIKE;
+        throw new InvalidMessageException("feedbackType is required", true, 0);
     }
 
     private static String joinReasons(List<FeedbackReason> reasons) {
@@ -275,10 +306,14 @@ public class ChatMessageServiceImpl implements ChatMessageService {
 
     private ChatMessageFeedbackResponse toChatMessageFeedbackResponse(ChatMessageFeedback feedback) {
         String content = feedback.getChatMessage().getContent();
-        User submittedBy = feedback.getChatMessage().getUser();
+        User submittedBy = feedback.getUser() != null ? feedback.getUser() : feedback.getChatMessage().getUser();
         return ChatMessageFeedbackResponse.builder()
                 .id(feedback.getId())
+                .messageId(feedback.getChatMessage().getId())
                 .chatMessageId(feedback.getChatMessage().getId())
+                .chatSessionId(feedback.getChatMessage().getChatSession().getId())
+                .feedbackType(feedback.getFeedbackType())
+                .reason(feedback.getReason())
                 .messageContent(content != null && content.length() > 200 ? content.substring(0, 200) + "..." : content)
                 .rating(feedback.getRating())
                 .reasons(splitReasons(feedback.getReasons()))
@@ -286,6 +321,7 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                 .submittedById(submittedBy.getId())
                 .submittedByName(submittedBy.getFirstName() + " " + submittedBy.getLastName())
                 .createdAt(feedback.getCreatedAt())
+                .updatedAt(feedback.getUpdatedAt())
                 .build();
     }
 
@@ -427,6 +463,7 @@ public class ChatMessageServiceImpl implements ChatMessageService {
 
         RagQueryResponse aiResponse;
         String assistantMessageId = "msg_" + UUID.randomUUID().toString().replace("-", "");
+        ChatMode resolvedMode = ChatMode.LEGAL_QA;
         try {
             var activeMappings = chatSessionDocumentRepository
                     .findByChatSessionIdAndUserIdAndActiveTrueOrderByAttachedAtAsc(chatSession.getId(), currentUser.getId());
@@ -436,17 +473,21 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                     .map(Document::getId)
                     .distinct()
                     .toList();
+            List<String> requestedDocumentIds = sendRequest.getDocumentIds() != null && !sendRequest.getDocumentIds().isEmpty()
+                    ? sendRequest.getDocumentIds()
+                    : sendRequest.getMessageAttachedDocumentIds();
             List<String> messageAttachedDocumentIds = resolveMessageAttachedDocumentIds(
-                    currentUser.getId(), workspace.getId(), sendRequest.getMessageAttachedDocumentIds());
+                    currentUser.getId(), workspace.getId(), requestedDocumentIds);
             String focusedDocumentId = resolveFocusedDocumentId(
                     currentUser.getId(), workspace.getId(), sendRequest.getFocusedDocumentId(), selectedDocument);
+            resolvedMode = resolveChatMode(attachedDocumentIds, messageAttachedDocumentIds, selectedDocument);
             updateSessionConversationState(
                     chatSession,
                     attachedDocumentIds,
                     focusedDocumentId,
                     messageAttachedDocumentIds,
                     sendRequest.getUserRole(),
-                    sendRequest.getConversationMode());
+                    resolvedMode.name());
             ConversationHistoryAssembler.MemoryWindow memoryWindow = conversationHistoryAssembler.build(
                     chatSession, attachedDocumentIds);
             RagQueryRequest aiRequest = RagQueryRequest.builder()
@@ -495,6 +536,7 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                     .content("AI service is currently unavailable. Please try again later.")
                     .status(ChatMessageStatus.FAILED)
                     .requestId(requestId)
+                    .resolvedMode(resolvedMode)
                     .errorMessage(ex.getMessage())
                     .build();
             chatMessageRepository.save(assistantMessage);
@@ -520,6 +562,7 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                 .content(aiResponse.getAnswer())
                 .status(ChatMessageStatus.COMPLETED)
                 .requestId(requestId)
+                .resolvedMode(resolvedMode)
                 .aiModel(aiResponse.getModel());
 
         if (aiResponse.getUsage() != null) {
@@ -541,7 +584,7 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         ChatMessage assistantMessage = assistantBuilder.build();
         chatMessageRepository.save(assistantMessage);
         applyConversationMemoryUpdate(chatSession, aiResponse.getConversationMemoryUpdate());
-        saveCitations(aiResponse.getCitations(), assistantMessage);
+        saveCitations(chatSession.getWorkspace().getId(), aiResponse.getCitations(), assistantMessage);
         subscriptionQuotaService.recordAiChatUsage(
                 currentUser,
                 assistantMessage.getPromptTokens() == null ? estimateTokens(question) : assistantMessage.getPromptTokens(),
@@ -555,7 +598,27 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                 .chatSession(toChatSessionResponse(chatSession))
                 .userMessage(toChatMessageResponse(userMessage))
                 .assistantMessage(toChatMessageResponse(assistantMessage))
+                .answer(aiResponse.getAnswer())
+                .resolvedMode(resolvedMode)
+                .sources(aiResponse.getCitations() == null ? List.of() : aiResponse.getCitations())
+                .riskLevel(aiResponse.getRiskLevel())
+                .suggestionType(aiResponse.getSuggestionType())
+                .userActionHints(aiResponse.getUserActionHint() == null
+                        ? List.of()
+                        : List.of(aiResponse.getUserActionHint()))
+                .assistantMessageId(assistantMessage.getId())
                 .build();
+    }
+
+    static ChatMode resolveChatMode(
+            List<String> sessionDocumentIds,
+            List<String> messageDocumentIds,
+            Document legacySelectedDocument) {
+        boolean hasSessionDocuments = sessionDocumentIds != null && !sessionDocumentIds.isEmpty();
+        boolean hasMessageDocuments = messageDocumentIds != null && !messageDocumentIds.isEmpty();
+        return hasSessionDocuments || hasMessageDocuments || legacySelectedDocument != null
+                ? ChatMode.DOCUMENT_ANALYSIS
+                : ChatMode.LEGAL_QA;
     }
 
     private void updateSessionTitleIfNeeded(ChatSession chatSession, String question) {
@@ -603,6 +666,7 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                 .riskLevel(message.getRiskLevel())
                 .legalDomain(message.getLegalDomain())
                 .userActionHint(message.getUserActionHint())
+                .resolvedMode(message.getResolvedMode())
                 .promptTokens(message.getPromptTokens())
                 .completionTokens(message.getCompletionTokens())
                 .totalTokens(message.getTotalTokens())
@@ -612,7 +676,7 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                 .build();
     }
 
-    private void saveCitations(List<RagQueryResponse.Citation> citations, ChatMessage assistantMessage) {
+    private void saveCitations(String workspaceId, List<RagQueryResponse.Citation> citations, ChatMessage assistantMessage) {
         if (citations == null || citations.isEmpty()) {
             return;
         }
@@ -629,6 +693,23 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                             citation.getFileName(),
                             citation.getSectionTitle(),
                             citation.getCitationId());
+
+                    String uri = null;
+                    if (knowledgeBase) {
+                        if (citation.getFileName() != null && !citation.getFileName().isBlank()) {
+                            try {
+                                uri = "/api/v1/workspaces/" + workspaceId + "/documents/system/download?filename=" 
+                                    + java.net.URLEncoder.encode(citation.getFileName(), java.nio.charset.StandardCharsets.UTF_8.toString());
+                            } catch (java.io.UnsupportedEncodingException e) {
+                                uri = "/api/v1/workspaces/" + workspaceId + "/documents/system/download?filename=" + citation.getFileName();
+                            }
+                        }
+                    } else {
+                        if (citation.getDocumentId() != null && !citation.getDocumentId().isBlank()) {
+                            uri = "/api/v1/workspaces/" + workspaceId + "/documents/" + citation.getDocumentId() + "/download";
+                        }
+                    }
+
                     return AiCitation.builder()
                             .id("cite_" + UUID.randomUUID().toString().replace("-", ""))
                             .sourceType(knowledgeBase ? CitationSourceType.KNOWLEDGE_BASE : CitationSourceType.DOCUMENT)
@@ -638,6 +719,7 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                             .pageNumber(citation.getPageNumber())
                             .score(citation.getScore())
                             .chatMessage(assistantMessage)
+                            .uri(uri)
                             .build();
                 })
                 .toList();

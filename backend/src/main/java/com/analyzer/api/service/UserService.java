@@ -21,6 +21,16 @@ public interface UserService {
      */
     void resendExpertActivation(String email);
 
+    /**
+     * Soft deletes (deactivates) a user account.
+     */
+    void softDeleteUser(Long userId, Long currentAdminId);
+
+    /**
+     * Restores (re-activates) a soft-deleted user account.
+     */
+    void restoreUser(Long userId);
+
     void requestPasswordReset(String email);
 
     void resetPassword(com.analyzer.api.dto.auth.ResetPasswordRequestDTO request);
