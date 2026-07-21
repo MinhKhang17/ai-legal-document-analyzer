@@ -12,7 +12,6 @@ import {
   Palette,
   Save,
   Shield,
-  ShieldCheck,
   Sparkles,
   Sun,
   UserCheck,
