@@ -45,6 +45,8 @@ import { AccountSecurityPage } from "../pages/settings/AccountSecurityPage";
 import { PaymentResultRedirect } from "../pages/billing/PaymentResultRedirect";
 import { LawyerTicketsPage } from "../pages/lawyer/LawyerTicketsPage";
 import { LawyerTicketDetailPage } from "../pages/lawyer/LawyerTicketDetailPage";
+import { LawyerRevenuePage } from "../pages/lawyer/LawyerRevenuePage";
+import { AdminRevenuePage } from "../pages/admin/AdminRevenuePage";
 import { CreateCustomerTicketPage } from "../pages/tickets/CreateCustomerTicketPage";
 import { SharedChatPage } from "../pages/chat/SharedChatPage";
 import { SharedTicketConversationPage } from "../pages/tickets/SharedTicketConversationPage";
@@ -298,6 +300,7 @@ export const router = createBrowserRouter([
       },
       { path: "/admin/refunds", element: <AdminRoute><AdminRefundsPage /></AdminRoute> },
       { path: "/admin/refunds/:id", element: <AdminRoute><AdminRefundDetailPage /></AdminRoute> },
+      { path: "/admin/revenue", element: <AdminRoute><AdminRevenuePage /></AdminRoute> },
       {
         path: "/admin/system-health",
         element: (
@@ -319,6 +322,14 @@ export const router = createBrowserRouter([
         element: (
           <ExpertRoute>
             <LawyerTicketDetailPage />
+          </ExpertRoute>
+        ),
+      },
+      {
+        path: "/lawyer/revenue",
+        element: (
+          <ExpertRoute>
+            <LawyerRevenuePage />
           </ExpertRoute>
         ),
       },

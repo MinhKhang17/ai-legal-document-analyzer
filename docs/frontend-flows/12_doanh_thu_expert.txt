@@ -2,8 +2,8 @@ FLOW 12 - DOANH THU / THANH TOÁN CHO EXPERT
 
 LƯU Ý QUAN TRỌNG (khác các flow 01-11):
 - Backend API cho flow này ĐÃ có thật trong code và đã có test.
-- Frontend CHƯA có bất kỳ màn hình, route, service nào gọi tới các API này (đã kiểm tra: không có kết quả nào cho "revenue"/"expertPayment" trong `frontend/src`).
-- Nội dung "Luồng chính", "Màn hình / component", "Dữ liệu / state" bên dưới là ĐỀ XUẤT cho FE team dựa trên API đã có, không phải mô tả UI đang tồn tại.
+- Frontend ĐÃ có màn hình, route và service tích hợp các API revenue.
+- Expert dùng `/lawyer/revenue`; Admin dùng `/admin/revenue` và card thanh toán trong `/admin/tickets/:ticketId`.
 - Chi tiết API, business logic, edge case: xem `backend/docs/expert_revenue_api.md`.
 
 CẬP NHẬT 2026-07-21 — backend đã thêm hoa hồng tự động + các API admin mới:
@@ -59,7 +59,7 @@ Validation:
 - `paymentStatus` bắt buộc chọn 1 trong 3 giá trị enum, không có giá trị mặc định rỗng.
 
 API / service tích hợp:
-- FE cần tạo mới: `frontend/src/services/expertRevenue.service.ts` (chưa tồn tại) và thêm endpoint constants vào `frontend/src/config/api.ts` + `frontend/.env.example` (hiện chưa có key nào cho revenue).
+- FE sử dụng `frontend/src/services/expertRevenue.service.ts`, endpoint constants trong `frontend/src/config/api.ts` và cấu hình mẫu trong `frontend/.env.example`.
 - BE:
   - `PATCH /api/v1/admin/tickets/{id}/expert-payment` — quyền `ADMIN`
   - `GET /api/v1/expert/revenue` — quyền `EXPERT`
@@ -112,7 +112,8 @@ Tiêu chí hoàn thành:
 - Expert xem được tổng quan doanh thu và danh sách ticket kèm phí của mình.
 
 HIỆN TRẠNG:
-- Backend đầy đủ, có test (`ExpertRevenueServiceImplTest.java`); frontend chưa triển khai gì.
+- Backend đầy đủ, có test (`ExpertRevenueServiceImplTest.java`).
+- Frontend đã có trang doanh thu Expert, tổng quan/cấu hình doanh thu Admin và thao tác thanh toán theo ticket.
 
 SUY LUẬN:
 - Tính năng bị bỏ lại phía sau các flow ticket khác (04, 05, 06) — có thể do ưu tiên xử lý ticket được làm trước, phần thanh toán/doanh thu chưa tới lượt.

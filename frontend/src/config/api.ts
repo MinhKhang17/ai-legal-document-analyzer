@@ -208,6 +208,20 @@ export const API_ENDPOINTS = {
       }),
   },
 
+  expertRevenue: {
+    summary: fromEnvOrDefault("VITE_EXPERT_REVENUE_API", "/api/v1/expert/revenue"),
+    tickets: fromEnvOrDefault("VITE_EXPERT_REVENUE_TICKETS_API", "/api/v1/expert/revenue/tickets"),
+    updatePayment: (ticketId: string) =>
+      fillPathParams(fromEnvOrDefault("VITE_ADMIN_EXPERT_PAYMENT_API", "/api/v1/admin/tickets/:ticketId/expert-payment"), { ticketId }),
+    resetPayment: (ticketId: string) =>
+      fillPathParams(fromEnvOrDefault("VITE_ADMIN_EXPERT_PAYMENT_RESET_API", "/api/v1/admin/tickets/:ticketId/expert-payment/reset"), { ticketId }),
+  },
+
+  adminRevenue: {
+    overview: fromEnvOrDefault("VITE_ADMIN_REVENUE_OVERVIEW_API", "/api/v1/admin/revenue/overview"),
+    settings: fromEnvOrDefault("VITE_ADMIN_REVENUE_SETTINGS_API", "/api/v1/admin/revenue/settings"),
+  },
+
   aiLegal: {
     ticketAssessment: (ticketId: string) =>
       fillPathParams(fromEnv("VITE_AI_TICKET_ASSESSMENT_API"), { ticketId }),

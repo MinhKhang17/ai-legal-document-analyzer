@@ -28,6 +28,7 @@ import {
   getTicketAiSummary,
 } from "../../services/aiFeature.service";
 import { getAdminExperts, type BackendUser } from "../../services/user.service";
+import { resetExpertPayment, updateExpertPayment } from "../../services/expertRevenue.service";
 import { useI18n } from "../../hooks/useI18n";
 import { useToast } from "../../hooks/useToast";
 import type {
@@ -42,7 +43,8 @@ import type {
   AiRiskAssessment,
 } from "../../types/aiFeature";
 import { getLegalTicketStatusLabel } from "../../types/legalTicketStatus";
-import { formatDisplayDate } from "../../utils/format";
+import type { ExpertPaymentStatus, ExpertRevenueTicket } from "../../types/expertRevenue";
+import { formatDisplayDate, formatDisplayDateTime, formatVndCurrency } from "../../utils/format";
 
 const getRiskTone = (risk?: string | null) => {
   if (risk === "HIGH") return "red";
@@ -114,6 +116,10 @@ export function AdminTicketDetailPage() {
   const [conversationText, setConversationText] = useState("");
   const [conversationFile, setConversationFile] = useState<File | null>(null);
   const [attachmentMaxKb, setAttachmentMaxKb] = useState(500);
+  const [consultationFee, setConsultationFee] = useState("0");
+  const [paymentStatus, setPaymentStatus] = useState<ExpertPaymentStatus>("UNPAID");
+  const [paymentSnapshot, setPaymentSnapshot] = useState<ExpertRevenueTicket | null>(null);
+  const [paymentSaving, setPaymentSaving] = useState(false);
 
   const loadTicket = useCallback(async () => {
     if (!ticketId) return;
@@ -130,6 +136,20 @@ export function AdminTicketDetailPage() {
           ? String(loadedTicket.assigned_lawyer_id)
           : "",
       );
+      setConsultationFee(String(loadedTicket.consultation_fee ?? 0));
+      setPaymentStatus(loadedTicket.expert_payment_status ?? "UNPAID");
+      setPaymentSnapshot({
+        ticketId: loadedTicket.id,
+        ticketCode: loadedTicket.ticketCode,
+        ticketStatus: loadedTicket.status,
+        consultationFee: loadedTicket.consultation_fee ?? 0,
+        commissionRate: loadedTicket.commission_rate,
+        platformFee: loadedTicket.platform_fee,
+        expertPayout: loadedTicket.expert_payout,
+        paymentStatus: loadedTicket.expert_payment_status ?? "UNPAID",
+        resolvedAt: loadedTicket.resolved_at,
+        paidAt: loadedTicket.expert_paid_at,
+      });
 
       const [
         summaryResult,
@@ -175,6 +195,7 @@ export function AdminTicketDetailPage() {
       setCitations([]);
       setExperts([]);
       setSelectedLawyerId("");
+      setPaymentSnapshot(null);
       setError(t("adminTickets.loadError"));
     } finally {
       setLoading(false);
@@ -208,6 +229,42 @@ export function AdminTicketDetailPage() {
     return expert ? `${expert.firstName} ${expert.lastName}`.trim() || expert.email : "";
   }, [experts, selectedLawyerId]);
 
+  const syncPayment = (payment: ExpertRevenueTicket) => {
+    setPaymentSnapshot(payment);
+    setConsultationFee(String(payment.consultationFee ?? 0));
+    setPaymentStatus(payment.paymentStatus ?? "UNPAID");
+  };
+
+  const handleSavePayment = async () => {
+    const fee = Number(consultationFee);
+    if (!ticketId || !Number.isFinite(fee) || fee < 0) {
+      setError(t("adminTickets.payment.invalidFee"));
+      return;
+    }
+    setPaymentSaving(true); setError("");
+    try {
+      syncPayment(await updateExpertPayment(ticketId, { consultationFee: fee, paymentStatus }));
+      toast.success(t("adminTickets.payment.saveSuccess"), t("toast.successTitle"));
+      await loadTicket();
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : t("adminTickets.payment.saveError");
+      setError(message); toast.error(message);
+    } finally { setPaymentSaving(false); }
+  };
+
+  const handleResetPayment = async () => {
+    if (!ticketId || !window.confirm(t("adminTickets.payment.resetConfirm"))) return;
+    setPaymentSaving(true); setError("");
+    try {
+      syncPayment(await resetExpertPayment(ticketId));
+      toast.success(t("adminTickets.payment.resetSuccess"), t("toast.successTitle"));
+      await loadTicket();
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : t("adminTickets.payment.resetError");
+      setError(message); toast.error(message);
+    } finally { setPaymentSaving(false); }
+  };
+
   const handleAssign = async (forceReassign: boolean) => {
     if (!ticketId || !selectedLawyerId) {
       toast.warning(t("adminTickets.selectExpertFirst"));
@@ -232,8 +289,11 @@ export function AdminTicketDetailPage() {
           .replace("{action}", forceReassign ? t("adminTickets.reassignAction") : t("adminTickets.assignAction"))
           .replace("{expert}", selectedExpertLabel || t("adminTickets.expert")),
       );
-    } catch {
-      const message = t("adminTickets.assignError");
+    } catch (cause) {
+      const rawMessage = cause instanceof Error ? cause.message : "";
+      const message = rawMessage.includes("CANNOT_REASSIGN_TICKET_WITH_PAYMENT_SET")
+        ? t("adminTickets.payment.resetBeforeReassign")
+        : rawMessage || t("adminTickets.assignError");
       setError(message);
       toast.error(message);
     } finally {
@@ -428,6 +488,20 @@ export function AdminTicketDetailPage() {
 
           <aside className="space-y-gutter">
             {ticket.contextSnapshot && <Card title={t("adminTickets.contextTitle")}><div className="space-y-sm text-sm"><p><strong>{t("adminTickets.contextQuestion")}:</strong> {ticket.contextSnapshot.userQuestion}</p><p className="whitespace-pre-line"><strong>{t("adminTickets.contextAnswer")}:</strong> {ticket.contextSnapshot.assistantAnswer || "—"}</p><pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-surface-container-low p-sm text-xs">{ticket.contextSnapshot.documentSnapshotJson || "[]"}</pre><pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-surface-container-low p-sm text-xs">{ticket.contextSnapshot.citationSnapshotJson || "[]"}</pre></div></Card>}
+            {hasAssignedLawyer && <Card title={t("adminTickets.payment.title")} subtitle={t("adminTickets.payment.subtitle")}>
+              <div className="space-y-md">
+                <label className="block text-sm font-semibold">{t("adminTickets.payment.consultationFee")}<input className="form-field mt-xs" type="number" min="0" step="1000" value={consultationFee} onChange={(event) => setConsultationFee(event.target.value)} /></label>
+                <label className="block text-sm font-semibold">{t("adminTickets.payment.status")}<select className="form-field mt-xs" value={paymentStatus} onChange={(event) => setPaymentStatus(event.target.value as ExpertPaymentStatus)}><option value="UNPAID">{t("expertRevenue.payment.UNPAID")}</option><option value="PENDING">{t("expertRevenue.payment.PENDING")}</option><option value="PAID">{t("expertRevenue.payment.PAID")}</option></select></label>
+                {!['RESOLVED', 'CLOSED'].includes(ticket.status) && <p className="rounded-lg bg-amber-50 p-sm text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">{t("adminTickets.payment.unresolvedNotice")}</p>}
+                <dl className="grid grid-cols-2 gap-sm text-xs">
+                  <div><dt className="text-on-surface-variant">{t("adminTickets.payment.rate")}</dt><dd className="font-semibold">{paymentSnapshot?.commissionRate != null ? `${Number(paymentSnapshot.commissionRate) * 100}%` : "-"}</dd></div>
+                  <div><dt className="text-on-surface-variant">{t("expertRevenue.platformFee")}</dt><dd className="font-semibold">{formatVndCurrency(Number(paymentSnapshot?.platformFee ?? 0), "0 ₫", locale)}</dd></div>
+                  <div><dt className="text-on-surface-variant">{t("expertRevenue.expertPayout")}</dt><dd className="font-semibold">{formatVndCurrency(Number(paymentSnapshot?.expertPayout ?? 0), "0 ₫", locale)}</dd></div>
+                  <div><dt className="text-on-surface-variant">{t("expertRevenue.paidAt")}</dt><dd className="font-semibold">{formatDisplayDateTime(paymentSnapshot?.paidAt, "-", locale)}</dd></div>
+                </dl>
+                <div className="flex flex-wrap gap-sm"><Button onClick={() => void handleSavePayment()} disabled={paymentSaving}>{paymentSaving ? t("common.loading") : t("actions.save")}</Button><Button variant="secondary" onClick={() => void handleResetPayment()} disabled={paymentSaving || paymentStatus === "PAID"}>{t("adminTickets.payment.reset")}</Button></div>
+              </div>
+            </Card>}
             <Card title={t("adminTickets.assignmentControls")}>
               <div className="space-y-md">
                 <label className="block text-sm font-semibold">
