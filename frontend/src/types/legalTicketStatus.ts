@@ -66,7 +66,7 @@ export const LEGAL_TICKET_TERMINAL_STATUSES = [
 ] as const satisfies readonly LegalTicketStatus[];
 
 export const isLegalTicketStatus = (value: string): value is LegalTicketStatus =>
-  VALID_LEGAL_TICKET_STATUSES.includes(value as LegalTicketStatus);
+  VALID_LEGAL_TICKET_STATUSES.some((status) => status === value);
 
 export const normalizeLegalTicketStatus = (
   value?: string | null,

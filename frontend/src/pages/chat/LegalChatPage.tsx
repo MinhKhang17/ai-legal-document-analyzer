@@ -927,7 +927,7 @@ export function LegalChatPage() {
   };
 
   return (
-    <div>
+    <div className="flex min-h-0 flex-col lg:h-full lg:flex-1">
       <PageHeader
         title={t("chat.pageTitle", {
           title: selectedSession?.title ?? t("chat.newConversation"),
@@ -935,6 +935,7 @@ export function LegalChatPage() {
         subtitle={t("chat.workspaceContext", {
           workspace: selectedWorkspace?.name ?? "—",
         })}
+        className="mb-md shrink-0"
         actions={
           <>
             {selectedSessionId && (
@@ -1005,12 +1006,12 @@ export function LegalChatPage() {
       />
 
       {error && (
-        <div className="mb-lg rounded-xl border border-error/40 bg-error/10 p-md text-sm text-error">
+        <div className="mb-md shrink-0 rounded-xl border border-error/40 bg-error/10 p-md text-sm text-error" role="alert">
           {error}
         </div>
       )}
 
-      <div className="grid gap-md xl:grid-cols-[minmax(0,1fr)_60px]">
+      <div className="grid min-h-0 flex-1 gap-md md:grid-cols-[minmax(0,1fr)_60px]">
         {activeDrawer && <button type="button" aria-label={t("chat.drawer.close")} className="fixed inset-0 z-30 bg-slate-950/30" onClick={() => setActiveDrawer(null)} />}
         <aside className={`fixed inset-y-0 right-0 z-40 w-[min(400px,calc(100vw-24px))] overflow-y-auto border-l border-legal-border bg-white p-md shadow-2xl transition-transform dark:border-slate-700 dark:bg-slate-950 ${activeDrawer ? "translate-x-0" : "translate-x-full"}`}>
           <div className="mb-md flex items-center justify-between"><p className="font-semibold">{activeDrawer === "session" ? t("chat.drawer.session") : activeDrawer === "documents" ? t("chat.drawer.documents") : t("chat.drawer.options")}</p><Button size="icon" variant="ghost" aria-label={t("actions.close")} onClick={() => setActiveDrawer(null)}><X className="h-5 w-5" /></Button></div>
@@ -1241,31 +1242,53 @@ export function LegalChatPage() {
 
         </aside>
 
-        <section className="order-1 min-w-0 space-y-gutter">
-          <Card
-            className="relative flex min-h-[680px] flex-col overflow-hidden border-legal-border p-0 xl:h-[calc(100vh-3rem)] xl:max-h-[900px]"
-          >
-            <div className="border-b border-legal-border bg-white p-md dark:border-slate-700 dark:bg-slate-900">
-              <div className="mb-sm flex items-center justify-between gap-md">
-                <p className="text-sm font-semibold">{t("chat.documents.usedCount", { count: formatNumber(attachedDocuments.length, locale) })}</p>
+        <section className="order-2 min-w-0 md:order-1 md:min-h-0">
+          <div className="relative flex min-h-[70svh] min-w-0 flex-col gap-sm lg:h-full lg:min-h-0">
+            <section className="shrink-0 rounded-xl border border-legal-border bg-white p-sm shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-md" aria-labelledby="chat-documents-heading">
+              <div className="flex flex-wrap items-center justify-between gap-sm">
+                <div className="min-w-0">
+                  <h2 id="chat-documents-heading" className="text-sm font-semibold text-on-surface dark:text-slate-100">
+                    {t("chat.documents.usedCount", { count: formatNumber(attachedDocuments.length, locale) })}
+                  </h2>
+                  <p className="mt-0.5 text-xs text-on-surface-variant dark:text-slate-400">
+                    {t("chat.documents.contextHint")}
+                  </p>
+                </div>
                 <Badge tone="gold">RAG</Badge>
               </div>
-              <div className="flex gap-sm overflow-x-auto pb-xs">
+              <div className="mt-sm flex gap-sm overflow-x-auto pb-xs">
                 {attachedDocuments.map((document) => (
-                  <div key={document.documentId} className="min-w-[240px] max-w-[300px] flex-1 rounded-xl border border-legal-border bg-surface-container-low p-sm dark:border-slate-700 dark:bg-slate-800">
+                  <article key={document.documentId} className="min-w-[min(17rem,78vw)] max-w-[19rem] flex-1 rounded-lg border border-legal-border bg-surface-container-low p-sm dark:border-slate-700 dark:bg-slate-800">
                     <div className="flex items-center gap-sm">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-50 text-error dark:bg-red-950/40"><FileText className="h-5 w-5" /></div>
-                      <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold" title={document.originalFileName}>{document.originalFileName}</p><p className="text-xs text-on-surface-variant">{formatMegabytes(document.size, locale)}</p></div>
-                      <button type="button" className="rounded-md p-xs text-on-surface-variant hover:bg-surface-container-high hover:text-error" aria-label={t("chat.documents.detachAria", { name: document.originalFileName })} disabled={documentActionBusy} onClick={() => void handleDetachDocument(document.documentId)}><X className="h-4 w-4" /></button>
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary dark:bg-slate-700 dark:text-inverse-primary"><FileText className="h-4 w-4" aria-hidden="true" /></div>
+                      <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold" title={document.originalFileName}>{document.originalFileName}</p><p className="truncate text-xs text-on-surface-variant dark:text-slate-400">{formatMegabytes(document.size, locale)}</p></div>
+                      <button type="button" className="shrink-0 rounded-md p-xs text-on-surface-variant transition hover:bg-surface-container-high hover:text-error disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-400 dark:hover:bg-slate-700" aria-label={t("chat.documents.detachAria", { name: document.originalFileName })} disabled={documentActionBusy} onClick={() => void handleDetachDocument(document.documentId)}><X className="h-4 w-4" aria-hidden="true" /></button>
                     </div>
                     <DocumentProcessingProgress status={document.uploadStatus} />
-                  </div>
+                  </article>
                 ))}
-                <button type="button" onClick={() => void handleOpenDocumentModal()} disabled={!selectedWorkspaceId || openingDocumentModal} className="flex min-h-16 shrink-0 items-center justify-center gap-sm rounded-xl border border-dashed border-primary/40 bg-primary/5 px-md text-sm font-semibold text-primary transition hover:bg-primary/10 disabled:opacity-50"><Plus className="h-4 w-4" />{t("chat.documents.add")}</button>
+                <button
+                  type="button"
+                  onClick={() => void handleOpenDocumentModal()}
+                  disabled={!selectedWorkspaceId || openingDocumentModal}
+                  className="group flex min-w-[min(15rem,78vw)] max-w-[17rem] shrink-0 items-center gap-sm rounded-lg border border-outline-variant bg-surface-container-low px-sm py-sm text-left text-primary transition hover:border-primary/50 hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-inverse-primary dark:hover:border-inverse-primary/50 dark:hover:bg-slate-700"
+                  aria-describedby="chat-add-document-hint"
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-white shadow-sm transition group-hover:bg-primary-container dark:bg-inverse-primary dark:text-slate-950">
+                    {openingDocumentModal ? <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Plus className="h-4 w-4" aria-hidden="true" />}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold">{openingDocumentModal ? t("chat.documents.opening") : t("chat.documents.add")}</span>
+                    <span id="chat-add-document-hint" className="block truncate text-xs font-normal text-on-surface-variant dark:text-slate-400">{t("chat.documents.addHint")}</span>
+                  </span>
+                </button>
               </div>
-              <div className={`mt-sm flex items-center gap-sm rounded-lg px-md py-sm text-xs font-medium ${chatBlockedByAttachedDocuments ? "bg-amber-50 text-amber-800 dark:bg-amber-950/30 dark:text-amber-200" : "bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-200"}`}>
-                <Bot className="h-4 w-4 shrink-0" />
-                <span className="min-w-0 flex-1">
+              {documentActionError && !documentModalOpen && <p className="mt-sm rounded-lg bg-error/10 px-sm py-xs text-xs font-medium text-error" role="alert">{documentActionError}</p>}
+            </section>
+            <div className={`flex shrink-0 flex-col gap-sm rounded-lg border px-sm py-sm text-xs font-medium sm:flex-row sm:items-center ${chatBlockedByAttachedDocuments ? "border-amber-200 bg-amber-50/70 text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200" : "border-primary/15 bg-primary/5 text-primary dark:border-inverse-primary/20 dark:bg-blue-950/20 dark:text-blue-200"}`}>
+              <div className="flex min-w-0 flex-1 items-start gap-sm">
+                <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/70 dark:bg-slate-900/60"><Bot className="h-3.5 w-3.5" aria-hidden="true" /></span>
+                <span className="min-w-0 leading-5">
                   {chatBlockedByAttachedDocuments
                     ? failedAttachedDocuments.length > 0
                       ? t("chat.documents.bannerFailed")
@@ -1274,8 +1297,8 @@ export function LegalChatPage() {
                       ? t("chat.documents.bannerGrounded", { count: formatNumber(attachedDocuments.length, locale) })
                       : t("chat.documents.bannerSystemKnowledge")}
                 </span>
-                <button type="button" className="shrink-0 font-semibold hover:underline" onClick={() => setActiveDrawer("documents")}>{t("chat.viewSources")}</button>
               </div>
+              <button type="button" className="self-start rounded-md px-sm py-xs font-semibold underline-offset-4 transition hover:bg-white/70 hover:underline sm:self-auto dark:hover:bg-slate-900/60" onClick={() => setActiveDrawer("documents")}>{t("chat.viewSources")}</button>
             </div>
             <div
               ref={chatScrollContainerRef}
@@ -1285,13 +1308,18 @@ export function LegalChatPage() {
                 shouldAutoScrollRef.current = nearBottom;
                 if (nearBottom) setShowNewResponseButton(false);
               }}
-              className="min-h-0 flex-1 space-y-md overflow-y-auto bg-surface-container-low/60 p-lg dark:bg-slate-950/40"
+              className="min-h-0 flex-1 space-y-md overflow-y-auto overflow-x-hidden px-xs py-sm sm:px-md"
             >
                 {messages.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-outline-variant p-lg text-sm text-on-surface-variant dark:border-slate-700 dark:text-slate-400">
-                    {selectedWorkspaceId
-                      ? t("chat.askToStart")
-                      : t("chat.pickWorkspaceFirst")}
+                  <div className="flex min-h-full items-center justify-center py-lg">
+                    <div className="w-full max-w-xl rounded-xl border border-legal-border bg-white/80 p-xl text-center shadow-sm dark:border-slate-700 dark:bg-slate-900/80">
+                      <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-primary dark:bg-slate-800 dark:text-inverse-primary"><Bot className="h-5 w-5" aria-hidden="true" /></span>
+                      <p className="mt-md text-sm font-medium text-on-surface-variant dark:text-slate-300">
+                        {selectedWorkspaceId
+                          ? t("chat.askToStart")
+                          : t("chat.pickWorkspaceFirst")}
+                      </p>
+                    </div>
                   </div>
                 ) : (
                   messages.map((message, messageIndex) => {
@@ -1309,15 +1337,15 @@ export function LegalChatPage() {
                     return (
                     <article
                       key={message.id}
-                      className="flex items-start gap-md"
+                      className="mx-auto flex w-full max-w-6xl items-start gap-md"
                     >
                       <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white ${assistant ? "bg-primary" : "bg-blue-600"}`}>
                         {assistant ? <Bot className="h-5 w-5" aria-hidden="true" /> : <UserRound className="h-5 w-5" aria-hidden="true" />}
                       </div>
-                      <div className="min-w-0 max-w-[82%]">
+                      <div className="min-w-0 max-w-[88%] overflow-hidden sm:max-w-[82%]">
                         <div className="mb-xs flex items-center justify-between gap-lg text-xs"><span className="font-semibold text-on-surface dark:text-slate-100">{assistant ? "LexiGuard AI" : t("chat.role.user")}</span><span className="text-on-surface-variant">{message.timestamp}</span></div>
                         <div
-                          className={`rounded-xl border p-md text-sm leading-6 shadow-sm ${
+                          className={`min-w-0 overflow-hidden rounded-xl border p-md text-sm leading-6 shadow-sm [overflow-wrap:anywhere] ${
                             assistant
                               ? "border-legal-border bg-white text-on-surface dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                               : "border-blue-100 bg-blue-50 text-on-surface dark:border-blue-900 dark:bg-blue-950/40 dark:text-slate-100"
@@ -1437,7 +1465,7 @@ export function LegalChatPage() {
             )}
 
             <form
-              className="border-t border-legal-border bg-white p-md dark:border-slate-700 dark:bg-slate-900"
+              className="shrink-0"
               onSubmit={(event) => {
                 event.preventDefault();
                 void handleSend();
@@ -1501,10 +1529,10 @@ export function LegalChatPage() {
                 </div>
               </div>
             </form>
-          </Card>
+          </div>
         </section>
-        <aside className="order-2 flex items-start justify-center">
-          <nav aria-label={t("chat.utilities")} className="sticky top-6 flex w-[60px] flex-col items-center gap-sm rounded-xl border border-legal-border bg-white p-sm shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <aside className="order-1 flex min-w-0 items-start justify-center md:order-2">
+          <nav aria-label={t("chat.utilities")} className="flex w-auto max-w-full items-center gap-sm rounded-xl border border-legal-border bg-white p-sm shadow-sm dark:border-slate-700 dark:bg-slate-900 md:sticky md:top-4 md:w-[60px] md:flex-col">
             <Button size="icon" variant={activeDrawer === "session" ? "primary" : "ghost"} aria-label={t("chat.drawer.sessionInformation")} title={t("chat.drawer.sessionInformation")} onClick={() => setActiveDrawer((current) => current === "session" ? null : "session")}><Info className="h-5 w-5" /></Button>
             <Button size="icon" variant={activeDrawer === "documents" ? "primary" : "ghost"} aria-label={t("chat.drawer.documents")} title={t("chat.drawer.documents")} onClick={() => setActiveDrawer((current) => current === "documents" ? null : "documents")}><Files className="h-5 w-5" /></Button>
             <Button size="icon" variant={activeDrawer === "settings" ? "primary" : "ghost"} aria-label={t("chat.drawer.options")} title={t("chat.drawer.options")} onClick={() => setActiveDrawer((current) => current === "settings" ? null : "settings")}><Settings className="h-5 w-5" /></Button>
@@ -1533,34 +1561,39 @@ export function LegalChatPage() {
         open={documentModalOpen}
         title={t("chat.documentModal.title")}
         onClose={() => setDocumentModalOpen(false)}
-        footer={<Button variant="secondary" onClick={() => setDocumentModalOpen(false)}>{t("actions.close")}</Button>}
+        footer={<div className="flex w-full justify-end"><Button variant="secondary" onClick={() => setDocumentModalOpen(false)}>{t("actions.close")}</Button></div>}
       >
         <div className="space-y-lg">
           {documentActionError && <p className="rounded-lg bg-error/10 p-sm text-sm text-error">{documentActionError}</p>}
-          <section>
-            <p className="font-semibold">{t("chat.documentModal.uploadTitle")}</p>
-            <p className="mt-xs text-xs text-on-surface-variant">{t("chat.documentModal.uploadDescription")}</p>
-            <div className="mt-sm space-y-sm">
-              <p className="text-xs text-on-surface-variant">{supportedContractScopeText(language)} {t("chat.documentModal.autoDetectHint")}</p>
-              <div className="flex flex-col gap-sm sm:flex-row">
-                <input className="form-field" type="file" onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)} />
-                <Button disabled={!uploadFile || documentActionBusy} onClick={() => void handleUploadAndAttach()}>{documentActionBusy ? t("chat.documentModal.processing") : t("chat.documentModal.uploadAndAttach")}</Button>
-              </div>
+          <section className="space-y-sm">
+            <div className="space-y-xs">
+              <p className="font-semibold">{t("chat.documentModal.uploadTitle")}</p>
+              <p className="text-xs text-on-surface-variant dark:text-slate-400">{t("chat.documentModal.uploadDescription")}</p>
+            </div>
+            <p className="text-xs text-on-surface-variant dark:text-slate-400">{supportedContractScopeText(language)} {t("chat.documentModal.autoDetectHint")}</p>
+            <div className="grid gap-sm sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+              <input
+                className="form-field h-11 min-w-0 px-0 py-0 pr-md text-sm file:mr-md file:h-full file:border-0 file:border-r file:border-outline-variant file:bg-surface-container-low file:px-md file:text-sm file:font-semibold file:text-primary dark:file:border-slate-700 dark:file:bg-slate-800 dark:file:text-inverse-primary"
+                type="file"
+                aria-label={t("chat.documentModal.uploadTitle")}
+                onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)}
+              />
+              <Button className="h-11 w-full sm:min-w-40 sm:w-auto" disabled={!uploadFile || documentActionBusy} onClick={() => void handleUploadAndAttach()}>{documentActionBusy ? t("chat.documentModal.processing") : t("chat.documentModal.uploadAndAttach")}</Button>
             </div>
           </section>
-          <section>
+          <section className="space-y-sm">
             <p className="font-semibold">{t("chat.documentModal.chooseFromWorkspace")}</p>
-            <div className="mt-sm max-h-72 space-y-sm overflow-y-auto">
+            <div className="max-h-72 space-y-sm overflow-y-auto">
               {workspaceDocuments.length === 0 ? <p className="text-sm text-on-surface-variant">{t("chat.noDocuments")}</p> : workspaceDocuments.map((document) => {
                 const attached = attachedDocuments.some((item) => item.documentId === document.documentId);
-                return <div key={document.documentId} className="flex items-center justify-between gap-md rounded-lg border border-legal-border p-sm dark:border-slate-700">
+                return <div key={document.documentId} className="flex flex-col gap-sm rounded-lg border border-legal-border p-sm dark:border-slate-700 sm:flex-row sm:items-center sm:justify-between sm:gap-md">
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-semibold" title={document.originalFileName}>{document.originalFileName}</p>
                     <div className="mt-xs"><StatusBadge status={document.status} /></div>
                     <DocumentProcessingProgress status={document.status} />
                     {document.errorMessage && <p className="mt-xs text-xs text-error">{t("upload.documentProcessingError")}</p>}
                   </div>
-                  <div className="flex gap-xs">
+                  <div className="flex flex-wrap justify-end gap-xs">
                     <Button size="icon" variant="ghost" aria-label={t("actions.download")} onClick={() => void handleDownloadWorkspaceDocument(document)}><Download className="h-4 w-4" /></Button>
                     {attached ? (
                       <Button size="sm" variant="danger" leftIcon={<Trash2 className="h-4 w-4" />} disabled={documentActionBusy} onClick={() => void handleDetachDocument(document.documentId)}>{t("chat.documentModal.removeFromChat")}</Button>

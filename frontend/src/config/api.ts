@@ -36,6 +36,8 @@ export const API_ENDPOINTS = {
     logout: fromEnv("VITE_AUTH_LOGOUT_API"),
     verifyEmail: fromEnvOrDefault("VITE_AUTH_VERIFY_EMAIL_API", "/api/v1/auth/verify-email"),
     resendVerification: fromEnvOrDefault("VITE_AUTH_RESEND_VERIFICATION_API", "/api/v1/auth/resend-verification"),
+    forgotPassword: fromEnvOrDefault("VITE_AUTH_FORGOT_PASSWORD_API", "/api/v1/auth/forgot-password"),
+    resetPassword: fromEnvOrDefault("VITE_AUTH_RESET_PASSWORD_API", "/api/v1/auth/reset-password"),
   },
 
   workspaces: {
