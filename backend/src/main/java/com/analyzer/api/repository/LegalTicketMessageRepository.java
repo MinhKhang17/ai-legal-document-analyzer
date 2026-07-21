@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -13,4 +14,6 @@ public interface LegalTicketMessageRepository extends JpaRepository<LegalTicketM
 
     List<LegalTicketMessage> findByTicket_IdOrderByCreatedAtAsc(String ticketId);
     Page<LegalTicketMessage> findByTicket_IdAndDeletedAtIsNullOrderByCreatedAtDesc(String ticketId, Pageable pageable);
+    Optional<LegalTicketMessage> findByTicket_IdAndSender_IdAndClientMessageId(
+            String ticketId, Long senderId, String clientMessageId);
 }

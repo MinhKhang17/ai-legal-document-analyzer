@@ -20,6 +20,7 @@ public class LegalTicketMessageResponse {
 
     @JsonProperty("id")
     private String id;
+    private String clientMessageId;
 
     @JsonProperty("ticket_id")
     private String ticketId;

@@ -16,4 +16,7 @@ public class ChatWithUserRequest {
     @NotBlank
     @Size(max = 5000)
     private String message;
+
+    @Size(max = 100)
+    private String clientMessageId;
 }
