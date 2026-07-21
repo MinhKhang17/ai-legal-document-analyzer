@@ -212,6 +212,15 @@ public class LegalTicket {
     @Column(name = "expert_paid_at")
     private LocalDateTime expertPaidAt;
 
+    @Column(name = "commission_rate", precision = 5, scale = 4)
+    private BigDecimal commissionRate;
+
+    @Column(name = "platform_fee", precision = 19, scale = 2)
+    private BigDecimal platformFee;
+
+    @Column(name = "expert_payout", precision = 19, scale = 2)
+    private BigDecimal expertPayout;
+
     @Column(nullable = false)
     @Builder.Default
     private boolean deleted = false;

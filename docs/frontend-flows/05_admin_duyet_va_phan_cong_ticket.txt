@@ -71,6 +71,8 @@ UI states:
 Edge cases:
 - Nếu `getAdminExperts()` trả danh sách trống: hiển thị thông báo yêu cầu tạo tài khoản Expert trước.
 - `hasAssignedLawyer` ảnh hưởng nút assign/reassign.
+- **(Cập nhật 2026-07-21)** `POST .../assign-lawyer` và `.../reassign-lawyer` giờ trả 409 `USER_IS_NOT_EXPERT` nếu `lawyerId` gửi lên không có role EXPERT — khó xảy ra qua UI vì danh sách đã lọc sẵn (`GET /admin/users/experts`), nhưng FE nên bắt lỗi này phòng trường hợp danh sách bị cache cũ.
+- **(Cập nhật 2026-07-21, quan trọng)** `.../reassign-lawyer` giờ trả 409 `CANNOT_REASSIGN_TICKET_WITH_PAYMENT_SET` nếu ticket đã có phí tư vấn/hoa hồng được tính (đã resolve ít nhất 1 lần, hoặc admin đã nhập `consultationFee`, hoặc `paymentStatus != UNPAID`). FE cần: (1) bắt lỗi này và hiển thị thông báo rõ ràng thay vì lỗi chung chung, (2) gợi ý admin gọi `POST /api/v1/admin/tickets/{id}/expert-payment/reset` trước (xem flow 12 mục "reset") để mở khoá reassign — trừ khi đã `PAID` thì không reset được nữa.
 
 Business rules:
 - Admin nhìn thấy toàn hệ thống, không chỉ ticket của mình.

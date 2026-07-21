@@ -18,6 +18,7 @@ import com.analyzer.api.repository.LegalTicketMessageRepository;
 import com.analyzer.api.repository.LegalTicketRepository;
 import com.analyzer.api.repository.UserRepository;
 import com.analyzer.api.service.ExpertLegalTicketService;
+import com.analyzer.api.service.ExpertRevenueService;
 import com.analyzer.api.service.EmailService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -40,6 +41,7 @@ public class ExpertLegalTicketServiceImpl implements ExpertLegalTicketService {
     private final UserRepository userRepository;
     private final LegalTicketMapper legalTicketMapper;
     private final EmailService emailService;
+    private final ExpertRevenueService expertRevenueService;
 
     @Override
     @Transactional(readOnly = true)
@@ -158,6 +160,7 @@ public class ExpertLegalTicketServiceImpl implements ExpertLegalTicketService {
         ticket.setExpertInternalNote(request.getExpertInternalNote());
         ticket.setResolvedAt(LocalDateTime.now());
         ticket.setLastLawyerMessageAt(LocalDateTime.now());
+        expertRevenueService.applyCommissionSnapshot(ticket);
 
         // Save Response Message
         LegalTicketMessage msg = LegalTicketMessage.builder()
