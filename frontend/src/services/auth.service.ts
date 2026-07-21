@@ -3,11 +3,15 @@ import { buildAuthHeaders } from "./http";
 import type {
   ApiErrorResponse,
   AuthMeResponse,
+  ForgotPasswordRequest,
+  ForgotPasswordResponse,
   LoginRequest,
   LoginResponse,
   RefreshResponse,
   RegisterRequest,
   RegisterResponse,
+  ResetPasswordRequest,
+  ResetPasswordResponse,
 } from "../types/auth";
 
 type ParsedResponse<T> = {
@@ -181,6 +185,26 @@ export async function login(payload: LoginRequest): Promise<LoginResponse> {
     API_ENDPOINTS.auth.login,
     payload,
     "Login failed. Please check your email and password.",
+  );
+}
+
+export async function requestPasswordReset(
+  payload: ForgotPasswordRequest,
+): Promise<ForgotPasswordResponse> {
+  return postJson<ForgotPasswordResponse>(
+    API_ENDPOINTS.auth.forgotPassword,
+    payload,
+    "Unable to request password reset. Please try again.",
+  );
+}
+
+export async function resetPassword(
+  payload: ResetPasswordRequest,
+): Promise<ResetPasswordResponse> {
+  return postJson<ResetPasswordResponse>(
+    API_ENDPOINTS.auth.resetPassword,
+    payload,
+    "Unable to reset password. Please try again.",
   );
 }
 
