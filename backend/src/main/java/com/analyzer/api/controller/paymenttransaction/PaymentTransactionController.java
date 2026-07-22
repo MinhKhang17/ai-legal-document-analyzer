@@ -35,10 +35,7 @@ import java.util.Map;
 @RequestMapping("/api/v1/payment-transactions")
 @RequiredArgsConstructor
 @Slf4j
-@Tag(
-        name = "Quản lý giao dịch thanh toán",
-        description = "Các API dùng để xem lịch sử giao dịch thanh toán và xử lý thanh toán qua VNPAY"
-)
+@Tag(name = "Quản lý giao dịch thanh toán", description = "Các API dùng để xem lịch sử giao dịch thanh toán và xử lý thanh toán qua VNPAY")
 public class PaymentTransactionController {
 
     private final PaymentTransactionService paymentTransactionService;
@@ -48,10 +45,7 @@ public class PaymentTransactionController {
 
     @GetMapping("/me")
     @PreAuthorize("isAuthenticated()")
-    @Operation(
-            summary = "Lấy lịch sử giao dịch của tôi",
-            description = "Khách hàng xem danh sách giao dịch thanh toán của chính mình."
-    )
+    @Operation(summary = "Lấy lịch sử giao dịch của tôi", description = "Khách hàng xem danh sách giao dịch thanh toán của chính mình.")
     public ResponseEntity<ApiResponseDTO<List<PaymentTransactionResponse>>> getMyTransactions(
             @AuthenticationPrincipal UserDetailsImpl currentUser) {
         Long customerId = currentUser.getId();
@@ -61,10 +55,7 @@ public class PaymentTransactionController {
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(
-            summary = "Lấy toàn bộ lịch sử giao dịch",
-            description = "Admin xem toàn bộ giao dịch thanh toán trong hệ thống."
-    )
+    @Operation(summary = "Lấy toàn bộ lịch sử giao dịch", description = "Admin xem toàn bộ giao dịch thanh toán trong hệ thống.")
     public ResponseEntity<ApiResponseDTO<List<PaymentTransactionResponse>>> getAllTransactions() {
         List<PaymentTransactionResponse> response = paymentTransactionService.getAllTransactions();
         return ResponseEntity.ok(ApiResponseDTO.success("Lấy toàn bộ lịch sử thanh toán thành công", response));
@@ -72,10 +63,7 @@ public class PaymentTransactionController {
 
     @PostMapping("/{id}/vnpay-url")
     @PreAuthorize("isAuthenticated()")
-    @Operation(
-            summary = "Tạo URL thanh toán VNPAY",
-            description = "Tạo đường dẫn thanh toán VNPAY cho một giao dịch đang chờ thanh toán."
-    )
+    @Operation(summary = "Tạo URL thanh toán VNPAY", description = "Tạo đường dẫn thanh toán VNPAY cho một giao dịch đang chờ thanh toán.")
     public ResponseEntity<ApiResponseDTO<PaymentUrlResponse>> createVnPayPaymentUrl(
             @AuthenticationPrincipal UserDetailsImpl currentUser,
             @PathVariable Long id,
@@ -84,17 +72,13 @@ public class PaymentTransactionController {
         PaymentUrlResponse response = paymentTransactionService.createVnPayPaymentUrl(
                 id,
                 customerId,
-                getClientIp(request)
-        );
+                getClientIp(request));
         return ResponseEntity.ok(ApiResponseDTO.success("Tạo URL thanh toán VNPAY thành công", response));
     }
 
     @PostMapping("/expert-ticket/{ticketId}/vnpay-url")
     @PreAuthorize("hasRole('CUSTOMER')")
-    @Operation(
-            summary = "Tạo URL thanh toán ticket chuyên gia",
-            description = "Tạo hoặc dùng lại giao dịch VNPAY đang chờ cho ticket trả phí đã được khách hàng chấp nhận báo giá."
-    )
+    @Operation(summary = "Tạo URL thanh toán ticket chuyên gia", description = "Tạo hoặc dùng lại giao dịch VNPAY đang chờ cho ticket trả phí đã được khách hàng chấp nhận báo giá.")
     public ResponseEntity<ApiResponseDTO<PaymentUrlResponse>> createExpertTicketVnPayPaymentUrl(
             @AuthenticationPrincipal UserDetailsImpl currentUser,
             @PathVariable String ticketId,
@@ -105,18 +89,12 @@ public class PaymentTransactionController {
     }
 
     @GetMapping("/vnpay-return")
-    @Operation(
-            summary = "Xử lý kết quả trả về từ VNPAY",
-            description = "Xác thực các tham số VNPAY trả về và cập nhật trạng thái giao dịch."
-    )
+    @Operation(summary = "Xử lý kết quả trả về từ VNPAY", description = "Xác thực các tham số VNPAY trả về và cập nhật trạng thái giao dịch.")
     public ResponseEntity<Void> handleVnPayReturn(
             @RequestParam Map<String, String> params) {
         try {
             paymentTransactionService.handleVnPayCallback(params);
         } catch (Exception ex) {
-            // Never let a callback validation failure surface as a raw JSON error page to the
-            // browser — log it server-side and still redirect; the frontend reads vnp_ResponseCode
-            // (already present in params) to render success/failure.
             log.warn("VNPay return callback failed: {}", ex.getMessage());
         }
         URI redirectUri = buildPaymentResultRedirectUri(params);
@@ -126,10 +104,7 @@ public class PaymentTransactionController {
     }
 
     @GetMapping("/vnpay-ipn")
-    @Operation(
-            summary = "Xử lý IPN từ VNPAY",
-            description = "Xác thực thông báo IPN từ VNPAY và cập nhật trạng thái giao dịch."
-    )
+    @Operation(summary = "Xử lý IPN từ VNPAY", description = "Xác thực thông báo IPN từ VNPAY và cập nhật trạng thái giao dịch.")
     public ResponseEntity<VnPayIpnResponse> handleVnPayIpn(@RequestParam Map<String, String> params) {
         try {
             paymentTransactionService.handleVnPayCallback(params);

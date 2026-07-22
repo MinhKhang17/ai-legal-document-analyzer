@@ -1,15 +1,16 @@
 package com.analyzer.api.service.impl;
 
 import com.analyzer.api.config.VnPayProperties;
-import com.analyzer.api.dto.paymenttransaction.PaymentUrlResponseDTO;
+import com.analyzer.api.dto.paymenttransaction.PaymentUrlResponse;
 import com.analyzer.api.entity.LegalTicket;
 import com.analyzer.api.entity.PaymentTransaction;
 import com.analyzer.api.entity.User;
 import com.analyzer.api.enums.*;
 import com.analyzer.api.mapper.PaymentTransactionMapper;
-import com.analyzer.api.repository.CustomerPlanRepository;
-import com.analyzer.api.repository.LegalTicketRepository;
-import com.analyzer.api.repository.PaymentTransactionRepository;
+import com.analyzer.api.repository.customerplan.CustomerPlanRepository;
+import com.analyzer.api.repository.legalticket.LegalTicketRepository;
+import com.analyzer.api.repository.paymenttransaction.PaymentTransactionRepository;
+import com.analyzer.api.service.paymenttransaction.impl.PaymentTransactionServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -71,7 +72,7 @@ class ExpertTicketPaymentServiceTest {
             return transaction;
         });
 
-        PaymentUrlResponseDTO response = service.createExpertTicketVnPayPaymentUrl(
+        PaymentUrlResponse response = service.createExpertTicketVnPayPaymentUrl(
                 "ticket-1", 2L, "127.0.0.1");
 
         assertEquals(99L, response.transactionId());
