@@ -38,6 +38,7 @@ public class SubscriptionPlanServiceImpl implements SubscriptionPlanService {
             throw new ConflictException("SUBSCRIPTION_PLAN_NAME_ALREADY_EXISTS");
         }
         SubscriptionPlan plan = subscriptionPlanMapper.toEntity(request);
+        plan.setMaxQuota(0); // legacy non-null DB column; no longer a product quota
         plan.setActive(request.getActive() == null || request.getActive());
         applyNewFields(plan, request);
         return saveOrConflict(plan);
@@ -74,7 +75,6 @@ public class SubscriptionPlanServiceImpl implements SubscriptionPlanService {
         plan.setDescription(request.getDescription());
         plan.setPrice(request.getPrice());
         plan.setDurationDays(request.getDurationDays());
-        plan.setMaxQuota(request.getMaxQuota());
         if (request.getActive() != null) plan.setActive(request.getActive());
         applyNewFields(plan, request);
         return saveOrConflict(plan);
@@ -115,20 +115,14 @@ public class SubscriptionPlanServiceImpl implements SubscriptionPlanService {
         request.setPlanName(firstText(request.getDisplayName(), request.getPlanName()));
         request.setPrice(request.getPriceVnd() != null ? request.getPriceVnd() : request.getPrice());
         request.setDurationDays(first(request.getBillingCycleDays(), request.getDurationDays()));
-        request.setMaxQuota(first(request.getContractAnalysisLimit(), request.getMaxQuota()));
         request.setAiQuota(first(request.getAiTokenLimit(), request.getAiQuota()));
-        request.setMaxWorkspaces(first(request.getWorkspaceLimit(), request.getMaxWorkspaces()));
-        request.setMaxContractsPerWorkspace(first(request.getDocumentPerWorkspaceLimit(), request.getMaxContractsPerWorkspace()));
-        request.setMaxDraftContracts(first(request.getContractDraftLimit(), request.getMaxDraftContracts()));
         request.setTicketQuota(first(request.getExpertTicketLimit(), request.getTicketQuota()));
         if (request.getPlanType() == null || request.getPlanName() == null
                 || request.getPrice() == null || request.getPrice().signum() < 0
                 || request.getDurationDays() == null || request.getDurationDays() <= 0) {
             throw new ConflictException("INVALID_SUBSCRIPTION_PLAN");
         }
-        Integer[] limits = {request.getMaxQuota(), request.getAiQuota(), request.getMaxWorkspaces(),
-                request.getMaxContractsPerWorkspace(), request.getStorageLimitMb(), request.getMaxFileSizeMb(),
-                request.getMaxAttachedDocumentsPerSession(), request.getMaxDraftContracts(), request.getTicketQuota()};
+        Integer[] limits = {request.getAiQuota(), request.getStorageLimitMb(), request.getTicketQuota()};
         for (Integer limit : limits) {
             if (limit == null || limit < 0) throw new ConflictException("INVALID_SUBSCRIPTION_PLAN_LIMITS");
         }
@@ -136,13 +130,8 @@ public class SubscriptionPlanServiceImpl implements SubscriptionPlanService {
 
     private void applyLegacyDefaults(SubscriptionPlanRequest request, SubscriptionPlan existing) {
         if (request.getAiTokenLimit() == null && request.getAiQuota() == null) request.setAiQuota(existing == null ? 0 : safe(existing.getAiQuota()));
-        if (request.getWorkspaceLimit() == null && request.getMaxWorkspaces() == null) request.setMaxWorkspaces(existing == null ? 0 : safe(existing.getMaxWorkspaces()));
-        if (request.getDocumentPerWorkspaceLimit() == null && request.getMaxContractsPerWorkspace() == null) request.setMaxContractsPerWorkspace(existing == null ? 0 : safe(existing.getMaxContractsPerWorkspace()));
-        if (request.getContractDraftLimit() == null && request.getMaxDraftContracts() == null) request.setMaxDraftContracts(existing == null ? 0 : safe(existing.getMaxDraftContracts()));
         if (request.getExpertTicketLimit() == null && request.getTicketQuota() == null) request.setTicketQuota(existing == null ? 0 : safe(existing.getTicketQuota()));
         if (request.getStorageLimitMb() == null) request.setStorageLimitMb(existing == null ? 0 : safe(existing.getStorageLimitMb()));
-        if (request.getMaxFileSizeMb() == null) request.setMaxFileSizeMb(existing == null ? 0 : safe(existing.getMaxFileSizeMb()));
-        if (request.getMaxAttachedDocumentsPerSession() == null) request.setMaxAttachedDocumentsPerSession(existing == null ? 0 : safe(existing.getMaxAttachedDocumentsPerSession()));
         if (existing != null) {
             if (request.getAllowSystemErrorTicket() == null) request.setAllowSystemErrorTicket(existing.getAllowSystemErrorTicket());
             if (request.getAllowQueryErrorTicket() == null) request.setAllowQueryErrorTicket(existing.getAllowQueryErrorTicket());
@@ -155,12 +144,7 @@ public class SubscriptionPlanServiceImpl implements SubscriptionPlanService {
     private void applyNewFields(SubscriptionPlan plan, SubscriptionPlanRequest request) {
         plan.setAiQuota(request.getAiQuota());
         plan.setTicketQuota(request.getTicketQuota());
-        plan.setMaxWorkspaces(request.getMaxWorkspaces());
-        plan.setMaxContractsPerWorkspace(request.getMaxContractsPerWorkspace());
-        plan.setMaxDraftContracts(request.getMaxDraftContracts());
         plan.setStorageLimitMb(request.getStorageLimitMb());
-        plan.setMaxFileSizeMb(request.getMaxFileSizeMb());
-        plan.setMaxAttachedDocumentsPerSession(request.getMaxAttachedDocumentsPerSession());
         if (request.getAllowSystemErrorTicket() != null) plan.setAllowSystemErrorTicket(request.getAllowSystemErrorTicket());
         if (request.getAllowQueryErrorTicket() != null) plan.setAllowQueryErrorTicket(request.getAllowQueryErrorTicket());
         if (request.getAllowContactExpertTicket() != null) plan.setAllowContactExpertTicket(request.getAllowContactExpertTicket());
@@ -180,14 +164,8 @@ public class SubscriptionPlanServiceImpl implements SubscriptionPlanService {
         response.setDisplayName(plan.getPlanName());
         response.setPriceVnd(plan.getPrice());
         response.setBillingCycleDays(plan.getDurationDays());
-        response.setContractAnalysisLimit(plan.getMaxQuota());
         response.setAiTokenLimit(plan.getAiQuota());
-        response.setWorkspaceLimit(plan.getMaxWorkspaces());
-        response.setDocumentPerWorkspaceLimit(plan.getMaxContractsPerWorkspace());
         response.setStorageLimitMb(plan.getStorageLimitMb());
-        response.setMaxFileSizeMb(plan.getMaxFileSizeMb());
-        response.setMaxAttachedDocumentsPerSession(plan.getMaxAttachedDocumentsPerSession());
-        response.setContractDraftLimit(plan.getMaxDraftContracts());
         response.setExpertTicketLimit(plan.getTicketQuota());
         response.setAllowSystemErrorTicket(plan.getAllowSystemErrorTicket());
         response.setAllowQueryErrorTicket(plan.getAllowQueryErrorTicket());

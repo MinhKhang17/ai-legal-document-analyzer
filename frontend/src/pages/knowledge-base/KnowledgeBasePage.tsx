@@ -1,5 +1,5 @@
-import { ArrowRight, ArrowUpDown, FileText, RefreshCw, RotateCcw, Search, SlidersHorizontal, Upload, UploadCloud } from "lucide-react";
-import type { ChangeEvent } from "react";
+import { ArrowUpDown, RefreshCw, RotateCcw, Search, SlidersHorizontal, Upload, UploadCloud } from "lucide-react";
+import type { ChangeEvent, DragEvent } from "react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Pagination } from "../../components/common/Pagination";
@@ -101,6 +101,7 @@ export function KnowledgeBasePage() {
   const [form, setForm] = useState(emptyForm);
   const [selectedFileName, setSelectedFileName] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [activeJob, setActiveJob] = useState<KnowledgeIngestionJob | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -231,10 +232,7 @@ export function KnowledgeBasePage() {
     }
   };
 
-  const handleTextFileSelect = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
+  const handleFile = async (file: File) => {
     try {
       const fileStem = file.name.replace(/\.[^.]+$/, "");
       const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
@@ -252,21 +250,32 @@ export function KnowledgeBasePage() {
       }));
     } catch {
       toast.error(t("knowledge.fileReadError"));
-    } finally {
-      event.target.value = "";
     }
+  };
+
+  const handleTextFileSelect = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (file) await handleFile(file);
+  };
+
+  const handleFileDrop = async (event: DragEvent<HTMLLabelElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDraggingFile(false);
+    const file = event.dataTransfer.files?.[0];
+    if (file) await handleFile(file);
   };
 
   const columns: DataTableColumn<KnowledgeBaseEntry>[] = [
     {
       header: t("knowledge.titleField"),
       cell: (entry) => (
-        <Link className="font-semibold text-primary hover:underline dark:text-inverse-primary" to={`/knowledge-base/${entry.id}`}>
+        <Link className="block max-w-56 break-words font-semibold leading-6 text-primary hover:underline dark:text-inverse-primary" to={`/knowledge-base/${entry.id}`}>
           {entry.title}
         </Link>
       ),
     },
-    { header: t("knowledge.code"), cell: (entry) => entry.code },
     { header: t("knowledge.category"), cell: (entry) => translateEnum(entry.category, knowledgeCategoryKeys) },
     { header: t("knowledge.scope"), cell: (entry) => <Badge>{translateEnum(entry.scope, knowledgeScopeKeys)}</Badge> },
     { header: t("table.status"), cell: (entry) => <div><Badge>{translateEnum(entry.currentStatus, knowledgeStatusKeys)}</Badge>{!entry.active && <p className="mt-xs text-xs text-on-surface-variant">{t("knowledge.inactiveForRetrieval")}</p>}</div> },
@@ -300,7 +309,32 @@ export function KnowledgeBasePage() {
       <section className="mb-xl grid grid-cols-1 items-start gap-gutter xl:grid-cols-[minmax(420px,0.85fr)_minmax(0,1.65fr)] [&>*]:min-w-0">
         <Card title={t("knowledge.uploadEntry")} subtitle={t("knowledge.uploadEntrySubtitle")}>
           <div className="space-y-lg">
-            <label className="block cursor-pointer rounded-2xl border-2 border-dashed border-legal-border bg-surface-container-low px-lg py-xl text-center transition hover:border-primary/60 hover:bg-primary/5 dark:border-slate-700 dark:bg-slate-900/60">
+            <label
+              className={`block cursor-pointer rounded-2xl border-2 border-dashed px-lg py-xl text-center transition ${
+                isDraggingFile
+                  ? "border-primary bg-primary/10 ring-2 ring-primary/20"
+                  : "border-legal-border bg-surface-container-low hover:border-primary/60 hover:bg-primary/5 dark:border-slate-700 dark:bg-slate-900/60"
+              }`}
+              onDragEnter={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                setIsDraggingFile(true);
+              }}
+              onDragOver={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                event.dataTransfer.dropEffect = "copy";
+                setIsDraggingFile(true);
+              }}
+              onDragLeave={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                  setIsDraggingFile(false);
+                }
+              }}
+              onDrop={(event) => void handleFileDrop(event)}
+            >
               <input
                 className="sr-only"
                 type="file"
@@ -349,12 +383,14 @@ export function KnowledgeBasePage() {
                 <p><span className="text-on-surface-variant">{t("documents.uploadedAt")}:</span> {new Date().toLocaleString(locale)}</p>
               </div>
             )}
-            <div className="flex flex-wrap justify-end gap-sm border-t border-legal-border pt-lg dark:border-slate-700">
-              <Button variant="secondary" onClick={() => { setForm(emptyForm); setSelectedFile(null); setSelectedFileName(""); }} disabled={saving}>{t("actions.cancel")}</Button>
-              <Button variant="secondary" onClick={() => void handleUpload(false)} disabled={saving}>{saving ? t("knowledge.submitting") : t("knowledge.saveDraft")}</Button>
-              <Button leftIcon={<Upload className="h-4 w-4" />} onClick={() => void handleUpload(true)} disabled={saving || !selectedFile}>
-                {saving ? t("knowledge.submitting") : t("knowledge.startIngest")}
-              </Button>
+            <div className="mx-auto grid w-full max-w-md grid-cols-2 gap-sm border-t border-legal-border pt-lg dark:border-slate-700">
+              <Button className="w-full justify-center" variant="secondary" onClick={() => { setForm(emptyForm); setSelectedFile(null); setSelectedFileName(""); }} disabled={saving}>{t("actions.cancel")}</Button>
+              <Button className="w-full justify-center" variant="secondary" onClick={() => void handleUpload(false)} disabled={saving}>{saving ? t("knowledge.submitting") : t("knowledge.saveDraft")}</Button>
+              <div className="col-span-2 flex justify-center">
+                <Button className="w-full justify-center sm:w-auto sm:min-w-64" leftIcon={<Upload className="h-4 w-4" />} onClick={() => void handleUpload(true)} disabled={saving || !selectedFile}>
+                  {saving ? t("knowledge.submitting") : t("knowledge.startIngest")}
+                </Button>
+              </div>
             </div>
 
             {activeJob && (
@@ -379,13 +415,6 @@ export function KnowledgeBasePage() {
               </div>
             )}
 
-            <div className="grid grid-cols-[1fr_auto_1fr_auto_1fr] items-center gap-xs text-center text-xs text-on-surface-variant dark:text-slate-400">
-              <div><FileText className="mx-auto mb-xs h-4 w-4" /><span>{t("knowledge.lifecycleUpload")}</span></div>
-              <ArrowRight className="h-4 w-4" />
-              <div><span className="font-semibold text-on-surface dark:text-slate-200">2</span><br />{t("knowledge.ingest")}</div>
-              <ArrowRight className="h-4 w-4" />
-              <div><span className="font-semibold text-on-surface dark:text-slate-200">3</span><br />{t("knowledge.approvePublishStep")}</div>
-            </div>
           </div>
         </Card>
 
@@ -478,7 +507,9 @@ export function KnowledgeBasePage() {
           ) : loading && entries.length === 0 ? (
             <p className="text-sm text-on-surface-variant dark:text-slate-400">{t("knowledge.loading")}</p>
           ) : (
-            <DataTable columns={columns} data={entries} getRowKey={(entry) => entry.id} emptyMessage={t("knowledge.empty")} />
+            <div className="min-w-0 overflow-x-auto [&_table]:w-full [&_table]:table-fixed [&_th]:align-middle [&_td]:align-middle [&_th]:px-sm [&_td]:px-sm [&_th]:text-center [&_td]:text-left">
+              <DataTable columns={columns} data={entries} getRowKey={(entry) => entry.id} emptyMessage={t("knowledge.empty")} />
+            </div>
           )}
           <Pagination page={page} totalPages={totalPages} totalItems={totalItems} disabled={loading} onPageChange={(nextPage) => { setPage(nextPage); const next = new URLSearchParams(searchParams); next.set("page", toPageParam(nextPage)); setSearchParams(next); }} />
         </Card>

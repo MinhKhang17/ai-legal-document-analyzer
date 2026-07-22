@@ -89,6 +89,21 @@ public class PaymentTransactionController {
         return ResponseEntity.ok(ApiResponseDTO.success("Tạo URL thanh toán VNPAY thành công", response));
     }
 
+    @PostMapping("/expert-ticket/{ticketId}/vnpay-url")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    @Operation(
+            summary = "Tạo URL thanh toán ticket chuyên gia",
+            description = "Tạo hoặc dùng lại giao dịch VNPAY đang chờ cho ticket trả phí đã được khách hàng chấp nhận báo giá."
+    )
+    public ResponseEntity<ApiResponseDTO<PaymentUrlResponse>> createExpertTicketVnPayPaymentUrl(
+            @AuthenticationPrincipal UserDetailsImpl currentUser,
+            @PathVariable String ticketId,
+            HttpServletRequest request) {
+        PaymentUrlResponse response = paymentTransactionService.createExpertTicketVnPayPaymentUrl(
+                ticketId, currentUser.getId(), getClientIp(request));
+        return ResponseEntity.ok(ApiResponseDTO.success("Tạo URL thanh toán ticket thành công", response));
+    }
+
     @GetMapping("/vnpay-return")
     @Operation(
             summary = "Xử lý kết quả trả về từ VNPAY",

@@ -1186,13 +1186,18 @@ class RagQueryService:
     def _replace_citation_markers_with_source_names(
         self, answer: str, hits: list[RagChunkHit]
     ) -> str:
-        """Replace internal grounding IDs with readable, non-clickable source names."""
+        """Replace grounding IDs with readable source names, once per source."""
         hits_by_id = {hit.citationId.upper(): hit for hit in hits if hit.citationId}
+        rendered_sources: set[str] = set()
 
         def readable_source(match: re.Match[str]) -> str:
             citation_id = match.group(1).upper()
             hit = hits_by_id.get(citation_id)
             if hit is None:
+                source_key = f"unknown:{citation_id}"
+                if source_key in rendered_sources:
+                    return ""
+                rendered_sources.add(source_key)
                 return "(Nguồn tài liệu đã truy xuất)"
 
             if hit.sourceType == "USER_DOCUMENT":
@@ -1200,6 +1205,10 @@ class RagQueryService:
                     (value.strip() for value in (hit.fileName, hit.title, hit.documentId) if value and value.strip()),
                     "tài liệu người dùng đã đính kèm",
                 )
+                source_key = f"user:{(hit.documentId or hit.fileName or hit.title or label).strip().casefold()}"
+                if source_key in rendered_sources:
+                    return ""
+                rendered_sources.add(source_key)
                 return f'(Nguồn hợp đồng/tài liệu người dùng: “{label}”)'
 
             label = next(
@@ -1210,6 +1219,15 @@ class RagQueryService:
                 ),
                 "tài liệu pháp lý của hệ thống",
             )
+            source_key = (
+                "kb:"
+                + (hit.knowledgeDocumentId or hit.lawCode or hit.fileName or hit.lawName or hit.title or label)
+                .strip()
+                .casefold()
+            )
+            if source_key in rendered_sources:
+                return ""
+            rendered_sources.add(source_key)
             location_parts = []
             if hit.articleNumber:
                 location_parts.append(f"Điều {hit.articleNumber}")
@@ -1220,4 +1238,6 @@ class RagQueryService:
             location = f", {', '.join(location_parts)}" if location_parts else ""
             return f'(Nguồn tài liệu hệ thống: “{label}”{location})'
 
-        return _CITATION_PATTERN.sub(readable_source, answer)
+        rendered = _CITATION_PATTERN.sub(readable_source, answer)
+        rendered = re.sub(r"[ \t]+([,.;:!?])", r"\1", rendered)
+        return re.sub(r"[ \t]{2,}", " ", rendered).strip()

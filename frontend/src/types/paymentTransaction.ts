@@ -11,12 +11,15 @@ export type PaymentStatus =
 export interface PaymentTransaction {
   id: number;
   customerId: number;
-  subscriptionPlanId: number;
-  planName: string;
-  customerPlanId: number;
+  subscriptionPlanId: number | null;
+  planName: string | null;
+  customerPlanId: number | null;
+  legalTicketId: string | null;
+  legalTicketTitle: string | null;
   amount: number;
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
+  paymentPurpose: "SUBSCRIPTION" | "EXPERT_TICKET";
   transactionCode: string | null;
   paymentUrl: string | null;
   gatewayTransactionNo: string | null;

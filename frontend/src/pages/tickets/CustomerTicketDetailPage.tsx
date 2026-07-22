@@ -35,6 +35,7 @@ import { getLegalTicketStatusLabel } from "../../types/legalTicketStatus";
 import { formatDisplayDate, formatFileSize, localeForLanguage } from "../../utils/format";
 import { ApiRequestError } from "../../services/http";
 import { ticketDate, ticketMoney, ticketText } from "../../utils/ticketDisplay";
+import { createExpertTicketVnPayPaymentUrl } from "../../services/paymentTransaction.service";
 
 export function CustomerTicketDetailPage() {
   const { id = "" } = useParams();
@@ -142,6 +143,24 @@ export function CustomerTicketDetailPage() {
       toast.error(message, t("toast.errorTitle"));
       if (actionError instanceof ApiRequestError && actionError.status === 409) await loadTicket(false);
     } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleExpertTicketPayment = async () => {
+    if (!id) return;
+    setSaving(true);
+    setError("");
+    try {
+      const payment = await createExpertTicketVnPayPaymentUrl(id);
+      if (!payment.paymentUrl?.trim()) throw new Error("PAYMENT_URL_NOT_AVAILABLE");
+      window.location.assign(payment.paymentUrl);
+    } catch (paymentError) {
+      const message = paymentError instanceof Error
+        ? paymentError.message
+        : "Không thể bắt đầu thanh toán ticket chuyên gia";
+      setError(message);
+      toast.error(message, t("toast.errorTitle"));
       setSaving(false);
     }
   };
@@ -329,8 +348,15 @@ export function CustomerTicketDetailPage() {
                 <div><dt className="label-uppercase">SLA</dt><dd>{ticketText(ticket.slaStatus, "Not scheduled")}</dd></div>
               </dl>
               {ticket.status === "WAITING_USER_ACCEPTANCE" && <div className="mt-md flex gap-sm"><Button disabled={saving} onClick={() => void runAction(() => decideExpertTicketQuote(id, "ACCEPT"), "Đã chấp nhận báo giá")}>Chấp nhận phạm vi và báo giá</Button><Button variant="secondary" disabled={saving} onClick={() => void runAction(() => decideExpertTicketQuote(id, "REJECT"), "Đã từ chối báo giá")}>Từ chối</Button></div>}
+              {ticket.status === "WAITING_PAYMENT" && ticket.pricingType === "PAID" && ticket.quoteStatus === "ACCEPTED" && (
+                <div className="mt-md">
+                  <Button disabled={saving} onClick={() => void handleExpertTicketPayment()}>
+                    {saving ? "Đang tạo giao dịch..." : "Thanh toán ticket qua VNPAY"}
+                  </Button>
+                  <p className="mt-xs text-xs text-on-surface-variant">Sau khi thanh toán thành công, ticket sẽ chuyển sang bước phân công chuyên gia.</p>
+                </div>
+              )}
             </Card>
-            {ticket.contextSnapshot && <Card title={t("sharedTicket.immutableContext")}><div className="space-y-md text-sm"><div><p className="label-uppercase">{t("sharedTicket.userQuestion")}</p><p className="mt-xs whitespace-pre-line">{ticket.contextSnapshot.userQuestion}</p></div><div><p className="label-uppercase">{t("sharedTicket.aiAnswer")}</p><p className="mt-xs max-h-64 overflow-y-auto whitespace-pre-line text-on-surface-variant">{ticket.contextSnapshot.assistantAnswer || "—"}</p></div><div><p className="label-uppercase">{t("ticketComposer.sharedDocuments")}</p><pre className="mt-xs max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-surface-container-low p-sm text-xs">{ticket.contextSnapshot.documentSnapshotJson || "[]"}</pre></div><p className="break-all text-xs text-on-surface-variant">{t("legalTickets.detail.contentHash")}: {ticket.contextSnapshot.contentHash}</p></div></Card>}
             <Card title={t("legalTickets.detail.actions")}>
               <div className="flex flex-col gap-sm">
                 {ticket.status === 'PENDING_ADMIN_REVIEW' && <Button variant="secondary" disabled={saving} onClick={() => void runAction(() => cancelLegalTicket(id, { reason: t("legalTickets.detail.cancelReason") }), t("legalTickets.detail.cancelSuccess"))}>

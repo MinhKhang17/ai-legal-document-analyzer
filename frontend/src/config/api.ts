@@ -136,6 +136,8 @@ export const API_ENDPOINTS = {
       fillPathParams(fromEnv("VITE_PAYMENT_TRANSACTION_VNPAY_URL_API"), {
         transactionId,
       }),
+    expertTicketVnPayUrl: (ticketId: string) =>
+      `/api/v1/payment-transactions/expert-ticket/${encodeURIComponent(ticketId)}/vnpay-url`,
   },
 
   users: {

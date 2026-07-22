@@ -1,6 +1,7 @@
 package com.analyzer.api.repository.paymenttransaction;
 
 import com.analyzer.api.entity.PaymentTransaction;
+import com.analyzer.api.enums.PaymentStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -19,6 +20,9 @@ public interface PaymentTransactionRepository extends JpaRepository<PaymentTrans
     List<PaymentTransaction> findByCustomerPlanId(Long customerPlanId);
 
     Optional<PaymentTransaction> findByTransactionCode(String transactionCode);
+
+    Optional<PaymentTransaction> findTopByLegalTicket_IdAndPaymentStatusOrderByCreatedAtDesc(
+            String legalTicketId, PaymentStatus paymentStatus);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select payment from PaymentTransaction payment where payment.id = :id")

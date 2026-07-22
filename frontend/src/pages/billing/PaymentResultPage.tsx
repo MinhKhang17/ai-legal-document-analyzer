@@ -134,8 +134,8 @@ export function PaymentResultPage() {
 
             <dl className="grid gap-md rounded-xl bg-surface-container-low p-md text-sm dark:bg-slate-800 md:grid-cols-2">
               <div>
-                <dt className="label-uppercase">{t("payment.result.plan")}</dt>
-                <dd className="mt-xs font-semibold">{transaction.planName}</dd>
+                <dt className="label-uppercase">{transaction.paymentPurpose === "EXPERT_TICKET" ? "Dịch vụ" : t("payment.result.plan")}</dt>
+                <dd className="mt-xs font-semibold">{transaction.paymentPurpose === "EXPERT_TICKET" ? transaction.legalTicketTitle || `Ticket ${transaction.legalTicketId}` : transaction.planName}</dd>
               </div>
               <div>
                 <dt className="label-uppercase">{t("payment.result.amount")}</dt>
@@ -158,6 +158,9 @@ export function PaymentResultPage() {
         )}
 
         <div className="mt-lg flex flex-wrap gap-sm">
+          {transaction?.paymentPurpose === "EXPERT_TICKET" && transaction.legalTicketId && (
+            <Link to={`/tickets/${transaction.legalTicketId}`}><Button>Quay lại ticket</Button></Link>
+          )}
           <Link to="/billing">
             <Button>{t("payment.result.backToBilling")}</Button>
           </Link>

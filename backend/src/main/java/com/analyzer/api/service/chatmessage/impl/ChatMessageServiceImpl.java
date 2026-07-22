@@ -552,7 +552,9 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                     .conversationMode(chatSession.getConversationMode())
                     .draftingAction(sendRequest.getDraftingAction())
                     .draftingContractType(sendRequest.getDraftingContractType())
-                    .draftingInformation(sendRequest.getDraftingInformation())
+                    .draftingInformation(sendRequest.getDraftingInformation() == null
+                            ? java.util.Map.of()
+                            : sendRequest.getDraftingInformation())
                     .draftingOriginalRequirement(sendRequest.getDraftingOriginalRequirement())
                     .topKUserChunks(5)
                     .topKKnowledgeChunks(5)

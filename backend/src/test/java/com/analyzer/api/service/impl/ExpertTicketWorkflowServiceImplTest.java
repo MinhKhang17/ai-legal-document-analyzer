@@ -14,6 +14,7 @@ import com.analyzer.api.service.revenue.ExpertRevenueService;
 import com.analyzer.api.service.subscription.SubscriptionQuotaService;
 import com.analyzer.api.service.legalticket.TicketCollaborationService;
 import com.analyzer.api.util.UserQuotaLock;
+import com.analyzer.api.dto.subscription.SubscriptionQuotaUsageSummaryResponse;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -67,6 +68,50 @@ class ExpertTicketWorkflowServiceImplTest {
     }
 
     @Test
+    void paidClassificationUsesWholeVietnameseDongWithinVnPayRange() {
+        User admin = user(1L, RoleName.ADMIN);
+        User expert = user(2L, RoleName.EXPERT);
+        LegalTicket ticket = ticket(LegalTicketStatus.PENDING_ADMIN_REVIEW);
+        when(ticketRepository.findByIdAndDeletedFalse("ticket-1")).thenReturn(Optional.of(ticket));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(admin));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(expert));
+
+        service.classify(1L, "ticket-1", AdminTicketClassificationRequest.builder()
+                .complexity(TicketComplexity.STANDARD).reason("Paid consultation")
+                .proposedExpertId(2L).pricingType(TicketPricingType.PAID)
+                .userPrice(new BigDecimal("150000")).internalTicketValue(new BigDecimal("100000")).build());
+
+        assertThat(ticket.getUserPrice()).isEqualByComparingTo("150000");
+        assertThat(ticket.getInternalTicketValue()).isEqualByComparingTo("100000");
+    }
+
+    @Test
+    void paidClassificationRejectsFractionalOrOutOfRangeVietnameseDong() {
+        User admin = user(1L, RoleName.ADMIN);
+        User expert = user(2L, RoleName.EXPERT);
+        LegalTicket ticket = ticket(LegalTicketStatus.PENDING_ADMIN_REVIEW);
+        when(ticketRepository.findByIdAndDeletedFalse("ticket-1")).thenReturn(Optional.of(ticket));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(admin));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(expert));
+
+        AdminTicketClassificationRequest fractional = AdminTicketClassificationRequest.builder()
+                .complexity(TicketComplexity.STANDARD).reason("Paid consultation")
+                .proposedExpertId(2L).pricingType(TicketPricingType.PAID)
+                .userPrice(new BigDecimal("150000.50")).internalTicketValue(new BigDecimal("100000")).build();
+        assertThatThrownBy(() -> service.classify(1L, "ticket-1", fractional))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("số nguyên");
+
+        AdminTicketClassificationRequest belowMinimum = AdminTicketClassificationRequest.builder()
+                .complexity(TicketComplexity.STANDARD).reason("Paid consultation")
+                .proposedExpertId(2L).pricingType(TicketPricingType.PAID)
+                .userPrice(new BigDecimal("4999")).internalTicketValue(new BigDecimal("100000")).build();
+        assertThatThrownBy(() -> service.classify(1L, "ticket-1", belowMinimum))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("5.000 VNĐ");
+    }
+
+    @Test
     void paidAssignmentCannotBeAcceptedBeforePayment() {
         User expert = user(2L, RoleName.EXPERT);
         LegalTicket ticket = ticket(LegalTicketStatus.PENDING_EXPERT_ACCEPTANCE);
@@ -81,6 +126,34 @@ class ExpertTicketWorkflowServiceImplTest {
                 ExpertAssignmentDecisionRequest.builder().decision("ACCEPT").build()))
                 .isInstanceOf(ConflictException.class);
         assertThat(ticket.getAssignedLawyer()).isNull();
+    }
+
+    @Test
+    void exhaustedIncludedCreditReturnsTicketForPaidReclassification() {
+        User expert = user(2L, RoleName.EXPERT);
+        LegalTicket ticket = ticket(LegalTicketStatus.PENDING_EXPERT_ASSESSMENT);
+        ticket.setProposedExpert(expert);
+        ticket.setPricingType(TicketPricingType.PLAN_INCLUDED);
+        ticket.setQuoteStatus(TicketQuoteStatus.DRAFT);
+        when(ticketRepository.findByIdAndDeletedFalse("ticket-1")).thenReturn(Optional.of(ticket));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(expert));
+        when(quotaService.getCurrentUsage(ticket.getCreatedBy())).thenReturn(
+                SubscriptionQuotaUsageSummaryResponse.builder()
+                        .periodStart(LocalDateTime.of(2026, 7, 1, 0, 0))
+                        .periodEnd(LocalDateTime.of(2026, 8, 1, 0, 0))
+                        .expertTicketsLimit(1)
+                        .build());
+        when(creditRepository.countByUser_IdAndQuotaCycleAndStatusIn(
+                eq(ticket.getCreatedBy().getId()), anyString(), anyList())).thenReturn(1L);
+
+        service.assess(2L, "ticket-1", ExpertTicketAssessmentRequest.builder()
+                .decision("ACCEPT").build());
+
+        assertThat(ticket.getStatus()).isEqualTo(LegalTicketStatus.RECLASSIFICATION_REQUESTED);
+        assertThat(ticket.getPricingType()).isNull();
+        assertThat(ticket.getCustomerPaymentStatus()).isEqualTo(TicketPaymentStatus.UNPAID);
+        verify(collaborationService).auditTicket(ticket, expert, "PAID_RECLASSIFICATION_REQUIRED",
+                "{\"reason\":\"included-credit-exhausted\"}");
     }
 
     @Test

@@ -53,10 +53,13 @@ class Settings:
     llm_provider: str = os.getenv("LLM_PROVIDER", "gemini")
     llm_query_enabled: bool = os.getenv("LLM_QUERY_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
     llm_v2_enabled: bool = os.getenv("LLM_V2_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
-    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
+    # Prefer the broadly available low-latency model for synchronous chat.
+    # The higher-capacity fallback still covers requests when this model is
+    # temporarily unavailable.
+    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
     gemini_base_url: str = os.getenv("GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta")
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
-    gemini_fallback_model: str = os.getenv("GEMINI_FALLBACK_MODEL", "")
+    gemini_fallback_model: str = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-3.5-flash")
     gemini_timeout_seconds: float = float(os.getenv("GEMINI_TIMEOUT_SECONDS", "120"))
     gemini_max_output_tokens: int = int(os.getenv("GEMINI_MAX_OUTPUT_TOKENS", "4096"))
     gemini_thinking_budget: int = int(os.getenv("GEMINI_THINKING_BUDGET", "512"))

@@ -344,8 +344,11 @@ export function AdminTicketDetailPage() {
     const price = Number(userPrice);
     const value = Number(internalValue);
     if (!ticketId || !selectedLawyerId || !classificationReason.trim()
-      || !Number.isFinite(price) || !Number.isFinite(value) || value <= 0) {
-      setError("Vui lòng nhập đầy đủ phân loại, chuyên gia, lý do và giá trị ticket.");
+      || !Number.isSafeInteger(price) || !Number.isSafeInteger(value) || value <= 0
+      || value >= 1_000_000_000
+      || (pricingType === "PLAN_INCLUDED" && price !== 0)
+      || (pricingType === "PAID" && (price < 5_000 || price >= 1_000_000_000))) {
+      setError("Giá phải là số nguyên VNĐ; báo giá trả phí từ 5.000 VNĐ đến dưới 1 tỷ VNĐ.");
       return;
     }
     setSaving(true); setError("");
@@ -564,14 +567,17 @@ export function AdminTicketDetailPage() {
               <div className="space-y-sm text-sm">
                 <select className="form-field" value={complexity} onChange={(event) => setComplexity(event.target.value as typeof complexity)}><option value="BASIC">BASIC</option><option value="STANDARD">STANDARD</option><option value="COMPLEX">COMPLEX</option><option value="OUT_OF_SCOPE">OUT_OF_SCOPE</option></select>
                 <select className="form-field" value={pricingType} onChange={(event) => { const value = event.target.value as typeof pricingType; setPricingType(value); if (value === "PLAN_INCLUDED") setUserPrice("0"); }}><option value="PLAN_INCLUDED">Dùng credit Premium</option><option value="PAID">Yêu cầu thanh toán</option></select>
-                <input className="form-field" type="number" min="0" value={userPrice} disabled={pricingType === "PLAN_INCLUDED"} onChange={(event) => setUserPrice(event.target.value)} placeholder="Giá user thanh toán" />
-                <input className="form-field" type="number" min="1" value={internalValue} onChange={(event) => setInternalValue(event.target.value)} placeholder="Giá trị nội bộ để tính payout" />
+                <label className="space-y-xs font-medium">Giá khách hàng thanh toán (VNĐ)
+                  <input className="form-field" type="number" min={pricingType === "PAID" ? 5000 : 0} max="999999999" step="1000" inputMode="numeric" value={userPrice} disabled={pricingType === "PLAN_INCLUDED"} onChange={(event) => setUserPrice(event.target.value)} placeholder="Ví dụ: 100000" />
+                </label>
+                <label className="space-y-xs font-medium">Giá trị nội bộ tính chi trả (VNĐ)
+                  <input className="form-field" type="number" min="1" max="999999999" step="1000" inputMode="numeric" value={internalValue} onChange={(event) => setInternalValue(event.target.value)} placeholder="Ví dụ: 100000" />
+                </label>
                 <textarea className="form-field min-h-20" value={classificationReason} onChange={(event) => setClassificationReason(event.target.value)} placeholder="Lý do phân loại *" />
                 <Button disabled={saving || !selectedLawyerId} onClick={() => void handleClassify()}>Gửi chuyên gia đánh giá</Button>
               </div>
             </Card>}
             {ticket.status === "WAITING_PAYMENT" && <Card title="Xác nhận thanh toán user"><div className="space-y-sm"><input className="form-field" value={customerPaymentReference} onChange={(event) => setCustomerPaymentReference(event.target.value)} placeholder="Mã giao dịch / callback ID" /><Button disabled={saving} onClick={() => void handleConfirmCustomerPayment()}>Xác nhận đã thanh toán</Button></div></Card>}
-            {ticket.contextSnapshot && <Card title={t("adminTickets.contextTitle")}><div className="space-y-sm text-sm"><p><strong>{t("adminTickets.contextQuestion")}:</strong> {ticket.contextSnapshot.userQuestion}</p><p className="whitespace-pre-line"><strong>{t("adminTickets.contextAnswer")}:</strong> {ticket.contextSnapshot.assistantAnswer || "—"}</p><pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-surface-container-low p-sm text-xs">{ticket.contextSnapshot.documentSnapshotJson || "[]"}</pre><pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-surface-container-low p-sm text-xs">{ticket.contextSnapshot.citationSnapshotJson || "[]"}</pre></div></Card>}
             {ticket.acceptedAt && ticket.resolutionDueAt && !["RESOLVED", "CLOSED", "REFUNDED"].includes(ticket.status) && <Card title="Gia hạn SLA" subtitle={`Hạn hiện tại: ${formatDisplayDateTime(ticket.resolutionDueAt, "Not scheduled", locale)}`}>
               <div className="space-y-sm">
                 <input className="form-field" type="number" min="1" step="1" value={slaExtensionHours} onChange={(event) => setSlaExtensionHours(event.target.value)} placeholder="Số giờ gia hạn" />

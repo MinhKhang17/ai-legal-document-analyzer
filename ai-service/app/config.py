@@ -40,8 +40,8 @@ class Settings(BaseSettings):
     llm_v2_enabled: bool = False
     llm_v2_max_concurrency: int = 4
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.0-flash-exp"
-    gemini_fallback_model: str = ""
+    gemini_model: str = "gemini-3.1-flash-lite"
+    gemini_fallback_model: str = "gemini-3.5-flash"
     gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
     gemini_timeout_seconds: float = 120.0
     gemini_max_output_tokens: int = 4096

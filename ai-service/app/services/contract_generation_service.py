@@ -39,6 +39,9 @@ def is_contract_generation_intent(question: str) -> bool:
         "tham khảo", "đã tham khảo", "tham chiếu", "đã dùng", "đã sử dụng", "nguồn gốc",
         "căn cứ", "căn cứ vào", "dựa vào", "dựa trên", "căn cứ đâu", "bạn lấy ở đâu",
         "dẫn chứng", "bằng chứng", "nghị định nào", "thông tư nào", "luật nào",
+        # Extraction is a read operation. In particular, the word "xuất" in
+        # "trích xuất" must not activate the contract export/drafting regex.
+        "trích xuất", "trích điều khoản", "rút trích", "extract clause", "extract terms",
     ]
     if any(kw in question_lower for kw in qa_keywords):
         return False
@@ -199,6 +202,17 @@ def is_export_docx_intent(question: str) -> bool:
         "copy thành file", "sao ra file",
     ]
     has_direct = any(pat in question_lower for pat in direct_patterns)
+
+    extraction_patterns = [
+        "trích xuất", "trích điều khoản", "rút trích",
+        "extract clause", "extract terms", "extract information",
+    ]
+    # "Trích xuất ... trong tài liệu" describes reading the input document;
+    # the embedded word "xuất" is not an instruction to export a new file.
+    # Keep supporting combined requests that explicitly say "ra file", DOCX,
+    # Word, etc.; those already match a high-confidence direct pattern above.
+    if any(pattern in question_lower for pattern in extraction_patterns) and not has_direct:
+        return False
 
     return (has_export and has_file) or has_direct
 

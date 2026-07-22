@@ -25,4 +25,26 @@ describe("isPlanEntitlementError", () => {
       "",
     ))).toBe(false);
   });
+
+  it.each([
+    "WORKSPACE_LIMIT_REACHED",
+    "CONTRACT_ANALYSIS_QUOTA_EXCEEDED",
+    "CONTRACTS_PER_WORKSPACE_LIMIT_EXCEEDED",
+    "MAX_FILE_SIZE_EXCEEDED",
+    "STORAGE_LIMIT_EXCEEDED",
+    "ATTACHED_DOCUMENT_LIMIT_EXCEEDED",
+    "AI_TOKEN_QUOTA_EXCEEDED",
+    "TOKEN_QUOTA_EXCEEDED",
+    "DRAFT_CONTRACT_QUOTA_EXCEEDED",
+    "EXPERT_TICKET_QUOTA_EXCEEDED",
+    "EXPERT_TICKET_CREDIT_UNAVAILABLE_REQUIRES_PAID_QUOTE",
+    "FREE_SUPPORT_TICKET_LIMIT_REACHED",
+  ])("recognizes plan quota conflict %s", (errorCode) => {
+    expect(isPlanEntitlementError(new ApiRequestError(
+      409,
+      "Plan quota exhausted",
+      { errorCode },
+      "",
+    ))).toBe(true);
+  });
 });

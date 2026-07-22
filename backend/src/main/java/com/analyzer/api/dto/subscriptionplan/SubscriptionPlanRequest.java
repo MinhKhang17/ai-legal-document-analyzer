@@ -35,38 +35,19 @@ public class SubscriptionPlanRequest {
     @Schema(description = "Duration of the plan in days", example = "30")
     private Integer durationDays;
 
-    @PositiveOrZero
-    @Schema(description = "Maximum contract analysis quota per month", example = "200")
-    private Integer maxQuota;
-
     @Schema(description = "Monthly AI token quota", example = "8500000")
     private Integer aiQuota;
 
     @Schema(description = "Monthly expert ticket quota", example = "1")
     private Integer ticketQuota;
 
-    @Schema(description = "Maximum workspaces for the plan", example = "20")
-    private Integer maxWorkspaces;
-
-    @Schema(description = "Maximum contracts per workspace", example = "50")
-    private Integer maxContractsPerWorkspace;
-
-    @Schema(description = "Maximum draft contracts per month", example = "40")
-    private Integer maxDraftContracts;
-
     @Schema(description = "Status of the plan", example = "true")
     private Boolean active;
 
     @PositiveOrZero private BigDecimal priceVnd;
     @Positive private Integer billingCycleDays;
-    @PositiveOrZero private Integer contractAnalysisLimit;
     @PositiveOrZero private Integer aiTokenLimit;
-    @PositiveOrZero private Integer workspaceLimit;
-    @PositiveOrZero private Integer documentPerWorkspaceLimit;
     @PositiveOrZero private Integer storageLimitMb;
-    @PositiveOrZero private Integer maxFileSizeMb;
-    @PositiveOrZero private Integer maxAttachedDocumentsPerSession;
-    @PositiveOrZero private Integer contractDraftLimit;
     @PositiveOrZero private Integer expertTicketLimit;
     private Boolean allowSystemErrorTicket;
     private Boolean allowQueryErrorTicket;

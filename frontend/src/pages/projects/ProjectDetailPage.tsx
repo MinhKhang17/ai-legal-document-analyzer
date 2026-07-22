@@ -1,4 +1,4 @@
-import { Edit3, MessageSquareText, ShieldAlert, UsersRound } from "lucide-react";
+import { Edit3, MessageSquareText, ShieldAlert } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Badge } from "../../components/common/Badge";
@@ -191,7 +191,7 @@ export function ProjectDetailPage() {
             )}
           </Card>
 
-          <div className="mt-xl grid gap-gutter xl:grid-cols-[1fr_360px]">
+          <div className="mt-xl">
             <Card title={t("workspace.quickActions")}>
               <div className="grid gap-sm sm:grid-cols-2">
                 <Link
@@ -212,31 +212,6 @@ export function ProjectDetailPage() {
                     {t("workspace.askAiDescription")}
                   </p>
                 </Link>
-              </div>
-            </Card>
-
-            <Card title={t("workspace.info")} actions={<UsersRound className="h-5 w-5 text-primary dark:text-inverse-primary" />}>
-              <div className="space-y-md">
-                <div>
-                  <p className="label-uppercase">{t("workspace.workspaceId")}</p>
-                  <p className="mt-xs break-all text-sm">{workspace.workspaceId}</p>
-                </div>
-                <div>
-                  <p className="label-uppercase">{t("common.description")}</p>
-                  <p className="mt-xs text-sm text-on-surface-variant dark:text-slate-400">
-                    {workspace.description || t("workspace.noDescription")}
-                  </p>
-                </div>
-                <div>
-                  <p className="label-uppercase">{t("workspace.createdAt")}</p>
-                  <p className="mt-xs text-sm">
-                    {formatDisplayDateTime(workspace.createdAt, "-", locale)}
-                  </p>
-                </div>
-                <div>
-                  <p className="label-uppercase">{t("status.failed")}</p>
-                  <p className="mt-xs text-sm">{summary.failedDocuments}</p>
-                </div>
               </div>
             </Card>
           </div>

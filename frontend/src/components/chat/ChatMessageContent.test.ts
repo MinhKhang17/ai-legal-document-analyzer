@@ -15,4 +15,18 @@ describe('normalizeChatMarkdown', () => {
     expect(normalized).not.toMatch(/\[(?:USER|KB)-\d+\]/);
     expect(normalized).toContain('\n1. Mức bồi thường thấp\n2. Miễn trừ bất hợp lý');
   });
+
+  it('shows each readable document source only once', () => {
+    const normalized = normalizeChatMarkdown(
+      'Rủi ro cao (Nguồn hợp đồng/tài liệu người dùng: “hop-dong.docx”), không nên ký '
+      + '(Nguồn hợp đồng/tài liệu người dùng: “hop-dong.docx”). Tuân thủ pháp luật '
+      + '(Nguồn tài liệu hệ thống: “84.2015.QH13”), bảo đảm an toàn '
+      + '(Nguồn tài liệu hệ thống: “84.2015.QH13”).',
+    );
+
+    expect(normalized.match(/hop-dong\.docx/g)).toHaveLength(1);
+    expect(normalized.match(/84\.2015\.QH13/g)).toHaveLength(1);
+    expect(normalized).not.toContain(' ,');
+    expect(normalized).not.toContain(' .');
+  });
 });

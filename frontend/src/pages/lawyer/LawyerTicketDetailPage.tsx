@@ -474,8 +474,6 @@ export function LawyerTicketDetailPage() {
             </div>
           </Card>
 
-          {ticket.contextSnapshot && <Card className="p-6"><h3 className="font-semibold">{t("sharedTicket.immutableContext")}</h3><div className="mt-md grid gap-md lg:grid-cols-2"><div><p className="text-xs font-semibold uppercase">{t("sharedTicket.userQuestion")}</p><p className="mt-xs whitespace-pre-line text-sm">{ticket.contextSnapshot.userQuestion}</p></div><div><p className="text-xs font-semibold uppercase">{t("adminTickets.contextAnswer")}</p><p className="mt-xs whitespace-pre-line text-sm">{ticket.contextSnapshot.assistantAnswer || "—"}</p></div><pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-lg bg-surface-container-low p-sm text-xs">{ticket.contextSnapshot.documentSnapshotJson || "[]"}</pre><pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-lg bg-surface-container-low p-sm text-xs">{ticket.contextSnapshot.citationSnapshotJson || "[]"}</pre></div></Card>}
-
           <Card className="p-6">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>

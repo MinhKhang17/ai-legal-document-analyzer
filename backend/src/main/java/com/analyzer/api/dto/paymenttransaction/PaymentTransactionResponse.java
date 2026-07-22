@@ -1,6 +1,7 @@
 package com.analyzer.api.dto.paymenttransaction;
 
 import com.analyzer.api.enums.PaymentMethod;
+import com.analyzer.api.enums.PaymentPurpose;
 import com.analyzer.api.enums.PaymentStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
@@ -20,6 +21,10 @@ public record PaymentTransactionResponse(
         @Schema(description = "Subscription Plan Name", example = "Premium Plan")
         String planName,
 
+        String legalTicketId,
+
+        String legalTicketTitle,
+
         @Schema(description = "Customer Plan ID", example = "4")
         Long customerPlanId,
 
@@ -31,6 +36,8 @@ public record PaymentTransactionResponse(
 
         @Schema(description = "Payment status", example = "PENDING")
         PaymentStatus paymentStatus,
+
+        PaymentPurpose paymentPurpose,
 
         @Schema(description = "Transaction reference code", example = "TX123456789")
         String transactionCode,

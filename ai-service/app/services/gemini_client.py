@@ -135,19 +135,21 @@ class GeminiClient:
                             "finish_reason": finish_reason,
                         }
                         if finish_reason == "MAX_TOKENS":
-                            return GeminiResponse(
-                                text=None,
-                                error="Gemini response was incomplete after retry (MAX_TOKENS)",
-                                model=active_model,
-                                **usage_fields,
+                            last_error = "Gemini response was incomplete after retry (MAX_TOKENS)"
+                            logger.warning(
+                                "%s for model %s; trying the next configured model or API key",
+                                last_error,
+                                active_model,
                             )
+                            break
                         if not text:
-                            return GeminiResponse(
-                                text=None,
-                                error="Gemini response missing text content",
-                                model=active_model,
-                                **usage_fields,
+                            last_error = "Gemini response missing text content"
+                            logger.warning(
+                                "%s for model %s; trying the next configured model or API key",
+                                last_error,
+                                active_model,
                             )
+                            break
 
                         return GeminiResponse(text=text, error=None, model=active_model, **usage_fields)
                 except Exception as exc:

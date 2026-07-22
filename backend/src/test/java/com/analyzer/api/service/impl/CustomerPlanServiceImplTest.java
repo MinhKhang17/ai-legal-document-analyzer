@@ -77,8 +77,6 @@ class CustomerPlanServiceImplTest {
         when(customerPlanRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(paidPlan));
         when(subscriptionPlanRepository.findByPlanTypeIgnoreCase("FREE")).thenReturn(Optional.of(free));
         when(customerPlanRepository.save(any(CustomerPlan.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(subscriptionQuotaService.getCurrentUsage(customer)).thenReturn(
-                SubscriptionQuotaUsageSummaryResponse.builder().contractAnalysisUsed(3).contractAnalysisLimit(200).build());
         when(customerPlanMapper.toResponseDTO(any(CustomerPlan.class))).thenReturn(response);
 
         assertThat(service.cancelPlan(7L, 5L)).isSameAs(response);
@@ -111,8 +109,6 @@ class CustomerPlanServiceImplTest {
         when(customerPlanRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(paidPlan));
         when(subscriptionPlanRepository.findByPlanTypeIgnoreCase("FREE")).thenReturn(Optional.of(free));
         when(customerPlanRepository.save(any(CustomerPlan.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(subscriptionQuotaService.getCurrentUsage(customer)).thenReturn(
-                SubscriptionQuotaUsageSummaryResponse.builder().contractAnalysisUsed(0).contractAnalysisLimit(200).build());
         when(customerPlanMapper.toResponseDTO(any(CustomerPlan.class))).thenReturn(response);
 
         assertThat(service.cancelPlan(7L, 5L)).isSameAs(response);
@@ -186,8 +182,6 @@ class CustomerPlanServiceImplTest {
                 .thenReturn(Optional.empty());
         when(subscriptionPlanRepository.findByPlanTypeIgnoreCase("FREE")).thenReturn(Optional.of(free));
         when(customerPlanRepository.save(any(CustomerPlan.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(subscriptionQuotaService.getCurrentUsage(customer)).thenReturn(
-                SubscriptionQuotaUsageSummaryResponse.builder().contractAnalysisUsed(0).contractAnalysisLimit(5).build());
         when(customerPlanMapper.toResponseDTO(any(CustomerPlan.class))).thenReturn(response);
 
         assertThat(service.cancelPlanAndActivateFree(7L, 5L, "Refund TX-1")).isSameAs(response);
@@ -224,8 +218,6 @@ class CustomerPlanServiceImplTest {
         when(customerPlanRepository.findTopByCustomerIdAndStatusOrderByCreatedAtDesc(7L, PlanStatus.ACTIVE))
                 .thenReturn(Optional.of(activePlan));
         when(customerPlanRepository.save(refundedPlan)).thenReturn(refundedPlan);
-        when(subscriptionQuotaService.getCurrentUsage(customer)).thenReturn(
-                SubscriptionQuotaUsageSummaryResponse.builder().contractAnalysisUsed(0).contractAnalysisLimit(200).build());
         when(customerPlanMapper.toResponseDTO(activePlan)).thenReturn(response);
 
         assertThat(service.cancelPlanAndActivateFree(7L, 5L, "Refund TX-OLD")).isSameAs(response);
@@ -284,9 +276,6 @@ class CustomerPlanServiceImplTest {
             activePlan.set(saved);
             return saved;
         });
-        when(subscriptionQuotaService.getCurrentUsage(customer)).thenReturn(
-                SubscriptionQuotaUsageSummaryResponse.builder()
-                        .contractAnalysisUsed(0).contractAnalysisLimit(5).build());
         when(customerPlanMapper.toResponseDTO(any(CustomerPlan.class))).thenReturn(response);
 
         assertThat(service.getMyPlan(42L)).isSameAs(response);

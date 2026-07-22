@@ -274,22 +274,7 @@ public class CustomerPlanServiceImpl implements CustomerPlanService {
     }
 
     private CustomerPlanResponse toResponseWithAccurateQuota(CustomerPlan plan) {
-        CustomerPlanResponse dto = customerPlanMapper.toResponseDTO(plan);
-        Integer maxQuota = plan.getAnalysisLimitSnapshot() != null
-                ? plan.getAnalysisLimitSnapshot()
-                : (plan.getSubscriptionPlan() != null ? plan.getSubscriptionPlan().getMaxQuota() : null);
-
-        if (plan.getStatus() == PlanStatus.ACTIVE && plan.getCustomer() != null) {
-            SubscriptionQuotaUsageSummaryResponse usage = subscriptionQuotaService.getCurrentUsage(plan.getCustomer());
-            dto.setUsedQuota(usage.getContractAnalysisUsed());
-            dto.setRemainingQuota(usage.getContractAnalysisLimit() == null
-                    ? null
-                    : Math.max(usage.getContractAnalysisLimit() - usage.getContractAnalysisUsed(), 0));
-        } else {
-            dto.setUsedQuota(0);
-            dto.setRemainingQuota(maxQuota);
-        }
-        return dto;
+        return customerPlanMapper.toResponseDTO(plan);
     }
 
     private CustomerPlan createDefaultFreePlan(Long customerId) {

@@ -19,7 +19,6 @@ export interface SubscriptionPlan {
   description?: string | null;
   price: number;
   durationDays: number;
-  maxQuota: number;
   active: boolean;
   createdAt: string;
   updatedAt: string;
@@ -27,14 +26,8 @@ export interface SubscriptionPlan {
   displayName?: string;
   priceVnd?: number;
   billingCycleDays?: number;
-  contractAnalysisLimit?: number;
   aiTokenLimit?: number;
-  workspaceLimit?: number;
-  documentPerWorkspaceLimit?: number;
   storageLimitMb?: number;
-  maxFileSizeMb?: number;
-  maxAttachedDocumentsPerSession?: number;
-  contractDraftLimit?: number;
   expertTicketLimit?: number;
   allowSystemErrorTicket?: boolean;
   allowQueryErrorTicket?: boolean;
@@ -67,20 +60,13 @@ export interface SubscriptionPlanRequest {
   description?: string | null;
   price: number;
   durationDays: number;
-  maxQuota: number;
   active?: boolean;
   name?: string;
   displayName?: string;
   priceVnd?: number;
   billingCycleDays?: number;
-  contractAnalysisLimit?: number;
   aiTokenLimit: number;
-  workspaceLimit: number;
-  documentPerWorkspaceLimit: number;
   storageLimitMb: number;
-  maxFileSizeMb: number;
-  maxAttachedDocumentsPerSession: number;
-  contractDraftLimit: number;
   expertTicketLimit: number;
   allowSystemErrorTicket: boolean;
   allowQueryErrorTicket: boolean;
@@ -95,8 +81,6 @@ export interface CustomerPlan {
   autoRenew: boolean;
   startDate: string | null;
   endDate: string | null;
-  usedQuota: number;
-  remainingQuota: number;
   latestTransactionId: number | null;
   latestTransactionCode: string | null;
   createdAt: string;
@@ -109,18 +93,10 @@ export interface CustomerPlan {
 export interface SubscriptionUsageSummary {
   periodStart: string;
   periodEnd: string;
-  contractAnalysisUsed: number;
-  contractAnalysisLimit: number;
   aiTokensUsed: number;
   aiTokensLimit: number;
-  draftContractsUsed: number;
-  draftContractsLimit: number;
   expertTicketsUsed: number;
   expertTicketsLimit: number;
-  workspacesUsed: number;
-  workspacesLimit: number;
-  documentsUsed: number;
-  documentsLimit: number;
   storageUsedBytes: number;
   storageLimitBytes: number;
 }

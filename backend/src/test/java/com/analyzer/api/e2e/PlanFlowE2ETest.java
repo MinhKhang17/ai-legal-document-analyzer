@@ -118,8 +118,8 @@ class PlanFlowE2ETest extends AbstractPlanFlowE2ETest {
         recordCompletedAssistantTokens(user, workspace, 200_000);
 
         SubscriptionQuotaUsageSummaryResponse beforeUpgrade = subscriptionQuotaService.getCurrentUsage(user);
-        assertThat(beforeUpgrade.getContractAnalysisUsed()).isEqualTo(20);
         assertThat(beforeUpgrade.getAiTokensUsed()).isEqualTo(500_000);
+        assertThat(beforeUpgrade.getStorageUsedBytes()).isEqualTo(2_000_000L);
 
         SubscribeRequest upgrade = new SubscribeRequest();
         upgrade.setSubscriptionPlanId(premium.getId());
@@ -133,10 +133,9 @@ class PlanFlowE2ETest extends AbstractPlanFlowE2ETest {
         assertThat(oldStandardRow.getStatus()).isEqualTo(PlanStatus.EXPIRED);
 
         SubscriptionQuotaUsageSummaryResponse afterUpgrade = subscriptionQuotaService.getCurrentUsage(user);
-        assertThat(afterUpgrade.getContractAnalysisUsed()).isEqualTo(20);
-        assertThat(afterUpgrade.getContractAnalysisLimit()).isEqualTo(premium.getMaxQuota());
         assertThat(afterUpgrade.getAiTokensUsed()).isEqualTo(500_000);
         assertThat(afterUpgrade.getAiTokensLimit()).isEqualTo(premium.getAiQuota());
+        assertThat(afterUpgrade.getStorageUsedBytes()).isEqualTo(2_000_000L);
     }
 
     // E2E-PLAN-04 (P0): Premium scheduled to downgrade to Standard; endDate already passed;
@@ -278,7 +277,7 @@ class PlanFlowE2ETest extends AbstractPlanFlowE2ETest {
     void e2e08_adminPlanEditDoesNotRetroactivelyChangeAnAlreadyActiveCustomer() {
         User existingCustomer = createCustomer("e2e08-existing");
         SubscriptionPlan premium = planByType("PREMIUM");
-        int originalMaxQuota = premium.getMaxQuota();
+        int originalAiQuota = premium.getAiQuota();
         LocalDateTime now = LocalDateTime.now();
         persistCustomerPlan(existingCustomer, premium, PlanStatus.ACTIVE, now.minusDays(5), now.plusDays(25));
 
@@ -287,19 +286,13 @@ class PlanFlowE2ETest extends AbstractPlanFlowE2ETest {
         editRequest.setPlanType(premium.getPlanType());
         editRequest.setPrice(premium.getPrice());
         editRequest.setDurationDays(premium.getDurationDays());
-        editRequest.setMaxQuota(originalMaxQuota + 500);
-        editRequest.setAiQuota(premium.getAiQuota());
+        editRequest.setAiQuota(originalAiQuota + 500_000);
         editRequest.setTicketQuota(premium.getTicketQuota());
-        editRequest.setMaxWorkspaces(premium.getMaxWorkspaces());
-        editRequest.setMaxContractsPerWorkspace(premium.getMaxContractsPerWorkspace());
-        editRequest.setMaxDraftContracts(premium.getMaxDraftContracts());
         editRequest.setStorageLimitMb(premium.getStorageLimitMb());
-        editRequest.setMaxFileSizeMb(premium.getMaxFileSizeMb());
-        editRequest.setMaxAttachedDocumentsPerSession(premium.getMaxAttachedDocumentsPerSession());
         subscriptionPlanService.updatePlan(premium.getId(), editRequest);
 
         SubscriptionQuotaUsageSummaryResponse existingUsage = subscriptionQuotaService.getCurrentUsage(existingCustomer);
-        assertThat(existingUsage.getContractAnalysisLimit()).isEqualTo(originalMaxQuota);
+        assertThat(existingUsage.getAiTokensLimit()).isEqualTo(originalAiQuota);
 
         User newCustomer = createCustomer("e2e08-new");
         SubscribeRequest subscribeRequest = new SubscribeRequest();
@@ -311,6 +304,6 @@ class PlanFlowE2ETest extends AbstractPlanFlowE2ETest {
                 signedVnPayCallback(transaction.getTransactionCode(), transaction.getAmount(), "00", "00"));
 
         SubscriptionQuotaUsageSummaryResponse newUsage = subscriptionQuotaService.getCurrentUsage(newCustomer);
-        assertThat(newUsage.getContractAnalysisLimit()).isEqualTo(originalMaxQuota + 500);
+        assertThat(newUsage.getAiTokensLimit()).isEqualTo(originalAiQuota + 500_000);
     }
 }

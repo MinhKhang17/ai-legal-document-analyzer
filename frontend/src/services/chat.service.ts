@@ -3,6 +3,7 @@ import {
   ACCESS_DENIED_MESSAGE,
   ApiRequestError,
   BACKEND_API_UNAVAILABLE_MESSAGE,
+  refreshAccessTokenOnce,
   type ApiErrorResponse,
 } from "./http";
 import type {
@@ -104,6 +105,25 @@ const requestJson = async <TResponse>(
       throw error;
     }
     throw new Error(BACKEND_API_UNAVAILABLE_MESSAGE);
+  }
+
+  if (response.status === 401 && new Headers(requestInit.headers).has("Authorization")) {
+    const refreshedToken = await refreshAccessTokenOnce();
+    if (refreshedToken) {
+      const retryHeaders = new Headers(requestInit.headers);
+      retryHeaders.set("Authorization", `Bearer ${refreshedToken}`);
+      try {
+        response = await fetch(buildApiUrl(endpointPath), {
+          ...requestInit,
+          headers: retryHeaders,
+        });
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          throw error;
+        }
+        throw new Error(BACKEND_API_UNAVAILABLE_MESSAGE);
+      }
+    }
   }
 
   const { data, rawText } = await readResponseBody<TResponse | ApiResponse<TResponse> | ApiErrorResponse>(response);

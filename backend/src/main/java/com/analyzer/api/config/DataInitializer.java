@@ -108,13 +108,13 @@ public class DataInitializer implements CommandLineRunner {
                 try {
                         seedPlan("FREE", "Free Plan", SubscriptionTier.BASIC,
                                         "Free plan for trial legal analysis usage.",
-                                        BigDecimal.ZERO, 30, 5, 50_000, 0, 1, 3, 1);
+                                        BigDecimal.ZERO, 30, 50_000, 0, 50);
                         seedPlan("STANDARD", "Standard Plan", SubscriptionTier.PRO,
                                         "Standard monthly plan for regular contract analysis and AI chat.",
-                                        new BigDecimal("79000"), 30, 50, 1_500_000, 0, 5, 15, 10);
+                                        new BigDecimal("79000"), 30, 1_500_000, 0, 1024);
                         seedPlan("PREMIUM", "Premium Plan", SubscriptionTier.PREMIUM,
                                         "Premium monthly plan with higher AI limits and one expert review ticket.",
-                                        new BigDecimal("299000"), 30, 200, 8_500_000, 1, 20, 50, 40);
+                                        new BigDecimal("299000"), 30, 8_500_000, 1, 5120);
                 } catch (DataIntegrityViolationException ex) {
                         // Another instance won the race to seed first (uk_subscription_plan_type_lower
                         // rejected the duplicate insert). Don't fail app startup over it.
@@ -144,12 +144,9 @@ public class DataInitializer implements CommandLineRunner {
                         String description,
                         BigDecimal price,
                         int durationDays,
-                        int maxQuota,
                         int aiQuota,
                         int ticketQuota,
-                        int maxWorkspaces,
-                        int maxContractsPerWorkspace,
-                        int maxDraftContracts) {
+                        int storageLimitMb) {
                 SubscriptionPlan plan = new SubscriptionPlan();
                 plan.setPlanType(planType);
                 plan.setPlanName(planName);
@@ -157,36 +154,34 @@ public class DataInitializer implements CommandLineRunner {
                 plan.setDescription(description);
                 plan.setPrice(price);
                 plan.setDurationDays(durationDays);
-                plan.setMaxQuota(maxQuota);
+                plan.setMaxQuota(0);
                 plan.setAiQuota(aiQuota);
                 plan.setTicketQuota(ticketQuota);
-                plan.setMaxWorkspaces(maxWorkspaces);
-                plan.setMaxContractsPerWorkspace(maxContractsPerWorkspace);
-                plan.setMaxDraftContracts(maxDraftContracts);
+                plan.setMaxWorkspaces(0);
+                plan.setMaxContractsPerWorkspace(0);
+                plan.setMaxDraftContracts(0);
+                plan.setStorageLimitMb(storageLimitMb);
                 if ("FREE".equals(planType)) {
-                        plan.setStorageLimitMb(50);
                         plan.setMaxFileSizeMb(10);
                         plan.setMaxAttachedDocumentsPerSession(1);
                         plan.setAllowSystemErrorTicket(true);
                         plan.setAllowQueryErrorTicket(true);
                         plan.setAllowContactExpertTicket(false);
-                        plan.setFeatureLimitsJson("[\"5 analyses\",\"50,000 AI tokens\",\"1 workspace\",\"System and query error support\"]");
+                        plan.setFeatureLimitsJson("[\"50,000 AI tokens\",\"50 MB storage\",\"System and query error support\"]");
                 } else if ("STANDARD".equals(planType)) {
-                        plan.setStorageLimitMb(1024);
                         plan.setMaxFileSizeMb(25);
                         plan.setMaxAttachedDocumentsPerSession(5);
                         plan.setAllowSystemErrorTicket(true);
                         plan.setAllowQueryErrorTicket(true);
                         plan.setAllowContactExpertTicket(false);
-                        plan.setFeatureLimitsJson("[\"50 analyses\",\"1,500,000 AI tokens\",\"5 workspaces\",\"System and query error support\"]");
+                        plan.setFeatureLimitsJson("[\"1,500,000 AI tokens\",\"1,024 MB storage\",\"System and query error support\"]");
                 } else {
-                        plan.setStorageLimitMb(5120);
                         plan.setMaxFileSizeMb(50);
                         plan.setMaxAttachedDocumentsPerSession(15);
                         plan.setAllowSystemErrorTicket(true);
                         plan.setAllowQueryErrorTicket(true);
                         plan.setAllowContactExpertTicket(true);
-                        plan.setFeatureLimitsJson("[\"200 analyses\",\"8,500,000 AI tokens\",\"20 workspaces\",\"1 expert ticket per month\"]");
+                        plan.setFeatureLimitsJson("[\"8,500,000 AI tokens\",\"5,120 MB storage\",\"1 expert ticket per month\"]");
                 }
                 plan.setActive(true);
 
