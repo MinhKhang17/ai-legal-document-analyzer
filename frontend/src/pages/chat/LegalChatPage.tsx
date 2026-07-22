@@ -711,26 +711,6 @@ export function LegalChatPage() {
         navigate("/billing/subscribe?reason=plan-required");
         return;
       }
-      if (isPlanEntitlementError(err)) {
-        const message = "Dịch vụ này yêu cầu gói phù hợp. Vui lòng chọn hoặc nâng cấp gói để tiếp tục.";
-        setError(message);
-        setMessages((previous) => previous.map((item) => item.id === assistantMessageId
-          ? { ...item, status: "error", errorMessage: message }
-          : item));
-        toast.warning(message);
-        navigate("/billing/subscribe?reason=plan-required");
-        return;
-      }
-      if (getApiErrorCode(err) === "TERMS_NOT_ACCEPTED") {
-        const message = "Bạn cần chấp thuận chính sách hiện hành trước khi phân tích tài liệu.";
-        setError(message);
-        setMessages((previous) => previous.map((item) => item.id === assistantMessageId
-          ? { ...item, status: "error", errorMessage: message }
-          : item));
-        setPolicyAccepted(false);
-        setPolicyModalOpen(true);
-        return;
-      }
       const message = getCreateTicketErrorMessage(err);
       setError(message);
       toast.error(message, t("toast.errorTitle"));
@@ -1017,6 +997,26 @@ export function LegalChatPage() {
               statusMessage: t("chat.status.stopped"),
             }
           : item));
+        return;
+      }
+      if (isPlanEntitlementError(err)) {
+        const message = "Dịch vụ này yêu cầu gói phù hợp. Vui lòng chọn hoặc nâng cấp gói để tiếp tục.";
+        setError(message);
+        setMessages((previous) => previous.map((item) => item.id === assistantMessageId
+          ? { ...item, status: "error", errorMessage: message }
+          : item));
+        toast.warning(message);
+        navigate("/billing/subscribe?reason=plan-required");
+        return;
+      }
+      if (getApiErrorCode(err) === "TERMS_NOT_ACCEPTED") {
+        const message = "Bạn cần chấp thuận chính sách hiện hành trước khi phân tích tài liệu.";
+        setError(message);
+        setMessages((previous) => previous.map((item) => item.id === assistantMessageId
+          ? { ...item, status: "error", errorMessage: message }
+          : item));
+        setPolicyAccepted(false);
+        setPolicyModalOpen(true);
         return;
       }
       const message = t("chat.messageSendError");
