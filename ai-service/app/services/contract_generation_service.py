@@ -710,7 +710,7 @@ class ContractGenerationService:
                     icon = "📝" if ext in ("docx", "doc") else "📥"
                     return (
                         f"{icon} [Tải về mẫu văn bản ({ext.upper()})]"
-                        f"(http://localhost:8080/api/v1/workspaces/{request.workspaceId}"
+                        f"(/api/v1/workspaces/{request.workspaceId}"
                         f"/documents/{reg_id}/download)"
                     )
                 else:

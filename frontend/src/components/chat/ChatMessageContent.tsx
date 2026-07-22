@@ -1,5 +1,6 @@
 import { Fragment, type ReactNode } from "react";
 import { cn } from "../../utils/cn";
+import { buildApiUrl } from "../../config/api";
 
 type InlineToken =
   | { type: "text"; value: string }
@@ -41,16 +42,20 @@ function renderInline(text: string): ReactNode[] {
       );
     } else if (token.type === "link") {
       const safeUrl = /^(https?:\/\/|\/)/i.test(token.url) ? token.url : "#";
+      const apiPathIndex = safeUrl.indexOf("/api/");
+      const resolvedUrl = apiPathIndex >= 0
+        ? buildApiUrl(safeUrl.slice(apiPathIndex).replace(/\\_/g, "_"))
+        : safeUrl;
       const isApiDownload = token.url.includes("/documents/system/download") || token.url.includes("/download");
       return (
         <a
           key={`${token.type}-${index}`}
-          href={safeUrl}
+          href={resolvedUrl}
           onClick={isApiDownload ? async (e) => {
             e.preventDefault();
             try {
               const tokenStr = localStorage.getItem("token") || "";
-              const response = await fetch(token.url, {
+              const response = await fetch(resolvedUrl, {
                 headers: tokenStr ? { Authorization: `Bearer ${tokenStr}` } : {},
               });
               if (!response.ok) throw new Error("Download failed");
@@ -73,7 +78,7 @@ function renderInline(text: string): ReactNode[] {
               anchor.click();
               setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
             } catch {
-              window.open(token.url, "_blank");
+              window.open(resolvedUrl, "_blank", "noopener,noreferrer");
             }
           } : undefined}
           target={safeUrl === "#" ? undefined : "_blank"}

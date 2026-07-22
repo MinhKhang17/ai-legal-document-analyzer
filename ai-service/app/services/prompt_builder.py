@@ -278,10 +278,10 @@ def build_user_prompt(
     download_instructions = (
         "HƯỚNG DẪN CUNG CẤP ĐƯỜNG DẪN TẢI XUỐNG CHO TÀI LIỆU HỆ THỐNG:\n"
         "Nếu người dùng muốn tải xuống các tệp ví dụ hoặc tài liệu đối chiếu thuộc danh sách tài liệu hệ thống (Neo4j) nêu trên, bạn có thể tạo đường dẫn tải xuống trực tiếp cho họ bằng định dạng Markdown sau:\n"
-        f"- [Tải xuống Tên_Tài_Liệu](http://localhost:8080/api/v1/workspaces/{ws_id}/documents/system/download?filename=Tên_File_Gốc)\n"
+        f"- [Tải xuống Tên_Tài_Liệu](/api/v1/workspaces/{ws_id}/documents/system/download?filename=Tên_File_Gốc)\n"
         "Ví dụ:\n"
-        f"- Tải xuống FAQ_HOP_DONG_LAO_DONG.txt: [Tải xuống FAQ_HOP_DONG_LAO_DONG.txt](http://localhost:8080/api/v1/workspaces/{ws_id}/documents/system/download?filename=FAQ_HOP_DONG_LAO_DONG.txt)\n"
-        f"- Tải xuống 08.LB-TT.doc: [Tải xuống 08.LB-TT.doc](http://localhost:8080/api/v1/workspaces/{ws_id}/documents/system/download?filename=08.LB-TT.doc)\n"
+        f"- Tải xuống FAQ_HOP_DONG_LAO_DONG.txt: [Tải xuống FAQ_HOP_DONG_LAO_DONG.txt](/api/v1/workspaces/{ws_id}/documents/system/download?filename=FAQ_HOP_DONG_LAO_DONG.txt)\n"
+        f"- Tải xuống 08.LB-TT.doc: [Tải xuống 08.LB-TT.doc](/api/v1/workspaces/{ws_id}/documents/system/download?filename=08.LB-TT.doc)\n"
         "Hãy đảm bảo tên file gốc (filename) khớp chính xác với tên được hiển thị trong danh sách tài liệu hệ thống (bao gồm cả phần mở rộng như .txt, .doc, .docx nếu có).\n\n"
     )
 
@@ -308,7 +308,7 @@ def build_user_prompt(
             "1. KHÔNG trả lời lan man, KHÔNG giải thích dông dài về cách xây dựng kiến thức pháp lý chung, KHÔNG có phần 'Lưu ý quan trọng'.\n"
             "2. LIỆT KÊ TRỰC TIẾP danh sách các file/tài liệu tham khảo có sẵn trong hệ thống (Neo4j) dưới dạng bullet points.\n"
             "3. CUNG CẤP đường dẫn tải xuống dạng link Markdown trực tiếp cho từng file tài liệu hệ thống đó, ví dụ:\n"
-            f"   - [Tên_Tài_Liệu](http://localhost:8080/api/v1/workspaces/{ws_id}/documents/system/download?filename=Tên_File_Gốc)\n"
+            f"   - [Tên_Tài_Liệu](/api/v1/workspaces/{ws_id}/documents/system/download?filename=Tên_File_Gốc)\n"
             "4. Định dạng câu trả lời cực kỳ ngắn gọn và đi thẳng vào danh sách các file/tài liệu tham khảo.\n"
             "5. Tên file (filename) trong link CHỈ được lấy đúng nguyên văn từ danh sách tài liệu hệ thống "
             "đã cung cấp bên dưới, KHÔNG được tự chế hoặc chỉnh sửa tên file.\n\n"
@@ -323,7 +323,7 @@ def build_user_prompt(
             "1. GIẢI THÍCH RÕ RÀNG: Các tài liệu/quyết định/nghị quyết hệ thống này được thu thập từ các nguồn trang web chính thống của Chính phủ Việt Nam (ví dụ: Cổng thông tin điện tử Chính phủ chinhphu.vn, Cơ sở dữ liệu quốc gia về văn bản pháp luật vbpl.vn, các Cổng thông tin điện tử của Ủy ban nhân dân tỉnh/thành phố, Công báo địa phương, v.v.).\n"
             "2. Tuyệt đối KHÔNG trả lời là 'hệ thống kiến thức nội bộ không rõ nguồn gốc' hoặc 'tôi không có khả năng truy cập internet nên không biết lấy ở trang web nào'. Bạn phải khẳng định nguồn gốc từ các trang web chính phủ Việt Nam nêu trên.\n"
             "3. LIỆT KÊ ngắn gọn danh sách các tài liệu tham khảo kèm đường dẫn tải xuống trực tiếp ở cuối câu trả lời dạng:\n"
-            f"   - [Tên_Tài_Liệu](http://localhost:8080/api/v1/workspaces/{ws_id}/documents/system/download?filename=Tên_File_Gốc)\n\n"
+            f"   - [Tên_Tài_Liệu](/api/v1/workspaces/{ws_id}/documents/system/download?filename=Tên_File_Gốc)\n\n"
         )
 
     history_context = truncate_to_token_budget(chat_history or "[none]", budget.recent_history)
