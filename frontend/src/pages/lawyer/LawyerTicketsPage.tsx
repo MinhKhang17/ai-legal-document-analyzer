@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { getMyLawyerTickets } from "../../api/lawyerTicketApi";
+import { getMyLawyerTickets, getProposedLawyerTickets } from "../../api/lawyerTicketApi";
 import { Badge } from "../../components/common/Badge";
 import { Button } from "../../components/common/Button";
 import { Card } from "../../components/common/Card";
@@ -57,8 +57,11 @@ export function LawyerTicketsPage() {
         10,
         statusFilter === "ALL" ? undefined : statusFilter,
       );
-      setTickets(response.items ?? []);
-      setTotalItems(response.totalItems ?? 0);
+      const proposed = statusFilter === "ALL" && page === 0 ? await getProposedLawyerTickets(0, 10) : null;
+      const combined = [...(proposed?.items ?? []), ...(response.items ?? [])]
+        .filter((item, index, list) => list.findIndex((candidate) => candidate.id === item.id) === index);
+      setTickets(combined);
+      setTotalItems((response.totalItems ?? 0) + (proposed?.totalItems ?? 0));
       setTotalPages(response.totalPages ?? 0);
     } catch {
       toast.error(t("lawyerTickets.loadError"), t("toast.errorTitle"));

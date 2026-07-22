@@ -60,6 +60,7 @@ export interface PageResponse<T> {
 }
 
 export interface CreateLegalTicketRequest {
+  creationSource?: "AI_CHAT" | "MANUAL_FORM";
   title?: string;
   description?: string;
   recipientType?: TicketRecipientType;
@@ -71,6 +72,14 @@ export interface CreateLegalTicketRequest {
   documentIds?: string[];
   citationIds?: string[];
   attachmentIds?: string[];
+  sharedProfileFields?: Array<"DISPLAY_NAME" | "EMAIL" | "PHONE">;
+  legalIssueCategory?: string;
+  contractType?: string | null;
+  urgency?: string;
+  userExpectedOutcome?: string;
+  aiAnswerSummary?: string | null;
+  aiIntent?: string | null;
+  consentGranted?: boolean;
   ticket_type?: LegalTicketType;
   chat_session_id?: string | null;
   chat_message_id?: string | null;
@@ -109,6 +118,44 @@ export interface ReopenLegalTicketRequest {
 }
 
 export interface LegalTicket {
+  creationSource?: "AI_CHAT" | "MANUAL_FORM";
+  legalIssueCategory?: string | null;
+  contractType?: string | null;
+  userExpectedOutcome?: string | null;
+  userId?: number;
+  userDisplayName?: string | null;
+  userEmail?: string | null;
+  userPhone?: string | null;
+  selectedDocumentIds?: string[];
+  sharedProfileFields?: string[];
+  consentGrantedAt?: string | null;
+  consentRevokedAt?: string | null;
+  aiQuestion?: string | null;
+  aiAnswerSummary?: string | null;
+  aiIntent?: string | null;
+  aiRiskLevel?: LegalTicketRiskLevel | null;
+  aiConfidence?: number | null;
+  ticketComplexity?: "BASIC" | "STANDARD" | "COMPLEX" | "OUT_OF_SCOPE" | null;
+  classificationReason?: string | null;
+  classifiedAt?: string | null;
+  pricingType?: "PLAN_INCLUDED" | "PAID" | null;
+  userPrice?: number | null;
+  internalTicketValue?: number | null;
+  quoteStatus?: "DRAFT" | "SENT" | "ACCEPTED" | "REJECTED" | "EXPIRED" | null;
+  paymentStatus?: "NOT_REQUIRED" | "UNPAID" | "PENDING" | "PAID" | "FAILED" | "REFUNDED" | "PARTIALLY_REFUNDED" | null;
+  quotaCycle?: string | null;
+  quotaReservationStatus?: "NOT_APPLICABLE" | "PENDING" | "RESERVED" | "CONSUMED" | "RELEASED" | "RESTORED" | null;
+  proposedExpertId?: number | null;
+  proposedExpertName?: string | null;
+  assignmentOfferedAt?: string | null;
+  acceptanceDueAt?: string | null;
+  acceptedAt?: string | null;
+  startedAt?: string | null;
+  firstResponseDueAt?: string | null;
+  firstRespondedAt?: string | null;
+  resolutionDueAt?: string | null;
+  lastExpertActivityAt?: string | null;
+  slaStatus?: "ON_TRACK" | "WAITING_FOR_USER" | "WARNING" | "OVERDUE" | "BREACHED" | "EXTENDED" | null;
   ticketCode?: string;
   title?: string;
   description?: string;

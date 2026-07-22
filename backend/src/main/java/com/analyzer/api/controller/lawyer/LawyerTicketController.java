@@ -33,6 +33,25 @@ public class LawyerTicketController {
     private final TicketFileService ticketFileService;
     private final LegalTicketService legalTicketService;
     private final ExpertLegalTicketService expertLegalTicketService;
+    private final com.analyzer.api.service.ExpertTicketWorkflowService expertTicketWorkflowService;
+
+    @PostMapping("/{id}/assessment")
+    @PreAuthorize("hasRole('EXPERT')")
+    public ResponseEntity<ApiResponseDTO<LegalTicketResponse>> assess(
+            @PathVariable("id") String ticketId,
+            @Valid @RequestBody ExpertTicketAssessmentRequest request) {
+        return ResponseEntity.ok(ApiResponseDTO.success("Assessment recorded",
+                expertTicketWorkflowService.assess(getCurrentUserId(), ticketId, request)));
+    }
+
+    @PostMapping("/{id}/assignment-decision")
+    @PreAuthorize("hasRole('EXPERT')")
+    public ResponseEntity<ApiResponseDTO<LegalTicketResponse>> decideAssignment(
+            @PathVariable("id") String ticketId,
+            @Valid @RequestBody ExpertAssignmentDecisionRequest request) {
+        return ResponseEntity.ok(ApiResponseDTO.success("Assignment decision recorded",
+                expertTicketWorkflowService.decideAssignment(getCurrentUserId(), ticketId, request)));
+    }
 
     @GetMapping("/my")
     @PreAuthorize("hasRole('EXPERT')")
@@ -44,6 +63,15 @@ public class LawyerTicketController {
         Long lawyerId = getCurrentUserId();
         return ResponseEntity.ok(ApiResponseDTO.success("Retrieved assigned tickets successfully",
                 expertLegalTicketService.getAssignedTickets(lawyerId, status, page, size)));
+    }
+
+    @GetMapping("/proposed")
+    @PreAuthorize("hasRole('EXPERT')")
+    public ResponseEntity<ApiResponseDTO<PageResponse<LegalTicketResponse>>> getProposedTickets(
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "10") int size) {
+        return ResponseEntity.ok(ApiResponseDTO.success("Retrieved proposed tickets",
+                expertLegalTicketService.getProposedTickets(getCurrentUserId(), page, size)));
     }
 
     @GetMapping("/{id}")

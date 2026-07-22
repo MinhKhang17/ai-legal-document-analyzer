@@ -204,7 +204,16 @@ public class ExpertRevenueServiceImpl implements ExpertRevenueService {
         if (ticket.getCommissionRate() == null) {
             ticket.setCommissionRate(revenueSettingService.getCurrentRate());
         }
-        BigDecimal fee = ticket.getConsultationFee() == null ? BigDecimal.ZERO : ticket.getConsultationFee();
+        BigDecimal fee;
+        if (ticket.getPricingType() == com.analyzer.api.enums.TicketPricingType.PLAN_INCLUDED
+                && ticket.getInternalTicketValue() != null) {
+            fee = ticket.getInternalTicketValue();
+        } else if (ticket.getUserPrice() != null) {
+            fee = ticket.getUserPrice();
+        } else {
+            fee = ticket.getConsultationFee() == null ? BigDecimal.ZERO : ticket.getConsultationFee();
+        }
+        ticket.setConsultationFee(fee);
         BigDecimal platformFee = fee.multiply(ticket.getCommissionRate()).setScale(2, RoundingMode.HALF_UP);
         ticket.setPlatformFee(platformFee);
         ticket.setExpertPayout(fee.subtract(platformFee));

@@ -20,6 +20,7 @@ import {
   getAttachmentPolicy,
   createTicketConversationShare,
   downloadTicketAttachment,
+  decideExpertTicketQuote,
 } from "../../services/legalTicket.service";
 import {
   getTicketAiAssessment,
@@ -33,6 +34,7 @@ import type { AdminTicketFile, AttachmentPolicy, LegalTicket, LegalTicketMessage
 import { getLegalTicketStatusLabel } from "../../types/legalTicketStatus";
 import { formatDisplayDate, formatFileSize, localeForLanguage } from "../../utils/format";
 import { ApiRequestError } from "../../services/http";
+import { ticketDate, ticketMoney, ticketText } from "../../utils/ticketDisplay";
 
 export function CustomerTicketDetailPage() {
   const { id = "" } = useParams();
@@ -315,6 +317,19 @@ export function CustomerTicketDetailPage() {
           </main>
 
           <aside className="space-y-gutter">
+            <Card title="Trạng thái dịch vụ chuyên gia">
+              <dl className="space-y-sm text-sm">
+                <div><dt className="label-uppercase">Nguồn tạo</dt><dd>{ticketText(ticket.creationSource, "Not available")}</dd></div>
+                <div><dt className="label-uppercase">Phân loại</dt><dd>{ticketText(ticket.ticketComplexity, "Pending classification")}</dd></div>
+                <div><dt className="label-uppercase">Giá cần thanh toán</dt><dd>{ticket.pricingType === "PLAN_INCLUDED" ? "Đã bao gồm trong gói Premium" : ticketMoney(ticket.userPrice, "Pending quote", locale)}</dd></div>
+                <div><dt className="label-uppercase">Báo giá / thanh toán</dt><dd>{ticketText(ticket.quoteStatus, "Pending quote")} / {ticketText(ticket.paymentStatus, "Not applicable")}</dd></div>
+                <div><dt className="label-uppercase">Chuyên gia</dt><dd>{ticketText(ticket.assigned_lawyer_name, "Not assigned")}</dd></div>
+                <div><dt className="label-uppercase">Phản hồi dự kiến</dt><dd>{ticketDate(ticket.firstResponseDueAt, "Not scheduled", locale)}</dd></div>
+                <div><dt className="label-uppercase">Hoàn thành dự kiến</dt><dd>{ticketDate(ticket.resolutionDueAt, "Not scheduled", locale)}</dd></div>
+                <div><dt className="label-uppercase">SLA</dt><dd>{ticketText(ticket.slaStatus, "Not scheduled")}</dd></div>
+              </dl>
+              {ticket.status === "WAITING_USER_ACCEPTANCE" && <div className="mt-md flex gap-sm"><Button disabled={saving} onClick={() => void runAction(() => decideExpertTicketQuote(id, "ACCEPT"), "Đã chấp nhận báo giá")}>Chấp nhận phạm vi và báo giá</Button><Button variant="secondary" disabled={saving} onClick={() => void runAction(() => decideExpertTicketQuote(id, "REJECT"), "Đã từ chối báo giá")}>Từ chối</Button></div>}
+            </Card>
             {ticket.contextSnapshot && <Card title={t("sharedTicket.immutableContext")}><div className="space-y-md text-sm"><div><p className="label-uppercase">{t("sharedTicket.userQuestion")}</p><p className="mt-xs whitespace-pre-line">{ticket.contextSnapshot.userQuestion}</p></div><div><p className="label-uppercase">{t("sharedTicket.aiAnswer")}</p><p className="mt-xs max-h-64 overflow-y-auto whitespace-pre-line text-on-surface-variant">{ticket.contextSnapshot.assistantAnswer || "—"}</p></div><div><p className="label-uppercase">{t("ticketComposer.sharedDocuments")}</p><pre className="mt-xs max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-surface-container-low p-sm text-xs">{ticket.contextSnapshot.documentSnapshotJson || "[]"}</pre></div><p className="break-all text-xs text-on-surface-variant">{t("legalTickets.detail.contentHash")}: {ticket.contextSnapshot.contentHash}</p></div></Card>}
             <Card title={t("legalTickets.detail.actions")}>
               <div className="flex flex-col gap-sm">

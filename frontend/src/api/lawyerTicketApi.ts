@@ -1,5 +1,6 @@
 export {
   getMyLawyerTickets,
+  getProposedLawyerTickets,
   getLawyerTicketDetail,
   getLawyerTicketMessages,
   requestMoreInfoLawyerTicket,

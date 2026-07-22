@@ -30,6 +30,44 @@ public class AdminTicketManagementController {
     private final AdminTicketManagementService adminTicketManagementService;
     private final LegalTicketService legalTicketService;
     private final com.analyzer.api.service.ExpertRevenueService expertRevenueService;
+    private final com.analyzer.api.service.ExpertTicketWorkflowService expertTicketWorkflowService;
+
+    @PostMapping("/{id}/classify")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponseDTO<LegalTicketResponse>> classify(
+            @PathVariable("id") String ticketId,
+            @Valid @RequestBody AdminTicketClassificationRequest request) {
+        return ResponseEntity.ok(ApiResponseDTO.success("Ticket classified",
+                expertTicketWorkflowService.classify(getCurrentUserId(), ticketId, request)));
+    }
+
+    @PostMapping("/{id}/confirm-payment")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponseDTO<LegalTicketResponse>> confirmPayment(
+            @PathVariable("id") String ticketId,
+            @Valid @RequestBody TicketPaymentConfirmationRequest request) {
+        return ResponseEntity.ok(ApiResponseDTO.success("Ticket payment confirmed",
+                expertTicketWorkflowService.confirmPayment(getCurrentUserId(), ticketId, request)));
+    }
+
+    @PostMapping("/{id}/offer-assignment")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponseDTO<LegalTicketResponse>> offerAssignment(
+            @PathVariable("id") String ticketId,
+            @Valid @RequestBody AssignLawyerRequest request) {
+        return ResponseEntity.ok(ApiResponseDTO.success("Assignment offered",
+                expertTicketWorkflowService.offerAssignment(getCurrentUserId(), ticketId,
+                        request.getLawyerId(), request.getAdminNote())));
+    }
+
+    @PostMapping("/{id}/extend-sla")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponseDTO<LegalTicketResponse>> extendSla(
+            @PathVariable("id") String ticketId,
+            @Valid @RequestBody AdminSlaExtensionRequest request) {
+        return ResponseEntity.ok(ApiResponseDTO.success("SLA extended",
+                expertTicketWorkflowService.extendSla(getCurrentUserId(), ticketId, request)));
+    }
 
     @PatchMapping("/{id}/expert-payment")
     @PreAuthorize("hasRole('ADMIN')")
@@ -105,7 +143,7 @@ public class AdminTicketManagementController {
             @Valid @RequestBody AssignLawyerRequest request) {
         Long adminId = getCurrentUserId();
         return ResponseEntity.ok(ApiResponseDTO.success("Lawyer assigned successfully",
-                adminTicketManagementService.assignLawyer(ticketId, adminId, request)));
+                expertTicketWorkflowService.offerAssignment(adminId, ticketId, request.getLawyerId(), request.getAdminNote())));
     }
 
     @PostMapping("/{id}/reassign-lawyer")
@@ -116,7 +154,7 @@ public class AdminTicketManagementController {
             @Valid @RequestBody AssignLawyerRequest request) {
         Long adminId = getCurrentUserId();
         return ResponseEntity.ok(ApiResponseDTO.success("Lawyer reassigned successfully",
-                adminTicketManagementService.reassignLawyer(ticketId, adminId, request)));
+                expertTicketWorkflowService.reassign(adminId, ticketId, request.getLawyerId(), request.getAdminNote())));
     }
 
     @PostMapping("/{id}/reject")

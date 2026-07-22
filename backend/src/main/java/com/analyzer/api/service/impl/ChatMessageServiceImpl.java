@@ -85,7 +85,9 @@ public class ChatMessageServiceImpl implements ChatMessageService {
     private final ChatMessageFeedbackRepository chatMessageFeedbackRepository;
     private final ChatSessionDocumentRepository chatSessionDocumentRepository;
     private final ConversationHistoryAssembler conversationHistoryAssembler;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    // Use Spring Boot's configured mapper so Java time values in the immutable
+    // query snapshot are serialized with the registered JavaTimeModule.
+    private final ObjectMapper objectMapper;
 
     @Override
     @Transactional(noRollbackFor = { AiServiceUnavailableException.class, AiServiceTimeoutException.class,

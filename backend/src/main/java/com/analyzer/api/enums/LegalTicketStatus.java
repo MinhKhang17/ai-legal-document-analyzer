@@ -4,19 +4,38 @@ package com.analyzer.api.enums;
  * Lifecycle state for a legal help ticket.
  */
 public enum LegalTicketStatus {
+    // Legacy states are retained for backward compatibility with existing rows/clients.
     OPEN,
     ASSIGNED,
     WAITING_FOR_USER,
     WAITING_FOR_EXPERT,
     DRAFT,
     PENDING_ADMIN_REVIEW,
+    PENDING_EXPERT_ASSESSMENT,
+    RECLASSIFICATION_REQUESTED,
+    WAITING_USER_ACCEPTANCE,
+    WAITING_PAYMENT,
+    READY_FOR_ASSIGNMENT,
+    PENDING_EXPERT_ACCEPTANCE,
+    ASSIGNED_TO_EXPERT,
     REJECTED_BY_ADMIN,
     ASSIGNED_TO_LAWYER,
     IN_REVIEW,
     NEED_MORE_INFO,
     CUSTOMER_RESPONDED,
+    INACTIVE_WARNING,
+    OVERDUE,
+    SLA_BREACHED,
+    ADMIN_INTERVENTION,
+    PENDING_REASSIGNMENT,
+    PARTIALLY_COMPLETED,
     RESOLVED,
     CLOSED,
     CANCELLED,
-    REOPENED
+    CANCELLED_BY_USER,
+    REOPENED,
+    FAILED_BY_EXPERT,
+    FAILED_BY_USER,
+    REFUND_PENDING,
+    REFUNDED
 }

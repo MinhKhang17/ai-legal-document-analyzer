@@ -16,6 +16,7 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.math.BigDecimal;
 import java.util.List;
+import com.analyzer.api.enums.*;
 
 @Data
 @Builder
@@ -24,6 +25,58 @@ import java.util.List;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @Schema(description = "Legal ticket response details")
 public class LegalTicketResponse {
+
+    private TicketCreationSource creationSource;
+    private String legalIssueCategory;
+    private String contractType;
+    private String userExpectedOutcome;
+    private Long userId;
+    private String userDisplayName;
+    private String userEmail;
+    private String userPhone;
+    private List<String> selectedDocumentIds;
+    private List<String> sharedProfileFields;
+    private LocalDateTime consentGrantedAt;
+    private LocalDateTime consentRevokedAt;
+    private String aiQuestion;
+    private String aiAnswerSummary;
+    private String aiIntent;
+    private RiskLevel aiRiskLevel;
+    private Double aiConfidence;
+    private TicketComplexity ticketComplexity;
+    private String classificationReason;
+    private LocalDateTime classifiedAt;
+    private Long classifiedById;
+    private TicketPricingType pricingType;
+    private BigDecimal userPrice;
+    private BigDecimal internalTicketValue;
+    private TicketQuoteStatus quoteStatus;
+    private TicketPaymentStatus paymentStatus;
+    private String quotaCycle;
+    private TicketQuotaReservationStatus quotaReservationStatus;
+    private Long proposedExpertId;
+    private String proposedExpertName;
+    private LocalDateTime assignmentOfferedAt;
+    private LocalDateTime acceptanceDueAt;
+    private LocalDateTime acceptedAt;
+    private LocalDateTime startedAt;
+    private LocalDateTime firstResponseDueAt;
+    private LocalDateTime firstRespondedAt;
+    private LocalDateTime resolutionDueAt;
+    private LocalDateTime completedAt;
+    private LocalDateTime lastExpertActivityAt;
+    private TicketSlaStatus slaStatus;
+    private LocalDateTime pausedAt;
+    private Long totalPausedDurationSeconds;
+    private String extensionReason;
+    private FailureResponsibleParty failureResponsibleParty;
+    private Long previousExpertId;
+    private String reassignmentReason;
+    private LocalDateTime reassignedAt;
+    private Long reassignedById;
+    private Integer completionPercent;
+    private BigDecimal approvedPartialPayout;
+    private String contributionNote;
 
     private String ticketCode;
     private String title;

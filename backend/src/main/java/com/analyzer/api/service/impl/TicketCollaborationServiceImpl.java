@@ -283,10 +283,14 @@ public class TicketCollaborationServiceImpl implements TicketCollaborationServic
         switch (action) {
             case "START_REVIEW" -> {
                 if (!"EXPERT".equalsIgnoreCase(role)
-                        || !Set.of(LegalTicketStatus.ASSIGNED, LegalTicketStatus.ASSIGNED_TO_LAWYER,
+                        || !Set.of(LegalTicketStatus.ASSIGNED_TO_EXPERT, LegalTicketStatus.ASSIGNED_TO_LAWYER,
                                 LegalTicketStatus.REOPENED, LegalTicketStatus.CUSTOMER_RESPONDED).contains(current))
                     invalidTransition();
+                if (ticket.getPricingType() == TicketPricingType.PAID
+                        && ticket.getCustomerPaymentStatus() != TicketPaymentStatus.PAID)
+                    throw new ConflictException("PAYMENT_REQUIRED_BEFORE_EXPERT_START");
                 next = LegalTicketStatus.IN_REVIEW;
+                if (ticket.getStartedAt() == null) ticket.setStartedAt(LocalDateTime.now());
             }
             case "REQUEST_USER_INFO" -> {
                 if (!("EXPERT".equalsIgnoreCase(role) || "ADMIN".equalsIgnoreCase(role))
@@ -302,20 +306,10 @@ public class TicketCollaborationServiceImpl implements TicketCollaborationServic
                 next = LegalTicketStatus.WAITING_FOR_EXPERT;
             }
             case "RESOLVE" -> {
-                if (!("EXPERT".equalsIgnoreCase(role) || "ADMIN".equalsIgnoreCase(role))
-                        || !Set.of(LegalTicketStatus.ASSIGNED, LegalTicketStatus.ASSIGNED_TO_LAWYER,
-                                LegalTicketStatus.IN_REVIEW, LegalTicketStatus.WAITING_FOR_EXPERT,
-                                LegalTicketStatus.CUSTOMER_RESPONDED).contains(current))
-                    invalidTransition();
-                next = LegalTicketStatus.RESOLVED;
-                ticket.setResolvedAt(LocalDateTime.now());
-                ticket.setStatus(next);
-                if (revenuePayrollService != null) {
-                    revenuePayrollService.recognizeResolvedTicket(ticket);
-                }
+                throw new ConflictException("FINAL_DELIVERABLE_REQUIRED_USE_EXPERT_RESOLVE_ENDPOINT");
             }
             case "CLOSE" -> {
-                if (!("CUSTOMER".equalsIgnoreCase(role) || "ADMIN".equalsIgnoreCase(role))
+                if (!"CUSTOMER".equalsIgnoreCase(role)
                         || current != LegalTicketStatus.RESOLVED)
                     invalidTransition();
                 next = LegalTicketStatus.CLOSED;
@@ -429,7 +423,8 @@ public class TicketCollaborationServiceImpl implements TicketCollaborationServic
     }
 
     private void audit(LegalTicket t, User actor, String action, String metadata) {
-        auditRepository.save(TicketAuditLog.builder().ticketId(t.getId()).actor(actor).action(action)
+        auditRepository.save(TicketAuditLog.builder().ticketId(t.getId()).actor(actor)
+                .actorType(actor == null ? "SYSTEM" : "USER").action(action)
                 .metadataJson(metadata).build());
     }
 

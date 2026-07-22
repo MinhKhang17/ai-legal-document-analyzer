@@ -31,6 +31,16 @@ public class LegalTicketController {
 
     private final LegalTicketService legalTicketService;
     private final TicketFileService ticketFileService;
+    private final com.analyzer.api.service.ExpertTicketWorkflowService expertTicketWorkflowService;
+
+    @PostMapping("/{id}/quote-decision")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public ResponseEntity<ApiResponseDTO<LegalTicketResponse>> decideQuote(
+            @PathVariable("id") String ticketId,
+            @Valid @RequestBody TicketQuoteDecisionRequest request) {
+        return ResponseEntity.ok(ApiResponseDTO.success("Quote decision recorded",
+                expertTicketWorkflowService.decideQuote(getCurrentUserId(), ticketId, request)));
+    }
 
     @PostMapping
     @PreAuthorize("hasAnyRole('CUSTOMER', 'ADMIN')")

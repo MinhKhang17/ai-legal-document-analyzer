@@ -132,6 +132,9 @@ public class AdminTicketManagementServiceImpl implements AdminTicketManagementSe
                 .orElseThrow(() -> new ResourceNotFoundException("TICKET_NOT_FOUND"));
         User admin = userRepository.findById(adminId)
                 .orElseThrow(() -> new ResourceNotFoundException("ADMIN_NOT_FOUND"));
+        if (note == null || note.isBlank()) {
+            throw new ConflictException("ADMIN_CLOSE_REASON_REQUIRED");
+        }
         if (ticket.getStatus() == LegalTicketStatus.CLOSED || ticket.getStatus() == LegalTicketStatus.CANCELLED) {
             throw new ConflictException("INVALID_STATUS_TRANSITION");
         }

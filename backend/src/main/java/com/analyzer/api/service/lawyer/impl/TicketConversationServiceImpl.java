@@ -31,6 +31,7 @@ public class TicketConversationServiceImpl implements TicketConversationService 
 
     private static final List<LegalTicketStatus> CHATABLE_STATUSES = List.of(
             LegalTicketStatus.ASSIGNED_TO_LAWYER,
+            LegalTicketStatus.ASSIGNED_TO_EXPERT,
             LegalTicketStatus.IN_REVIEW,
             LegalTicketStatus.NEED_MORE_INFO,
             LegalTicketStatus.CUSTOMER_RESPONDED,
@@ -84,6 +85,10 @@ public class TicketConversationServiceImpl implements TicketConversationService 
             ticket.setStatus(LegalTicketStatus.IN_REVIEW);
         }
         ticket.setLastLawyerMessageAt(LocalDateTime.now());
+        ticket.setLastExpertActivityAt(LocalDateTime.now());
+        if (ticket.getFirstRespondedAt() == null) {
+            ticket.setFirstRespondedAt(LocalDateTime.now());
+        }
         legalTicketRepository.save(ticket);
 
         emailService.sendTicketNotificationAsync(ticket.getCreatedBy().getEmail(), ticket.getCreatedBy().getFirstName(),

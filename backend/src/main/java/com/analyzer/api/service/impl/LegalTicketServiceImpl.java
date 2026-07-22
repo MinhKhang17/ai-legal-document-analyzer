@@ -7,13 +7,18 @@ import com.analyzer.api.enums.ChatMessageRole;
 import com.analyzer.api.enums.LegalTicketMessageType;
 import com.analyzer.api.enums.LegalTicketStatus;
 import com.analyzer.api.enums.LegalTicketType;
+import com.analyzer.api.enums.TicketCreationSource;
+import com.analyzer.api.enums.TicketPaymentStatus;
+import com.analyzer.api.enums.TicketQuotaReservationStatus;
 import com.analyzer.api.enums.RiskLevel;
 import com.analyzer.api.enums.RoleName;
 import com.analyzer.api.exception.common.ConflictException;
 import com.analyzer.api.exception.common.ForbiddenException;
 import com.analyzer.api.exception.common.ResourceNotFoundException;
+import com.analyzer.api.exception.validation.TicketValidationException;
 import com.analyzer.api.mapper.LegalTicketMapper;
 import com.analyzer.api.repository.*;
+import com.analyzer.api.repository.ai.AiCitationRepository;
 import com.analyzer.api.service.LegalTicketService;
 import com.analyzer.api.service.EmailService;
 import com.analyzer.api.service.ExpertRevenueService;
@@ -29,8 +34,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -48,6 +55,7 @@ public class LegalTicketServiceImpl implements LegalTicketService {
     private final LegalTicketRepository legalTicketRepository;
     private final LegalTicketMessageRepository legalTicketMessageRepository;
     private final ChatMessageRepository chatMessageRepository;
+    private final ChatSessionRepository chatSessionRepository;
     private final UserRepository userRepository;
     private final WorkspaceRepository workspaceRepository;
     private final DocumentRepository documentRepository;
@@ -57,7 +65,9 @@ public class LegalTicketServiceImpl implements LegalTicketService {
     private final TicketContextSnapshotRepository snapshotRepository;
     private final TicketCollaborationService collaborationService;
     private final ExpertRevenueService expertRevenueService;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final AiCitationRepository aiCitationRepository;
+    private final ExpertTicketCreditReservationRepository expertTicketCreditReservationRepository;
+    private final ObjectMapper objectMapper;
 
     @Override
     @Transactional
@@ -120,6 +130,20 @@ public class LegalTicketServiceImpl implements LegalTicketService {
                 && !chatMsg.getChatSession().getId().equals(userMessage.getChatSession().getId())) {
             throw new ConflictException("SOURCE_MESSAGES_NOT_IN_SAME_SESSION");
         }
+        String sourceSessionId = firstNonBlank(request.getChatSessionId(),
+                chatMsg != null && chatMsg.getChatSession() != null ? chatMsg.getChatSession().getId() : null);
+        TicketCreationSource creationSource = sourceSessionId != null || chatMsg != null || userMessage != null
+                ? TicketCreationSource.AI_CHAT : TicketCreationSource.MANUAL_FORM;
+        if (request.getCreationSource() != null && request.getCreationSource() != creationSource) {
+            throw new ConflictException("TICKET_CREATION_SOURCE_MISMATCH");
+        }
+        if (sourceSessionId != null) {
+            var sourceSession = chatSessionRepository.findByIdAndUserId(sourceSessionId, customerId)
+                    .orElseThrow(() -> new ForbiddenException("SOURCE_SESSION_ACCESS_DENIED"));
+            if (!sourceSession.getWorkspace().getId().equals(workspace.getId())) {
+                throw new ForbiddenException("SOURCE_SESSION_NOT_IN_WORKSPACE");
+            }
+        }
         List<Document> sharedDocuments = resolveSharedDocuments(request, customerId, workspace);
 
         String question = firstNonBlank(userMessage != null ? userMessage.getContent() : null,
@@ -129,20 +153,42 @@ public class LegalTicketServiceImpl implements LegalTicketService {
         }
 
         String customerNote = firstNonBlank(request.getCustomerNote(), request.getQuestion());
+        String title = firstNonBlank(request.getTitle(), question.length() > 120 ? question.substring(0, 120) : question);
+        String description = firstNonBlank(request.getDescription(), customerNote);
+        String issueCategory = firstNonBlank(request.getLegalIssueCategory(), chatMsg != null ? chatMsg.getLegalDomain() : null);
+        String expectedOutcome = firstNonBlank(request.getUserExpectedOutcome());
+        if (requestedType == LegalTicketType.CONTACT_EXPERT) {
+            requireCreateField(title, "title");
+            requireCreateField(description, "description");
+            requireCreateField(issueCategory, "legalIssueCategory");
+            requireCreateField(expectedOutcome, "userExpectedOutcome");
+        }
+        List<String> sharedProfileFields = Optional.ofNullable(request.getSharedProfileFields()).orElse(List.of())
+                .stream().filter(Objects::nonNull).map(String::trim).filter(value -> !value.isBlank())
+                .filter(Set.of("DISPLAY_NAME", "EMAIL", "PHONE")::contains).distinct().toList();
+        if (!sharedProfileFields.isEmpty() && !Boolean.TRUE.equals(request.getConsentGranted())) {
+            throw new ConflictException("PROFILE_SHARING_CONSENT_REQUIRED");
+        }
+        validateCitationOwnership(request.getCitationIds(), chatMsg, customerId);
 
         LegalTicket ticket = LegalTicket.builder()
                 .requestId(requestId)
                 .issueFingerprint(request.getIssueFingerprint())
                 .customerNote(customerNote)
                 .ticketType(requestedType)
-                .relatedChatSessionId(firstNonBlank(request.getChatSessionId(),
-                        chatMsg != null && chatMsg.getChatSession() != null ? chatMsg.getChatSession().getId() : null))
+                .creationSource(creationSource)
+                .legalIssueCategory(issueCategory)
+                .contractType(firstNonBlank(request.getContractType()))
+                .userExpectedOutcome(expectedOutcome)
+                .sharedProfileFieldsJson(writeJson(sharedProfileFields))
+                .consentGrantedAt(sharedProfileFields.isEmpty() ? null : LocalDateTime.now())
+                .relatedChatSessionId(sourceSessionId)
                 .relatedChatMessageId(firstNonBlank(request.getChatMessageId(), chatMsg != null ? chatMsg.getId() : null))
                 .sourceUserMessageId(userMessage != null ? userMessage.getId() : request.getUserMessageId())
                 .sourceAssistantMessageId(chatMsg != null ? chatMsg.getId() : request.getAssistantMessageId())
                 .recipientType(request.getRecipientType())
-                .title(firstNonBlank(request.getTitle(), question.length() > 120 ? question.substring(0, 120) : question))
-                .description(firstNonBlank(request.getDescription(), customerNote))
+                .title(title)
+                .description(description)
                 .priority(request.getPriority())
                 .conversationScope(request.getConversationScope())
                 .focusedDocumentId(request.getFocusedDocumentId())
@@ -161,6 +207,8 @@ public class LegalTicketServiceImpl implements LegalTicketService {
                 .legalDomain(chatMsg != null ? chatMsg.getLegalDomain() : null)
                 .userActionHint(chatMsg != null ? chatMsg.getUserActionHint() : null)
                 .status(LegalTicketStatus.PENDING_ADMIN_REVIEW)
+                .customerPaymentStatus(TicketPaymentStatus.UNPAID)
+                .quotaReservationStatus(TicketQuotaReservationStatus.PENDING)
                 .lastCustomerMessageAt(LocalDateTime.now())
                 .build();
 
@@ -190,10 +238,6 @@ public class LegalTicketServiceImpl implements LegalTicketService {
                 .internalOnly(false)
                 .build();
         legalTicketMessageRepository.save(systemMsg);
-        if (requestedType == LegalTicketType.CONTACT_EXPERT) {
-            subscriptionQuotaService.recordExpertTicketUsage(customer);
-        }
-
         for (User admin : userRepository.findAllByRole_NameAndActiveTrue(RoleName.ADMIN)) {
             emailService.sendTicketNotificationAsync(admin.getEmail(), admin.getFirstName(), ticket.getId(),
                     ticket.getTicketType().name(), ticket.getStatus().name(), "/admin/tickets/" + ticket.getId(),
@@ -238,11 +282,15 @@ public class LegalTicketServiceImpl implements LegalTicketService {
                 throw new ForbiddenException("Ban khong co quyen truy cap ticket nay");
             }
         } else if (RoleName.EXPERT.name().equalsIgnoreCase(userRole)) {
-            if (ticket.getAssignedLawyer() == null || !ticket.getAssignedLawyer().getId().equals(userId)) {
+            boolean assigned = ticket.getAssignedLawyer() != null && ticket.getAssignedLawyer().getId().equals(userId);
+            boolean proposed = ticket.getProposedExpert() != null && ticket.getProposedExpert().getId().equals(userId);
+            if (!assigned && !proposed) {
                 throw new ForbiddenException("NOT_ASSIGNED_EXPERT");
             }
         }
 
+        if (RoleName.ADMIN.name().equalsIgnoreCase(userRole)) return toAdminResponse(ticket);
+        if (RoleName.EXPERT.name().equalsIgnoreCase(userRole)) return toExpertResponse(ticket);
         return toResponse(ticket);
     }
 
@@ -281,12 +329,18 @@ public class LegalTicketServiceImpl implements LegalTicketService {
             throw new ForbiddenException("Ban khong co quyen huy ticket nay");
         }
 
-        if (ticket.getStatus() != LegalTicketStatus.PENDING_ADMIN_REVIEW) {
+        if (!Set.of(LegalTicketStatus.PENDING_ADMIN_REVIEW, LegalTicketStatus.PENDING_EXPERT_ASSESSMENT,
+                LegalTicketStatus.WAITING_USER_ACCEPTANCE, LegalTicketStatus.READY_FOR_ASSIGNMENT,
+                LegalTicketStatus.PENDING_EXPERT_ACCEPTANCE).contains(ticket.getStatus())) {
             throw new ConflictException("INVALID_STATUS_TRANSITION");
         }
+        if (ticket.getCustomerPaymentStatus() == TicketPaymentStatus.PAID) {
+            throw new ConflictException("PAID_TICKET_REQUIRES_REFUND_FLOW");
+        }
 
-        ticket.setStatus(LegalTicketStatus.CANCELLED);
+        ticket.setStatus(LegalTicketStatus.CANCELLED_BY_USER);
         ticket.setCancelledAt(LocalDateTime.now());
+        releaseReservedCredit(ticket, "CANCELLED_BY_USER");
 
         String reason = request != null && request.getReason() != null ? request.getReason() : "Khong co ly do";
 
@@ -397,6 +451,13 @@ public class LegalTicketServiceImpl implements LegalTicketService {
 
         ticket.setStatus(LegalTicketStatus.CUSTOMER_RESPONDED);
         ticket.setLastCustomerMessageAt(LocalDateTime.now());
+        if (ticket.getPausedAt() != null) {
+            long paused = Math.max(0, Duration.between(ticket.getPausedAt(), LocalDateTime.now()).getSeconds());
+            ticket.setTotalPausedDurationSeconds(Optional.ofNullable(ticket.getTotalPausedDurationSeconds()).orElse(0L) + paused);
+            if (ticket.getResolutionDueAt() != null) ticket.setResolutionDueAt(ticket.getResolutionDueAt().plusSeconds(paused));
+            ticket.setPausedAt(null);
+        }
+        ticket.setSlaStatus(com.analyzer.api.enums.TicketSlaStatus.ON_TRACK);
 
         LegalTicketMessage msg = LegalTicketMessage.builder()
                 .ticket(ticket)
@@ -436,7 +497,7 @@ public class LegalTicketServiceImpl implements LegalTicketService {
         }
 
         List<LegalTicketResponse> list = pageResult.getContent().stream()
-                .map(this::toResponse)
+                .map(this::toAdminResponse)
                 .collect(Collectors.toList());
 
         return PageResponse.<LegalTicketResponse>builder()
@@ -463,6 +524,7 @@ public class LegalTicketServiceImpl implements LegalTicketService {
 
         ticket.setStatus(LegalTicketStatus.REJECTED_BY_ADMIN);
         ticket.setRejectionReason(request.getReason());
+        releaseReservedCredit(ticket, "REJECTED_BY_ADMIN");
 
         LegalTicketMessage msg = LegalTicketMessage.builder()
                 .ticket(ticket)
@@ -516,6 +578,28 @@ public class LegalTicketServiceImpl implements LegalTicketService {
             }
         }
         return null;
+    }
+
+    private void requireCreateField(String value, String field) {
+        if (value == null || value.isBlank()) {
+            throw new TicketValidationException(Map.of(field, field + " is required"));
+        }
+    }
+
+    private void validateCitationOwnership(List<String> citationIds, ChatMessage assistantMessage, Long userId) {
+        List<String> ids = Optional.ofNullable(citationIds).orElse(List.of()).stream()
+                .filter(Objects::nonNull).distinct().toList();
+        if (ids.isEmpty()) return;
+        if (assistantMessage == null) throw new ConflictException("CITATIONS_REQUIRE_SOURCE_MESSAGE");
+        for (String id : ids) {
+            AiCitation citation = aiCitationRepository.findById(id)
+                    .orElseThrow(() -> new ResourceNotFoundException("CITATION_NOT_FOUND"));
+            if (citation.getChatMessage() == null
+                    || !citation.getChatMessage().getId().equals(assistantMessage.getId())
+                    || !citation.getChatMessage().getUser().getId().equals(userId)) {
+                throw new ForbiddenException("CITATION_ACCESS_DENIED");
+            }
+        }
     }
 
     private ChatMessage requireOwnedMessage(String messageId, Long userId, ChatMessageRole role) {
@@ -608,9 +692,47 @@ public class LegalTicketServiceImpl implements LegalTicketService {
     }
 
     private LegalTicketResponse toResponse(LegalTicket ticket) {
-        LegalTicketResponse response = collaborationService.enrich(legalTicketMapper.toResponse(ticket), ticket);
+        LegalTicketResponse response = enrichedResponse(ticket);
         // Customer-facing ticket APIs must not expose notes intended only for experts/admins.
         response.setExpertInternalNote(null);
+        response.setAdminNote(null);
+        response.setCommissionRate(null);
+        response.setPlatformFee(null);
+        response.setExpertPayout(null);
+        response.setInternalTicketValue(null);
+        response.setApprovedPartialPayout(null);
+        response.setContributionNote(null);
+        response.setClassifiedById(null);
+        response.setReassignedById(null);
+        response.setUserEmail(isShared(ticket, "EMAIL") ? ticket.getCreatedBy().getEmail() : null);
+        response.setUserDisplayName(isShared(ticket, "DISPLAY_NAME") ? response.getUserDisplayName() : null);
+        response.setUserPhone(null);
+        return response;
+    }
+
+    private LegalTicketResponse toAdminResponse(LegalTicket ticket) {
+        return enrichedResponse(ticket);
+    }
+
+    private LegalTicketResponse toExpertResponse(LegalTicket ticket) {
+        LegalTicketResponse response = enrichedResponse(ticket);
+        response.setAdminNote(null);
+        response.setExpertInternalNote(null);
+        response.setCommissionRate(null);
+        response.setPlatformFee(null);
+        response.setInternalTicketValue(null);
+        response.setClassifiedById(null);
+        response.setReassignedById(null);
+        response.setUserEmail(isShared(ticket, "EMAIL") ? ticket.getCreatedBy().getEmail() : null);
+        response.setUserDisplayName(isShared(ticket, "DISPLAY_NAME") ? response.getUserDisplayName() : null);
+        response.setUserPhone(null);
+        return response;
+    }
+
+    private LegalTicketResponse enrichedResponse(LegalTicket ticket) {
+        LegalTicketResponse response = collaborationService.enrich(legalTicketMapper.toResponse(ticket), ticket);
+        response.setSelectedDocumentIds(readStringList(ticket.getSharedDocumentIdsJson()));
+        response.setSharedProfileFields(readStringList(ticket.getSharedProfileFieldsJson()));
         snapshotRepository.findByTicket_Id(ticket.getId()).ifPresent(snapshot -> response.setContextSnapshot(
                 TicketContextSnapshotResponse.builder().id(snapshot.getId()).userQuestion(snapshot.getUserQuestion())
                         .assistantAnswer(snapshot.getAssistantAnswer()).conversationTitle(snapshot.getConversationTitle())
@@ -619,6 +741,30 @@ public class LegalTicketServiceImpl implements LegalTicketService {
                         .selectedMessageSnapshotJson(snapshot.getSelectedMessageSnapshotJson())
                         .contentHash(snapshot.getContentHash()).createdAt(snapshot.getCreatedAt()).build()));
         return response;
+    }
+
+    private boolean isShared(LegalTicket ticket, String field) {
+        return ticket.getConsentRevokedAt() == null && readStringList(ticket.getSharedProfileFieldsJson()).contains(field);
+    }
+
+    private List<String> readStringList(String json) {
+        if (json == null || json.isBlank()) return List.of();
+        try {
+            return objectMapper.readValue(json, objectMapper.getTypeFactory().constructCollectionType(List.class, String.class));
+        } catch (Exception ex) {
+            return List.of();
+        }
+    }
+
+    private void releaseReservedCredit(LegalTicket ticket, String reason) {
+        expertTicketCreditReservationRepository.findByTicket_Id(ticket.getId()).ifPresent(reservation -> {
+            if (reservation.getStatus() == TicketQuotaReservationStatus.RESERVED) {
+                reservation.setStatus(TicketQuotaReservationStatus.RELEASED);
+                reservation.setReleasedAt(LocalDateTime.now());
+                reservation.setReleaseReason(reason);
+                ticket.setQuotaReservationStatus(TicketQuotaReservationStatus.RELEASED);
+            }
+        });
     }
 
     private String writeJson(Object value) {

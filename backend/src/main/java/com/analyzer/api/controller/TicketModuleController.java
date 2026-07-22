@@ -26,6 +26,7 @@ public class TicketModuleController {
     private final LegalTicketService legalTicketService;
     private final ExpertLegalTicketService expertLegalTicketService;
     private final AdminTicketManagementService adminTicketManagementService;
+    private final ExpertTicketWorkflowService expertTicketWorkflowService;
 
     @GetMapping("/config/attachment-policy")
     public ResponseEntity<ApiResponseDTO<AttachmentPolicyResponse>> attachmentPolicy() {
@@ -109,7 +110,8 @@ public class TicketModuleController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponseDTO<LegalTicketResponse>> assign(@PathVariable String ticketId, @Valid @RequestBody AssignLawyerRequest request) {
         return ResponseEntity.ok(ApiResponseDTO.success("Ticket assigned",
-                adminTicketManagementService.assignLawyer(ticketId, currentUserId(), request)));
+                expertTicketWorkflowService.offerAssignment(currentUserId(), ticketId,
+                        request.getLawyerId(), request.getAdminNote())));
     }
 
     @PostMapping("/tickets/{ticketId}/shares")

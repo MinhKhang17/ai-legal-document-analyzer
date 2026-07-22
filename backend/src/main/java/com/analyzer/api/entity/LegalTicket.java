@@ -8,6 +8,14 @@ import com.analyzer.api.enums.UserActionHint;
 import com.analyzer.api.enums.ConversationScope;
 import com.analyzer.api.enums.TicketPriority;
 import com.analyzer.api.enums.TicketRecipientType;
+import com.analyzer.api.enums.TicketCreationSource;
+import com.analyzer.api.enums.TicketComplexity;
+import com.analyzer.api.enums.TicketPricingType;
+import com.analyzer.api.enums.TicketQuoteStatus;
+import com.analyzer.api.enums.TicketPaymentStatus;
+import com.analyzer.api.enums.TicketQuotaReservationStatus;
+import com.analyzer.api.enums.TicketSlaStatus;
+import com.analyzer.api.enums.FailureResponsibleParty;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -50,6 +58,28 @@ public class LegalTicket {
     @Enumerated(EnumType.STRING)
     @Column(name = "ticket_type")
     private LegalTicketType ticketType;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "creation_source", nullable = false)
+    private TicketCreationSource creationSource;
+
+    @Column(name = "legal_issue_category")
+    private String legalIssueCategory;
+
+    @Column(name = "contract_type")
+    private String contractType;
+
+    @Column(name = "user_expected_outcome", columnDefinition = "TEXT")
+    private String userExpectedOutcome;
+
+    @Column(name = "shared_profile_fields_json", columnDefinition = "TEXT")
+    private String sharedProfileFieldsJson;
+
+    @Column(name = "consent_granted_at")
+    private LocalDateTime consentGrantedAt;
+
+    @Column(name = "consent_revoked_at")
+    private LocalDateTime consentRevokedAt;
 
     @Column(name = "related_chat_session_id")
     private String relatedChatSessionId;
@@ -139,6 +169,117 @@ public class LegalTicket {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "assigned_lawyer_id")
     private User assignedLawyer;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "proposed_expert_id")
+    private User proposedExpert;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "ticket_complexity")
+    private TicketComplexity ticketComplexity;
+
+    @Column(name = "classification_reason", columnDefinition = "TEXT")
+    private String classificationReason;
+
+    @Column(name = "classified_at")
+    private LocalDateTime classifiedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "classified_by_id")
+    private User classifiedBy;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "pricing_type")
+    private TicketPricingType pricingType;
+
+    @Column(name = "user_price", precision = 19, scale = 2)
+    private BigDecimal userPrice;
+
+    @Column(name = "internal_ticket_value", precision = 19, scale = 2)
+    private BigDecimal internalTicketValue;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "quote_status")
+    private TicketQuoteStatus quoteStatus;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "customer_payment_status")
+    private TicketPaymentStatus customerPaymentStatus;
+
+    @Column(name = "customer_payment_reference")
+    private String customerPaymentReference;
+
+    @Column(name = "quota_cycle")
+    private String quotaCycle;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "quota_reservation_status")
+    private TicketQuotaReservationStatus quotaReservationStatus;
+
+    @Column(name = "assignment_offered_at")
+    private LocalDateTime assignmentOfferedAt;
+
+    @Column(name = "acceptance_due_at")
+    private LocalDateTime acceptanceDueAt;
+
+    @Column(name = "accepted_at")
+    private LocalDateTime acceptedAt;
+
+    @Column(name = "started_at")
+    private LocalDateTime startedAt;
+
+    @Column(name = "first_response_due_at")
+    private LocalDateTime firstResponseDueAt;
+
+    @Column(name = "first_responded_at")
+    private LocalDateTime firstRespondedAt;
+
+    @Column(name = "resolution_due_at")
+    private LocalDateTime resolutionDueAt;
+
+    @Column(name = "completed_at")
+    private LocalDateTime completedAt;
+
+    @Column(name = "last_expert_activity_at")
+    private LocalDateTime lastExpertActivityAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "sla_status")
+    private TicketSlaStatus slaStatus;
+
+    @Column(name = "paused_at")
+    private LocalDateTime pausedAt;
+
+    @Column(name = "total_paused_duration_seconds")
+    private Long totalPausedDurationSeconds;
+
+    @Column(name = "extension_reason", columnDefinition = "TEXT")
+    private String extensionReason;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "failure_responsible_party")
+    private FailureResponsibleParty failureResponsibleParty;
+
+    @Column(name = "previous_expert_id")
+    private Long previousExpertId;
+
+    @Column(name = "reassignment_reason", columnDefinition = "TEXT")
+    private String reassignmentReason;
+
+    @Column(name = "reassigned_at")
+    private LocalDateTime reassignedAt;
+
+    @Column(name = "reassigned_by_id")
+    private Long reassignedById;
+
+    @Column(name = "completion_percent")
+    private Integer completionPercent;
+
+    @Column(name = "approved_partial_payout", precision = 19, scale = 2)
+    private BigDecimal approvedPartialPayout;
+
+    @Column(name = "contribution_note", columnDefinition = "TEXT")
+    private String contributionNote;
 
     // Snapshot fields
     @Column(name = "issue_title")
@@ -246,6 +387,12 @@ public class LegalTicket {
             this.ticketCode = "TKT-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
         }
         if (this.priority == null) this.priority = TicketPriority.NORMAL;
+        if (this.creationSource == null) this.creationSource = TicketCreationSource.MANUAL_FORM;
+        if (this.quoteStatus == null) this.quoteStatus = TicketQuoteStatus.DRAFT;
+        if (this.customerPaymentStatus == null) this.customerPaymentStatus = TicketPaymentStatus.UNPAID;
+        if (this.quotaReservationStatus == null) this.quotaReservationStatus = TicketQuotaReservationStatus.PENDING;
+        if (this.slaStatus == null) this.slaStatus = TicketSlaStatus.ON_TRACK;
+        if (this.totalPausedDurationSeconds == null) this.totalPausedDurationSeconds = 0L;
         if (this.recipientType == null) this.recipientType = TicketRecipientType.EXPERT;
         if (this.conversationScope == null) this.conversationScope = ConversationScope.SELECTED_RESPONSE;
         this.createdAt = LocalDateTime.now();

@@ -14,7 +14,7 @@ import { PageHeader } from "../../components/common/PageHeader";
 import { useI18n } from "../../hooks/useI18n";
 import { useToast } from "../../hooks/useToast";
 import type { LegalTicketType } from "../../types/legalTicket";
-import { isPlanEntitlementError } from "../../services/http";
+import { ApiRequestError, isPlanEntitlementError } from "../../services/http";
 
 import { getAccessToken as getSessionAccessToken } from "../../services/authSession";
 const getAccessToken = () => getSessionAccessToken() ?? "";
@@ -32,6 +32,14 @@ export function CreateCustomerTicketPage() {
   const [issueFingerprint, setIssueFingerprint] = useState("");
   const [customerNote, setCustomerNote] = useState("");
   const [question, setQuestion] = useState("");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [legalIssueCategory, setLegalIssueCategory] = useState("");
+  const [contractType, setContractType] = useState("");
+  const [expectedOutcome, setExpectedOutcome] = useState("");
+  const [shareDisplayName, setShareDisplayName] = useState(true);
+  const [shareEmail, setShareEmail] = useState(false);
+  const [consentGranted, setConsentGranted] = useState(false);
   const [ticketType, setTicketType] = useState<LegalTicketType>("CONTACT_EXPERT");
 
   const [loadingWorkspaces, setLoadingWorkspaces] = useState(true);
@@ -114,9 +122,9 @@ export function CreateCustomerTicketPage() {
 
     if (
       !selectedWorkspaceId ||
-      !selectedDocumentId ||
       !question.trim() ||
-      !issueFingerprint.trim()
+      !issueFingerprint.trim() ||
+      (ticketType === "CONTACT_EXPERT" && (!title.trim() || !description.trim() || !legalIssueCategory.trim() || !expectedOutcome.trim() || !consentGranted))
     ) {
       toast.error(
         t("legalTickets.create.validationError"),
@@ -129,13 +137,22 @@ export function CreateCustomerTicketPage() {
 
     try {
       const ticket = await createLegalTicket({
+        creationSource: "MANUAL_FORM",
         ticket_type: ticketType,
         request_id: null,
         workspace_id: selectedWorkspaceId,
-        document_id: selectedDocumentId,
+        document_id: selectedDocumentId || null,
+        documentIds: selectedDocumentId ? [selectedDocumentId] : [],
         question: question.trim(),
         issue_fingerprint: issueFingerprint.trim(),
         customer_note: customerNote.trim() || null,
+        title: title.trim(),
+        description: description.trim(),
+        legalIssueCategory: legalIssueCategory.trim(),
+        contractType: contractType.trim() || null,
+        userExpectedOutcome: expectedOutcome.trim(),
+        sharedProfileFields: [shareDisplayName ? "DISPLAY_NAME" : null, shareEmail ? "EMAIL" : null].filter((value): value is "DISPLAY_NAME" | "EMAIL" => value !== null),
+        consentGranted,
       });
 
       toast.success(t("legalTickets.create.success"), t("toast.successTitle"));
@@ -147,7 +164,11 @@ export function CreateCustomerTicketPage() {
         navigate("/billing/subscribe?reason=plan-required");
         return;
       }
-      toast.error(t("legalTickets.create.submitError"), t("toast.errorTitle"));
+      if (error instanceof ApiRequestError && error.details?.data && typeof error.details.data === "object") {
+        toast.error(Object.values(error.details.data as Record<string, string>).join(" · "), t("toast.errorTitle"));
+      } else {
+        toast.error(error instanceof Error ? error.message : t("legalTickets.create.submitError"), t("toast.errorTitle"));
+      }
     } finally {
       setSubmitting(false);
     }
@@ -181,6 +202,19 @@ export function CreateCustomerTicketPage() {
             </select>
           </div>
           <div>
+            <label className="mb-2 block text-sm font-medium" htmlFor="create-ticket-title">Tiêu đề *</label>
+            <input id="create-ticket-title" className="form-field" maxLength={255} value={title} onChange={(event) => setTitle(event.target.value)} disabled={submitting} required={ticketType === "CONTACT_EXPERT"} />
+          </div>
+          <div>
+            <label className="mb-2 block text-sm font-medium" htmlFor="create-ticket-description">Mô tả chi tiết *</label>
+            <textarea id="create-ticket-description" className="form-field min-h-24" maxLength={5000} value={description} onChange={(event) => setDescription(event.target.value)} disabled={submitting} required={ticketType === "CONTACT_EXPERT"} />
+          </div>
+          <div className="grid gap-md sm:grid-cols-2">
+            <div><label className="mb-2 block text-sm font-medium" htmlFor="create-ticket-category">Nhóm vấn đề pháp lý *</label><input id="create-ticket-category" className="form-field" maxLength={255} value={legalIssueCategory} onChange={(event) => setLegalIssueCategory(event.target.value)} disabled={submitting} required={ticketType === "CONTACT_EXPERT"} /></div>
+            <div><label className="mb-2 block text-sm font-medium" htmlFor="create-ticket-contract">Loại hợp đồng</label><input id="create-ticket-contract" className="form-field" maxLength={255} value={contractType} onChange={(event) => setContractType(event.target.value)} disabled={submitting} /></div>
+          </div>
+          <div><label className="mb-2 block text-sm font-medium" htmlFor="create-ticket-outcome">Kết quả mong muốn *</label><textarea id="create-ticket-outcome" className="form-field min-h-20" maxLength={5000} value={expectedOutcome} onChange={(event) => setExpectedOutcome(event.target.value)} disabled={submitting} required={ticketType === "CONTACT_EXPERT"} /></div>
+          <div>
             <label className="mb-2 block text-sm font-medium" htmlFor="create-ticket-workspace">
               {t("legalTickets.create.workspace")}
             </label>
@@ -190,7 +224,6 @@ export function CreateCustomerTicketPage() {
               value={selectedWorkspaceId}
               onChange={(event) => setSelectedWorkspaceId(event.target.value)}
               disabled={loadingWorkspaces || submitting}
-              required
             >
               <option value="">
                 {loadingWorkspaces
@@ -234,6 +267,13 @@ export function CreateCustomerTicketPage() {
               ))}
             </select>
           </div>
+
+          {ticketType === "CONTACT_EXPERT" && <div className="rounded-lg border border-legal-border p-md">
+            <p className="font-semibold">Dữ liệu chia sẻ với chuyên gia</p>
+            <p className="mt-xs text-sm text-on-surface-variant">Tài liệu: {selectedDocumentId ? documents.find((item) => item.documentId === selectedDocumentId)?.originalFileName ?? selectedDocumentId : "Không chia sẻ tài liệu"}</p>
+            <div className="mt-sm flex gap-md text-sm"><label><input type="checkbox" checked={shareDisplayName} onChange={(event) => setShareDisplayName(event.target.checked)} /> Tên hiển thị</label><label><input type="checkbox" checked={shareEmail} onChange={(event) => setShareEmail(event.target.checked)} /> Email</label></div>
+            <label className="mt-sm flex items-start gap-sm text-sm"><input className="mt-1" type="checkbox" checked={consentGranted} onChange={(event) => setConsentGranted(event.target.checked)} /><span>Tôi đồng ý chia sẻ đúng các dữ liệu được liệt kê phía trên.</span></label>
+          </div>}
           <div>
             <label className="mb-2 block text-sm font-medium" htmlFor="create-ticket-question">
               {t("legalTickets.create.question")}

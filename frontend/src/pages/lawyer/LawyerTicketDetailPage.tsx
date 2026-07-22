@@ -35,6 +35,7 @@ import {
   type LawyerTicketFile,
 } from "../../api/lawyerTicketApi";
 import { getTicketConversation, sendTicketConversationMessage, downloadTicketAttachment } from "../../services/legalTicket.service";
+import { assessExpertTicket, decideExpertAssignment } from "../../services/lawyerTicket.service";
 import type { LegalTicketMessage } from "../../types/legalTicket";
 import { Badge } from "../../components/common/Badge";
 import { Button } from "../../components/common/Button";
@@ -86,10 +87,10 @@ const visibilityScopeKeys: Record<string, string> = {
 const terminalStatuses = new Set(["REJECTED_BY_ADMIN", "RESOLVED", "CLOSED", "CANCELLED"]);
 
 const canStartReview = (status?: string | null) =>
-  status === "ASSIGNED_TO_LAWYER" || status === "CUSTOMER_RESPONDED" || status === "REOPENED";
+  status === "ASSIGNED_TO_EXPERT" || status === "ASSIGNED_TO_LAWYER" || status === "CUSTOMER_RESPONDED" || status === "REOPENED";
 
 const canChatOnTicket = (status?: string | null) =>
-  Boolean(status && ['ASSIGNED_TO_LAWYER', 'IN_REVIEW', 'NEED_MORE_INFO', 'CUSTOMER_RESPONDED', 'REOPENED'].includes(status));
+  Boolean(status && ['ASSIGNED_TO_EXPERT', 'ASSIGNED_TO_LAWYER', 'IN_REVIEW', 'NEED_MORE_INFO', 'CUSTOMER_RESPONDED', 'REOPENED'].includes(status));
 const canRequestMoreInfo = (status?: string | null) =>
   Boolean(status && ['ASSIGNED_TO_LAWYER', 'IN_REVIEW', 'CUSTOMER_RESPONDED'].includes(status));
 const canResolveTicket = (status?: string | null) =>
@@ -135,6 +136,7 @@ export function LawyerTicketDetailPage() {
   const [expertInternalNote, setExpertInternalNote] = useState("");
   const [resolveSubmitting, setResolveSubmitting] = useState(false);
   const [actionError, setActionError] = useState("");
+  const [decisionReason, setDecisionReason] = useState("");
 
   const isTerminal = terminalStatuses.has(String(ticket?.status ?? ""));
   const translateEnum = (value: string | null | undefined, keys: Record<string, string>) => {
@@ -278,6 +280,19 @@ export function LawyerTicketDetailPage() {
       setStartingReview(false);
     }
   }, [ticketId, ticket, refreshAll, toast, t]);
+
+  const handleWorkflowDecision = useCallback(async (kind: "ASSESS_ACCEPT" | "ASSESS_DECLINE" | "ASSIGN_ACCEPT" | "ASSIGN_DECLINE") => {
+    if (!ticketId) return;
+    if (kind.endsWith("DECLINE") && !decisionReason.trim()) { setActionError("Cần nhập lý do từ chối"); return; }
+    setStartingReview(true); setActionError("");
+    try {
+      const updated = kind.startsWith("ASSESS")
+        ? await assessExpertTicket(ticketId, { decision: kind === "ASSESS_ACCEPT" ? "ACCEPT" : "DECLINE", reason: decisionReason.trim() || undefined })
+        : await decideExpertAssignment(ticketId, kind === "ASSIGN_ACCEPT" ? "ACCEPT" : "DECLINE", decisionReason.trim() || undefined);
+      setTicket(updated); setDecisionReason(""); await refreshAll();
+    } catch (cause) { setActionError(cause instanceof Error ? cause.message : "Không thể cập nhật ticket"); }
+    finally { setStartingReview(false); }
+  }, [ticketId, decisionReason, refreshAll]);
 
   const handleRequestMoreInfo = useCallback(async () => {
     const message = requestInfoMessage.trim();
@@ -429,10 +444,21 @@ export function LawyerTicketDetailPage() {
               </div>
 
               <div className="flex flex-wrap gap-2">
+                {ticket.status === "PENDING_EXPERT_ASSESSMENT" && <><Button onClick={() => void handleWorkflowDecision("ASSESS_ACCEPT")} disabled={startingReview}>Chấp nhận phạm vi đánh giá</Button><Button variant="secondary" onClick={() => void handleWorkflowDecision("ASSESS_DECLINE")} disabled={startingReview}>Từ chối đánh giá</Button></>}
+                {ticket.status === "PENDING_EXPERT_ACCEPTANCE" && <><Button onClick={() => void handleWorkflowDecision("ASSIGN_ACCEPT")} disabled={startingReview}>Nhận ticket</Button><Button variant="secondary" onClick={() => void handleWorkflowDecision("ASSIGN_DECLINE")} disabled={startingReview}>Từ chối phân công</Button></>}
                 <Badge>{getLegalTicketStatusLabel(ticket.status, t)}</Badge>
                 <Badge>{ticket.risk_level ? t(`risk.${ticket.risk_level.toLowerCase()}`) : t("risk.none")}</Badge>
               </div>
             </div>
+
+            {["PENDING_EXPERT_ASSESSMENT", "PENDING_EXPERT_ACCEPTANCE"].includes(ticket.status) && <div className="mt-md"><textarea className="form-field min-h-20" value={decisionReason} onChange={(event) => setDecisionReason(event.target.value)} placeholder="Lý do (bắt buộc khi từ chối)" /></div>}
+
+            <dl className="mt-md grid gap-sm text-sm sm:grid-cols-2 lg:grid-cols-4">
+              <div><dt className="text-muted-foreground">Payout dự kiến</dt><dd className="font-semibold">{ticket.expert_payout == null ? "Pending pricing" : new Intl.NumberFormat(locale, { style: "currency", currency: "VND" }).format(ticket.expert_payout)}</dd></div>
+              <div><dt className="text-muted-foreground">Hạn nhận ticket</dt><dd>{ticket.acceptanceDueAt ? formatDisplayDate(ticket.acceptanceDueAt, "Not scheduled", locale) : "Not scheduled"}</dd></div>
+              <div><dt className="text-muted-foreground">Hạn phản hồi</dt><dd>{ticket.firstResponseDueAt ? formatDisplayDate(ticket.firstResponseDueAt, "Not scheduled", locale) : "Not scheduled"}</dd></div>
+              <div><dt className="text-muted-foreground">Hạn hoàn thành</dt><dd>{ticket.resolutionDueAt ? formatDisplayDate(ticket.resolutionDueAt, "Not scheduled", locale) : "Not scheduled"}</dd></div>
+            </dl>
 
             <div className="mt-6 grid gap-4 md:grid-cols-2">
               <InfoItem

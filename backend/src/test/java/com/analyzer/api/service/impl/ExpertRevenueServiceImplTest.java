@@ -5,6 +5,7 @@ import com.analyzer.api.entity.LegalTicket;
 import com.analyzer.api.entity.User;
 import com.analyzer.api.enums.ExpertPaymentStatus;
 import com.analyzer.api.enums.LegalTicketStatus;
+import com.analyzer.api.enums.TicketPricingType;
 import com.analyzer.api.exception.common.ConflictException;
 import com.analyzer.api.repository.LegalTicketRepository;
 import com.analyzer.api.repository.UserRepository;
@@ -137,6 +138,22 @@ class ExpertRevenueServiceImplTest {
         assertEquals(new BigDecimal("0.2000"), ticket.getCommissionRate());
         assertEquals(new BigDecimal("200000.00"), ticket.getPlatformFee());
         assertEquals(new BigDecimal("800000.00"), ticket.getExpertPayout());
+    }
+
+    @Test
+    void includedTicketPayoutUsesInternalValueInsteadOfZeroUserPrice() {
+        LegalTicket ticket = ticket("included", LegalTicketStatus.ASSIGNED_TO_EXPERT, "0", ExpertPaymentStatus.UNPAID);
+        ticket.setAssignedLawyer(User.builder().id(5L).build());
+        ticket.setPricingType(TicketPricingType.PLAN_INCLUDED);
+        ticket.setUserPrice(BigDecimal.ZERO);
+        ticket.setInternalTicketValue(new BigDecimal("500000"));
+        when(revenueSettingService.getCurrentRate()).thenReturn(new BigDecimal("0.2000"));
+
+        service().applyCommissionSnapshot(ticket);
+
+        assertEquals(new BigDecimal("500000"), ticket.getConsultationFee());
+        assertEquals(new BigDecimal("100000.00"), ticket.getPlatformFee());
+        assertEquals(new BigDecimal("400000.00"), ticket.getExpertPayout());
     }
 
     @Test

@@ -4,6 +4,7 @@ import com.analyzer.api.enums.LegalTicketType;
 import com.analyzer.api.enums.ConversationScope;
 import com.analyzer.api.enums.TicketPriority;
 import com.analyzer.api.enums.TicketRecipientType;
+import com.analyzer.api.enums.TicketCreationSource;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
@@ -19,6 +20,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Schema(description = "Request to create a legal ticket")
 public class CreateLegalTicketRequest {
+
+    private TicketCreationSource creationSource;
 
     @Size(max = 255)
     private String title;
@@ -46,6 +49,28 @@ public class CreateLegalTicketRequest {
 
     @Builder.Default
     private java.util.List<String> attachmentIds = java.util.List.of();
+
+    @Builder.Default
+    private java.util.List<String> sharedProfileFields = java.util.List.of();
+
+    @Size(max = 255)
+    private String legalIssueCategory;
+
+    @Size(max = 255)
+    private String contractType;
+
+    private String urgency;
+
+    @Size(max = 5000)
+    private String userExpectedOutcome;
+
+    @Size(max = 5000)
+    private String aiAnswerSummary;
+
+    @Size(max = 255)
+    private String aiIntent;
+
+    private Boolean consentGranted;
 
     @JsonProperty("ticket_type")
     private LegalTicketType ticketType;

@@ -178,6 +178,15 @@ public class GlobalExceptionHandler {
                                 HttpStatus.GATEWAY_TIMEOUT);
         }
 
+        @ExceptionHandler(TicketValidationException.class)
+        public ResponseEntity<ApiResponseDTO<Map<String, String>>> handleTicketValidation(
+                        TicketValidationException ex) {
+                return new ResponseEntity<>(
+                                new ApiResponseDTO<>(HttpStatus.BAD_REQUEST.value(), "Ticket validation failed",
+                                                ex.getFieldErrors(), "TICKET_VALIDATION_FAILED"),
+                                HttpStatus.BAD_REQUEST);
+        }
+
         @ExceptionHandler(NoResourceFoundException.class)
         public ResponseEntity<ApiResponseDTO<Void>> handleNoResourceFoundException(NoResourceFoundException ex) {
                 return new ResponseEntity<>(

@@ -65,7 +65,7 @@ public class ExpertLegalTicketServiceImpl implements ExpertLegalTicketService {
         }
 
         List<LegalTicketResponse> list = pageResult.getContent().stream()
-                .map(legalTicketMapper::toResponse)
+                .map(this::toExpertResponse)
                 .collect(Collectors.toList());
 
         return PageResponse.<LegalTicketResponse>builder()
@@ -78,6 +78,40 @@ public class ExpertLegalTicketServiceImpl implements ExpertLegalTicketService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public PageResponse<LegalTicketResponse> getProposedTickets(Long expertId, int page, int size) {
+        requireExpert(expertId);
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<LegalTicket> result = legalTicketRepository.findByProposedExpertIdAndStatusInAndDeletedFalse(
+                expertId, List.of(LegalTicketStatus.PENDING_EXPERT_ASSESSMENT,
+                        LegalTicketStatus.PENDING_EXPERT_ACCEPTANCE), pageable);
+        List<LegalTicketResponse> items = result.getContent().stream().map(this::toExpertResponse).toList();
+        return PageResponse.<LegalTicketResponse>builder().items(items).page(result.getNumber()).size(result.getSize())
+                .totalItems(result.getTotalElements()).totalPages(result.getTotalPages()).build();
+    }
+
+    private User requireExpert(Long expertId) {
+        User expert = userRepository.findById(expertId)
+                .orElseThrow(() -> new ResourceNotFoundException("EXPERT_NOT_FOUND"));
+        if (expert.getRole() == null || expert.getRole().getName() != RoleName.EXPERT) {
+            throw new ForbiddenException("EXPERT_ROLE_REQUIRED");
+        }
+        return expert;
+    }
+
+    private LegalTicketResponse toExpertResponse(LegalTicket ticket) {
+        LegalTicketResponse response = legalTicketMapper.toResponse(ticket);
+        response.setAdminNote(null); response.setExpertInternalNote(null);
+        response.setCommissionRate(null); response.setPlatformFee(null); response.setInternalTicketValue(null);
+        boolean consentActive = ticket.getConsentRevokedAt() == null;
+        String shared = ticket.getSharedProfileFieldsJson() == null ? "" : ticket.getSharedProfileFieldsJson();
+        if (!consentActive || !shared.contains("\"DISPLAY_NAME\"")) response.setUserDisplayName(null);
+        if (!consentActive || !shared.contains("\"EMAIL\"")) response.setUserEmail(null);
+        response.setUserPhone(null);
+        return response;
+    }
+
+    @Override
     @Transactional
     public LegalTicketResponse startReview(Long expertId, String ticketId) {
         LegalTicket ticket = legalTicketRepository.findByIdAndDeletedFalse(ticketId)
@@ -85,13 +119,20 @@ public class ExpertLegalTicketServiceImpl implements ExpertLegalTicketService {
 
         validateAssignedExpert(ticket, expertId);
 
-        if (ticket.getStatus() != LegalTicketStatus.ASSIGNED_TO_LAWYER &&
+        if (ticket.getStatus() != LegalTicketStatus.ASSIGNED_TO_EXPERT &&
+            ticket.getStatus() != LegalTicketStatus.ASSIGNED_TO_LAWYER &&
             ticket.getStatus() != LegalTicketStatus.CUSTOMER_RESPONDED &&
             ticket.getStatus() != LegalTicketStatus.REOPENED) {
             throw new ConflictException("INVALID_STATUS_TRANSITION");
         }
 
+        if (ticket.getPricingType() == com.analyzer.api.enums.TicketPricingType.PAID
+                && ticket.getCustomerPaymentStatus() != com.analyzer.api.enums.TicketPaymentStatus.PAID) {
+            throw new ConflictException("PAYMENT_REQUIRED_BEFORE_EXPERT_START");
+        }
         ticket.setStatus(LegalTicketStatus.IN_REVIEW);
+        if (ticket.getStartedAt() == null) ticket.setStartedAt(LocalDateTime.now());
+        ticket.setLastExpertActivityAt(LocalDateTime.now());
         ticket.setLastLawyerMessageAt(LocalDateTime.now());
 
         // System message
@@ -127,6 +168,9 @@ public class ExpertLegalTicketServiceImpl implements ExpertLegalTicketService {
 
         ticket.setStatus(LegalTicketStatus.NEED_MORE_INFO);
         ticket.setLastLawyerMessageAt(LocalDateTime.now());
+        ticket.setLastExpertActivityAt(LocalDateTime.now());
+        ticket.setPausedAt(LocalDateTime.now());
+        ticket.setSlaStatus(com.analyzer.api.enums.TicketSlaStatus.WAITING_FOR_USER);
 
         // Save Request message
         LegalTicketMessage msg = LegalTicketMessage.builder()
@@ -149,8 +193,7 @@ public class ExpertLegalTicketServiceImpl implements ExpertLegalTicketService {
 
         validateAssignedExpert(ticket, expertId);
 
-        if (ticket.getStatus() != LegalTicketStatus.ASSIGNED_TO_LAWYER &&
-            ticket.getStatus() != LegalTicketStatus.IN_REVIEW &&
+        if (ticket.getStatus() != LegalTicketStatus.IN_REVIEW &&
             ticket.getStatus() != LegalTicketStatus.CUSTOMER_RESPONDED &&
             ticket.getStatus() != LegalTicketStatus.REOPENED) {
             throw new ConflictException("INVALID_STATUS_TRANSITION");
@@ -160,7 +203,9 @@ public class ExpertLegalTicketServiceImpl implements ExpertLegalTicketService {
         ticket.setExpertAnswer(request.getExpertAnswer());
         ticket.setExpertInternalNote(request.getExpertInternalNote());
         ticket.setResolvedAt(LocalDateTime.now());
+        ticket.setCompletedAt(LocalDateTime.now());
         ticket.setLastLawyerMessageAt(LocalDateTime.now());
+        ticket.setLastExpertActivityAt(LocalDateTime.now());
         expertRevenueService.applyCommissionSnapshot(ticket);
         revenuePayrollService.recognizeResolvedTicket(ticket);
 

@@ -254,15 +254,10 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
     public void checkCanCreateExpertTicket(User user) {
         userQuotaLock.acquire(user.getId());
         SubscriptionPlan plan = getCurrentPlan(user);
-        int ticketQuota = plan.getTicketQuota() == null ? 0 : plan.getTicketQuota();
-        if (!Boolean.TRUE.equals(plan.getAllowContactExpertTicket()) || ticketQuota <= 0) {
+        if (!"PREMIUM".equalsIgnoreCase(plan.getPlanType())
+                || !Boolean.TRUE.equals(plan.getAllowContactExpertTicket())) {
             throw new com.analyzer.api.exception.common.ForbiddenException(
                     "EXPERT_TICKET_REQUIRES_PREMIUM", "An upgraded plan is required to contact an expert");
-        }
-
-        SubscriptionQuotaUsageSummaryResponse usage = getCurrentUsage(user);
-        if (usage.getExpertTicketsUsed() >= ticketQuota) {
-            throw new ConflictException("EXPERT_TICKET_QUOTA_EXCEEDED");
         }
     }
 

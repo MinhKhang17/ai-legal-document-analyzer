@@ -249,6 +249,34 @@ export const rejectLegalTicket = async (
     "Không thể từ chối legal ticket",
   );
 
+export const classifyExpertTicket = (ticketId: string, payload: {
+  complexity: "BASIC" | "STANDARD" | "COMPLEX" | "OUT_OF_SCOPE";
+  reason: string;
+  proposedExpertId: number;
+  pricingType: "PLAN_INCLUDED" | "PAID";
+  userPrice: number;
+  internalTicketValue: number;
+}): Promise<LegalTicket> => postJson<LegalTicket>(
+  `/api/v1/admin/tickets/${encodeURIComponent(ticketId)}/classify`, payload, "Không thể phân loại ticket");
+
+export const confirmExpertTicketPayment = (ticketId: string, paymentReference: string): Promise<LegalTicket> =>
+  postJson<LegalTicket>(`/api/v1/admin/tickets/${encodeURIComponent(ticketId)}/confirm-payment`,
+    { paymentReference }, "Không thể xác nhận thanh toán");
+
+export const decideExpertTicketQuote = (ticketId: string, decision: "ACCEPT" | "REJECT"): Promise<LegalTicket> =>
+  postJson<LegalTicket>(`/api/v1/legal-tickets/${encodeURIComponent(ticketId)}/quote-decision`,
+    { decision }, "Không thể cập nhật báo giá");
+
+export const extendExpertTicketSla = (
+  ticketId: string,
+  hours: number,
+  reason: string,
+): Promise<LegalTicket> => postJson<LegalTicket>(
+  `/api/v1/admin/tickets/${encodeURIComponent(ticketId)}/extend-sla`,
+  { hours, reason },
+  "Không thể gia hạn SLA",
+);
+
 export const getAttachmentPolicy = (): Promise<AttachmentPolicy> =>
   getJson<AttachmentPolicy>("/api/config/attachment-policy", "Không thể tải giới hạn file đính kèm");
 

@@ -13,6 +13,8 @@ public interface ExpertLegalTicketService {
 
     PageResponse<LegalTicketResponse> getAssignedTickets(Long expertId, LegalTicketStatus status, int page, int size);
 
+    PageResponse<LegalTicketResponse> getProposedTickets(Long expertId, int page, int size);
+
     LegalTicketResponse startReview(Long expertId, String ticketId);
 
     LegalTicketResponse requestMoreInfo(Long expertId, String ticketId, RequestMoreInfoRequest request);

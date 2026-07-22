@@ -53,6 +53,13 @@ export const getMyLawyerTickets = async (page = 0, size = 10, status?: string): 
   ));
 };
 
+export const getProposedLawyerTickets = async (page = 0, size = 10): Promise<LawyerTicketPageResponse> =>
+  requestApiData<LawyerTicketPageResponse>(
+    `/api/v1/lawyer/tickets/proposed?page=${page}&size=${size}`,
+    { method: "GET", headers: buildAuthHeaders({ Accept: "application/json" }), credentials: "include" },
+    "Không thể tải ticket đang chờ phản hồi",
+  );
+
 export const getLawyerTicketDetail = async (
   ticketId: string,
 ): Promise<LawyerTicketDetail> =>
@@ -187,3 +194,19 @@ export const resolveLawyerTicket = async (
     payload,
     "Khong the gui ket luan xu ly ticket",
   );
+
+export const assessExpertTicket = (ticketId: string, payload: {
+  decision: "ACCEPT" | "DECLINE" | "REQUEST_RECLASSIFICATION";
+  reason?: string;
+  proposedType?: "BASIC" | "STANDARD" | "COMPLEX" | "OUT_OF_SCOPE";
+  estimatedWorkload?: number;
+  documentCount?: number;
+  issueCount?: number;
+  expectedDurationHours?: number;
+  requestedMinimumPayout?: number;
+}): Promise<LegalTicket> => postLawyerTicketAction<LegalTicket>(
+  lawyerTicketActionEndpoint(ticketId, "assessment"), payload, "Không thể gửi đánh giá ticket");
+
+export const decideExpertAssignment = (ticketId: string, decision: "ACCEPT" | "DECLINE", reason?: string): Promise<LegalTicket> =>
+  postLawyerTicketAction<LegalTicket>(lawyerTicketActionEndpoint(ticketId, "assignment-decision"),
+    { decision, reason }, "Không thể phản hồi đề nghị phân công");

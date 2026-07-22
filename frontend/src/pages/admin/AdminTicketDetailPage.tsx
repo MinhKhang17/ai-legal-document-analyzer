@@ -21,6 +21,9 @@ import {
   sendTicketConversationMessage,
   uploadTicketAttachment,
   getAttachmentPolicy,
+  classifyExpertTicket,
+  confirmExpertTicketPayment,
+  extendExpertTicketSla,
 } from "../../services/legalTicket.service";
 import {
   getTicketAiAssessment,
@@ -120,6 +123,14 @@ export function AdminTicketDetailPage() {
   const [paymentStatus, setPaymentStatus] = useState<ExpertPaymentStatus>("UNPAID");
   const [paymentSnapshot, setPaymentSnapshot] = useState<ExpertRevenueTicket | null>(null);
   const [paymentSaving, setPaymentSaving] = useState(false);
+  const [complexity, setComplexity] = useState<"BASIC" | "STANDARD" | "COMPLEX" | "OUT_OF_SCOPE">("BASIC");
+  const [pricingType, setPricingType] = useState<"PLAN_INCLUDED" | "PAID">("PLAN_INCLUDED");
+  const [userPrice, setUserPrice] = useState("0");
+  const [internalValue, setInternalValue] = useState("0");
+  const [classificationReason, setClassificationReason] = useState("");
+  const [customerPaymentReference, setCustomerPaymentReference] = useState("");
+  const [slaExtensionHours, setSlaExtensionHours] = useState("24");
+  const [slaExtensionReason, setSlaExtensionReason] = useState("");
 
   const loadTicket = useCallback(async () => {
     if (!ticketId) return;
@@ -132,8 +143,8 @@ export function AdminTicketDetailPage() {
       const loadedTicket = await getAdminLegalTicket(ticketId);
       setTicket(loadedTicket);
       setSelectedLawyerId(
-        loadedTicket.assigned_lawyer_id
-          ? String(loadedTicket.assigned_lawyer_id)
+        loadedTicket.assigned_lawyer_id || loadedTicket.proposedExpertId
+          ? String(loadedTicket.assigned_lawyer_id ?? loadedTicket.proposedExpertId)
           : "",
       );
       setConsultationFee(String(loadedTicket.consultation_fee ?? 0));
@@ -266,6 +277,10 @@ export function AdminTicketDetailPage() {
   };
 
   const handleAssign = async (forceReassign: boolean) => {
+    if (forceReassign && !adminNote.trim()) {
+      toast.warning("Cần nhập lý do phân công lại chuyên gia");
+      return;
+    }
     if (!ticketId || !selectedLawyerId) {
       toast.warning(t("adminTickets.selectExpertFirst"));
       return;
@@ -325,8 +340,45 @@ export function AdminTicketDetailPage() {
     }
   };
 
+  const handleClassify = async () => {
+    const price = Number(userPrice);
+    const value = Number(internalValue);
+    if (!ticketId || !selectedLawyerId || !classificationReason.trim()
+      || !Number.isFinite(price) || !Number.isFinite(value) || value <= 0) {
+      setError("Vui lòng nhập đầy đủ phân loại, chuyên gia, lý do và giá trị ticket.");
+      return;
+    }
+    setSaving(true); setError("");
+    try {
+      setTicket(await classifyExpertTicket(ticketId, {
+        complexity, reason: classificationReason.trim(), proposedExpertId: Number(selectedLawyerId),
+        pricingType, userPrice: price, internalTicketValue: value,
+      }));
+      toast.success("Đã gửi ticket cho chuyên gia đánh giá");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Không thể phân loại ticket");
+    } finally { setSaving(false); }
+  };
+
+  const handleConfirmCustomerPayment = async () => {
+    if (!ticketId || !customerPaymentReference.trim()) {
+      setError("Cần mã tham chiếu thanh toán"); return;
+    }
+    setSaving(true);
+    try {
+      setTicket(await confirmExpertTicketPayment(ticketId, customerPaymentReference.trim()));
+      toast.success("Đã xác nhận thanh toán");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Không thể xác nhận thanh toán");
+    } finally { setSaving(false); }
+  };
+
   const handleInternalAction = async (action: "approve" | "close") => {
     if (!ticketId) return;
+    if (action === "close" && !adminNote.trim()) {
+      toast.warning("Cần nhập lý do đóng ticket");
+      return;
+    }
     setSaving(true);
     setError("");
     try {
@@ -337,6 +389,27 @@ export function AdminTicketDetailPage() {
       toast.success(action === "approve" ? t("adminTickets.internalReviewSuccess") : t("adminTickets.closeSuccess"));
     } catch {
       const message = t("adminTickets.internalUpdateError");
+      setError(message);
+      toast.error(message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleExtendSla = async () => {
+    const hours = Number(slaExtensionHours);
+    if (!ticketId || !Number.isInteger(hours) || hours <= 0 || !slaExtensionReason.trim()) {
+      setError("Cần nhập số giờ gia hạn hợp lệ và lý do");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      setTicket(await extendExpertTicketSla(ticketId, hours, slaExtensionReason.trim()));
+      setSlaExtensionReason("");
+      toast.success("Đã gia hạn SLA và ghi nhận lý do");
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "Không thể gia hạn SLA";
       setError(message);
       toast.error(message);
     } finally {
@@ -487,7 +560,25 @@ export function AdminTicketDetailPage() {
           </main>
 
           <aside className="space-y-gutter">
+            {ticket.ticket_type === "CONTACT_EXPERT" && ["PENDING_ADMIN_REVIEW", "RECLASSIFICATION_REQUESTED"].includes(ticket.status) && <Card title="Phân loại và báo giá">
+              <div className="space-y-sm text-sm">
+                <select className="form-field" value={complexity} onChange={(event) => setComplexity(event.target.value as typeof complexity)}><option value="BASIC">BASIC</option><option value="STANDARD">STANDARD</option><option value="COMPLEX">COMPLEX</option><option value="OUT_OF_SCOPE">OUT_OF_SCOPE</option></select>
+                <select className="form-field" value={pricingType} onChange={(event) => { const value = event.target.value as typeof pricingType; setPricingType(value); if (value === "PLAN_INCLUDED") setUserPrice("0"); }}><option value="PLAN_INCLUDED">Dùng credit Premium</option><option value="PAID">Yêu cầu thanh toán</option></select>
+                <input className="form-field" type="number" min="0" value={userPrice} disabled={pricingType === "PLAN_INCLUDED"} onChange={(event) => setUserPrice(event.target.value)} placeholder="Giá user thanh toán" />
+                <input className="form-field" type="number" min="1" value={internalValue} onChange={(event) => setInternalValue(event.target.value)} placeholder="Giá trị nội bộ để tính payout" />
+                <textarea className="form-field min-h-20" value={classificationReason} onChange={(event) => setClassificationReason(event.target.value)} placeholder="Lý do phân loại *" />
+                <Button disabled={saving || !selectedLawyerId} onClick={() => void handleClassify()}>Gửi chuyên gia đánh giá</Button>
+              </div>
+            </Card>}
+            {ticket.status === "WAITING_PAYMENT" && <Card title="Xác nhận thanh toán user"><div className="space-y-sm"><input className="form-field" value={customerPaymentReference} onChange={(event) => setCustomerPaymentReference(event.target.value)} placeholder="Mã giao dịch / callback ID" /><Button disabled={saving} onClick={() => void handleConfirmCustomerPayment()}>Xác nhận đã thanh toán</Button></div></Card>}
             {ticket.contextSnapshot && <Card title={t("adminTickets.contextTitle")}><div className="space-y-sm text-sm"><p><strong>{t("adminTickets.contextQuestion")}:</strong> {ticket.contextSnapshot.userQuestion}</p><p className="whitespace-pre-line"><strong>{t("adminTickets.contextAnswer")}:</strong> {ticket.contextSnapshot.assistantAnswer || "—"}</p><pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-surface-container-low p-sm text-xs">{ticket.contextSnapshot.documentSnapshotJson || "[]"}</pre><pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-surface-container-low p-sm text-xs">{ticket.contextSnapshot.citationSnapshotJson || "[]"}</pre></div></Card>}
+            {ticket.acceptedAt && ticket.resolutionDueAt && !["RESOLVED", "CLOSED", "REFUNDED"].includes(ticket.status) && <Card title="Gia hạn SLA" subtitle={`Hạn hiện tại: ${formatDisplayDateTime(ticket.resolutionDueAt, "Not scheduled", locale)}`}>
+              <div className="space-y-sm">
+                <input className="form-field" type="number" min="1" step="1" value={slaExtensionHours} onChange={(event) => setSlaExtensionHours(event.target.value)} placeholder="Số giờ gia hạn" />
+                <textarea className="form-field min-h-20" value={slaExtensionReason} onChange={(event) => setSlaExtensionReason(event.target.value)} placeholder="Lý do gia hạn (bắt buộc)" />
+                <Button variant="secondary" disabled={saving || !slaExtensionReason.trim()} onClick={() => void handleExtendSla()}>Gia hạn SLA</Button>
+              </div>
+            </Card>}
             {hasAssignedLawyer && <Card title={t("adminTickets.payment.title")} subtitle={t("adminTickets.payment.subtitle")}>
               <div className="space-y-md">
                 <label className="block text-sm font-semibold">{t("adminTickets.payment.consultationFee")}<input className="form-field mt-xs" type="number" min="0" step="1000" value={consultationFee} onChange={(event) => setConsultationFee(event.target.value)} /></label>
@@ -529,11 +620,11 @@ export function AdminTicketDetailPage() {
                 </label>
                 <div className="flex flex-wrap gap-sm">
                   {ticket.ticket_type !== "CONTACT_EXPERT" && <Button variant="secondary" onClick={() => void handleInternalAction("approve")} disabled={saving || ticket.status !== "PENDING_ADMIN_REVIEW"}>{t("adminTickets.reviewInternally")}</Button>}
-                  <Button variant="secondary" onClick={() => void handleInternalAction("close")} disabled={saving || ticket.status === "CLOSED" || ticket.status === "CANCELLED"}>{t("adminTickets.close")}</Button>
+                  <Button variant="secondary" onClick={() => void handleInternalAction("close")} disabled={saving || !adminNote.trim() || ticket.status === "CLOSED" || ticket.status === "CANCELLED"}>{t("adminTickets.close")}</Button>
                   <Button
                     leftIcon={<UserCheck className="h-4 w-4" />}
                     onClick={() => void handleAssign(false)}
-                    disabled={saving || hasAssignedLawyer}
+                    disabled={saving || hasAssignedLawyer || !["READY_FOR_ASSIGNMENT", "PENDING_REASSIGNMENT"].includes(ticket.status)}
                   >
                     {t("adminTickets.assign")}
                   </Button>
@@ -541,7 +632,7 @@ export function AdminTicketDetailPage() {
                     variant="secondary"
                     leftIcon={<Send className="h-4 w-4" />}
                     onClick={() => void handleAssign(true)}
-                    disabled={saving || !hasAssignedLawyer}
+                    disabled={saving || !hasAssignedLawyer || !adminNote.trim()}
                   >
                     {t("adminTickets.reassign")}
                   </Button>
