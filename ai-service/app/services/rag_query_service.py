@@ -421,8 +421,8 @@ class RagQueryService:
         response = RagQueryResponse(
             requestId=request.requestId,
             chatSessionId=request.chatSessionId,
-            answer=self._replace_citation_markers_with_source_names(
-                answer, [*prompt_user_hits, *prompt_knowledge_hits]
+            answer=self._enrich_answer_with_download_links(
+                answer, request.workspaceId, prompt_knowledge_hits
             ),
             confidenceScore=effective_confidence,
             shouldSuggestTicket=should_suggest_ticket,
@@ -1183,61 +1183,10 @@ class RagQueryService:
             sectionTitle=hit.sectionTitle,
         )
 
-    def _replace_citation_markers_with_source_names(
-        self, answer: str, hits: list[RagChunkHit]
+    def _enrich_answer_with_download_links(
+        self, answer: str, workspace_id: str, knowledge_hits: list[RagChunkHit]
     ) -> str:
-        """Replace grounding IDs with readable source names, once per source."""
-        hits_by_id = {hit.citationId.upper(): hit for hit in hits if hit.citationId}
-        rendered_sources: set[str] = set()
-
-        def readable_source(match: re.Match[str]) -> str:
-            citation_id = match.group(1).upper()
-            hit = hits_by_id.get(citation_id)
-            if hit is None:
-                source_key = f"unknown:{citation_id}"
-                if source_key in rendered_sources:
-                    return ""
-                rendered_sources.add(source_key)
-                return "(Nguồn tài liệu đã truy xuất)"
-
-            if hit.sourceType == "USER_DOCUMENT":
-                label = next(
-                    (value.strip() for value in (hit.fileName, hit.title, hit.documentId) if value and value.strip()),
-                    "tài liệu người dùng đã đính kèm",
-                )
-                source_key = f"user:{(hit.documentId or hit.fileName or hit.title or label).strip().casefold()}"
-                if source_key in rendered_sources:
-                    return ""
-                rendered_sources.add(source_key)
-                return f'(Nguồn hợp đồng/tài liệu người dùng: “{label}”)'
-
-            label = next(
-                (
-                    value.strip()
-                    for value in (hit.lawName, hit.fileName, hit.title, hit.lawCode, hit.knowledgeDocumentId)
-                    if value and value.strip()
-                ),
-                "tài liệu pháp lý của hệ thống",
-            )
-            source_key = (
-                "kb:"
-                + (hit.knowledgeDocumentId or hit.lawCode or hit.fileName or hit.lawName or hit.title or label)
-                .strip()
-                .casefold()
-            )
-            if source_key in rendered_sources:
-                return ""
-            rendered_sources.add(source_key)
-            location_parts = []
-            if hit.articleNumber:
-                location_parts.append(f"Điều {hit.articleNumber}")
-            if hit.clauseNumber:
-                location_parts.append(f"khoản {hit.clauseNumber}")
-            if hit.pageNumber is not None:
-                location_parts.append(f"trang {hit.pageNumber}")
-            location = f", {', '.join(location_parts)}" if location_parts else ""
-            return f'(Nguồn tài liệu hệ thống: “{label}”{location})'
-
-        rendered = _CITATION_PATTERN.sub(readable_source, answer)
-        rendered = re.sub(r"[ \t]+([,.;:!?])", r"\1", rendered)
-        return re.sub(r"[ \t]{2,}", " ", rendered).strip()
+        # Preserve every inline [USER-x]/[KB-x] marker. The frontend renders
+        # download actions from structured citation metadata instead of
+        # rewriting or removing claim-level grounding from the answer.
+        return answer

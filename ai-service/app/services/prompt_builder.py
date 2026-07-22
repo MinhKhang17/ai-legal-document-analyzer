@@ -277,8 +277,9 @@ def build_user_prompt(
     ws_id = workspace_id or "ws_unknown"
     download_instructions = (
         "HƯỚNG DẪN CUNG CẤP ĐƯỜNG DẪN TẢI XUỐNG CHO TÀI LIỆU HỆ THỐNG:\n"
-        "Trong câu trả lời phân tích pháp lý thông thường, dùng citation kỹ thuật [KB-x] chỉ để hệ thống kiểm tra nội bộ; "
-        "hệ thống sẽ tự thay nó bằng tên tài liệu trước khi hiển thị. KHÔNG gắn link tải vào citation.\n"
+        "Trong câu trả lời phân tích pháp lý thông thường, giữ nguyên citation kỹ thuật [USER-x] và [KB-x] "
+        "ngay sau từng dữ kiện, nhận định hoặc khuyến nghị được chúng hỗ trợ. KHÔNG gắn link tải vào citation; "
+        "UI sẽ hiển thị thông tin và nút tải nguồn riêng từ metadata có cấu trúc.\n"
         "Nếu người dùng muốn tải xuống các tệp ví dụ hoặc tài liệu đối chiếu thuộc danh sách tài liệu hệ thống (Neo4j) nêu trên, bạn có thể tạo đường dẫn tải xuống trực tiếp cho họ bằng định dạng Markdown sau:\n"
         f"- [Tải xuống Tên_Tài_Liệu](/api/v1/workspaces/{ws_id}/documents/system/download?filename=Tên_File_Gốc)\n"
         "Ví dụ:\n"

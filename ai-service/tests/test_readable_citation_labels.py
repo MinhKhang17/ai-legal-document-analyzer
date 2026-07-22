@@ -2,7 +2,7 @@ from app.services.rag_query_service import RagQueryService
 from app.services.retrieval_service import RagChunkHit
 
 
-def test_internal_citation_ids_are_replaced_with_source_names() -> None:
+def test_internal_citation_ids_are_preserved_for_claim_level_grounding() -> None:
     service = RagQueryService.__new__(RagQueryService)
     answer = "Điều khoản có rủi ro [USER-1] và cần đối chiếu pháp luật [KB-1]."
     hits = [
@@ -23,16 +23,14 @@ def test_internal_citation_ids_are_replaced_with_source_names() -> None:
         ),
     ]
 
-    rendered = service._replace_citation_markers_with_source_names(answer, hits)
+    rendered = service._enrich_answer_with_download_links(answer, "ws-1", hits[1:])
 
-    assert "[USER-1]" not in rendered
-    assert "[KB-1]" not in rendered
-    assert "04-2026-HDTN-HCM.pdf" in rendered
-    assert "Bộ luật Dân sự 2015" in rendered
-    assert "Điều 13" in rendered
+    assert rendered == answer
+    assert "[USER-1]" in rendered
+    assert "[KB-1]" in rendered
 
 
-def test_each_readable_source_is_rendered_only_once() -> None:
+def test_repeated_claim_level_citations_are_not_deduplicated() -> None:
     service = RagQueryService.__new__(RagQueryService)
     answer = (
         "Làm thêm quá mức [USER-1], miễn trách nhiệm an toàn [USER-2]. "
@@ -57,11 +55,8 @@ def test_each_readable_source_is_rendered_only_once() -> None:
         ),
     ]
 
-    rendered = service._replace_citation_markers_with_source_names(answer, hits)
+    rendered = service._enrich_answer_with_download_links(answer, "ws-1", hits[2:])
 
-    assert rendered.count("Nguồn hợp đồng/tài liệu người dùng") == 1
-    assert rendered.count("hop-dong.docx") == 1
-    assert rendered.count("Nguồn tài liệu hệ thống") == 1
-    assert rendered.count("84.2015.QH13") == 1
-    assert "[USER-" not in rendered
-    assert "[KB-" not in rendered
+    assert rendered == answer
+    assert rendered.count("[USER-") == 2
+    assert rendered.count("[KB-") == 2

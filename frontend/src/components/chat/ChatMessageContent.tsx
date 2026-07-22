@@ -185,30 +185,10 @@ export function sanitizeAndExtractContent(text: string): string {
 }
 
 export function normalizeChatMarkdown(text: string): string {
-  const normalized = text
+  return text
     .replace(/\[\[(KB-\d+)[^\]]*\]\]\([^)]*\/documents\/system\/download[^)]*\)/gi, "[$1]")
     .replace(/(^|[\s(])((?:USER|KB)-\d+)\]/gim, "$1[$2]")
-    // Legacy messages do not retain a reliable ID-to-label map. Hide internal
-    // IDs and direct users to the structured source list for the exact file.
-    .replace(/\[USER-\d+\]/gi, "(Nguồn: hợp đồng/tài liệu người dùng đã đính kèm)")
-    .replace(/\[KB-\d+\]/gi, "(Nguồn: tài liệu pháp lý của hệ thống)")
     .replace(/\s+(?=\d{1,2}\.\s+(?:\*\*|[#🔴🟠🟡🟢]|[A-ZÀ-Ỹ]))/gu, "\n");
-
-  const seenSources = new Set<string>();
-  const deduplicated = normalized.replace(
-    /\(Nguồn\s+(hợp đồng\/tài liệu người dùng|tài liệu hệ thống):\s*[“"]([^”"]+)[”"](?:,[^)]*)?\)/giu,
-    (fullMatch, sourceType: string, label: string) => {
-      const key = `${sourceType.toLocaleLowerCase('vi-VN')}:${label.trim().toLocaleLowerCase('vi-VN')}`;
-      if (seenSources.has(key)) return '';
-      seenSources.add(key);
-      return fullMatch;
-    },
-  );
-
-  return deduplicated
-    .replace(/[ \t]+([,.;:!?])/g, '$1')
-    .replace(/[ \t]{2,}/g, ' ')
-    .trim();
 }
 
 export function ChatMessageContent({ content, className }: ChatMessageContentProps) {
