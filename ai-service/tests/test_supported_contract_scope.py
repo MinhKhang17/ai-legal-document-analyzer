@@ -8,6 +8,7 @@ def test_detector_uses_canonical_granular_types() -> None:
     assert detect_contract_type("hợp đồng thực tập của tôi") == ContractType.INTERNSHIP
     assert detect_contract_type("hợp đồng cộng tác viên") == ContractType.COLLABORATOR
     assert detect_contract_type("hợp đồng làm thêm part-time") == ContractType.PART_TIME_EMPLOYMENT
+    assert detect_contract_type("hợp đồng lao động của tôi") == ContractType.PART_TIME_EMPLOYMENT
     assert detect_contract_type("bán laptop cá nhân") == ContractType.SMALL_ASSET_SALE
 
 

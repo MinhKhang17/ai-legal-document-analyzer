@@ -43,10 +43,11 @@ def is_contract_generation_intent(question: str) -> bool:
     if any(kw in question_lower for kw in qa_keywords):
         return False
 
-    creation_keywords = [
-        "generate", "create", "draft", "provide", "give", "make", "write",
-        "tạo", "soạn", "soạn thảo", "viết", "cung cấp", "bản thảo", "lập",
-        "in", "xuất", "tải", "lấy", "mẫu", "bản", "cho tôi",
+    creation_patterns = [
+        r"\b(?:generate|create|draft|provide|give|make|write)\b",
+        r"(?<!\w)(?:tạo|soạn thảo|soạn|viết|cung cấp|lập|in|xuất|tải|lấy|mẫu)(?!\w)",
+        r"(?<!\w)cho tôi(?!\w)",
+        r"(?<!\w)bản thảo(?!\w)",
     ]
     contract_keywords = [
         "contract", "agreement", "lease", "tenancy", "rental",
@@ -55,14 +56,13 @@ def is_contract_generation_intent(question: str) -> bool:
         "mua bán", "dịch vụ", "chuyển nhượng", "tặng cho", "vay tiền", "ủy quyền",
     ]
 
-    has_creation = any(kw in question_lower for kw in creation_keywords)
+    has_creation = any(re.search(pattern, question_lower) for pattern in creation_patterns)
     has_contract = any(kw in question_lower for kw in contract_keywords)
 
     direct_patterns = [
-        "lease agreement", "tenancy agreement", "rental agreement",
-        "rental contract", "lease contract", "tenancy contract",
-        "mẫu hợp đồng", "bản hợp đồng", "hợp đồng lao động", "hợp đồng thuê",
-        "hợp đồng mua bán", "hợp đồng dịch vụ",
+        "draft a contract", "draft an agreement", "create a contract", "create an agreement",
+        "generate a contract", "generate an agreement", "write a contract", "write an agreement",
+        "mẫu hợp đồng", "soạn hợp đồng", "soạn thảo hợp đồng", "tạo hợp đồng", "viết hợp đồng",
     ]
     has_direct = any(pat in question_lower for pat in direct_patterns)
 

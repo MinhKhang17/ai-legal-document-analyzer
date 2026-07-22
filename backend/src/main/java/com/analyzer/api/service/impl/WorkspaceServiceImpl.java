@@ -9,12 +9,15 @@ import com.analyzer.api.entity.Document;
 import com.analyzer.api.entity.User;
 import com.analyzer.api.entity.Workspace;
 import com.analyzer.api.enums.RoleName;
+import com.analyzer.api.enums.KnowledgeStatus;
+import com.analyzer.api.enums.KnowledgeVisibility;
 import com.analyzer.api.exception.common.ForbiddenException;
 import com.analyzer.api.exception.common.ResourceNotFoundException;
 import com.analyzer.api.exception.workspace.DocumentProcessingDispatchException;
 import com.analyzer.api.repository.DocumentRepository;
 import com.analyzer.api.repository.UserRepository;
 import com.analyzer.api.repository.WorkspaceRepository;
+import com.analyzer.api.repository.knowledge.KnowledgeBaseVersionRepository;
 import com.analyzer.api.service.EmailService;
 import com.analyzer.api.service.SubscriptionQuotaService;
 import com.analyzer.api.service.PolicyAcceptanceService;
@@ -68,6 +71,7 @@ public class WorkspaceServiceImpl implements WorkspaceService {
     private final SubscriptionQuotaService subscriptionQuotaService;
     private final EmailService emailService;
     private final PolicyAcceptanceService policyAcceptanceService;
+    private final KnowledgeBaseVersionRepository knowledgeBaseVersionRepository;
 
     @Value("${app.storage.upload-root:uploads}")
     private String uploadRoot;
@@ -460,50 +464,50 @@ public class WorkspaceServiceImpl implements WorkspaceService {
     @Override
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public org.springframework.core.io.Resource downloadSystemDocumentFile(String filename) {
-        if (filename == null || filename.contains("..") || filename.contains("/") || filename.contains("\\")) {
-            throw new RuntimeException("Filename hop le khong duoc chua ki tu dac biet hoac duong dan");
+        if (!StringUtils.hasText(filename) || filename.contains("..") || filename.contains("/") || filename.contains("\\")) {
+            throw new IllegalArgumentException("INVALID_KNOWLEDGE_FILENAME");
         }
-        
+
         try {
-            java.nio.file.Path baseDir = java.nio.file.Path.of("/app/uploads/knowledge_base").toAbsolutePath().normalize();
-            
-            // Search recursively for a file matching the name (with or without extension)
-            final String targetName = filename.toLowerCase();
-            final java.nio.file.Path[] foundFile = new java.nio.file.Path[1];
-            
-            java.nio.file.Files.walkFileTree(baseDir, new java.nio.file.SimpleFileVisitor<java.nio.file.Path>() {
-                @Override
-                public java.nio.file.FileVisitResult visitFile(java.nio.file.Path file, java.nio.file.attribute.BasicFileAttributes attrs) throws java.io.IOException {
-                    String name = file.getFileName().toString().toLowerCase();
-                    int lastDot = name.lastIndexOf('.');
-                    String stem = lastDot > 0 ? name.substring(0, lastDot) : name;
-                    
-                    if (name.equals(targetName) || stem.equals(targetName)) {
-                        foundFile[0] = file;
-                        return java.nio.file.FileVisitResult.TERMINATE;
-                    }
-                    return java.nio.file.FileVisitResult.CONTINUE;
-                }
-            });
-            
-            if (foundFile[0] == null) {
-                throw new RuntimeException("File khong ton tai hoac khong the doc: " + filename);
+            String targetName = filename.trim().toLowerCase(java.util.Locale.ROOT);
+            com.analyzer.api.entity.KnowledgeBaseVersion version = knowledgeBaseVersionRepository
+                    .findByStatusAndVisibilityAndActiveTrueOrderByCreatedAtDesc(
+                            KnowledgeStatus.PUBLIC, KnowledgeVisibility.PUBLIC)
+                    .stream()
+                    .filter(candidate -> matchesKnowledgeFilename(candidate.getOriginalFileName(), targetName))
+                    .findFirst()
+                    .orElseThrow(() -> new ResourceNotFoundException("KNOWLEDGE_SOURCE_FILE_NOT_FOUND"));
+
+            String storedPath = version.getSourceStoragePath();
+            if (!StringUtils.hasText(storedPath) && version.getSourceDocument() != null) {
+                storedPath = version.getSourceDocument().getFilePath();
             }
-            
-            java.nio.file.Path filePath = foundFile[0].toAbsolutePath().normalize();
+            if (!StringUtils.hasText(storedPath)) {
+                throw new ResourceNotFoundException("KNOWLEDGE_SOURCE_FILE_NOT_FOUND");
+            }
+
+            java.nio.file.Path baseDir = java.nio.file.Path.of(uploadRoot).toAbsolutePath().normalize();
+            java.nio.file.Path filePath = java.nio.file.Path.of(storedPath).toAbsolutePath().normalize();
             if (!filePath.startsWith(baseDir)) {
-                throw new RuntimeException("Khong duoc truy cap ngoai thu muc cho phep");
+                throw new ForbiddenException("INVALID_KNOWLEDGE_SOURCE_PATH");
             }
-            
+
             org.springframework.core.io.Resource resource = new org.springframework.core.io.UrlResource(filePath.toUri());
-            if (resource.exists() || resource.isReadable()) {
+            if (resource.exists() && resource.isReadable()) {
                 return resource;
-            } else {
-                throw new RuntimeException("File khong ton tai hoac khong the doc: " + filename);
             }
-        } catch (Exception e) {
-            throw new RuntimeException("Loi khi doc file tri thuc: " + e.getMessage(), e);
+            throw new ResourceNotFoundException("KNOWLEDGE_SOURCE_FILE_NOT_FOUND");
+        } catch (java.net.MalformedURLException e) {
+            throw new IllegalStateException("INVALID_KNOWLEDGE_SOURCE_URL", e);
         }
+    }
+
+    private boolean matchesKnowledgeFilename(String originalFileName, String targetName) {
+        if (!StringUtils.hasText(originalFileName)) return false;
+        String candidateName = originalFileName.trim().toLowerCase(java.util.Locale.ROOT);
+        int lastDot = candidateName.lastIndexOf('.');
+        String candidateStem = lastDot > 0 ? candidateName.substring(0, lastDot) : candidateName;
+        return candidateName.equals(targetName) || candidateStem.equals(targetName);
     }
 
     @Override

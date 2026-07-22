@@ -106,7 +106,9 @@ def detect_contract_type(question: str) -> ContractType:
         return ContractType.INTERNSHIP
     if any(key in q for key in ["cộng tác viên", "collaborator"]):
         return ContractType.COLLABORATOR
-    if any(key in q for key in ["làm thêm", "bán thời gian", "part-time"]):
+    if any(key in q for key in [
+        "hợp đồng lao động", "người lao động", "làm thêm", "bán thời gian", "part-time",
+    ]):
         return ContractType.PART_TIME_EMPLOYMENT
     if any(key in q for key in ["dịch vụ", "freelance", "thiết kế", "viết bài", "gia công nhỏ"]):
         return ContractType.FREELANCE_SERVICE

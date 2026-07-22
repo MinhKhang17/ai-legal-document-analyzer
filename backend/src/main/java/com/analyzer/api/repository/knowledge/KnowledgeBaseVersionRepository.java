@@ -2,6 +2,7 @@ package com.analyzer.api.repository.knowledge;
 
 import com.analyzer.api.entity.KnowledgeBaseVersion;
 import com.analyzer.api.enums.KnowledgeStatus;
+import com.analyzer.api.enums.KnowledgeVisibility;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -20,4 +21,7 @@ public interface KnowledgeBaseVersionRepository extends JpaRepository<KnowledgeB
     Optional<KnowledgeBaseVersion> findFirstByNeo4jDocumentId(String neo4jDocumentId);
 
     Optional<KnowledgeBaseVersion> findFirstByOriginalFileNameIgnoreCaseOrderByCreatedAtDesc(String originalFileName);
+
+    List<KnowledgeBaseVersion> findByStatusAndVisibilityAndActiveTrueOrderByCreatedAtDesc(
+            KnowledgeStatus status, KnowledgeVisibility visibility);
 }

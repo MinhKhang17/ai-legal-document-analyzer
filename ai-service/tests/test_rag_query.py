@@ -269,6 +269,31 @@ class RagQueryTests(unittest.TestCase):
         self.assertEqual(response.userActionHint, "PROVIDE_MORE_INFO")
         self.assertFalse(response.inputComplete)
 
+    def test_employment_contract_question_without_attachment_explains_what_to_check(self) -> None:
+        service = RagQueryService(
+            retrieval_service=_KnowledgeOnlyRetrievalService(),
+            llm_client=_FakeLlmClient(),
+        )
+
+        response = service.query(
+            RagQueryRequest(
+                requestId="req-employment-no-document",
+                userId="user-1",
+                workspaceId="ws-1",
+                chatSessionId="chat-1",
+                question="Về hợp đồng lao động của tôi thì có vấn đề gì không?",
+            )
+        )
+
+        self.assertEqual(response.intent, "PART_TIME_OR_INTERNSHIP_CONTRACT_REVIEW")
+        self.assertEqual(response.suggestionType, "ASK_UPLOAD_CONTRACT")
+        self.assertEqual(response.userActionHint, "UPLOAD_CONTRACT")
+        self.assertFalse(response.inputComplete)
+        self.assertIn("chưa thể kết luận", response.answer.lower())
+        self.assertIn("mức lương", response.answer.lower())
+        self.assertIn("chấm dứt hợp đồng", response.answer.lower())
+        self.assertNotIn("đây là loại hợp đồng nào", response.answer.lower())
+
     def test_short_clause_follow_up_uses_history_and_document_context(self) -> None:
         service = RagQueryService(
             retrieval_service=_FakeRetrievalService(),

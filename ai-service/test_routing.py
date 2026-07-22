@@ -18,6 +18,8 @@ class TestRouting(unittest.TestCase):
         self.assertFalse(is_contract_generation_intent("tham khảo từ luật nào"))
         self.assertFalse(is_contract_generation_intent("rà soát hợp đồng này"))
         self.assertFalse(is_contract_generation_intent("phân tích rủi ro hợp đồng"))
+        self.assertFalse(is_contract_generation_intent("về hợp đồng lao động của tôi thì có vấn đề gì không"))
+        self.assertFalse(is_contract_generation_intent("cho biết thông tin hợp đồng lao động của bạn"))
 
 if __name__ == "__main__":
     unittest.main()

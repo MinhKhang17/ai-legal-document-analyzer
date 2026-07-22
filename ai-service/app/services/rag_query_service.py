@@ -889,6 +889,23 @@ class RagQueryService:
         )
 
     def _guard_answer(self, intent: LegalQueryIntent, questions: list[str]) -> str:
+        if (
+            intent == LegalQueryIntent.PART_TIME_OR_INTERNSHIP_CONTRACT_REVIEW
+            and any("tải lên" in question.lower() for question in questions)
+        ):
+            return (
+                "Mình chưa thể kết luận hợp đồng lao động của bạn có vấn đề cụ thể hay không "
+                "vì hiện chưa có nội dung hợp đồng để đối chiếu. Tuy vậy, bạn có thể tự kiểm tra trước các nhóm nội dung sau:\n\n"
+                "- Thông tin các bên, chức danh, công việc và địa điểm làm việc có rõ ràng, đúng với thỏa thuận thực tế không.\n"
+                "- Loại hợp đồng, thời hạn và thời gian thử việc có được ghi cụ thể không.\n"
+                "- Mức lương, phụ cấp, hình thức và thời hạn trả lương có đầy đủ, dễ hiểu không.\n"
+                "- Thời giờ làm việc, nghỉ ngơi, làm thêm giờ và cách tính quyền lợi liên quan có rõ ràng không.\n"
+                "- Nội dung về bảo hiểm, bảo mật, bàn giao tài sản và trách nhiệm của mỗi bên có phù hợp với công việc thực tế không.\n"
+                "- Điều kiện chấm dứt hợp đồng, thời hạn báo trước, bồi thường hoặc khấu trừ có điểm nào quá rộng, mơ hồ hoặc bất lợi bất thường không.\n\n"
+                "Để mình rà soát đúng hợp đồng của bạn, hãy tải file hợp đồng hoặc dán các điều khoản bạn lo ngại. "
+                "Bạn có thể che thông tin nhạy cảm như số định danh, địa chỉ và số tài khoản trước khi gửi."
+            )
+
         mapping = {
             LegalQueryIntent.OUT_OF_DOMAIN_GENERAL_QUERY: "Mình chỉ hỗ trợ phân tích hợp đồng đơn giản trong phạm vi sinh viên. Bạn có thể hỏi về hợp đồng thuê trọ, làm thêm/thực tập, dịch vụ nhỏ, mua bán tài sản nhỏ hoặc giấy vay tiền.",
             LegalQueryIntent.INVALID_OR_MEANINGLESS_QUERY: "Mình chưa hiểu yêu cầu hiện tại. Bạn hãy mô tả rõ câu hỏi về hợp đồng hoặc tải tài liệu cần kiểm tra.",

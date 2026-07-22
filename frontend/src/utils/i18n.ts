@@ -65,7 +65,7 @@ const en: TranslationDictionary = {
   "auth.creatingWorkspace": "Creating workspace...",
   "auth.registrationFailed": "Registration failed. Please try again.",
   "auth.acceptTermsRequired":
-    "You must accept the workspace terms to continue.",
+    "You must accept the Terms of Use and Privacy and Data Processing Policy to continue.",
   "auth.showPassword": "Show password",
   "auth.hidePassword": "Hide password",
   "auth.showConfirmPassword": "Show confirm password",
@@ -131,6 +131,29 @@ const en: TranslationDictionary = {
     "I agree to process only authorized documents and accept the workspace terms.",
   "auth.acceptPrivacyPolicy":
     "I have read and accept the current Privacy and Data Processing Policy.",
+  "auth.acceptCombinedPolicies":
+    "I have read and accept the Terms of Use and Privacy and Data Processing Policy (view details).",
+  "auth.policyDetailsTitle": "Terms and privacy policy",
+  "auth.policyDetailsIntro":
+    "Please review these terms before creating your account. This acceptance applies to the current published versions.",
+  "auth.termsDetailsTitle": "1. Terms of Use",
+  "auth.termsDetailsAuthorizedUse":
+    "Only upload and process documents that you own or are authorized to use, and do not use the service for unlawful purposes.",
+  "auth.termsDetailsAiNotice":
+    "AI responses provide explanatory legal assistance and may be incomplete. They do not replace advice from a qualified lawyer and should be verified before important decisions.",
+  "auth.termsDetailsAccount":
+    "You are responsible for protecting your account credentials and for activity performed through your account.",
+  "auth.privacyDetailsTitle": "2. Privacy and Data Processing Policy",
+  "auth.privacyDetailsPurpose":
+    "Account information, questions and uploaded documents are processed to provide workspace, document analysis and legal-assistant features.",
+  "auth.privacyDetailsScope":
+    "Documents are associated with their selected workspace. You are responsible for avoiding unnecessary personal or sensitive data in submitted content.",
+  "auth.privacyDetailsAudit":
+    "The system may retain technical and audit metadata needed for security, troubleshooting and recording policy acceptance.",
+  "auth.policyConsentTitle": "3. Recording your consent",
+  "auth.policyConsentDescription":
+    "When you accept, the system records the current terms and privacy-policy versions and the acceptance time. You may be asked to accept again when a version changes.",
+  "auth.acceptPoliciesAction": "Accept and return",
   "auth.alreadyHaveAccount": "Already have an account?",
   "auth.logIn": "Log in",
   "authHero.title": "Source-grounded AI for legal contract review",
@@ -2210,7 +2233,7 @@ const vi: TranslationDictionary = {
   "auth.creatingWorkspace": "Đang khởi tạo workspace...",
   "auth.registrationFailed": "Đăng ký thất bại. Vui lòng thử lại.",
   "auth.acceptTermsRequired":
-    "Bạn cần chấp nhận điều khoản không gian làm việc để tiếp tục.",
+    "Bạn cần chấp nhận Điều khoản sử dụng và Chính sách quyền riêng tư, xử lý dữ liệu để tiếp tục.",
   "auth.showPassword": "Hiện mật khẩu",
   "auth.hidePassword": "Ẩn mật khẩu",
   "auth.showConfirmPassword": "Hiện xác nhận mật khẩu",
@@ -2276,6 +2299,29 @@ const vi: TranslationDictionary = {
     "Tôi đồng ý chỉ xử lý tài liệu được phép và chấp nhận điều khoản workspace.",
   "auth.acceptPrivacyPolicy":
     "Tôi đã đọc và đồng ý với Chính sách quyền riêng tư và xử lý dữ liệu hiện hành.",
+  "auth.acceptCombinedPolicies":
+    "Tôi đã đọc và đồng ý với Điều khoản sử dụng và Chính sách quyền riêng tư, xử lý dữ liệu (xem chi tiết).",
+  "auth.policyDetailsTitle": "Điều khoản và chính sách quyền riêng tư",
+  "auth.policyDetailsIntro":
+    "Vui lòng đọc các nội dung sau trước khi tạo tài khoản. Việc xác nhận áp dụng cho các phiên bản chính sách hiện hành đã được công bố.",
+  "auth.termsDetailsTitle": "1. Điều khoản sử dụng",
+  "auth.termsDetailsAuthorizedUse":
+    "Chỉ tải lên và xử lý tài liệu mà bạn sở hữu hoặc được phép sử dụng; không sử dụng dịch vụ cho mục đích trái pháp luật.",
+  "auth.termsDetailsAiNotice":
+    "Câu trả lời của AI mang tính hỗ trợ giải thích pháp lý và có thể chưa đầy đủ. Nội dung không thay thế tư vấn của luật sư đủ chuyên môn và cần được kiểm chứng trước quyết định quan trọng.",
+  "auth.termsDetailsAccount":
+    "Bạn chịu trách nhiệm bảo vệ thông tin đăng nhập và các hoạt động được thực hiện thông qua tài khoản của mình.",
+  "auth.privacyDetailsTitle": "2. Chính sách quyền riêng tư và xử lý dữ liệu",
+  "auth.privacyDetailsPurpose":
+    "Thông tin tài khoản, câu hỏi và tài liệu tải lên được xử lý để cung cấp workspace, phân tích tài liệu và các chức năng trợ lý pháp lý.",
+  "auth.privacyDetailsScope":
+    "Tài liệu được liên kết với workspace đã chọn. Bạn có trách nhiệm hạn chế đưa dữ liệu cá nhân hoặc dữ liệu nhạy cảm không cần thiết vào nội dung gửi lên.",
+  "auth.privacyDetailsAudit":
+    "Hệ thống có thể lưu metadata kỹ thuật và nhật ký cần thiết cho bảo mật, xử lý sự cố và ghi nhận việc chấp thuận chính sách.",
+  "auth.policyConsentTitle": "3. Ghi nhận sự đồng ý",
+  "auth.policyConsentDescription":
+    "Khi bạn đồng ý, hệ thống ghi nhận phiên bản điều khoản, phiên bản chính sách quyền riêng tư hiện hành và thời điểm xác nhận. Bạn có thể được yêu cầu xác nhận lại khi phiên bản thay đổi.",
+  "auth.acceptPoliciesAction": "Đồng ý và quay lại",
   "auth.alreadyHaveAccount": "Đã có tài khoản?",
   "auth.logIn": "Đăng nhập",
   "authHero.title": "AI có căn cứ nguồn cho rà soát hợp đồng pháp lý",

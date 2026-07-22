@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { register } from '../../api/authApi';
 import { Button } from '../../components/common/Button';
 import { Card } from '../../components/common/Card';
+import { Modal } from '../../components/common/Modal';
 import { useI18n } from '../../hooks/useI18n';
 
 type RegisterFormData = {
@@ -26,8 +27,8 @@ export function RegisterPage() {
     confirmPassword: '',
   });
   const [confirmPasswordTouched, setConfirmPasswordTouched] = useState(false);
-  const [acceptedTerms, setAcceptedTerms] = useState(false);
-  const [acceptedPrivacyPolicy, setAcceptedPrivacyPolicy] = useState(false);
+  const [acceptedPolicies, setAcceptedPolicies] = useState(false);
+  const [policyModalOpen, setPolicyModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -40,8 +41,7 @@ export function RegisterPage() {
 
   const canSubmit =
     !isSubmitting &&
-    acceptedTerms &&
-    acceptedPrivacyPolicy &&
+    acceptedPolicies &&
     formData.firstName.trim().length > 0 &&
     formData.lastName.trim().length > 0 &&
     formData.email.trim().length > 0 &&
@@ -99,7 +99,7 @@ export function RegisterPage() {
             return;
           }
 
-          if (!acceptedTerms || !acceptedPrivacyPolicy) {
+          if (!acceptedPolicies) {
             setSubmitError(t('auth.acceptTermsRequired'));
             return;
           }
@@ -113,8 +113,8 @@ export function RegisterPage() {
               email: formData.email.trim(),
               password: formData.password,
               confirmPassword: formData.confirmPassword,
-              acceptedTerms,
-              acceptedPrivacyPolicy,
+              acceptedTerms: acceptedPolicies,
+              acceptedPrivacyPolicy: acceptedPolicies,
             });
 
             navigate('/auth/check-email', {
@@ -248,42 +248,32 @@ export function RegisterPage() {
           </p>
         )}
 
-        <label className="flex cursor-pointer items-start gap-2 rounded-lg bg-surface-container-low p-2.5 text-[10px] leading-4 text-on-surface-variant dark:bg-slate-800 dark:text-slate-400">
+        <div className="flex items-start gap-2 rounded-lg bg-surface-container-low p-2.5 text-[10px] leading-4 text-on-surface-variant dark:bg-slate-800 dark:text-slate-400">
           <span className="relative mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center">
             <input
               className="peer h-4 w-4 cursor-pointer appearance-none rounded border border-outline bg-white checked:border-primary checked:bg-primary dark:border-slate-600 dark:bg-slate-900"
               type="checkbox"
-              checked={acceptedTerms}
+              checked={acceptedPolicies}
               onChange={(event) => {
-                setAcceptedTerms(event.target.checked);
+                if (event.target.checked) {
+                  setPolicyModalOpen(true);
+                } else {
+                  setAcceptedPolicies(false);
+                }
                 setSubmitError(null);
               }}
-              aria-label={t('auth.acceptWorkspaceTerms')}
+              aria-label={t('auth.acceptCombinedPolicies')}
             />
             <Check className="pointer-events-none absolute h-3 w-3 text-white opacity-0 peer-checked:opacity-100" />
           </span>
-
-          <span>
-            {t('auth.acceptWorkspaceTerms')}
-          </span>
-        </label>
-
-        <label className="flex cursor-pointer items-start gap-2 rounded-lg bg-surface-container-low p-2.5 text-[10px] leading-4 text-on-surface-variant dark:bg-slate-800 dark:text-slate-400">
-          <span className="relative mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center">
-            <input
-              className="peer h-4 w-4 cursor-pointer appearance-none rounded border border-outline bg-white checked:border-primary checked:bg-primary dark:border-slate-600 dark:bg-slate-900"
-              type="checkbox"
-              checked={acceptedPrivacyPolicy}
-              onChange={(event) => {
-                setAcceptedPrivacyPolicy(event.target.checked);
-                setSubmitError(null);
-              }}
-              aria-label={t('auth.acceptPrivacyPolicy')}
-            />
-            <Check className="pointer-events-none absolute h-3 w-3 text-white opacity-0 peer-checked:opacity-100" />
-          </span>
-          <span>{t('auth.acceptPrivacyPolicy')}</span>
-        </label>
+          <button
+            type="button"
+            className="text-left hover:text-primary hover:underline"
+            onClick={() => setPolicyModalOpen(true)}
+          >
+            {t('auth.acceptCombinedPolicies')}
+          </button>
+        </div>
 
         {submitError && (
           <p className="text-[10px] font-medium text-error dark:text-red-300" role="alert">
@@ -308,6 +298,62 @@ export function RegisterPage() {
           {t('auth.logIn')}
         </Link>
       </p>
+
+      <Modal
+        open={policyModalOpen}
+        title={t('auth.policyDetailsTitle')}
+        size="lg"
+        onClose={() => setPolicyModalOpen(false)}
+        footer={(
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setPolicyModalOpen(false)}>
+              {t('actions.close')}
+            </Button>
+            <Button
+              onClick={() => {
+                setAcceptedPolicies(true);
+                setSubmitError(null);
+                setPolicyModalOpen(false);
+              }}
+            >
+              {t('auth.acceptPoliciesAction')}
+            </Button>
+          </div>
+        )}
+      >
+        <div className="space-y-5 text-sm leading-6 text-on-surface-variant dark:text-slate-300">
+          <p>{t('auth.policyDetailsIntro')}</p>
+
+          <section>
+            <h3 className="font-semibold text-on-surface dark:text-slate-100">
+              {t('auth.termsDetailsTitle')}
+            </h3>
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              <li>{t('auth.termsDetailsAuthorizedUse')}</li>
+              <li>{t('auth.termsDetailsAiNotice')}</li>
+              <li>{t('auth.termsDetailsAccount')}</li>
+            </ul>
+          </section>
+
+          <section>
+            <h3 className="font-semibold text-on-surface dark:text-slate-100">
+              {t('auth.privacyDetailsTitle')}
+            </h3>
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              <li>{t('auth.privacyDetailsPurpose')}</li>
+              <li>{t('auth.privacyDetailsScope')}</li>
+              <li>{t('auth.privacyDetailsAudit')}</li>
+            </ul>
+          </section>
+
+          <section className="rounded-lg border border-legal-border bg-surface-container-low p-3 dark:border-slate-700 dark:bg-slate-800">
+            <h3 className="font-semibold text-on-surface dark:text-slate-100">
+              {t('auth.policyConsentTitle')}
+            </h3>
+            <p className="mt-1">{t('auth.policyConsentDescription')}</p>
+          </section>
+        </div>
+      </Modal>
     </Card>
   );
 }
