@@ -121,30 +121,28 @@ class RagQueryService:
     def query(self, request: RagQueryRequest) -> RagQueryResponse:
         # ── Step 0a: Export chat to DOCX shortcut ──
         from app.services.contract_generation_service import (
-            ContractGenerationService,
             is_contract_generation_intent,
             is_export_docx_intent,
         )
+        from app.services.safe_query_shortcuts import (
+            build_contract_prompt_response,
+            build_conversation_shortcut,
+        )
+
+        shortcut = build_conversation_shortcut(request)
+        if shortcut is not None:
+            return shortcut
 
         follow_up = is_follow_up_query(request.question)
         previous_snapshot = self.context_store.latest(request.chatSessionId) if follow_up else None
         bounded_history_text = self._request_history_text(request)
 
         if is_export_docx_intent(request.question):
-            gen_service = ContractGenerationService(
-                retrieval_service=self.retrieval_service,
-                llm_client=self.llm_client,
-            )
-            return gen_service.export_chat_to_docx(request)
+            return build_contract_prompt_response(request)
 
         # ── Step 0b: Contract generation shortcut ──
         if is_contract_generation_intent(request.question) and not follow_up:
-            gen_service = ContractGenerationService(
-                retrieval_service=self.retrieval_service,
-                llm_client=self.llm_client,
-                llm_enabled=self.llm_enabled,
-            )
-            return gen_service.generate_contract(request)
+            return build_contract_prompt_response(request)
 
         user_hits, legal_search_query, knowledge_hits = self._retrieve(request)
         logger.info("DEBUG RAG QUERY: request=%s, user_hits_count=%d", request.model_dump(exclude={"chatHistory", "conversationSummaryJson"}), len(user_hits))
@@ -436,6 +434,7 @@ class RagQueryService:
             retrievedUserChunks=len(user_hits),
             retrievedKnowledgeChunks=len(knowledge_hits),
             intent=intent_result.intent.value,
+            intents=self._ordered_intents(request.question, intent_result.intent.value),
             contractType=intent_result.contract_type.value,
             userRole=intent_result.user_role.value,
             jurisdiction=intent_result.jurisdiction.value,
@@ -494,6 +493,20 @@ class RagQueryService:
                 )
             )
         return response
+
+    @staticmethod
+    def _ordered_intents(question: str, primary_intent: str) -> list[str]:
+        """Keep execution order for common compound requests without replacing the existing classifier."""
+        normalized = question.lower()
+        analysis_words = ("phân tích", "đánh giá", "analyze", "review")
+        rewrite_words = ("viết lại", "sửa lại", "rewrite", "revise")
+        intents = [primary_intent]
+        if any(word in normalized for word in analysis_words) and any(word in normalized for word in rewrite_words):
+            if primary_intent not in {"CLAUSE_ANALYSIS", "DOCUMENT_ANALYSIS"}:
+                intents.insert(0, "CLAUSE_ANALYSIS")
+            if "CLAUSE_REWRITE" not in intents:
+                intents.append("CLAUSE_REWRITE")
+        return intents
 
     def _build_token_breakdown(
         self,

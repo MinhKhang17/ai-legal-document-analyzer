@@ -66,6 +66,22 @@ public class RagQueryResponse {
     private String model;
     @JsonProperty("error_message")
     private String errorMessage;
+    @JsonProperty("intent")
+    private String intent;
+    @JsonProperty("intents")
+    private List<String> intents;
+    @JsonProperty("suggested_actions")
+    @JsonAlias("suggestedActions")
+    private List<String> suggestedActions;
+    @JsonProperty("selected_document_ids")
+    @JsonAlias("selectedDocumentIds")
+    private List<String> selectedDocumentIds;
+    @JsonProperty("drafting_prompt")
+    @JsonAlias("draftingPrompt")
+    private String draftingPrompt;
+    @JsonProperty("redaction_required")
+    @JsonAlias("redactionRequired")
+    private Boolean redactionRequired;
 
     @JsonProperty("conversation_memory_update")
     @JsonAlias("conversationMemoryUpdate")

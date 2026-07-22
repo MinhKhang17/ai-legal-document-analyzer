@@ -39,7 +39,8 @@ import { formatDisplayDateTime, formatNumber, formatPercent } from "../../utils/
 import { simulateStreaming } from "../../utils/simulateStreaming";
 import { supportedContractScopeText } from "../../config/supportedContractTypes";
 import { finishSubmission, tryStartSubmission } from "../../utils/submissionGuard";
-import { isPlanEntitlementError } from "../../services/http";
+import { getApiErrorCode, isPlanEntitlementError } from "../../services/http";
+import { acceptCurrentPolicies } from "../../services/policy.service";
 
 import { getAccessToken as getSessionAccessToken } from "../../services/authSession";
 const getAccessToken = () => getSessionAccessToken() ?? "";
@@ -255,6 +256,9 @@ export function LegalChatPage() {
   const [openingDocumentModal, setOpeningDocumentModal] = useState(false);
   const [documentActionError, setDocumentActionError] = useState("");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [policyModalOpen, setPolicyModalOpen] = useState(false);
+  const [policyAccepted, setPolicyAccepted] = useState(false);
+  const [policyAccepting, setPolicyAccepting] = useState(false);
   const [messageCitations, setMessageCitations] = useState<AiCitation[]>([]);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<WorkspaceChatSession | null>(null);
@@ -265,6 +269,7 @@ export function LegalChatPage() {
   const shouldAutoScrollRef = useRef(true);
   const [showNewResponseButton, setShowNewResponseButton] = useState(false);
   const lastSubmissionRef = useRef<{
+    requestId: string;
     workspaceId: string;
     sessionId: string;
     documentId?: string;
@@ -706,6 +711,26 @@ export function LegalChatPage() {
         navigate("/billing/subscribe?reason=plan-required");
         return;
       }
+      if (isPlanEntitlementError(err)) {
+        const message = "Dịch vụ này yêu cầu gói phù hợp. Vui lòng chọn hoặc nâng cấp gói để tiếp tục.";
+        setError(message);
+        setMessages((previous) => previous.map((item) => item.id === assistantMessageId
+          ? { ...item, status: "error", errorMessage: message }
+          : item));
+        toast.warning(message);
+        navigate("/billing/subscribe?reason=plan-required");
+        return;
+      }
+      if (getApiErrorCode(err) === "TERMS_NOT_ACCEPTED") {
+        const message = "Bạn cần chấp thuận chính sách hiện hành trước khi phân tích tài liệu.";
+        setError(message);
+        setMessages((previous) => previous.map((item) => item.id === assistantMessageId
+          ? { ...item, status: "error", errorMessage: message }
+          : item));
+        setPolicyAccepted(false);
+        setPolicyModalOpen(true);
+        return;
+      }
       const message = getCreateTicketErrorMessage(err);
       setError(message);
       toast.error(message, t("toast.errorTitle"));
@@ -811,6 +836,12 @@ export function LegalChatPage() {
       setUploadFile(null);
       toast.success(t("chat.documents.uploadedAttachedSuccess"));
     } catch (err) {
+      if (getApiErrorCode(err) === "TERMS_NOT_ACCEPTED") {
+        setPolicyAccepted(false);
+        setPolicyModalOpen(true);
+        setDocumentActionError("Bạn cần chấp thuận Điều khoản sử dụng và Chính sách xử lý dữ liệu hiện hành trước khi tải tài liệu.");
+        return;
+      }
       const raw = err instanceof Error ? err.message : t("chat.documents.uploadError");
       const message = /quota|storage|limit/i.test(raw) ? t("chat.documents.quotaExhausted") : t("chat.documents.uploadError");
       setDocumentActionError(message);
@@ -848,6 +879,7 @@ export function LegalChatPage() {
   };
 
   const handleSend = async (override?: {
+    requestId?: string;
     message: string;
     workspaceId: string;
     sessionId?: string;
@@ -859,6 +891,7 @@ export function LegalChatPage() {
     const targetWorkspaceId = override?.workspaceId ?? selectedWorkspaceId;
     let targetSessionId = override?.sessionId ?? selectedSessionId;
     const targetDocumentId = override?.documentId ?? (selectedDocumentId || undefined);
+    const requestId = override?.requestId ?? `req_${crypto.randomUUID().replaceAll("-", "")}`;
 
     if (!question || !targetWorkspaceId) {
       return;
@@ -922,6 +955,7 @@ export function LegalChatPage() {
     shouldAutoScrollRef.current = true;
     window.requestAnimationFrame(() => chatInputRef.current?.focus());
     lastSubmissionRef.current = {
+      requestId,
       workspaceId: targetWorkspaceId,
       sessionId: targetSessionId ?? "",
       documentId: targetDocumentId,
@@ -935,6 +969,7 @@ export function LegalChatPage() {
         question,
         undefined,
         controller.signal,
+        requestId,
       );
 
       if (conversation?.chatSession) {
@@ -966,6 +1001,10 @@ export function LegalChatPage() {
               ...completedMessage,
               id: conversation.assistantMessage.messageId ?? assistantMessageId,
               status: "completed",
+              intent: conversation.intent,
+              suggestedActions: conversation.suggestedActions,
+              draftingPrompt: conversation.draftingPrompt,
+              redactionRequired: conversation.redactionRequired,
             }
           : item));
       }
@@ -1512,6 +1551,33 @@ export function LegalChatPage() {
                               content={message.content}
                               className="text-on-surface dark:text-slate-100"
                             />
+                            {message.intent === "CONTRACT_PROMPT_GENERATION" && message.draftingPrompt && (
+                              <div className="mt-md rounded-lg border border-legal-border bg-surface-container-low p-md dark:border-slate-700 dark:bg-slate-800">
+                                <p className="mb-sm text-xs font-semibold uppercase tracking-wide text-on-surface-variant dark:text-slate-300">
+                                  Drafting prompt {message.redactionRequired ? "· dữ liệu nhạy cảm đã được ẩn" : ""}
+                                </p>
+                                <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-md bg-white p-sm text-xs text-on-surface dark:bg-slate-950 dark:text-slate-100">
+                                  {message.draftingPrompt}
+                                </pre>
+                                <div className="mt-sm flex flex-wrap gap-sm">
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    leftIcon={<ClipboardCheck className="h-4 w-4" />}
+                                    onClick={() => void navigator.clipboard.writeText(message.draftingPrompt ?? "")}
+                                  >
+                                    Sao chép prompt
+                                  </Button>
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => window.open("https://chatgpt.com/", "_blank", "noopener,noreferrer")}
+                                  >
+                                    Mở ChatGPT
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
                             {message.status === "streaming" && <span className="ml-1 inline-block h-4 w-0.5 bg-primary motion-safe:animate-pulse" aria-hidden="true" />}
                             {message.status === "cancelled" && <p className="mt-sm text-xs font-medium text-on-surface-variant">{message.statusMessage ?? t("chat.status.stopped")}</p>}
                             {assistant && isCompleted && !message.id.startsWith('local-') && <ChatMessageFeedbackControls messageId={message.id} language={language} />}
@@ -1677,6 +1743,51 @@ export function LegalChatPage() {
         onClose={() => setTicketDraft(null)}
         onSubmit={submitTicket}
       />}
+
+      <Modal
+        open={policyModalOpen}
+        title="Chấp thuận chính sách xử lý tài liệu"
+        onClose={() => !policyAccepting && setPolicyModalOpen(false)}
+      >
+        <div className="space-y-md text-sm text-on-surface dark:text-slate-100">
+          <p>
+            Trước khi tải lên hoặc phân tích tài liệu, bạn cần chấp thuận phiên bản hiện hành của
+            Điều khoản sử dụng và Chính sách xử lý dữ liệu. Câu hỏi pháp lý chung không dùng tài liệu vẫn hoạt động.
+          </p>
+          <label className="flex items-start gap-sm rounded-lg border border-legal-border p-md dark:border-slate-700">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={policyAccepted}
+              onChange={(event) => setPolicyAccepted(event.target.checked)}
+            />
+            <span>Tôi đã đọc và đồng ý với Điều khoản sử dụng và Chính sách xử lý dữ liệu hiện hành.</span>
+          </label>
+          <div className="flex justify-end gap-sm">
+            <Button variant="secondary" disabled={policyAccepting} onClick={() => setPolicyModalOpen(false)}>
+              Hủy
+            </Button>
+            <Button
+              disabled={!policyAccepted || policyAccepting}
+              onClick={() => void (async () => {
+                setPolicyAccepting(true);
+                try {
+                  await acceptCurrentPolicies(getAccessToken());
+                  setPolicyModalOpen(false);
+                  setPolicyAccepted(false);
+                  await handleUploadAndAttach();
+                } catch {
+                  toast.error("Không thể lưu chấp thuận điều khoản.");
+                } finally {
+                  setPolicyAccepting(false);
+                }
+              })()}
+            >
+              {policyAccepting ? "Đang lưu..." : "Đồng ý và tiếp tục"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       <Modal
         open={documentModalOpen}

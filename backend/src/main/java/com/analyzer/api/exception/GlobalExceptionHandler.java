@@ -177,6 +177,13 @@ public class GlobalExceptionHandler {
                                 HttpStatus.GATEWAY_TIMEOUT);
         }
 
+        @ExceptionHandler(InvalidAiResponseException.class)
+        public ResponseEntity<ApiResponseDTO<Void>> handleInvalidAiResponseException(InvalidAiResponseException ex) {
+                return new ResponseEntity<>(
+                                ApiResponseDTO.error(HttpStatus.UNPROCESSABLE_ENTITY.value(), ex.getErrorCode(), ex.getMessage()),
+                                HttpStatus.UNPROCESSABLE_ENTITY);
+        }
+
         @ExceptionHandler(ExpiredVerificationTokenException.class)
         public ResponseEntity<ApiResponseDTO<Void>> handleExpiredVerificationTokenException(ExpiredVerificationTokenException ex) {
                 return new ResponseEntity<>(
@@ -207,7 +214,7 @@ public class GlobalExceptionHandler {
         @ExceptionHandler(TooManyRequestsException.class)
         public ResponseEntity<ApiResponseDTO<Void>> handleTooManyRequestsException(TooManyRequestsException ex) {
                 return new ResponseEntity<>(
-                                ApiResponseDTO.error(HttpStatus.TOO_MANY_REQUESTS.value(), ex.getMessage()),
+                                ApiResponseDTO.error(HttpStatus.TOO_MANY_REQUESTS.value(), ex.getErrorCode(), ex.getMessage()),
                                 HttpStatus.TOO_MANY_REQUESTS);
         }
 

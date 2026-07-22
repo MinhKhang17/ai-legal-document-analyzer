@@ -20,6 +20,15 @@ public interface SubscriptionQuotaService {
 
     void checkCanUseAiChat(User user, int estimatedInputTokens);
 
+    void reserveAiChatQuota(User user, String requestId, int estimatedTokens);
+
+    void attachAiQueryContext(User user, String requestId, String workspaceId, String chatSessionId,
+                              String contextSnapshotJson);
+
+    void completeAiChatQuota(User user, String requestId, int inputTokens, int outputTokens);
+
+    void failAiChatQuota(User user, String requestId, String errorCode);
+
     void recordAiChatUsage(User user, int inputTokens, int outputTokens);
 
     void checkCanDraftContract(User user);

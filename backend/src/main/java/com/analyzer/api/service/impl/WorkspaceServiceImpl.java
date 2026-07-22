@@ -17,6 +17,7 @@ import com.analyzer.api.repository.UserRepository;
 import com.analyzer.api.repository.WorkspaceRepository;
 import com.analyzer.api.service.EmailService;
 import com.analyzer.api.service.SubscriptionQuotaService;
+import com.analyzer.api.service.PolicyAcceptanceService;
 import com.analyzer.api.service.WorkspaceService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -65,6 +66,7 @@ public class WorkspaceServiceImpl implements WorkspaceService {
     private final UserRepository userRepository;
     private final SubscriptionQuotaService subscriptionQuotaService;
     private final EmailService emailService;
+    private final PolicyAcceptanceService policyAcceptanceService;
 
     @Value("${app.storage.upload-root:uploads}")
     private String uploadRoot;
@@ -143,6 +145,7 @@ public class WorkspaceServiceImpl implements WorkspaceService {
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Khong tim thay nguoi dung"));
+        policyAcceptanceService.requireCurrent(userId);
         subscriptionQuotaService.checkCanUploadOrAnalyzeContract(user, workspaceId, file.getSize());
 
         workspaceRepository.findByIdAndUserIdAndStatus(workspaceId, userId, STATUS_ACTIVE)

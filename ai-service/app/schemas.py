@@ -250,6 +250,7 @@ class RagQueryResponse(BaseModel):
 
     # ── NEW fields (all optional for backward compatibility) ──
     intent: str | None = Field(default=None, description="Detected LegalQueryIntent (e.g. FULL_CONTRACT_REVIEW).")
+    intents: list[str] = Field(default_factory=list, description="Ordered detected intents.")
     contractType: str | None = Field(default=None, description="Detected ContractType (e.g. RENTAL, LABOR).")
     userRole: str | None = Field(default=None, description="Detected role of the user in the contract.")
     jurisdiction: str | None = Field(default=None, description="Detected jurisdiction for the query.")
@@ -258,6 +259,10 @@ class RagQueryResponse(BaseModel):
     inputComplete: bool | None = Field(default=None, description="Whether the user provided all required input.")
     missingInputs: list[str] | None = Field(default=None, description="List of missing input items.")
     analysis: AnalysisResult | None = Field(default=None, description="Structured analysis output.")
+    suggestedActions: list[str] = Field(default_factory=list)
+    selectedDocumentIds: list[str] = Field(default_factory=list)
+    draftingPrompt: str | None = None
+    redactionRequired: bool = False
     model: str | None = None
     usage: RagUsage | None = None
     llmExecuted: bool | None = Field(default=None, description="True only when the prompt was sent to the configured LLM provider.")

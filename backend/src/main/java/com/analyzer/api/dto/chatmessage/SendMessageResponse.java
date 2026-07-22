@@ -28,4 +28,10 @@ public class SendMessageResponse {
     private SuggestionType suggestionType;
     private List<UserActionHint> userActionHints;
     private String assistantMessageId;
+    private String intent;
+    private List<String> intents;
+    private List<String> suggestedActions;
+    private List<String> selectedDocumentIds;
+    private String draftingPrompt;
+    private Boolean redactionRequired;
 }

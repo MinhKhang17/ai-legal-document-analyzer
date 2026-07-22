@@ -40,11 +40,12 @@ function renderInline(text: string): ReactNode[] {
         </strong>
       );
     } else if (token.type === "link") {
+      const safeUrl = /^(https?:\/\/|\/)/i.test(token.url) ? token.url : "#";
       const isApiDownload = token.url.includes("/documents/system/download") || token.url.includes("/download");
       return (
         <a
           key={`${token.type}-${index}`}
-          href={token.url}
+          href={safeUrl}
           onClick={isApiDownload ? async (e) => {
             e.preventDefault();
             try {
@@ -75,7 +76,7 @@ function renderInline(text: string): ReactNode[] {
               window.open(token.url, "_blank");
             }
           } : undefined}
-          target="_blank"
+          target={safeUrl === "#" ? undefined : "_blank"}
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1 font-semibold text-primary hover:underline dark:text-inverse-primary transition-colors cursor-pointer rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary dark:bg-primary/20"
         >

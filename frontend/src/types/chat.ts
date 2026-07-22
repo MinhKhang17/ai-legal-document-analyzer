@@ -16,6 +16,10 @@ export interface ChatMessage {
   riskLevel?: string | null;
   legalDomain?: string | null;
   userActionHint?: string | null;
+  intent?: string | null;
+  suggestedActions?: string[];
+  draftingPrompt?: string | null;
+  redactionRequired?: boolean;
 }
 
 export interface ChatThread {
@@ -75,11 +79,18 @@ export interface WorkspaceChatConversation {
   suggestionType?: string | null;
   userActionHints?: string[];
   assistantMessageId?: string;
+  intent?: string | null;
+  intents?: string[];
+  suggestedActions?: string[];
+  selectedDocumentIds?: string[];
+  draftingPrompt?: string | null;
+  redactionRequired?: boolean;
 }
 
 export type ChatMode = 'AUTO' | 'LEGAL_QA' | 'DOCUMENT_ANALYSIS';
 
 export interface WorkspaceChatRequest {
+  requestId?: string;
   message: string;
   documentId?: string;
   documentIds?: string[];

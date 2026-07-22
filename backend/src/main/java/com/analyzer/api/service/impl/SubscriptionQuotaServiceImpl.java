@@ -5,6 +5,8 @@ import com.analyzer.api.entity.CustomerPlan;
 import com.analyzer.api.entity.SubscriptionPlan;
 import com.analyzer.api.entity.SubscriptionUsage;
 import com.analyzer.api.entity.User;
+import com.analyzer.api.entity.AiQueryExecution;
+import com.analyzer.api.enums.AiQueryExecutionStatus;
 import com.analyzer.api.enums.ChatMessageRole;
 import com.analyzer.api.enums.ChatMessageStatus;
 import com.analyzer.api.enums.ContractGenerationStatus;
@@ -13,6 +15,7 @@ import com.analyzer.api.enums.LegalTicketType;
 import com.analyzer.api.enums.UsageEventType;
 import com.analyzer.api.exception.common.ConflictException;
 import com.analyzer.api.repository.ChatMessageRepository;
+import com.analyzer.api.repository.AiQueryExecutionRepository;
 import com.analyzer.api.repository.ChatSessionDocumentRepository;
 import com.analyzer.api.repository.DocumentRepository;
 import com.analyzer.api.repository.LegalTicketRepository;
@@ -53,6 +56,7 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
     private final LegalTicketRepository legalTicketRepository;
     private final SubscriptionUsageRepository subscriptionUsageRepository;
     private final ChatSessionDocumentRepository chatSessionDocumentRepository;
+    private final AiQueryExecutionRepository aiQueryExecutionRepository;
     private final CustomerPlanExpiryHelper customerPlanExpiryHelper;
     private final CustomerPlanSnapshotHelper customerPlanSnapshotHelper;
     private final UserQuotaLock userQuotaLock;
@@ -260,6 +264,94 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
         if (usage.getExpertTicketsUsed() >= ticketQuota) {
             throw new ConflictException("EXPERT_TICKET_QUOTA_EXCEEDED");
         }
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void reserveAiChatQuota(User user, String requestId, int estimatedTokens) {
+        userQuotaLock.acquire(user.getId());
+        AiQueryExecution existing = aiQueryExecutionRepository
+                .findByRequestIdAndUserId(requestId, user.getId())
+                .orElse(null);
+        if (existing != null && existing.getStatus() == AiQueryExecutionStatus.PROCESSING) {
+            throw new ConflictException("QUERY_ALREADY_PROCESSING", "This query is already processing");
+        }
+        if (existing != null && existing.getStatus() == AiQueryExecutionStatus.COMPLETED) {
+            return;
+        }
+
+        SubscriptionPlan plan = getCurrentPlan(user);
+        CustomerPlan activePlan = getActiveCustomerPlan(user.getId());
+        LocalDateTime periodStart = activePlan != null && activePlan.getBillingCycleStartAt() != null
+                ? activePlan.getBillingCycleStartAt()
+                : AppClock.now().withDayOfMonth(1).toLocalDate().atStartOfDay();
+        LocalDateTime periodEnd = activePlan != null && activePlan.getBillingCycleEndAt() != null
+                ? activePlan.getBillingCycleEndAt()
+                : periodStart.plusMonths(1);
+        int normalizedEstimate = Math.max(estimatedTokens, 0);
+        long completedUsage = getCurrentUsage(user).getAiTokensUsed();
+        long activeReservations = aiQueryExecutionRepository.sumReservedTokens(
+                user.getId(), AiQueryExecutionStatus.PROCESSING, periodStart, periodEnd, requestId);
+        if (plan.getAiQuota() != null
+                && completedUsage + activeReservations + normalizedEstimate > plan.getAiQuota()) {
+            throw new com.analyzer.api.exception.common.TooManyRequestsException(
+                    "TOKEN_QUOTA_EXCEEDED", "AI token quota exceeded for the current plan");
+        }
+
+        AiQueryExecution execution = existing != null ? existing : AiQueryExecution.builder()
+                .requestId(requestId)
+                .user(user)
+                .build();
+        execution.setStatus(AiQueryExecutionStatus.PROCESSING);
+        execution.setEstimatedTokens(normalizedEstimate);
+        execution.setActualInputTokens(null);
+        execution.setActualOutputTokens(null);
+        execution.setErrorCode(null);
+        execution.setPlanTypeSnapshot(plan.getPlanType());
+        aiQueryExecutionRepository.save(execution);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void attachAiQueryContext(User user, String requestId, String workspaceId, String chatSessionId,
+                                     String contextSnapshotJson) {
+        AiQueryExecution execution = aiQueryExecutionRepository.findByRequestIdAndUserId(requestId, user.getId())
+                .orElseThrow(() -> new ConflictException("CONCURRENT_MODIFICATION", "Query reservation not found"));
+        if (execution.getStatus() != AiQueryExecutionStatus.PROCESSING) {
+            throw new ConflictException("CONCURRENT_MODIFICATION", "Query is no longer processing");
+        }
+        execution.setWorkspaceId(workspaceId);
+        execution.setChatSessionId(chatSessionId);
+        execution.setContextSnapshotJson(contextSnapshotJson);
+        aiQueryExecutionRepository.save(execution);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void completeAiChatQuota(User user, String requestId, int inputTokens, int outputTokens) {
+        AiQueryExecution execution = aiQueryExecutionRepository.findByRequestIdAndUserId(requestId, user.getId())
+                .orElseThrow(() -> new ConflictException("CONCURRENT_MODIFICATION", "Query reservation not found"));
+        if (execution.getStatus() == AiQueryExecutionStatus.COMPLETED) {
+            return;
+        }
+        execution.setActualInputTokens(Math.max(inputTokens, 0));
+        execution.setActualOutputTokens(Math.max(outputTokens, 0));
+        execution.setStatus(AiQueryExecutionStatus.COMPLETED);
+        aiQueryExecutionRepository.save(execution);
+        recordUsage(user, UsageEventType.AI_QUERY,
+                Math.max(inputTokens, 0) + Math.max(outputTokens, 0), requestId);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void failAiChatQuota(User user, String requestId, String errorCode) {
+        aiQueryExecutionRepository.findByRequestIdAndUserId(requestId, user.getId()).ifPresent(execution -> {
+            if (execution.getStatus() != AiQueryExecutionStatus.COMPLETED) {
+                execution.setStatus(AiQueryExecutionStatus.FAILED);
+                execution.setErrorCode(errorCode);
+                aiQueryExecutionRepository.save(execution);
+            }
+        });
     }
 
     @Override

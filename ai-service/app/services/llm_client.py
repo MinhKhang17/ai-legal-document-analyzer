@@ -199,21 +199,26 @@ class GeminiRagLlmClient:
 
         payload = self._extract_json(raw_text)
         if payload is None:
-            risk_level = extract_risk_level(sanitized_text)
-            analysis_data = parse_markdown_to_analysis(sanitized_text)
-            return LlmResponse(
-                answer=sanitized_text,
-                risk_level=risk_level,
-                raw_response=raw_text,
-                error=None,
-                analysis=analysis_data,
-                model=response.model,
-                prompt_tokens=response.prompt_tokens,
-                completion_tokens=response.completion_tokens,
-                total_tokens=response.total_tokens,
-                used_knowledge_citation_ids=tuple(self._extract_inline_citations(sanitized_text, "KB")),
-                used_user_citation_ids=tuple(self._extract_inline_citations(sanitized_text, "USER")),
+            repair = self._client.generate_text(
+                system_prompt=(
+                    "Repair the supplied model output into one valid JSON object only. Preserve the answer and "
+                    "citation markers. Required keys: answer, riskLevel, confidenceScore, missingInformation, "
+                    "usedKnowledgeCitationIds, usedUserCitationIds. Do not add facts."
+                ),
+                user_prompt=raw_text,
             )
+            payload = self._extract_json(repair.text or "") if not repair.error else None
+            if payload is None:
+                return LlmResponse(
+                    answer=None,
+                    risk_level="UNKNOWN",
+                    raw_response=None,
+                    error="INVALID_AI_RESPONSE",
+                    model=response.model,
+                    prompt_tokens=response.prompt_tokens + repair.prompt_tokens,
+                    completion_tokens=response.completion_tokens + repair.completion_tokens,
+                    total_tokens=response.total_tokens + repair.total_tokens,
+                )
 
         answer = str(payload.get("answer") or payload.get("response") or raw_text).strip()
         sanitized_answer = sanitize_response(answer)

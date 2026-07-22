@@ -168,10 +168,12 @@ export function ContractAssistantPage() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<WorkspaceChatSession | null>(null);
   const lastSubmissionRef = useRef<{
+    requestId: string;
     workspaceId: string;
     sessionId: string;
     message: string;
   } | null>(null);
+  const submissionPendingRef = useRef(false);
 
   // Phase 1: Resolve Sandbox Workspace on mount
   useEffect(() => {
@@ -497,6 +499,7 @@ export function ContractAssistantPage() {
   };
 
   const handleSend = async (override?: {
+    requestId?: string;
     message: string;
     workspaceId: string;
     sessionId?: string;
@@ -504,10 +507,13 @@ export function ContractAssistantPage() {
     const question = (override?.message ?? input).trim();
     const targetWorkspaceId = override?.workspaceId ?? sandboxWorkspaceId;
     const targetSessionId = override?.sessionId ?? selectedSessionId;
+    const requestId = override?.requestId ?? `req_${crypto.randomUUID().replaceAll("-", "")}`;
 
     if (!question || !targetWorkspaceId) {
       return;
     }
+    if (submissionPendingRef.current) return;
+    submissionPendingRef.current = true;
 
     const optimisticUserMessage = createOptimisticUserMessage(question, language, t("common.justNow"));
     const assistantMessageId = `local-assistant-${Date.now()}`;
@@ -520,6 +526,7 @@ export function ContractAssistantPage() {
     setSending(true);
     setError("");
     lastSubmissionRef.current = {
+      requestId,
       workspaceId: targetWorkspaceId,
       sessionId: targetSessionId ?? "",
       message: question,
@@ -531,11 +538,16 @@ export function ContractAssistantPage() {
             getAccessToken(),
             targetSessionId,
             question,
+            undefined,
+            undefined,
+            requestId,
           )
         : await sendWorkspaceMessage(
             getAccessToken(),
             targetWorkspaceId,
             question,
+            undefined,
+            requestId,
           );
 
       if (conversation?.chatSession) {
@@ -552,14 +564,24 @@ export function ContractAssistantPage() {
           {
             ...toDisplayMessage(conversation.assistantMessage, language, t("common.justNow")),
             id: conversation.assistantMessage.messageId ?? assistantMessageId,
+            intent: conversation.intent,
+            suggestedActions: conversation.suggestedActions,
+            draftingPrompt: conversation.draftingPrompt,
+            redactionRequired: conversation.redactionRequired,
           },
         ]);
       }
-    } catch {
+    } catch (err) {
+      if (isPlanEntitlementError(err)) {
+        toast.warning("Dịch vụ này yêu cầu gói phù hợp. Vui lòng chọn hoặc nâng cấp gói để tiếp tục.");
+        navigate("/billing/subscribe?reason=plan-required");
+        return;
+      }
       const message = t("chat.messageSendError");
       setError(message);
       toast.error(message, t("toast.errorTitle"));
     } finally {
+      submissionPendingRef.current = false;
       setSending(false);
     }
   };
@@ -797,6 +819,33 @@ export function ContractAssistantPage() {
                               content={message.content}
                               className={assistant ? "text-on-surface dark:text-slate-100" : "text-white"}
                             />
+                            {message.intent === "CONTRACT_PROMPT_GENERATION" && message.draftingPrompt && (
+                              <div className="mt-md rounded-lg border border-legal-border bg-surface-container-low p-md dark:border-slate-700 dark:bg-slate-800">
+                                <p className="mb-sm text-xs font-semibold uppercase tracking-wide text-on-surface-variant dark:text-slate-300">
+                                  Drafting prompt {message.redactionRequired ? "· dữ liệu nhạy cảm đã được ẩn" : ""}
+                                </p>
+                                <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-md bg-white p-sm text-xs text-on-surface dark:bg-slate-950 dark:text-slate-100">
+                                  {message.draftingPrompt}
+                                </pre>
+                                <div className="mt-sm flex flex-wrap gap-sm">
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    leftIcon={<ClipboardCheck className="h-4 w-4" />}
+                                    onClick={() => void navigator.clipboard.writeText(message.draftingPrompt ?? "")}
+                                  >
+                                    Sao chép prompt
+                                  </Button>
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => window.open("https://chatgpt.com/", "_blank", "noopener,noreferrer")}
+                                  >
+                                    Mở ChatGPT
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
                             {shouldShowTicketAction && (
                               <div className="mt-md rounded-lg border border-legal-border bg-surface-container-low p-sm dark:border-slate-700 dark:bg-slate-800">
                                 <div className="flex flex-wrap gap-xs">

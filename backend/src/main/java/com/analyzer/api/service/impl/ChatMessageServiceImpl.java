@@ -4,6 +4,7 @@ import com.analyzer.api.client.PythonAiClient;
 import com.analyzer.api.dto.PageResponse;
 import com.analyzer.api.dto.ai.RagQueryRequest;
 import com.analyzer.api.dto.ai.RagQueryResponse;
+import com.analyzer.api.dto.ai.QueryContextSnapshot;
 import com.analyzer.api.dto.chatmessage.ChatMessageFeedbackRequest;
 import com.analyzer.api.dto.chatmessage.ChatMessageFeedbackResponse;
 import com.analyzer.api.dto.chatmessage.ChatMessageResponse;
@@ -42,6 +43,7 @@ import com.analyzer.api.repository.WorkspaceRepository;
 import com.analyzer.api.repository.ai.AiCitationRepository;
 import com.analyzer.api.service.ChatMessageService;
 import com.analyzer.api.service.SubscriptionQuotaService;
+import com.analyzer.api.service.PolicyAcceptanceService;
 import com.analyzer.api.service.conversation.ConversationHistoryAssembler;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -59,6 +61,7 @@ import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -77,6 +80,7 @@ public class ChatMessageServiceImpl implements ChatMessageService {
     private final PythonAiClient pythonAiClient;
     private final UserRepository userRepository;
     private final SubscriptionQuotaService subscriptionQuotaService;
+    private final PolicyAcceptanceService policyAcceptanceService;
     private final AiCitationRepository aiCitationRepository;
     private final ChatMessageFeedbackRepository chatMessageFeedbackRepository;
     private final ChatSessionDocumentRepository chatSessionDocumentRepository;
@@ -84,15 +88,13 @@ public class ChatMessageServiceImpl implements ChatMessageService {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
-    @Transactional(noRollbackFor = { AiServiceUnavailableException.class, AiServiceTimeoutException.class })
+    @Transactional(noRollbackFor = { AiServiceUnavailableException.class, AiServiceTimeoutException.class,
+            InvalidAiResponseException.class })
     public SendMessageResponse sendMessageInWorkspace(Long userId, String workspaceId, SendMessageRequest request) {
         // Validate request
         validateMessageRequest(request);
         User currentUser = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        subscriptionQuotaService.checkCanUseAiChat(currentUser,
-                estimateTokens(request.getMessage()) + SYSTEM_PROMPT_TOKEN_OVERHEAD);
-
         // Find Workspace
         Workspace workspace = workspaceRepository.findById(workspaceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Workspace not found"));
@@ -117,25 +119,32 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                 .orElseGet(() -> createDefaultChatSession(workspace));
 
         ensureAttachedDocumentsReady(chatSession, userId);
+        requirePoliciesForDocumentProcessing(chatSession, userId, selectedDocument);
+
+        String requestId = resolveRequestId(request);
+        Optional<SendMessageResponse> replay = replayCompletedRequest(currentUser, chatSession, requestId);
+        if (replay.isPresent()) {
+            return replay.get();
+        }
+        subscriptionQuotaService.reserveAiChatQuota(currentUser, requestId,
+                estimateTokens(request.getMessage()) + SYSTEM_PROMPT_TOKEN_OVERHEAD);
 
         // Create User Message
-        ChatMessage userMessage = createAndSaveUserMessage(chatSession, request.getMessage().trim());
+        ChatMessage userMessage = createOrReuseUserMessage(chatSession, request.getMessage().trim(), requestId);
 
         // Process AI Query
         return executeAiQuery(currentUser, workspace, chatSession, userMessage, request.getMessage().trim(),
-                selectedDocument, request);
+                selectedDocument, request, requestId);
     }
 
     @Override
-    @Transactional(noRollbackFor = { AiServiceUnavailableException.class, AiServiceTimeoutException.class })
+    @Transactional(noRollbackFor = { AiServiceUnavailableException.class, AiServiceTimeoutException.class,
+            InvalidAiResponseException.class })
     public SendMessageResponse sendMessageInChatSession(Long userId, String chatSessionId, SendMessageRequest request) {
         // Validate request
         validateMessageRequest(request);
         User currentUser = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        subscriptionQuotaService.checkCanUseAiChat(currentUser,
-                estimateTokens(request.getMessage()) + SYSTEM_PROMPT_TOKEN_OVERHEAD);
-
         // Find ChatSession
         ChatSession chatSession = chatSessionRepository.findById(chatSessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Chat session not found"));
@@ -161,13 +170,22 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         Document selectedDocument = resolveSelectedDocument(userId, workspace.getId(), request.getDocumentId());
 
         ensureAttachedDocumentsReady(chatSession, userId);
+        requirePoliciesForDocumentProcessing(chatSession, userId, selectedDocument);
+
+        String requestId = resolveRequestId(request);
+        Optional<SendMessageResponse> replay = replayCompletedRequest(currentUser, chatSession, requestId);
+        if (replay.isPresent()) {
+            return replay.get();
+        }
+        subscriptionQuotaService.reserveAiChatQuota(currentUser, requestId,
+                estimateTokens(request.getMessage()) + SYSTEM_PROMPT_TOKEN_OVERHEAD);
 
         // Create User Message
-        ChatMessage userMessage = createAndSaveUserMessage(chatSession, request.getMessage().trim());
+        ChatMessage userMessage = createOrReuseUserMessage(chatSession, request.getMessage().trim(), requestId);
 
         // Process AI Query
         return executeAiQuery(currentUser, workspace, chatSession, userMessage, request.getMessage().trim(),
-                selectedDocument, request);
+                selectedDocument, request, requestId);
     }
 
     @Override
@@ -417,7 +435,21 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         return chatSessionRepository.save(chatSession);
     }
 
-    private ChatMessage createAndSaveUserMessage(ChatSession chatSession, String content) {
+    private ChatMessage createOrReuseUserMessage(ChatSession chatSession, String content, String requestId) {
+        Optional<ChatMessage> existing = chatMessageRepository
+                .findTopByRequestIdAndUserIdAndRoleOrderByCreatedAtDesc(
+                        requestId, chatSession.getUser().getId(), ChatMessageRole.USER);
+        if (existing.isPresent()) {
+            ChatMessage message = existing.get();
+            if (!message.getChatSession().getId().equals(chatSession.getId())
+                    || !message.getContent().equals(content)) {
+                throw new ConflictException("REQUEST_ID_REUSED",
+                        "The requestId is already associated with different query content");
+            }
+            message.setStatus(ChatMessageStatus.PROCESSING);
+            message.setErrorMessage(null);
+            return chatMessageRepository.save(message);
+        }
         String userMessageId = "msg_" + UUID.randomUUID().toString().replace("-", "");
         ChatMessage userMessage = ChatMessage.builder()
                 .id(userMessageId)
@@ -427,6 +459,7 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                 .messageType(ChatMessageType.NORMAL_CHAT)
                 .content(content)
                 .status(ChatMessageStatus.PROCESSING)
+                .requestId(requestId)
                 .build();
         return chatMessageRepository.save(userMessage);
     }
@@ -438,8 +471,8 @@ public class ChatMessageServiceImpl implements ChatMessageService {
             ChatMessage userMessage,
             String question,
             Document selectedDocument,
-            SendMessageRequest sendRequest) {
-        String requestId = "req_" + UUID.randomUUID().toString().replace("-", "");
+            SendMessageRequest sendRequest,
+            String requestId) {
         userMessage.setRequestId(requestId);
 
         if (chatSession.getIsDefault() && "Default Conversation".equals(chatSession.getTitle())) {
@@ -451,7 +484,19 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         }
 
         RagQueryResponse aiResponse;
-        String assistantMessageId = "msg_" + UUID.randomUUID().toString().replace("-", "");
+        ChatMessage assistantMessage = chatMessageRepository
+                .findTopByRequestIdAndUserIdAndRoleOrderByCreatedAtDesc(
+                        requestId, currentUser.getId(), ChatMessageRole.ASSISTANT)
+                .orElseGet(() -> ChatMessage.builder()
+                        .id("msg_" + UUID.randomUUID().toString().replace("-", ""))
+                        .chatSession(chatSession)
+                        .user(chatSession.getUser())
+                        .role(ChatMessageRole.ASSISTANT)
+                        .messageType(ChatMessageType.NORMAL_CHAT)
+                        .content("")
+                        .requestId(requestId)
+                        .build());
+        String assistantMessageId = assistantMessage.getId();
         ChatMode resolvedMode = ChatMode.LEGAL_QA;
         try {
             var activeMappings = chatSessionDocumentRepository
@@ -504,11 +549,58 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                     .topKUserChunks(5)
                     .topKKnowledgeChunks(5)
                     .build();
+            QueryContextSnapshot contextSnapshot = QueryContextSnapshot.builder()
+                    .requestId(requestId)
+                    .userId(currentUser.getId())
+                    .workspaceId(workspace.getId())
+                    .chatSessionId(chatSession.getId())
+                    .attachedDocumentIds(List.copyOf(attachedDocumentIds))
+                    .documentVersions(activeMappings.stream()
+                            .map(mapping -> mapping.getDocument())
+                            .map(document -> new QueryContextSnapshot.DocumentVersion(
+                                    document.getId(), document.getUpdatedAt(), document.getStatus()))
+                            .toList())
+                    .messageAttachedDocumentIds(List.copyOf(messageAttachedDocumentIds))
+                    .focusedDocumentId(focusedDocumentId)
+                    .conversationSummary(chatSession.getConversationSummaryJson())
+                    .recentHistory(List.copyOf(memoryWindow.recentHistory()))
+                    .planType(subscriptionQuotaService.getCurrentPlan(currentUser).getPlanType())
+                    .termsVersion(policyAcceptanceService.currentTermsVersion())
+                    .privacyPolicyVersion(policyAcceptanceService.currentPrivacyVersion())
+                    .estimatedTokens(estimateTokens(question) + SYSTEM_PROMPT_TOKEN_OVERHEAD)
+                    .createdAt(LocalDateTime.now())
+                    .build();
+            String contextSnapshotJson = objectMapper.writeValueAsString(contextSnapshot);
+            assistantMessage.setStatus(ChatMessageStatus.PROCESSING);
+            assistantMessage.setContent("");
+            assistantMessage.setErrorMessage(null);
+            assistantMessage.setResolvedMode(resolvedMode);
+            assistantMessage.setContextSnapshotJson(contextSnapshotJson);
+            chatMessageRepository.save(assistantMessage);
+            subscriptionQuotaService.attachAiQueryContext(
+                    currentUser, requestId, workspace.getId(), chatSession.getId(), contextSnapshotJson);
             aiResponse = pythonAiClient.query(aiRequest);
+            java.util.Set<String> allowedDocumentIds = new java.util.HashSet<>(attachedDocumentIds);
+            allowedDocumentIds.addAll(messageAttachedDocumentIds);
+            if (selectedDocument != null) allowedDocumentIds.add(selectedDocument.getId());
+            validateAiResponse(aiResponse, requestId, allowedDocumentIds);
         } catch (NoReadyDocumentsException ex) {
             userMessage.setStatus(ChatMessageStatus.FAILED);
             userMessage.setErrorMessage(ex.getMessage());
             chatMessageRepository.save(userMessage);
+            subscriptionQuotaService.failAiChatQuota(currentUser, requestId, "DOCUMENT_NOT_READY");
+            throw ex;
+        } catch (JsonProcessingException ex) {
+            subscriptionQuotaService.failAiChatQuota(currentUser, requestId, "INVALID_QUERY_SNAPSHOT");
+            throw new InvalidAiResponseException("Unable to create a safe immutable query context");
+        } catch (InvalidAiResponseException ex) {
+            userMessage.setStatus(ChatMessageStatus.FAILED);
+            userMessage.setErrorMessage(ex.getMessage());
+            chatMessageRepository.save(userMessage);
+            assistantMessage.setStatus(ChatMessageStatus.FAILED);
+            assistantMessage.setErrorMessage(ex.getMessage());
+            chatMessageRepository.save(assistantMessage);
+            subscriptionQuotaService.failAiChatQuota(currentUser, requestId, ex.getErrorCode());
             throw ex;
         } catch (AiServiceUnavailableException | AiServiceTimeoutException ex) {
             // Persist failed user message state
@@ -517,24 +609,27 @@ public class ChatMessageServiceImpl implements ChatMessageService {
             chatMessageRepository.save(userMessage);
 
             // Persist failed assistant message
-            ChatMessage assistantMessage = ChatMessage.builder()
-                    .id(assistantMessageId)
-                    .chatSession(chatSession)
-                    .user(chatSession.getUser())
-                    .role(ChatMessageRole.ASSISTANT)
-                    .messageType(ChatMessageType.NORMAL_CHAT)
-                    .content("AI service is currently unavailable. Please try again later.")
-                    .status(ChatMessageStatus.FAILED)
-                    .requestId(requestId)
-                    .resolvedMode(resolvedMode)
-                    .errorMessage(ex.getMessage())
-                    .build();
+            assistantMessage.setContent("AI service is currently unavailable. Please try again later.");
+            assistantMessage.setStatus(ChatMessageStatus.FAILED);
+            assistantMessage.setResolvedMode(resolvedMode);
+            assistantMessage.setErrorMessage(ex.getMessage());
             chatMessageRepository.save(assistantMessage);
+            subscriptionQuotaService.failAiChatQuota(currentUser, requestId,
+                    ex instanceof AiServiceTimeoutException ? "AI_PROVIDER_TIMEOUT" : "AI_SERVICE_UNAVAILABLE");
 
             // Update session timestamp
             chatSession.setLastMessageAt(LocalDateTime.now());
             chatSessionRepository.save(chatSession);
 
+            throw ex;
+        } catch (RuntimeException ex) {
+            userMessage.setStatus(ChatMessageStatus.FAILED);
+            userMessage.setErrorMessage(ex.getMessage());
+            chatMessageRepository.save(userMessage);
+            assistantMessage.setStatus(ChatMessageStatus.FAILED);
+            assistantMessage.setErrorMessage(ex.getMessage());
+            chatMessageRepository.save(assistantMessage);
+            subscriptionQuotaService.failAiChatQuota(currentUser, requestId, "QUERY_EXECUTION_FAILED");
             throw ex;
         }
 
@@ -542,41 +637,31 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         userMessage.setStatus(ChatMessageStatus.COMPLETED);
         chatMessageRepository.save(userMessage);
 
-        // Create successful assistant message
-        ChatMessage.ChatMessageBuilder assistantBuilder = ChatMessage.builder()
-                .id(assistantMessageId)
-                .chatSession(chatSession)
-                .user(chatSession.getUser())
-                .role(ChatMessageRole.ASSISTANT)
-                .messageType(ChatMessageType.NORMAL_CHAT)
-                .content(aiResponse.getAnswer())
-                .status(ChatMessageStatus.COMPLETED)
-                .requestId(requestId)
-                .resolvedMode(resolvedMode)
-                .aiModel(aiResponse.getModel());
+        assistantMessage.setContent(aiResponse.getAnswer());
+        assistantMessage.setStatus(ChatMessageStatus.COMPLETED);
+        assistantMessage.setResolvedMode(resolvedMode);
+        assistantMessage.setAiModel(aiResponse.getModel());
 
         if (aiResponse.getUsage() != null) {
-            assistantBuilder.promptTokens(aiResponse.getUsage().getPromptTokens())
-                    .completionTokens(aiResponse.getUsage().getCompletionTokens())
-                    .totalTokens(aiResponse.getUsage().getTotalTokens());
+            assistantMessage.setPromptTokens(aiResponse.getUsage().getPromptTokens());
+            assistantMessage.setCompletionTokens(aiResponse.getUsage().getCompletionTokens());
+            assistantMessage.setTotalTokens(aiResponse.getUsage().getTotalTokens());
         }
 
-        assistantBuilder
-                .confidenceScore(aiResponse.getConfidenceScore())
-                .shouldSuggestTicket(aiResponse.getShouldSuggestTicket())
-                .suggestionType(aiResponse.getSuggestionType())
-                .suggestionReason(aiResponse.getSuggestionReason())
-                .missingInformation(aiResponse.getMissingInformation())
-                .riskLevel(aiResponse.getRiskLevel())
-                .legalDomain(aiResponse.getLegalDomain())
-                .userActionHint(aiResponse.getUserActionHint());
-
-        ChatMessage assistantMessage = assistantBuilder.build();
+        assistantMessage.setConfidenceScore(aiResponse.getConfidenceScore());
+        assistantMessage.setShouldSuggestTicket(aiResponse.getShouldSuggestTicket());
+        assistantMessage.setSuggestionType(aiResponse.getSuggestionType());
+        assistantMessage.setSuggestionReason(aiResponse.getSuggestionReason());
+        assistantMessage.setMissingInformation(aiResponse.getMissingInformation());
+        assistantMessage.setRiskLevel(aiResponse.getRiskLevel());
+        assistantMessage.setLegalDomain(aiResponse.getLegalDomain());
+        assistantMessage.setUserActionHint(aiResponse.getUserActionHint());
         chatMessageRepository.save(assistantMessage);
         applyConversationMemoryUpdate(chatSession, aiResponse.getConversationMemoryUpdate());
         saveCitations(chatSession.getWorkspace().getId(), aiResponse.getCitations(), assistantMessage);
-        subscriptionQuotaService.recordAiChatUsage(
+        subscriptionQuotaService.completeAiChatQuota(
                 currentUser,
+                requestId,
                 assistantMessage.getPromptTokens() == null ? estimateTokens(question)
                         : assistantMessage.getPromptTokens(),
                 assistantMessage.getCompletionTokens() == null ? estimateTokens(aiResponse.getAnswer())
@@ -599,7 +684,117 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                         ? List.of()
                         : List.of(aiResponse.getUserActionHint()))
                 .assistantMessageId(assistantMessage.getId())
+                .intent(aiResponse.getIntent())
+                .intents(aiResponse.getIntents())
+                .suggestedActions(aiResponse.getSuggestedActions())
+                .selectedDocumentIds(aiResponse.getSelectedDocumentIds())
+                .draftingPrompt(aiResponse.getDraftingPrompt())
+                .redactionRequired(aiResponse.getRedactionRequired())
                 .build();
+    }
+
+    private String resolveRequestId(SendMessageRequest request) {
+        String requestId = request.getRequestId();
+        if (requestId == null || requestId.isBlank()) {
+            return "req_" + UUID.randomUUID().toString().replace("-", "");
+        }
+        return requestId.trim();
+    }
+
+    private void requirePoliciesForDocumentProcessing(ChatSession session, Long userId, Document selectedDocument) {
+        if (selectedDocument != null
+                || chatSessionDocumentRepository.countByChatSessionIdAndUserIdAndActiveTrue(session.getId(), userId) > 0) {
+            policyAcceptanceService.requireCurrent(userId);
+        }
+    }
+
+    private Optional<SendMessageResponse> replayCompletedRequest(
+            User user, ChatSession session, String requestId) {
+        Optional<ChatMessage> existingAssistant = chatMessageRepository
+                .findTopByRequestIdAndUserIdAndRoleOrderByCreatedAtDesc(
+                        requestId, user.getId(), ChatMessageRole.ASSISTANT);
+        if (existingAssistant.isEmpty()) {
+            return Optional.empty();
+        }
+        ChatMessage assistant = existingAssistant.get();
+        if (!assistant.getChatSession().getId().equals(session.getId())) {
+            throw new ConflictException("REQUEST_ID_REUSED",
+                    "The requestId is already associated with another chat session");
+        }
+        if (assistant.getStatus() == ChatMessageStatus.PROCESSING) {
+            throw new ConflictException("QUERY_ALREADY_PROCESSING", "This query is already processing");
+        }
+        if (assistant.getStatus() != ChatMessageStatus.COMPLETED) {
+            return Optional.empty();
+        }
+        ChatMessage userMessage = chatMessageRepository
+                .findTopByRequestIdAndUserIdAndRoleOrderByCreatedAtDesc(
+                        requestId, user.getId(), ChatMessageRole.USER)
+                .orElse(null);
+        List<RagQueryResponse.Citation> citations = aiCitationRepository.findByChatMessage_Id(assistant.getId())
+                .stream()
+                .map(this::toStoredCitation)
+                .toList();
+        return Optional.of(SendMessageResponse.builder()
+                .chatSession(toChatSessionResponse(session))
+                .userMessage(toChatMessageResponse(userMessage))
+                .assistantMessage(toChatMessageResponse(assistant))
+                .answer(assistant.getContent())
+                .resolvedMode(assistant.getResolvedMode())
+                .sources(citations)
+                .riskLevel(assistant.getRiskLevel())
+                .suggestionType(assistant.getSuggestionType())
+                .userActionHints(assistant.getUserActionHint() == null
+                        ? List.of() : List.of(assistant.getUserActionHint()))
+                .assistantMessageId(assistant.getId())
+                .build());
+    }
+
+    private RagQueryResponse.Citation toStoredCitation(AiCitation citation) {
+        boolean knowledgeBase = citation.getSourceType() == CitationSourceType.KNOWLEDGE_BASE;
+        return RagQueryResponse.Citation.builder()
+                .citationId(citation.getSourceReferenceId())
+                .sourceType(knowledgeBase ? "SYSTEM_KB" : "USER_DOCUMENT")
+                .documentId(knowledgeBase ? null : citation.getSourceReferenceId())
+                .knowledgeDocumentId(knowledgeBase ? citation.getSourceReferenceId() : null)
+                .fileName(citation.getLabel())
+                .sectionTitle(citation.getLabel())
+                .excerpt(citation.getExcerpt())
+                .pageNumber(citation.getPageNumber())
+                .score(citation.getScore())
+                .build();
+    }
+
+    static void validateAiResponse(RagQueryResponse response, String requestId) {
+        validateAiResponse(response, requestId, null);
+    }
+
+    static void validateAiResponse(RagQueryResponse response, String requestId,
+                                   java.util.Set<String> allowedDocumentIds) {
+        if (response == null || response.getAnswer() == null || response.getAnswer().isBlank()) {
+            throw new InvalidAiResponseException("AI returned an empty or malformed response");
+        }
+        if (response.getRequestId() != null && !requestId.equals(response.getRequestId())) {
+            throw new InvalidAiResponseException("AI response requestId does not match the query");
+        }
+        if (response.getConfidenceScore() != null
+                && (response.getConfidenceScore() < 0 || response.getConfidenceScore() > 1)) {
+            throw new InvalidAiResponseException("AI confidence must be between 0 and 1");
+        }
+        if (response.getLegalDomain() != null
+                && response.getConfidenceScore() != null && response.getConfidenceScore() >= 0.8
+                && (response.getCitations() == null || response.getCitations().isEmpty())) {
+            throw new InvalidAiResponseException("High-confidence AI responses require supporting citations");
+        }
+        if (allowedDocumentIds != null && response.getCitations() != null) {
+            boolean invalidUserCitation = response.getCitations().stream()
+                    .filter(citation -> "USER_DOCUMENT".equalsIgnoreCase(citation.getSourceType()))
+                    .map(RagQueryResponse.Citation::getDocumentId)
+                    .anyMatch(documentId -> documentId == null || !allowedDocumentIds.contains(documentId));
+            if (invalidUserCitation) {
+                throw new InvalidAiResponseException("AI returned a citation outside the immutable document snapshot");
+            }
+        }
     }
 
     static ChatMode resolveChatMode(
@@ -664,6 +859,13 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         }
 
         List<AiCitation> entities = citations.stream()
+                .filter(citation -> citation.getCitationId() != null && !citation.getCitationId().isBlank())
+                .collect(java.util.stream.Collectors.toMap(
+                        citation -> citation.getCitationId().toUpperCase(),
+                        citation -> citation,
+                        (first, duplicate) -> first,
+                        java.util.LinkedHashMap::new))
+                .values().stream()
                 .map(citation -> {
                     boolean knowledgeBase = "SYSTEM_KB".equalsIgnoreCase(citation.getSourceType());
                     String sourceReferenceId = firstNonBlank(

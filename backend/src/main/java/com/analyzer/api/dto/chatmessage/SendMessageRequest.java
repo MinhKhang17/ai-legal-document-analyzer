@@ -18,6 +18,9 @@ import java.util.List;
 @AllArgsConstructor
 public class SendMessageRequest {
 
+    @Size(max = 100, message = "Request ID must not exceed 100 characters")
+    private String requestId;
+
     @NotBlank(message = "Message content is required")
     @Size(max = 5000, message = "Message content must not exceed 5000 characters")
     @JsonAlias("query")

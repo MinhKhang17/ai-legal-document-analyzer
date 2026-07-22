@@ -6,6 +6,7 @@ import com.analyzer.api.entity.User;
 import com.analyzer.api.enums.PlanStatus;
 import com.analyzer.api.exception.common.ConflictException;
 import com.analyzer.api.repository.ChatMessageRepository;
+import com.analyzer.api.repository.AiQueryExecutionRepository;
 import com.analyzer.api.repository.ChatSessionDocumentRepository;
 import com.analyzer.api.repository.DocumentRepository;
 import com.analyzer.api.repository.LegalTicketRepository;
@@ -40,6 +41,7 @@ class SubscriptionQuotaServiceImplTest {
     @Mock WorkspaceRepository workspaceRepository;
     @Mock DocumentRepository documentRepository;
     @Mock ChatMessageRepository chatMessageRepository;
+    @Mock AiQueryExecutionRepository aiQueryExecutionRepository;
     @Mock ContractGenerationJobRepository contractGenerationJobRepository;
     @Mock LegalTicketRepository legalTicketRepository;
     @Mock SubscriptionUsageRepository subscriptionUsageRepository;

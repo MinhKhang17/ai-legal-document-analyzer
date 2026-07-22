@@ -41,6 +41,7 @@ interface ApiErrorResponse {
 }
 
 type SendMessageRequest = {
+  requestId?: string;
   message: string;
   documentId?: string;
   documentIds?: string[];
@@ -344,15 +345,17 @@ export async function sendWorkspaceMessage(
   workspaceId: string,
   message: string,
   documentId?: string,
+  requestId?: string,
 ): Promise<WorkspaceChatConversation> {
   const response = await postJson<ApiResponse<WorkspaceChatConversation>>(
     API_ENDPOINTS.chat.workspaceMessages(workspaceId),
-    { message, ...(documentId ? { documentId } : {}) } satisfies SendMessageRequest,
+    { requestId, message, ...(documentId ? { documentId } : {}) } satisfies SendMessageRequest,
     "Không thể gửi câu hỏi",
     accessToken,
   );
 
   return {
+    ...response.data,
     chatSession: mapSession(response.data.chatSession),
     userMessage: mapMessage(response.data.userMessage),
     assistantMessage: mapMessage(response.data.assistantMessage),
@@ -365,16 +368,18 @@ export async function sendChatSessionMessage(
   message: string,
   documentId?: string,
   signal?: AbortSignal,
+  requestId?: string,
 ): Promise<WorkspaceChatConversation> {
   const response = await postJson<ApiResponse<WorkspaceChatConversation>>(
     API_ENDPOINTS.chat.sessionMessages(chatSessionId),
-    { message, ...(documentId ? { documentId } : {}) } satisfies SendMessageRequest,
+    { requestId, message, ...(documentId ? { documentId } : {}) } satisfies SendMessageRequest,
     "Không thể gửi câu hỏi",
     accessToken,
     signal,
   );
 
   return {
+    ...response.data,
     chatSession: mapSession(response.data.chatSession),
     userMessage: mapMessage(response.data.userMessage),
     assistantMessage: mapMessage(response.data.assistantMessage),

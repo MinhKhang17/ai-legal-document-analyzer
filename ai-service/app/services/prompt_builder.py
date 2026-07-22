@@ -11,6 +11,8 @@ from app.services.token_budget import PromptTokenBudget, truncate_to_token_budge
 
 def build_system_prompt() -> str:
     base_prompt = (
+        "Hệ thống không phải luật sư và không thay thế tư vấn pháp lý chuyên nghiệp.\n"
+        "Phạm vi không bao gồm hợp đồng thương mại phức tạp; hệ thống ưu tiên các giao dịch như mua bán tài sản cá nhân nhỏ.\n"
         "Bạn là LexAI, trợ lý pháp lý thông minh và thân thiện.\n\n"
         "Nhiệm vụ của bạn là giúp người dùng hiểu các tài liệu pháp lý, hợp đồng, quyết định hành chính và các văn bản liên quan bằng ngôn ngữ dễ hiểu.\n\n"
 
@@ -499,6 +501,7 @@ def build_intent_instruction(
         )
 
     elif intent == LegalQueryIntent.SIGNING_DECISION_SUPPORT:
+        parts.append("không quyết định hoặc khuyến khích ký thay người dùng.\n")
         parts.append(
             "BẠN ĐANG THỰC HIỆN: HỖ TRỢ QUYẾT ĐỊNH KÝ HỢP ĐỒNG\n\n"
             "Không quyết định hoặc khuyến khích ký thay người dùng. Bắt buộc nói rõ hệ thống không "
