@@ -20,7 +20,6 @@ import com.analyzer.api.repository.LegalTicketRepository;
 import com.analyzer.api.repository.UserRepository;
 import com.analyzer.api.service.admin.AdminTicketManagementService;
 import com.analyzer.api.service.EmailService;
-import com.analyzer.api.service.ExpertRevenueService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,13 +31,21 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AdminTicketManagementServiceImpl implements AdminTicketManagementService {
 
+    private static final List<LegalTicketStatus> ASSIGNABLE_STATUSES = List.of(
+            LegalTicketStatus.DRAFT,
+            LegalTicketStatus.PENDING_ADMIN_REVIEW,
+            LegalTicketStatus.ASSIGNED_TO_LAWYER,
+            LegalTicketStatus.IN_REVIEW,
+            LegalTicketStatus.NEED_MORE_INFO,
+            LegalTicketStatus.CUSTOMER_RESPONDED,
+            LegalTicketStatus.REOPENED);
+
     private final LegalTicketRepository legalTicketRepository;
     private final LegalTicketMessageRepository legalTicketMessageRepository;
     private final DocumentRepository documentRepository;
     private final UserRepository userRepository;
     private final LegalTicketMapper legalTicketMapper;
     private final EmailService emailService;
-    private final ExpertRevenueService expertRevenueService;
 
     @Override
     @Transactional
@@ -49,8 +56,16 @@ public class AdminTicketManagementServiceImpl implements AdminTicketManagementSe
         if (ticket.getTicketType() == com.analyzer.api.enums.LegalTicketType.REFUND_REQUEST) {
             throw new ConflictException("REFUND_TICKET_ADMIN_ONLY");
         }
+        if (!ASSIGNABLE_STATUSES.contains(ticket.getStatus())) {
+            throw new ConflictException("INVALID_STATUS_TRANSITION");
+        }
         if (ticket.getAssignedLawyer() != null && !Boolean.TRUE.equals(request.getForceReassign())) {
             throw new ConflictException("Ticket đã được phân công cho Luật sư ID: " + ticket.getAssignedLawyer().getId());
+        }
+
+        if (ticket.getAssignedLawyer() != null
+                && ticket.getAssignedLawyer().getId().equals(request.getLawyerId())) {
+            return legalTicketMapper.toResponse(ticket);
         }
         if (Boolean.TRUE.equals(request.getForceReassign()) && hasPaymentData(ticket)) {
             throw new ConflictException("CANNOT_REASSIGN_TICKET_WITH_PAYMENT_SET");
@@ -58,8 +73,9 @@ public class AdminTicketManagementServiceImpl implements AdminTicketManagementSe
 
         User lawyer = userRepository.findById(request.getLawyerId())
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy Luật sư ID: " + request.getLawyerId()));
-        if (lawyer.getRole() == null || lawyer.getRole().getName() != RoleName.EXPERT) {
-            throw new ConflictException("USER_IS_NOT_EXPERT");
+
+        if (!lawyer.isActive() || lawyer.getRole() == null || lawyer.getRole().getName() != RoleName.EXPERT) {
+            throw new ConflictException("ASSIGNEE_MUST_BE_ACTIVE_EXPERT");
         }
 
         ticket.setAssignedLawyer(lawyer);
@@ -81,8 +97,8 @@ public class AdminTicketManagementServiceImpl implements AdminTicketManagementSe
 
     private boolean hasPaymentData(LegalTicket ticket) {
         return ticket.getExpertPaymentStatus() != ExpertPaymentStatus.UNPAID
-                || (ticket.getConsultationFee() != null && ticket.getConsultationFee().compareTo(BigDecimal.ZERO) > 0)
-                || ticket.getCommissionRate() != null;
+                || (ticket.getConsultationFee() != null
+                    && ticket.getConsultationFee().compareTo(BigDecimal.ZERO) > 0);
     }
 
     @Override
@@ -125,7 +141,6 @@ public class AdminTicketManagementServiceImpl implements AdminTicketManagementSe
         ticket.setStatus(LegalTicketStatus.CLOSED);
         ticket.setClosedAt(java.time.LocalDateTime.now());
         ticket.setAdminNote(note);
-        expertRevenueService.applyCommissionSnapshot(ticket);
         legalTicketMessageRepository.save(LegalTicketMessage.builder().ticket(ticket).sender(admin)
                 .content("Admin da dong ticket." + (note == null || note.isBlank() ? "" : " " + note))
                 .messageType(LegalTicketMessageType.SYSTEM).internalOnly(false).build());

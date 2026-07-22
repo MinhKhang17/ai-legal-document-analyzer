@@ -10,6 +10,9 @@ export interface CurrentUser {
   emailVerified?: boolean;
   mustChangePassword?: boolean;
   passwordResetDeadline?: string | null;
+  specialty?: string | null;
+  legalDomain?: string | null;
+  description?: string | null;
 }
 
 export interface ApiResponse<T> {

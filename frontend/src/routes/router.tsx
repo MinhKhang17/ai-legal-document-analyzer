@@ -42,6 +42,7 @@ import { SystemHealthPage } from "../pages/admin/SystemHealthPage";
 import { ContractDetailPage } from "../pages/contracts/ContractDetailPage";
 import { SettingsPage } from "../pages/settings/SettingsPage";
 import { AccountSecurityPage } from "../pages/settings/AccountSecurityPage";
+import { ProfilePage } from "../pages/settings/ProfilePage";
 import { PaymentResultRedirect } from "../pages/billing/PaymentResultRedirect";
 import { LawyerTicketsPage } from "../pages/lawyer/LawyerTicketsPage";
 import { LawyerTicketDetailPage } from "../pages/lawyer/LawyerTicketDetailPage";
@@ -269,6 +270,7 @@ export const router = createBrowserRouter([
       },
       { path: "/settings", element: <SettingsPage /> },
       { path: "/settings/security", element: <AccountSecurityPage /> },
+      { path: "/profile", element: <ProfilePage /> },
       {
         path: "/admin",
         element: (

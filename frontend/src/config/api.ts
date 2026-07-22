@@ -142,6 +142,7 @@ export const API_ENDPOINTS = {
     list: fromEnv("VITE_USERS_API"),
     detail: (userId: number | string) =>
       fillPathParams(fromEnv("VITE_USER_DETAIL_API"), { userId }),
+    profile: fromEnvOrDefault("VITE_USER_PROFILE_API", "/api/v1/users/profile"),
     changePassword: fromEnvOrDefault("VITE_CHANGE_PASSWORD_API", "/api/v1/users/change-password"),
     adminExperts: fromEnvOrDefault("VITE_ADMIN_EXPERTS_API", "/api/v1/admin/users/experts"),
     resendExpertActivation: fromEnvOrDefault("VITE_ADMIN_EXPERT_RESEND_API", "/api/v1/admin/users/experts/resend-activation"),

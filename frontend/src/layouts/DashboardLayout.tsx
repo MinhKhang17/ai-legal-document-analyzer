@@ -17,17 +17,19 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   return (
     <div className={cn(
       'min-h-screen bg-ivory text-on-surface dark:bg-slate-950 dark:text-slate-100',
-      isLegalChat && 'lg:h-screen lg:overflow-hidden',
+      isLegalChat && 'h-screen h-[100dvh] min-h-0 overflow-hidden',
     )}>
       <Sidebar />
       <div className={cn(
-        'min-h-screen transition-all duration-300',
+        'transition-all duration-300',
         sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-72',
-        isLegalChat && 'lg:flex lg:h-screen lg:min-h-0 lg:flex-col lg:overflow-hidden',
+        isLegalChat
+          ? 'flex h-full min-h-0 flex-col overflow-hidden'
+          : 'min-h-screen',
       )}>
         <Topbar />
         <main className={isLegalChat
-          ? 'w-full max-w-none px-md py-xl sm:px-lg lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-hidden lg:px-lg lg:py-md 2xl:px-margin'
+          ? 'flex min-h-0 w-full max-w-none flex-1 flex-col overflow-hidden px-md py-sm sm:px-lg lg:py-md 2xl:px-margin'
           : 'mx-auto w-full max-w-[1480px] px-md py-xl sm:px-lg lg:px-margin'}>
           {children}
         </main>

@@ -59,9 +59,20 @@ public class TicketConversationServiceImpl implements TicketConversationService 
         User lawyer = userRepository.findById(lawyerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin Luật sư ID: " + lawyerId));
 
+        String clientMessageId = normalizeClientMessageId(request.getClientMessageId());
+        if (clientMessageId != null) {
+            var existing = legalTicketMessageRepository
+                    .findByTicket_IdAndSender_IdAndClientMessageId(ticketId, lawyerId, clientMessageId);
+            if (existing.isPresent()) {
+                return ChatWithUserResponse.builder().ticketId(ticketId).messageId(existing.get().getId())
+                        .message(existing.get().getContent()).build();
+            }
+        }
+
         LegalTicketMessage message = LegalTicketMessage.builder()
                 .ticket(ticket)
                 .sender(lawyer)
+                .clientMessageId(clientMessageId)
                 .content(request.getMessage())
                 .messageType(LegalTicketMessageType.EXPERT_RESPONSE)
                 .internalOnly(false)
@@ -84,6 +95,10 @@ public class TicketConversationServiceImpl implements TicketConversationService 
                 .messageId(savedMessage.getId())
                 .message(savedMessage.getContent())
                 .build();
+    }
+
+    private String normalizeClientMessageId(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     @Override

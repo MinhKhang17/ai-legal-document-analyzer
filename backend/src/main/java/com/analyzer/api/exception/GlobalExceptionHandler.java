@@ -3,6 +3,7 @@ package com.analyzer.api.exception;
 import com.analyzer.api.dto.ApiResponseDTO;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -36,6 +37,13 @@ public class GlobalExceptionHandler {
                 return new ResponseEntity<>(
                                 ApiResponseDTO.error(HttpStatus.UNAUTHORIZED.value(), "Email hoặc mật khẩu không đúng"),
                                 HttpStatus.UNAUTHORIZED);
+        }
+
+        @ExceptionHandler(AccessDeniedException.class)
+        public ResponseEntity<ApiResponseDTO<Void>> handleAccessDeniedException(AccessDeniedException ex) {
+                return new ResponseEntity<>(
+                                ApiResponseDTO.error(HttpStatus.FORBIDDEN.value(), "Bạn không có quyền thực hiện thao tác này"),
+                                HttpStatus.FORBIDDEN);
         }
 
         @ExceptionHandler(DisabledException.class)

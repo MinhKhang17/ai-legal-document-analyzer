@@ -6,13 +6,16 @@ import com.analyzer.api.entity.User;
 import com.analyzer.api.enums.PlanStatus;
 import com.analyzer.api.exception.common.ConflictException;
 import com.analyzer.api.repository.ChatMessageRepository;
-import com.analyzer.api.repository.CustomerPlanRepository;
+import com.analyzer.api.repository.ChatSessionDocumentRepository;
 import com.analyzer.api.repository.DocumentRepository;
 import com.analyzer.api.repository.LegalTicketRepository;
 import com.analyzer.api.repository.SubscriptionPlanRepository;
 import com.analyzer.api.repository.WorkspaceRepository;
 import com.analyzer.api.repository.contract.ContractGenerationJobRepository;
 import com.analyzer.api.repository.subscription.SubscriptionUsageRepository;
+import com.analyzer.api.service.support.CustomerPlanExpiryHelper;
+import com.analyzer.api.service.support.CustomerPlanSnapshotHelper;
+import com.analyzer.api.service.support.UserQuotaLock;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -32,21 +35,23 @@ class SubscriptionQuotaServiceImplTest {
     private static final String SANDBOX_NAME = "Contract Assistant Sandbox";
 
     @Mock SubscriptionPlanRepository subscriptionPlanRepository;
-    @Mock CustomerPlanRepository customerPlanRepository;
     @Mock WorkspaceRepository workspaceRepository;
     @Mock DocumentRepository documentRepository;
     @Mock ChatMessageRepository chatMessageRepository;
     @Mock ContractGenerationJobRepository contractGenerationJobRepository;
     @Mock LegalTicketRepository legalTicketRepository;
     @Mock SubscriptionUsageRepository subscriptionUsageRepository;
+    @Mock ChatSessionDocumentRepository chatSessionDocumentRepository;
+    @Mock CustomerPlanExpiryHelper customerPlanExpiryHelper;
+    @Mock CustomerPlanSnapshotHelper customerPlanSnapshotHelper;
+    @Mock UserQuotaLock userQuotaLock;
     @InjectMocks SubscriptionQuotaServiceImpl service;
 
     @Test
     void freeUserCreatesWorkspaceWithinQuota() {
         User user = User.builder().id(10L).build();
         SubscriptionPlan free = plan("FREE", 1, true);
-        when(customerPlanRepository.findTopByCustomerIdAndStatusOrderByCreatedAtDesc(10L, PlanStatus.ACTIVE))
-                .thenReturn(Optional.empty());
+        when(customerPlanExpiryHelper.getActiveOrHandleExpiry(10L)).thenReturn(null);
         when(subscriptionPlanRepository.findByPlanTypeIgnoreCase("FREE")).thenReturn(Optional.of(free));
         when(workspaceRepository.countQuotaWorkspaces(10L, "ACTIVE", SANDBOX_NAME, SANDBOX_DESCRIPTION)).thenReturn(0L);
 
@@ -56,8 +61,7 @@ class SubscriptionQuotaServiceImplTest {
     @Test
     void userAtWorkspaceQuotaGetsExplicitConflict() {
         User user = User.builder().id(10L).build();
-        when(customerPlanRepository.findTopByCustomerIdAndStatusOrderByCreatedAtDesc(10L, PlanStatus.ACTIVE))
-                .thenReturn(Optional.empty());
+        when(customerPlanExpiryHelper.getActiveOrHandleExpiry(10L)).thenReturn(null);
         when(subscriptionPlanRepository.findByPlanTypeIgnoreCase("FREE"))
                 .thenReturn(Optional.of(plan("FREE", 1, true)));
         when(workspaceRepository.countQuotaWorkspaces(10L, "ACTIVE", SANDBOX_NAME, SANDBOX_DESCRIPTION)).thenReturn(1L);
@@ -74,8 +78,8 @@ class SubscriptionQuotaServiceImplTest {
         SubscriptionPlan paid = plan("PREMIUM", 20, true);
         CustomerPlan active = CustomerPlan.builder()
                 .customer(user).subscriptionPlan(paid).status(PlanStatus.ACTIVE).build();
-        when(customerPlanRepository.findTopByCustomerIdAndStatusOrderByCreatedAtDesc(20L, PlanStatus.ACTIVE))
-                .thenReturn(Optional.of(active));
+        when(customerPlanExpiryHelper.getActiveOrHandleExpiry(20L)).thenReturn(active);
+        when(customerPlanSnapshotHelper.effectivePlanView(active)).thenReturn(paid);
         when(workspaceRepository.countQuotaWorkspaces(20L, "ACTIVE", SANDBOX_NAME, SANDBOX_DESCRIPTION)).thenReturn(19L);
 
         assertThatCode(() -> service.checkCanCreateWorkspace(user)).doesNotThrowAnyException();
@@ -86,8 +90,7 @@ class SubscriptionQuotaServiceImplTest {
         User user = User.builder().id(30L).build();
         CustomerPlan active = CustomerPlan.builder()
                 .customer(user).subscriptionPlan(plan("PREMIUM", 20, false)).status(PlanStatus.ACTIVE).build();
-        when(customerPlanRepository.findTopByCustomerIdAndStatusOrderByCreatedAtDesc(30L, PlanStatus.ACTIVE))
-                .thenReturn(Optional.of(active));
+        when(customerPlanExpiryHelper.getActiveOrHandleExpiry(30L)).thenReturn(active);
 
         assertThatThrownBy(() -> service.checkCanCreateWorkspace(user))
                 .isInstanceOf(ConflictException.class)
