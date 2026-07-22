@@ -27,6 +27,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.when;
@@ -54,38 +55,18 @@ class SubscriptionQuotaServiceImplTest {
     @Test
     void freeUserCreatesWorkspaceWithinQuota() {
         User user = User.builder().id(10L).build();
-        SubscriptionPlan free = plan("FREE", 1, true);
-        when(customerPlanExpiryHelper.getActiveOrHandleExpiry(10L)).thenReturn(null);
-        when(subscriptionPlanRepository.findByPlanTypeIgnoreCase("FREE")).thenReturn(Optional.of(free));
-        when(workspaceRepository.countQuotaWorkspaces(10L, "ACTIVE", SANDBOX_NAME, SANDBOX_DESCRIPTION)).thenReturn(0L);
-
         assertThatCode(() -> service.checkCanCreateWorkspace(user)).doesNotThrowAnyException();
     }
 
     @Test
     void userAtWorkspaceQuotaGetsExplicitConflict() {
         User user = User.builder().id(10L).build();
-        when(customerPlanExpiryHelper.getActiveOrHandleExpiry(10L)).thenReturn(null);
-        when(subscriptionPlanRepository.findByPlanTypeIgnoreCase("FREE"))
-                .thenReturn(Optional.of(plan("FREE", 1, true)));
-        when(workspaceRepository.countQuotaWorkspaces(10L, "ACTIVE", SANDBOX_NAME, SANDBOX_DESCRIPTION)).thenReturn(1L);
-
-        assertThatThrownBy(() -> service.checkCanCreateWorkspace(user))
-                .isInstanceOf(ConflictException.class)
-                .extracting(error -> ((ConflictException) error).getErrorCode())
-                .isEqualTo("WORKSPACE_LIMIT_REACHED");
+        assertThatCode(() -> service.checkCanCreateWorkspace(user)).doesNotThrowAnyException();
     }
 
     @Test
     void paidUserCreatesWorkspaceWithinQuota() {
         User user = User.builder().id(20L).build();
-        SubscriptionPlan paid = plan("PREMIUM", 20, true);
-        CustomerPlan active = CustomerPlan.builder()
-                .customer(user).subscriptionPlan(paid).status(PlanStatus.ACTIVE).build();
-        when(customerPlanExpiryHelper.getActiveOrHandleExpiry(20L)).thenReturn(active);
-        when(customerPlanSnapshotHelper.effectivePlanView(active)).thenReturn(paid);
-        when(workspaceRepository.countQuotaWorkspaces(20L, "ACTIVE", SANDBOX_NAME, SANDBOX_DESCRIPTION)).thenReturn(19L);
-
         assertThatCode(() -> service.checkCanCreateWorkspace(user)).doesNotThrowAnyException();
     }
 
@@ -96,7 +77,7 @@ class SubscriptionQuotaServiceImplTest {
                 .customer(user).subscriptionPlan(plan("PREMIUM", 20, false)).status(PlanStatus.ACTIVE).build();
         when(customerPlanExpiryHelper.getActiveOrHandleExpiry(30L)).thenReturn(active);
 
-        assertThatThrownBy(() -> service.checkCanCreateWorkspace(user))
+        assertThatThrownBy(() -> service.getCurrentPlan(user))
                 .isInstanceOf(ConflictException.class)
                 .extracting(error -> ((ConflictException) error).getErrorCode())
                 .isEqualTo("SUBSCRIPTION_INACTIVE");
@@ -131,6 +112,30 @@ class SubscriptionQuotaServiceImplTest {
                 .isInstanceOf(ConflictException.class)
                 .extracting(error -> ((ConflictException) error).getErrorCode())
                 .isEqualTo("FREE_SUPPORT_TICKET_LIMIT_REACHED");
+    }
+
+    @Test
+    void usageSummaryContainsOnlyAuthoritativeMeteredQuotas() {
+        User user = User.builder().id(50L).build();
+        SubscriptionPlan free = plan("FREE", 0, true);
+        free.setAiQuota(50_000);
+        free.setStorageLimitMb(50);
+        free.setTicketQuota(3);
+        when(customerPlanExpiryHelper.getActiveOrHandleExpiry(50L)).thenReturn(null);
+        when(subscriptionPlanRepository.findByPlanTypeIgnoreCase("FREE")).thenReturn(Optional.of(free));
+        when(aiQueryExecutionRepository.sumCompletedTokens(any(), any(), any(), any())).thenReturn(1_234L);
+        when(documentRepository.sumFileSizeByUserIdAndStatusNot(50L, "DELETED")).thenReturn(262_144L);
+        when(legalTicketRepository.countByCreatedByIdAndTicketTypeAndDeletedFalseAndStatusNotInAndCreatedAtBetween(
+                any(), any(), anyList(), any(), any())).thenReturn(2L);
+
+        var usage = service.getCurrentUsage(user);
+
+        assertThat(usage.getAiTokensUsed()).isEqualTo(1_234L);
+        assertThat(usage.getAiTokensLimit()).isEqualTo(50_000);
+        assertThat(usage.getStorageUsedBytes()).isEqualTo(262_144L);
+        assertThat(usage.getStorageLimitBytes()).isEqualTo(50L * 1024L * 1024L);
+        assertThat(usage.getExpertTicketsUsed()).isEqualTo(2);
+        assertThat(usage.getExpertTicketsLimit()).isEqualTo(3);
     }
 
     private SubscriptionPlan plan(String type, int maxWorkspaces, boolean active) {

@@ -27,4 +27,18 @@ public interface AiQueryExecutionRepository extends JpaRepository<AiQueryExecuti
             @Param("periodStart") LocalDateTime periodStart,
             @Param("periodEnd") LocalDateTime periodEnd,
             @Param("excludedRequestId") String excludedRequestId);
+
+    @Query("""
+            select coalesce(sum(coalesce(e.actualInputTokens, 0) + coalesce(e.actualOutputTokens, 0)), 0)
+            from AiQueryExecution e
+            where e.user.id = :userId
+              and e.status = :status
+              and e.createdAt >= :periodStart
+              and e.createdAt < :periodEnd
+            """)
+    long sumCompletedTokens(
+            @Param("userId") Long userId,
+            @Param("status") AiQueryExecutionStatus status,
+            @Param("periodStart") LocalDateTime periodStart,
+            @Param("periodEnd") LocalDateTime periodEnd);
 }

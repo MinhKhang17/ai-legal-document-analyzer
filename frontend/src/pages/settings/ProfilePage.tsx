@@ -364,18 +364,6 @@ export function ProfilePage() {
                 <div className="space-y-md">
                   <div>
                     <div className="mb-xs flex justify-between text-sm">
-                      <span className="font-semibold text-on-surface dark:text-slate-200">{language === 'vi' ? 'Phân tích hợp đồng' : 'Contract Analyses'}</span>
-                      <span className="text-on-surface-variant dark:text-slate-400">
-                        {usageSummary.contractAnalysisUsed} / {usageSummary.contractAnalysisLimit}
-                      </span>
-                    </div>
-                    <ProgressBar
-                      value={calcPercent(usageSummary.contractAnalysisUsed, usageSummary.contractAnalysisLimit)}
-                    />
-                  </div>
-
-                  <div>
-                    <div className="mb-xs flex justify-between text-sm">
                       <span className="font-semibold text-on-surface dark:text-slate-200">{language === 'vi' ? 'Token AI' : 'AI Tokens'}</span>
                       <span className="text-on-surface-variant dark:text-slate-400">
                         {usageSummary.aiTokensUsed.toLocaleString()} / {usageSummary.aiTokensLimit.toLocaleString()}
@@ -388,13 +376,25 @@ export function ProfilePage() {
 
                   <div>
                     <div className="mb-xs flex justify-between text-sm">
-                      <span className="font-semibold text-on-surface dark:text-slate-200">{language === 'vi' ? 'Số lượng Workspace' : 'Workspaces'}</span>
+                      <span className="font-semibold text-on-surface dark:text-slate-200">{language === 'vi' ? 'Dung lượng lưu trữ' : 'Storage'}</span>
                       <span className="text-on-surface-variant dark:text-slate-400">
-                        {usageSummary.workspacesUsed} / {usageSummary.workspacesLimit}
+                        {(usageSummary.storageUsedBytes / 1024 / 1024).toFixed(2)} / {(usageSummary.storageLimitBytes / 1024 / 1024).toFixed(2)} MB
                       </span>
                     </div>
                     <ProgressBar
-                      value={calcPercent(usageSummary.workspacesUsed, usageSummary.workspacesLimit)}
+                      value={calcPercent(usageSummary.storageUsedBytes, usageSummary.storageLimitBytes)}
+                    />
+                  </div>
+
+                  <div>
+                    <div className="mb-xs flex justify-between text-sm">
+                      <span className="font-semibold text-on-surface dark:text-slate-200">{language === 'vi' ? 'Ticket chuyên gia' : 'Expert Tickets'}</span>
+                      <span className="text-on-surface-variant dark:text-slate-400">
+                        {usageSummary.expertTicketsUsed} / {usageSummary.expertTicketsLimit}
+                      </span>
+                    </div>
+                    <ProgressBar
+                      value={calcPercent(usageSummary.expertTicketsUsed, usageSummary.expertTicketsLimit)}
                     />
                   </div>
                 </div>

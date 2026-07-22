@@ -1,21 +1,16 @@
 package com.analyzer.api.e2e;
 
-import com.analyzer.api.entity.ChatMessage;
-import com.analyzer.api.entity.ChatSession;
+import com.analyzer.api.entity.AiQueryExecution;
 import com.analyzer.api.entity.CustomerPlan;
 import com.analyzer.api.entity.Document;
 import com.analyzer.api.entity.Role;
 import com.analyzer.api.entity.SubscriptionPlan;
 import com.analyzer.api.entity.User;
 import com.analyzer.api.entity.Workspace;
-import com.analyzer.api.enums.ChatMessageRole;
-import com.analyzer.api.enums.ChatMessageStatus;
-import com.analyzer.api.enums.ChatMessageType;
-import com.analyzer.api.enums.ChatSessionStatus;
+import com.analyzer.api.enums.AiQueryExecutionStatus;
 import com.analyzer.api.enums.PlanStatus;
 import com.analyzer.api.enums.RoleName;
-import com.analyzer.api.repository.ChatMessageRepository;
-import com.analyzer.api.repository.ChatSessionRepository;
+import com.analyzer.api.repository.AiQueryExecutionRepository;
 import com.analyzer.api.repository.CustomerPlanRepository;
 import com.analyzer.api.repository.DocumentRepository;
 import com.analyzer.api.repository.RoleRepository;
@@ -96,9 +91,7 @@ abstract class AbstractPlanFlowE2ETest {
     @Autowired
     protected DocumentRepository documentRepository;
     @Autowired
-    protected ChatSessionRepository chatSessionRepository;
-    @Autowired
-    protected ChatMessageRepository chatMessageRepository;
+    protected AiQueryExecutionRepository aiQueryExecutionRepository;
     @Autowired
     protected CustomerPlanRepository customerPlanRepository;
     @Autowired
@@ -224,27 +217,16 @@ abstract class AbstractPlanFlowE2ETest {
     // same test, without needing to fight the entity's @PrePersist-managed
     // createdAt.
     protected void recordCompletedAssistantTokens(User owner, Workspace workspace, int totalTokens) {
-        LocalDateTime now = LocalDateTime.now();
-        ChatSession session = ChatSession.builder()
-                .id("cs_" + UUID.randomUUID().toString().replace("-", ""))
+        AiQueryExecution execution = AiQueryExecution.builder()
+                .requestId("req_" + UUID.randomUUID().toString().replace("-", ""))
                 .user(owner)
-                .workspace(workspace)
-                .title("E2E session")
-                .status(ChatSessionStatus.ACTIVE)
+                .workspaceId(workspace.getId())
+                .status(AiQueryExecutionStatus.COMPLETED)
+                .estimatedTokens(totalTokens)
+                .actualInputTokens(totalTokens)
+                .actualOutputTokens(0)
                 .build();
-        session = chatSessionRepository.save(session);
-
-        ChatMessage message = ChatMessage.builder()
-                .id("msg_" + UUID.randomUUID().toString().replace("-", ""))
-                .chatSession(session)
-                .user(owner)
-                .role(ChatMessageRole.ASSISTANT)
-                .messageType(ChatMessageType.NORMAL_CHAT)
-                .content("E2E assistant reply")
-                .status(ChatMessageStatus.COMPLETED)
-                .totalTokens(totalTokens)
-                .build();
-        chatMessageRepository.save(message);
+        aiQueryExecutionRepository.save(execution);
     }
 
     // Mirrors PaymentTransactionServiceImpl's private

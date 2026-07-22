@@ -7,21 +7,14 @@ import com.analyzer.api.entity.SubscriptionUsage;
 import com.analyzer.api.entity.User;
 import com.analyzer.api.entity.AiQueryExecution;
 import com.analyzer.api.enums.AiQueryExecutionStatus;
-import com.analyzer.api.enums.ChatMessageRole;
-import com.analyzer.api.enums.ChatMessageStatus;
-import com.analyzer.api.enums.ContractGenerationStatus;
 import com.analyzer.api.enums.LegalTicketStatus;
 import com.analyzer.api.enums.LegalTicketType;
 import com.analyzer.api.enums.UsageEventType;
 import com.analyzer.api.exception.common.ConflictException;
-import com.analyzer.api.repository.ChatMessageRepository;
 import com.analyzer.api.repository.AiQueryExecutionRepository;
-import com.analyzer.api.repository.ChatSessionDocumentRepository;
 import com.analyzer.api.repository.DocumentRepository;
 import com.analyzer.api.repository.LegalTicketRepository;
 import com.analyzer.api.repository.SubscriptionPlanRepository;
-import com.analyzer.api.repository.WorkspaceRepository;
-import com.analyzer.api.repository.contract.ContractGenerationJobRepository;
 import com.analyzer.api.repository.subscription.SubscriptionUsageRepository;
 import com.analyzer.api.service.SubscriptionQuotaService;
 import com.analyzer.api.service.support.CustomerPlanExpiryHelper;
@@ -40,24 +33,15 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
 
-    private static final String ACTIVE_WORKSPACE_STATUS = "ACTIVE";
     private static final String DELETED_DOCUMENT_STATUS = "DELETED";
-    private static final String READY_DOCUMENT_STATUS = "READY";
-    private static final String USER_DOCUMENT_SOURCE_TYPE = "USER_DOCUMENT";
-    private static final String SYSTEM_SANDBOX_NAME = "Contract Assistant Sandbox";
-    private static final String SYSTEM_SANDBOX_DESCRIPTION = "System workspace for general contract assistant chat";
     private static final int FREE_SUPPORT_TICKET_LIMIT = 3;
     private static final String QUOTA_UPGRADE_MESSAGE =
             "The current plan quota is exhausted. Please purchase or upgrade your service plan.";
 
     private final SubscriptionPlanRepository subscriptionPlanRepository;
-    private final WorkspaceRepository workspaceRepository;
     private final DocumentRepository documentRepository;
-    private final ChatMessageRepository chatMessageRepository;
-    private final ContractGenerationJobRepository contractGenerationJobRepository;
     private final LegalTicketRepository legalTicketRepository;
     private final SubscriptionUsageRepository subscriptionUsageRepository;
-    private final ChatSessionDocumentRepository chatSessionDocumentRepository;
     private final AiQueryExecutionRepository aiQueryExecutionRepository;
     private final CustomerPlanExpiryHelper customerPlanExpiryHelper;
     private final CustomerPlanSnapshotHelper customerPlanSnapshotHelper;
@@ -103,12 +87,8 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
                 ? activePlan.getBillingCycleEndAt()
                 : periodStart.plusMonths(1);
 
-        int contractAnalysisUsed = Math.toIntExact(documentRepository.countByUserIdAndSourceTypeAndStatusAndProcessedAtBetween(
-                user.getId(), USER_DOCUMENT_SOURCE_TYPE, READY_DOCUMENT_STATUS, periodStart, periodEnd));
-        long aiTokensUsed = chatMessageRepository.sumTotalTokensByUserAndRoleAndStatusBetween(
-                user.getId(), ChatMessageRole.ASSISTANT, ChatMessageStatus.COMPLETED, periodStart, periodEnd);
-        int draftContractsUsed = Math.toIntExact(contractGenerationJobRepository.countByRequesterIdAndStatusAndCreatedAtBetween(
-                user.getId(), ContractGenerationStatus.COMPLETED, periodStart, periodEnd));
+        long aiTokensUsed = aiQueryExecutionRepository.sumCompletedTokens(
+                user.getId(), AiQueryExecutionStatus.COMPLETED, periodStart, periodEnd);
         int expertTicketsUsed = Math.toIntExact(
                 legalTicketRepository.countByCreatedByIdAndTicketTypeAndDeletedFalseAndStatusNotInAndCreatedAtBetween(
                         user.getId(),
@@ -116,27 +96,15 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
                         List.of(LegalTicketStatus.CANCELLED, LegalTicketStatus.REJECTED_BY_ADMIN),
                         periodStart,
                         periodEnd));
-        int workspacesUsed = Math.toIntExact(workspaceRepository.countQuotaWorkspaces(
-                user.getId(), ACTIVE_WORKSPACE_STATUS, SYSTEM_SANDBOX_NAME, SYSTEM_SANDBOX_DESCRIPTION));
-        int documentsUsed = Math.toIntExact(documentRepository.countByUserIdAndStatusNot(user.getId(), DELETED_DOCUMENT_STATUS));
         long storageUsedBytes = documentRepository.sumFileSizeByUserIdAndStatusNot(user.getId(), DELETED_DOCUMENT_STATUS);
 
         return SubscriptionQuotaUsageSummaryResponse.builder()
                 .periodStart(periodStart)
                 .periodEnd(periodEnd)
-                .contractAnalysisUsed(contractAnalysisUsed)
-                .contractAnalysisLimit(plan.getMaxQuota())
                 .aiTokensUsed(aiTokensUsed)
                 .aiTokensLimit(plan.getAiQuota())
-                .draftContractsUsed(draftContractsUsed)
-                .draftContractsLimit(plan.getMaxDraftContracts())
                 .expertTicketsUsed(expertTicketsUsed)
                 .expertTicketsLimit(plan.getTicketQuota())
-                .workspacesUsed(workspacesUsed)
-                .workspacesLimit(plan.getMaxWorkspaces())
-                .documentsUsed(documentsUsed)
-                .documentsLimit(plan.getMaxWorkspaces() == null || plan.getMaxContractsPerWorkspace() == null
-                        ? null : plan.getMaxWorkspaces() * plan.getMaxContractsPerWorkspace())
                 .storageUsedBytes(storageUsedBytes)
                 .storageLimitBytes(plan.getStorageLimitMb() == null ? null : plan.getStorageLimitMb() * 1024L * 1024L)
                 .build();
@@ -145,13 +113,7 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
     @Override
     @Transactional
     public void checkCanCreateWorkspace(User user) {
-        userQuotaLock.acquire(user.getId());
-        SubscriptionPlan plan = getCurrentPlan(user);
-        long currentWorkspaceCount = workspaceRepository.countQuotaWorkspaces(
-                user.getId(), ACTIVE_WORKSPACE_STATUS, SYSTEM_SANDBOX_NAME, SYSTEM_SANDBOX_DESCRIPTION);
-        if (plan.getMaxWorkspaces() != null && currentWorkspaceCount >= plan.getMaxWorkspaces()) {
-            throw new ConflictException("WORKSPACE_LIMIT_REACHED", QUOTA_UPGRADE_MESSAGE);
-        }
+        // Workspace count is no longer a metered plan quota.
     }
 
     @Override
@@ -165,19 +127,9 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
     public void checkCanUploadOrAnalyzeContract(User user, String workspaceId, long fileSizeBytes) {
         userQuotaLock.acquire(user.getId());
         SubscriptionPlan plan = getCurrentPlan(user);
-        SubscriptionQuotaUsageSummaryResponse usage = getCurrentUsage(user);
-
-        if (plan.getMaxQuota() != null && usage.getContractAnalysisUsed() >= plan.getMaxQuota()) {
-            throw new ConflictException("CONTRACT_ANALYSIS_QUOTA_EXCEEDED", QUOTA_UPGRADE_MESSAGE);
-        }
-
-        long workspaceContractCount = documentRepository.countByWorkspaceIdAndUserIdAndStatusNot(
-                workspaceId, user.getId(), DELETED_DOCUMENT_STATUS);
-        if (plan.getMaxContractsPerWorkspace() != null && workspaceContractCount >= plan.getMaxContractsPerWorkspace()) {
-            throw new ConflictException("CONTRACTS_PER_WORKSPACE_LIMIT_EXCEEDED", QUOTA_UPGRADE_MESSAGE);
-        }
+        // Analysis/document-count quotas were retired. Storage remains metered.
         if (plan.getMaxFileSizeMb() != null && fileSizeBytes > plan.getMaxFileSizeMb() * 1024L * 1024L) {
-            throw new ConflictException("MAX_FILE_SIZE_EXCEEDED", QUOTA_UPGRADE_MESSAGE);
+            throw new ConflictException("MAX_FILE_SIZE_EXCEEDED", "File exceeds the technical upload size limit");
         }
         long storageUsed = documentRepository.sumFileSizeByUserIdAndStatusNot(user.getId(), DELETED_DOCUMENT_STATUS);
         if (plan.getStorageLimitMb() != null
@@ -189,19 +141,7 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
     @Override
     @Transactional
     public void checkCanAttachDocument(User user, String chatSessionId) {
-        userQuotaLock.acquire(user.getId());
-        SubscriptionPlan plan = getCurrentPlan(user);
-        if (plan.getMaxAttachedDocumentsPerSession() == null) {
-            return;
-        }
-        // Count fresh, after acquiring the lock — a count taken by the caller before the lock
-        // would let concurrent attach-different-document requests all read the same stale
-        // count and all pass, bypassing the limit.
-        long currentlyAttached = chatSessionDocumentRepository.countByChatSessionIdAndUserIdAndActiveTrue(
-                chatSessionId, user.getId());
-        if (currentlyAttached >= plan.getMaxAttachedDocumentsPerSession()) {
-            throw new ConflictException("ATTACHED_DOCUMENT_LIMIT_EXCEEDED", QUOTA_UPGRADE_MESSAGE);
-        }
+        // Attachment count is no longer a metered plan quota.
     }
 
     // REQUIRES_NEW: caller holds this transaction open across the (slow) AI call that follows
@@ -233,16 +173,7 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void checkCanDraftContract(User user) {
-        userQuotaLock.acquire(user.getId());
-        SubscriptionPlan plan = getCurrentPlan(user);
-        if (plan.getMaxDraftContracts() == null) {
-            return;
-        }
-
-        SubscriptionQuotaUsageSummaryResponse usage = getCurrentUsage(user);
-        if (usage.getDraftContractsUsed() >= plan.getMaxDraftContracts()) {
-            throw new ConflictException("DRAFT_CONTRACT_QUOTA_EXCEEDED", QUOTA_UPGRADE_MESSAGE);
-        }
+        // Contract drafts are no longer a metered plan quota.
     }
 
     @Override

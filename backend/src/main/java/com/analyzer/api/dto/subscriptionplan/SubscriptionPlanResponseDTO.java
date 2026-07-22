@@ -29,23 +29,11 @@ public class SubscriptionPlanResponseDTO {
     @Schema(description = "Duration of the plan in days", example = "30")
     private Integer durationDays;
 
-    @Schema(description = "Maximum contract analysis quota per month", example = "200")
-    private Integer maxQuota;
-
     @Schema(description = "Monthly AI token quota", example = "8500000")
     private Integer aiQuota;
 
     @Schema(description = "Monthly expert ticket quota", example = "1")
     private Integer ticketQuota;
-
-    @Schema(description = "Maximum workspaces for the plan", example = "20")
-    private Integer maxWorkspaces;
-
-    @Schema(description = "Maximum contracts per workspace", example = "50")
-    private Integer maxContractsPerWorkspace;
-
-    @Schema(description = "Maximum draft contracts per month", example = "40")
-    private Integer maxDraftContracts;
 
     @Schema(description = "Status of the plan", example = "true")
     private Boolean active;
@@ -60,14 +48,8 @@ public class SubscriptionPlanResponseDTO {
     private String displayName;
     private BigDecimal priceVnd;
     private Integer billingCycleDays;
-    private Integer contractAnalysisLimit;
     private Integer aiTokenLimit;
-    private Integer workspaceLimit;
-    private Integer documentPerWorkspaceLimit;
     private Integer storageLimitMb;
-    private Integer maxFileSizeMb;
-    private Integer maxAttachedDocumentsPerSession;
-    private Integer contractDraftLimit;
     private Integer expertTicketLimit;
     private Boolean allowSystemErrorTicket;
     private Boolean allowQueryErrorTicket;

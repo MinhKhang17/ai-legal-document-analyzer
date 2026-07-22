@@ -54,16 +54,6 @@ function BillingMetricCard({ label, value, detail, progressValue }: BillingMetri
   );
 }
 
-const getQuotaPercent = (customerPlan: CustomerPlan) => {
-  const limit = customerPlan.subscriptionPlan.maxQuota;
-
-  if (limit <= 0) {
-    return 0;
-  }
-
-  return Math.max(0, Math.min(100, Math.round((customerPlan.usedQuota / limit) * 100)));
-};
-
 const getPaymentStatusTone = (status: string): BadgeTone => {
   switch (status.toUpperCase()) {
     case 'SUCCESS':
@@ -211,8 +201,8 @@ export function BillingPage() {
     void loadUsage();
   }, [loadCustomerPlan, loadPaymentTransactions, loadUsage]);
 
-  const quotaPercent = useMemo(() => (customerPlan ? getQuotaPercent(customerPlan) : 0), [customerPlan]);
   const usagePercent = (used: number, limit: number) => limit > 0 ? Math.min(100, (used / limit) * 100) : 0;
+  const bytesToMb = (bytes: number) => bytes / 1024 / 1024;
 
   const handleCreatePaymentUrl = async (transaction: PaymentTransaction) => {
     setPayingTransactionId(transaction.id);
@@ -484,23 +474,7 @@ export function BillingPage() {
 
     return (
       <>
-        <section className="grid gap-gutter md:grid-cols-2 xl:grid-cols-4">
-          <BillingMetricCard
-            label={t('billing.usedQuota')}
-            value={numberFormatter.format(customerPlan.usedQuota)}
-            detail={`${t('billing.maxQuota')}: ${numberFormatter.format(customerPlan.subscriptionPlan.maxQuota)} ${t('billing.analyses')}`}
-            progressValue={quotaPercent}
-          />
-          <BillingMetricCard
-            label={t('billing.remainingQuota')}
-            value={numberFormatter.format(customerPlan.remainingQuota)}
-            detail={`${t('billing.maxQuota')}: ${numberFormatter.format(customerPlan.subscriptionPlan.maxQuota)} ${t('billing.analyses')}`}
-          />
-          <BillingMetricCard
-            label={t('billing.maxQuota')}
-            value={numberFormatter.format(customerPlan.subscriptionPlan.maxQuota)}
-            detail={getPlanTypeLabel(customerPlan.subscriptionPlan.planType)}
-          />
+        <section className="grid gap-gutter md:grid-cols-2">
           <Card>
             <div className="flex items-start justify-between gap-md">
               <div>
@@ -520,14 +494,10 @@ export function BillingPage() {
         {usageSummary && (
           <section className="mt-xl">
             <h2 className="mb-md text-title-lg font-semibold">{t('billing.usageSummary.title')}</h2>
-            <div className="grid gap-gutter md:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-gutter md:grid-cols-3">
               {[
                 [t('billing.limit.aiTokens'), usageSummary.aiTokensUsed, usageSummary.aiTokensLimit],
-                [t('billing.limit.contractAnalyses'), usageSummary.contractAnalysisUsed, usageSummary.contractAnalysisLimit],
-                [t('billing.limit.workspaces'), usageSummary.workspacesUsed, usageSummary.workspacesLimit],
-                [t('billing.limit.documents'), usageSummary.documentsUsed, usageSummary.documentsLimit],
-                [t('billing.limit.storageMb'), Math.round(usageSummary.storageUsedBytes / 1024 / 1024), Math.round(usageSummary.storageLimitBytes / 1024 / 1024)],
-                [t('billing.limit.draftContracts'), usageSummary.draftContractsUsed, usageSummary.draftContractsLimit],
+                [t('billing.limit.storageMb'), bytesToMb(usageSummary.storageUsedBytes), bytesToMb(usageSummary.storageLimitBytes)],
                 [t('billing.limit.expertTickets'), usageSummary.expertTicketsUsed, usageSummary.expertTicketsLimit],
               ].map(([label, used, limit]) => (
                 <BillingMetricCard key={String(label)} label={String(label)} value={`${numberFormatter.format(Number(used))} / ${numberFormatter.format(Number(limit))}`} progressValue={usagePercent(Number(used), Number(limit))} />
@@ -570,7 +540,6 @@ export function BillingPage() {
               </div>
               <div className="flex flex-wrap gap-xs">
                 <Badge tone="gold"><ShieldCheck className="h-3 w-3" /> {t('billing.planType')}: {getPlanTypeLabel(customerPlan.subscriptionPlan.planType)}</Badge>
-                <Badge tone="gold"><Sparkles className="h-3 w-3" /> {t('billing.maxQuota')}: {numberFormatter.format(customerPlan.subscriptionPlan.maxQuota)}</Badge>
               </div>
               <dl className="grid gap-sm rounded-xl bg-white/10 p-md text-sm md:grid-cols-2">
                 <div>
@@ -588,12 +557,6 @@ export function BillingPage() {
                 <div>
                   <dt className="text-surface-container">{t('billing.autoRenew')}</dt>
                   <dd className="font-semibold">{customerPlan.autoRenew ? t('billing.yes') : t('billing.no')}</dd>
-                </div>
-                <div>
-                  <dt className="text-surface-container">{t('billing.quotaUsage')}</dt>
-                  <dd className="font-semibold">
-                    {numberFormatter.format(customerPlan.usedQuota)} / {numberFormatter.format(customerPlan.subscriptionPlan.maxQuota)}
-                  </dd>
                 </div>
               </dl>
             </div>
@@ -613,11 +576,8 @@ export function BillingPage() {
                   <div className="flex items-center justify-between gap-sm"><h3 className="font-bold">{plan.displayName ?? plan.planName}</h3>{current && <Badge tone="green">{t('billing.currentPlan')}</Badge>}</div>
                   <p className="mt-sm text-2xl font-bold text-primary">{formatPrice(plan.priceVnd ?? plan.price)}</p>
                   <ul className="mt-md space-y-xs text-sm text-on-surface-variant dark:text-slate-300">
-                    <li>{t('billing.comparison.analysisCount', { count: numberFormatter.format(plan.contractAnalysisLimit ?? plan.maxQuota) })}</li>
                     <li>{t('billing.comparison.aiTokenCount', { count: numberFormatter.format(plan.aiTokenLimit ?? 0) })}</li>
-                    <li>{t('billing.comparison.workspaceDocuments', { workspaces: numberFormatter.format(plan.workspaceLimit ?? 0), documents: numberFormatter.format(plan.documentPerWorkspaceLimit ?? 0) })}</li>
-                    <li>{t('billing.comparison.storageFiles', { storage: numberFormatter.format(plan.storageLimitMb ?? 0), fileSize: numberFormatter.format(plan.maxFileSizeMb ?? 0) })}</li>
-                    <li>{t('billing.comparison.attachmentsPerSession', { count: numberFormatter.format(plan.maxAttachedDocumentsPerSession ?? 0) })}</li>
+                    <li>{t('billing.limit.storageMb')}: {numberFormatter.format(plan.storageLimitMb ?? 0)} MB</li>
                     <li>{t('billing.limit.contactExpert')}: {plan.allowContactExpertTicket ? t('billing.comparison.expertTicketsPerMonth', { count: numberFormatter.format(plan.expertTicketLimit ?? 0) }) : t('billing.comparison.premiumOnly')}</li>
                   </ul>
                   <Button className="mt-md w-full" disabled={current || !plan.active} onClick={() => navigate('/billing/subscribe')}>{current ? t('billing.comparison.inUse') : t('billing.choosePlan')}</Button>

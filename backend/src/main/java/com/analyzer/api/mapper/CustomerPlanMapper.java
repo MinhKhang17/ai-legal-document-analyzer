@@ -10,7 +10,6 @@ import org.mapstruct.MappingConstants;
 public interface CustomerPlanMapper {
 
     @Mapping(target = "customerId", source = "customer.id")
-    @Mapping(target = "remainingQuota", expression = "java(plan.getRemainingQuota())")
     @Mapping(target = "latestTransactionId", ignore = true)
     @Mapping(target = "latestTransactionCode", ignore = true)
     CustomerPlanResponseDTO toResponseDTO(CustomerPlan plan);

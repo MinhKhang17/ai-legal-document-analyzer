@@ -63,19 +63,12 @@ const emptyPlanForm: SubscriptionPlanRequest = {
   description: '',
   price: 0,
   durationDays: 30,
-  maxQuota: 100,
   name: '',
   displayName: '',
   priceVnd: 0,
   billingCycleDays: 30,
-  contractAnalysisLimit: 0,
   aiTokenLimit: 0,
-  workspaceLimit: 0,
-  documentPerWorkspaceLimit: 0,
   storageLimitMb: 0,
-  maxFileSizeMb: 0,
-  maxAttachedDocumentsPerSession: 0,
-  contractDraftLimit: 0,
   expertTicketLimit: 0,
   allowSystemErrorTicket: true,
   allowQueryErrorTicket: true,
@@ -345,14 +338,8 @@ export function AdminConsolePage() {
     }
     const numericLimits = [
       planForm.priceVnd ?? planForm.price,
-      planForm.contractAnalysisLimit ?? planForm.maxQuota,
       planForm.aiTokenLimit,
-      planForm.workspaceLimit,
-      planForm.documentPerWorkspaceLimit,
       planForm.storageLimitMb,
-      planForm.maxFileSizeMb,
-      planForm.maxAttachedDocumentsPerSession,
-      planForm.contractDraftLimit,
       planForm.expertTicketLimit,
     ];
     if ((planForm.billingCycleDays ?? planForm.durationDays) <= 0 || numericLimits.some((value) => value < 0)) {
@@ -398,19 +385,12 @@ export function AdminConsolePage() {
       description: plan.description ?? '',
       price: plan.price,
       durationDays: plan.durationDays,
-      maxQuota: plan.maxQuota,
       name: plan.name ?? plan.planType,
       displayName: plan.displayName ?? plan.planName,
       priceVnd: plan.priceVnd ?? plan.price,
       billingCycleDays: plan.billingCycleDays ?? plan.durationDays,
-      contractAnalysisLimit: plan.contractAnalysisLimit ?? plan.maxQuota,
       aiTokenLimit: plan.aiTokenLimit ?? 0,
-      workspaceLimit: plan.workspaceLimit ?? 0,
-      documentPerWorkspaceLimit: plan.documentPerWorkspaceLimit ?? 0,
       storageLimitMb: plan.storageLimitMb ?? 0,
-      maxFileSizeMb: plan.maxFileSizeMb ?? 0,
-      maxAttachedDocumentsPerSession: plan.maxAttachedDocumentsPerSession ?? 0,
-      contractDraftLimit: plan.contractDraftLimit ?? 0,
       expertTicketLimit: plan.expertTicketLimit ?? 0,
       allowSystemErrorTicket: plan.allowSystemErrorTicket ?? true,
       allowQueryErrorTicket: plan.allowQueryErrorTicket ?? true,
@@ -574,7 +554,9 @@ export function AdminConsolePage() {
     { header: t('billing.planName'), cell: (plan) => <span className="font-semibold">{plan.planName}</span> },
     { header: t('billing.planType'), cell: (plan) => ['FREE', 'STANDARD', 'PREMIUM'].includes(plan.planType.toUpperCase()) ? t(`billing.planType.${plan.planType.toUpperCase()}`) : t('billing.planType.UNKNOWN') },
     { header: t('billing.price'), cell: (plan) => formatVndCurrency(plan.price, t('billing.free'), locale) },
-    { header: t('billing.maxQuota'), cell: (plan) => formatNumber(plan.maxQuota, locale) },
+    { header: t('billing.limit.aiTokens'), cell: (plan) => formatNumber(plan.aiTokenLimit ?? 0, locale) },
+    { header: t('billing.limit.storageMb'), cell: (plan) => `${formatNumber(plan.storageLimitMb ?? 0, locale)} MB` },
+    { header: t('billing.limit.expertTickets'), cell: (plan) => formatNumber(plan.expertTicketLimit ?? 0, locale) },
     { header: t('admin.duration'), cell: (plan) => `${plan.durationDays} ${t('billing.days')}` },
     { header: t('table.status'), cell: (plan) => <Badge tone={plan.active ? 'green' : 'slate'}>{plan.active ? t('admin.active') : t('admin.inactive')}</Badge> },
     {
@@ -778,16 +760,6 @@ export function AdminConsolePage() {
                 onChange={(event) => setPlanForm((previous) => ({ ...previous, durationDays: Number(event.target.value), billingCycleDays: Number(event.target.value) }))}
               />
             </label>
-            <label className="text-sm font-semibold">
-              {t('billing.maxQuota')}
-              <input
-                className="form-field mt-xs"
-                type="number"
-                min={0}
-                value={planForm.maxQuota}
-                onChange={(event) => setPlanForm((previous) => ({ ...previous, maxQuota: Number(event.target.value), contractAnalysisLimit: Number(event.target.value) }))}
-              />
-            </label>
             <label className="flex items-center gap-sm pt-lg text-sm font-semibold">
               <input
                 type="checkbox"
@@ -800,12 +772,7 @@ export function AdminConsolePage() {
           <div className="grid gap-md md:grid-cols-2">
             {([
               ['aiTokenLimit', 'billing.limit.aiTokens'],
-              ['workspaceLimit', 'billing.limit.workspaces'],
-              ['documentPerWorkspaceLimit', 'billing.limit.documentsPerWorkspace'],
               ['storageLimitMb', 'billing.limit.storageMb'],
-              ['maxFileSizeMb', 'billing.limit.maxFileSize'],
-              ['maxAttachedDocumentsPerSession', 'billing.limit.attachmentsPerSession'],
-              ['contractDraftLimit', 'billing.limit.draftContracts'],
               ['expertTicketLimit', 'billing.limit.expertTickets'],
             ] as const).map(([field, label]) => (
               <label key={field} className="text-sm font-semibold">

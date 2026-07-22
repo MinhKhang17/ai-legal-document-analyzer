@@ -334,18 +334,8 @@ export function SubscribePlanPage() {
                       </p>
                     </div>
                     <dl className="mt-md grid gap-sm text-sm">
-                      <div className="flex items-center justify-between gap-md">
-                        <dt className="text-on-surface-variant dark:text-slate-400">{t('billing.maxQuota')}</dt>
-                        <dd className="font-semibold text-on-surface dark:text-slate-100">
-                          {numberFormatter.format(plan.maxQuota)} {t('billing.analyses')}
-                        </dd>
-                      </div>
                       <div className="flex items-center justify-between gap-md"><dt className="text-on-surface-variant">{t('billing.limit.aiTokens')}</dt><dd className="font-semibold">{numberFormatter.format(plan.aiTokenLimit ?? 0)}</dd></div>
-                      <div className="flex items-center justify-between gap-md"><dt className="text-on-surface-variant">{t('billing.limit.workspaces')}</dt><dd className="font-semibold">{numberFormatter.format(plan.workspaceLimit ?? 0)}</dd></div>
-                      <div className="flex items-center justify-between gap-md"><dt className="text-on-surface-variant">{t('billing.limit.documentsPerWorkspace')}</dt><dd className="font-semibold">{numberFormatter.format(plan.documentPerWorkspaceLimit ?? 0)}</dd></div>
-                      <div className="flex items-center justify-between gap-md"><dt className="text-on-surface-variant">{t('billing.limit.storagePerFile')}</dt><dd className="font-semibold">{numberFormatter.format(plan.storageLimitMb ?? 0)} / {numberFormatter.format(plan.maxFileSizeMb ?? 0)} MB</dd></div>
-                      <div className="flex items-center justify-between gap-md"><dt className="text-on-surface-variant">{t('billing.limit.attachmentsPerSession')}</dt><dd className="font-semibold">{numberFormatter.format(plan.maxAttachedDocumentsPerSession ?? 0)}</dd></div>
-                      <div className="flex items-center justify-between gap-md"><dt className="text-on-surface-variant">{t('billing.limit.draftContracts')}</dt><dd className="font-semibold">{numberFormatter.format(plan.contractDraftLimit ?? 0)}</dd></div>
+                      <div className="flex items-center justify-between gap-md"><dt className="text-on-surface-variant">{t('billing.limit.storage')}</dt><dd className="font-semibold">{numberFormatter.format(plan.storageLimitMb ?? 0)} MB</dd></div>
                       <div className="flex items-center justify-between gap-md"><dt className="text-on-surface-variant">{t('billing.limit.contactExpert')}</dt><dd className="font-semibold">{plan.allowContactExpertTicket ? t('billing.comparison.expertTicketsPerMonth', { count: numberFormatter.format(plan.expertTicketLimit ?? 0) }) : t('billing.comparison.premiumOnly')}</dd></div>
                       <div className="flex items-center justify-between gap-md">
                         <dt className="text-on-surface-variant dark:text-slate-400">{t('billing.planType')}</dt>
@@ -373,14 +363,8 @@ export function SubscribePlanPage() {
                 <thead><tr className="border-b border-legal-border text-left dark:border-slate-700"><th className="p-sm">{t('billing.comparison.limits')}</th>{plans.map((plan) => <th key={plan.id} className="p-sm">{plan.displayName ?? plan.planName}{refreshedCurrentPlan?.subscriptionPlan.id === plan.id ? ` · ${t('billing.comparison.current')}` : ''}</th>)}</tr></thead>
                 <tbody>
                   {[
-                    [t('billing.limit.contractAnalyses'), (plan: SubscriptionPlan) => numberFormatter.format(plan.contractAnalysisLimit ?? plan.maxQuota)],
                     [t('billing.limit.aiTokens'), (plan: SubscriptionPlan) => numberFormatter.format(plan.aiTokenLimit ?? 0)],
-                    [t('billing.limit.workspaces'), (plan: SubscriptionPlan) => numberFormatter.format(plan.workspaceLimit ?? 0)],
-                    [t('billing.limit.documentsPerWorkspace'), (plan: SubscriptionPlan) => numberFormatter.format(plan.documentPerWorkspaceLimit ?? 0)],
                     [t('billing.limit.storage'), (plan: SubscriptionPlan) => `${numberFormatter.format(plan.storageLimitMb ?? 0)} MB`],
-                    [t('billing.limit.maxFileSize'), (plan: SubscriptionPlan) => `${numberFormatter.format(plan.maxFileSizeMb ?? 0)} MB`],
-                    [t('billing.limit.attachmentsPerSession'), (plan: SubscriptionPlan) => numberFormatter.format(plan.maxAttachedDocumentsPerSession ?? 0)],
-                    [t('billing.limit.draftContracts'), (plan: SubscriptionPlan) => numberFormatter.format(plan.contractDraftLimit ?? 0)],
                     [t('billing.limit.contactExpert'), (plan: SubscriptionPlan) => plan.allowContactExpertTicket ? t('billing.comparison.expertTicketsPerMonth', { count: numberFormatter.format(plan.expertTicketLimit ?? 0) }) : t('billing.comparison.premiumOnly')],
                   ].map(([label, render]) => <tr key={String(label)} className="border-b border-legal-border/60 dark:border-slate-800"><td className="p-sm font-semibold">{String(label)}</td>{plans.map((plan) => <td key={plan.id} className="p-sm text-on-surface-variant dark:text-slate-300">{(render as (value: SubscriptionPlan) => string)(plan)}</td>)}</tr>)}
                 </tbody>

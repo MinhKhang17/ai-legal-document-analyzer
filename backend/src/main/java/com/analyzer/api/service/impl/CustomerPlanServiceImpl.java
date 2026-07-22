@@ -2,7 +2,6 @@ package com.analyzer.api.service.impl;
 
 import com.analyzer.api.dto.customerplan.CustomerPlanResponseDTO;
 import com.analyzer.api.dto.customerplan.SubscribeRequestDTO;
-import com.analyzer.api.dto.subscription.SubscriptionQuotaUsageSummaryResponse;
 import com.analyzer.api.entity.CustomerPlan;
 import com.analyzer.api.entity.PaymentTransaction;
 import com.analyzer.api.entity.SubscriptionPlan;
@@ -288,22 +287,7 @@ public class CustomerPlanServiceImpl implements CustomerPlanService {
     }
 
     private CustomerPlanResponseDTO toResponseWithAccurateQuota(CustomerPlan plan) {
-        CustomerPlanResponseDTO dto = customerPlanMapper.toResponseDTO(plan);
-        Integer maxQuota = plan.getAnalysisLimitSnapshot() != null
-                ? plan.getAnalysisLimitSnapshot()
-                : (plan.getSubscriptionPlan() != null ? plan.getSubscriptionPlan().getMaxQuota() : null);
-
-        if (plan.getStatus() == PlanStatus.ACTIVE && plan.getCustomer() != null) {
-            SubscriptionQuotaUsageSummaryResponse usage = subscriptionQuotaService.getCurrentUsage(plan.getCustomer());
-            dto.setUsedQuota(usage.getContractAnalysisUsed());
-            dto.setRemainingQuota(usage.getContractAnalysisLimit() == null
-                    ? null
-                    : Math.max(usage.getContractAnalysisLimit() - usage.getContractAnalysisUsed(), 0));
-        } else {
-            dto.setUsedQuota(0);
-            dto.setRemainingQuota(maxQuota);
-        }
-        return dto;
+        return customerPlanMapper.toResponseDTO(plan);
     }
 
     private CustomerPlan createDefaultFreePlan(Long customerId) {
