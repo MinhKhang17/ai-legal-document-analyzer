@@ -9,7 +9,10 @@ import com.analyzer.api.dto.auth.RegistrationResponseDTO;
 import java.util.List;
 
 public interface UserService {
-    RegistrationResponseDTO createUser(UserRequestDTO request);
+    default RegistrationResponseDTO createUser(UserRequestDTO request) {
+        return createUser(request, null, null);
+    }
+    RegistrationResponseDTO createUser(UserRequestDTO request, String remoteAddress, String userAgent);
     UserResponseDTO getUserById(Long id);
     List<UserResponseDTO> getAllUsers();
     UserResponseDTO updateProfile(Long userId, UpdateProfileRequestDTO request);

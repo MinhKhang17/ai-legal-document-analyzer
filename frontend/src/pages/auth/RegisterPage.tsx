@@ -27,6 +27,7 @@ export function RegisterPage() {
   });
   const [confirmPasswordTouched, setConfirmPasswordTouched] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [acceptedPrivacyPolicy, setAcceptedPrivacyPolicy] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -40,6 +41,7 @@ export function RegisterPage() {
   const canSubmit =
     !isSubmitting &&
     acceptedTerms &&
+    acceptedPrivacyPolicy &&
     formData.firstName.trim().length > 0 &&
     formData.lastName.trim().length > 0 &&
     formData.email.trim().length > 0 &&
@@ -97,7 +99,7 @@ export function RegisterPage() {
             return;
           }
 
-          if (!acceptedTerms) {
+          if (!acceptedTerms || !acceptedPrivacyPolicy) {
             setSubmitError(t('auth.acceptTermsRequired'));
             return;
           }
@@ -112,6 +114,7 @@ export function RegisterPage() {
               password: formData.password,
               confirmPassword: formData.confirmPassword,
               acceptedTerms,
+              acceptedPrivacyPolicy,
             });
 
             navigate('/auth/check-email', {
@@ -263,6 +266,23 @@ export function RegisterPage() {
           <span>
             {t('auth.acceptWorkspaceTerms')}
           </span>
+        </label>
+
+        <label className="flex cursor-pointer items-start gap-2 rounded-lg bg-surface-container-low p-2.5 text-[10px] leading-4 text-on-surface-variant dark:bg-slate-800 dark:text-slate-400">
+          <span className="relative mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center">
+            <input
+              className="peer h-4 w-4 cursor-pointer appearance-none rounded border border-outline bg-white checked:border-primary checked:bg-primary dark:border-slate-600 dark:bg-slate-900"
+              type="checkbox"
+              checked={acceptedPrivacyPolicy}
+              onChange={(event) => {
+                setAcceptedPrivacyPolicy(event.target.checked);
+                setSubmitError(null);
+              }}
+              aria-label={t('auth.acceptPrivacyPolicy')}
+            />
+            <Check className="pointer-events-none absolute h-3 w-3 text-white opacity-0 peer-checked:opacity-100" />
+          </span>
+          <span>{t('auth.acceptPrivacyPolicy')}</span>
         </label>
 
         {submitError && (

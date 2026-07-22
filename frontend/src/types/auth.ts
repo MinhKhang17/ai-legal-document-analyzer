@@ -28,6 +28,7 @@ export interface RegisterRequest {
   password: string;
   confirmPassword: string;
   acceptedTerms: boolean;
+  acceptedPrivacyPolicy: boolean;
 }
 
 export interface RegistrationResult {

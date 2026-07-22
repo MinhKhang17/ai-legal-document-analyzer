@@ -36,4 +36,8 @@ public class UserRequestDTO {
     @AssertTrue(message = "You must accept the terms")
     @Schema(description = "User accepts terms and conditions", example = "true")
     private Boolean acceptedTerms;
+
+    @AssertTrue(message = "You must accept the privacy and data processing policy")
+    @Schema(description = "User accepts the privacy and data processing policy", example = "true")
+    private Boolean acceptedPrivacyPolicy;
 }

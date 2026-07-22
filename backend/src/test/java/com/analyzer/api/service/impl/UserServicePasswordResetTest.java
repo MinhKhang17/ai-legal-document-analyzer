@@ -69,6 +69,7 @@ class UserServicePasswordResetTest {
     }
 
     private UserServiceImpl service() {
-        return new UserServiceImpl(userRepository, roleRepository, userMapper, passwordEncoder, emailService);
+        return new UserServiceImpl(userRepository, roleRepository, userMapper, passwordEncoder, emailService,
+                mock(com.analyzer.api.service.PolicyAcceptanceService.class));
     }
 }

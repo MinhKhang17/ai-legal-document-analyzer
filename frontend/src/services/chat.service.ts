@@ -1,7 +1,9 @@
 import { API_ENDPOINTS, buildApiUrl } from "../config/api";
 import {
   ACCESS_DENIED_MESSAGE,
+  ApiRequestError,
   BACKEND_API_UNAVAILABLE_MESSAGE,
+  type ApiErrorResponse,
 } from "./http";
 import type {
   DeleteChatSessionResponse,
@@ -33,11 +35,6 @@ interface PageResponse<T> {
   size: number;
   totalItems: number;
   totalPages: number;
-}
-
-interface ApiErrorResponse {
-  message?: string;
-  error?: string;
 }
 
 type SendMessageRequest = {
@@ -111,7 +108,13 @@ const requestJson = async <TResponse>(
   const { data, rawText } = await readResponseBody<TResponse | ApiResponse<TResponse> | ApiErrorResponse>(response);
 
   if (!response.ok) {
-    throw new Error(getApiErrorMessage(data as ApiErrorResponse | null, rawText, errorMessage));
+    const details = data as ApiErrorResponse | null;
+    throw new ApiRequestError(
+      response.status,
+      getApiErrorMessage(details, rawText, errorMessage),
+      details,
+      rawText,
+    );
   }
 
   if (data === null) {

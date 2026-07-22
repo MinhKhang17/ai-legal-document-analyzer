@@ -8,7 +8,7 @@ export interface ApiResponse<T> {
   errorCode?: string;
 }
 
-interface ApiErrorResponse {
+export interface ApiErrorResponse {
   message?: string;
   errorCode?: string;
   error?: string;

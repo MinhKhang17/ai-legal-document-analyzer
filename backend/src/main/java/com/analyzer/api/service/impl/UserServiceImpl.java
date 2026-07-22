@@ -15,6 +15,7 @@ import com.analyzer.api.mapper.UserMapper;
 import com.analyzer.api.repository.RoleRepository;
 import com.analyzer.api.repository.UserRepository;
 import com.analyzer.api.service.EmailService;
+import com.analyzer.api.service.PolicyAcceptanceService;
 import com.analyzer.api.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -44,10 +45,12 @@ public class UserServiceImpl implements UserService {
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
+    private final PolicyAcceptanceService policyAcceptanceService;
 
     @Override
     @Transactional
-    public RegistrationResponseDTO createUser(UserRequestDTO request) {
+    public RegistrationResponseDTO createUser(
+            UserRequestDTO request, String remoteAddress, String userAgent) {
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new RuntimeException("Email already exists");
         }
@@ -59,6 +62,9 @@ public class UserServiceImpl implements UserService {
 
         if (!Boolean.TRUE.equals(request.getAcceptedTerms())) {
             throw new RuntimeException("You must accept the terms");
+        }
+        if (!Boolean.TRUE.equals(request.getAcceptedPrivacyPolicy())) {
+            throw new RuntimeException("You must accept the privacy and data processing policy");
         }
 
         Role customerRole = roleRepository.findByName(RoleName.CUSTOMER)
@@ -77,6 +83,7 @@ public class UserServiceImpl implements UserService {
         user.setEmailDeliveryStatus("PENDING");
 
         User savedUser = userRepository.save(user);
+        policyAcceptanceService.acceptCurrent(savedUser.getId(), remoteAddress, userAgent);
         boolean sent = emailService.sendVerificationEmail(savedUser.getEmail(), savedUser.getFirstName(), verificationToken);
         savedUser.setEmailDeliveryStatus(sent ? "SENT" : "FAILED");
         userRepository.save(savedUser);

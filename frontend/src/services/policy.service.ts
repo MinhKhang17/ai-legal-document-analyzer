@@ -1,4 +1,3 @@
-import { buildApiUrl } from "../config/api";
 import { buildBearerHeaders, requestApiData } from "./http";
 
 export interface PolicyStatus {
@@ -9,13 +8,13 @@ export interface PolicyStatus {
 }
 
 export const getCurrentPolicyStatus = (accessToken: string) => requestApiData<PolicyStatus>(
-  buildApiUrl("/api/v1/policies/current"),
+  "/api/v1/policies/current",
   { method: "GET", headers: buildBearerHeaders(accessToken), credentials: "include" },
   "Không thể kiểm tra điều khoản hiện hành",
 );
 
 export const acceptCurrentPolicies = (accessToken: string) => requestApiData<PolicyStatus>(
-  buildApiUrl("/api/v1/policies/accept"),
+  "/api/v1/policies/accept",
   {
     method: "POST",
     headers: buildBearerHeaders(accessToken, { "Content-Type": "application/json" }),

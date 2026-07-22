@@ -36,8 +36,10 @@ public class AuthController {
             description = "Creates a new user account in the system"
     )
     public ResponseEntity<ApiResponseDTO<RegistrationResponseDTO>> register(
-            @RequestBody UserRequestDTO request) {
-        RegistrationResponseDTO user = userService.createUser(request);
+            @Valid @RequestBody UserRequestDTO request,
+            HttpServletRequest httpRequest) {
+        RegistrationResponseDTO user = userService.createUser(
+                request, httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent"));
         return new ResponseEntity<>(ApiResponseDTO.created("Tạo tài khoản thành công", user), HttpStatus.CREATED);
     }
 

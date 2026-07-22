@@ -129,6 +129,8 @@ const en: TranslationDictionary = {
   "auth.lastName": "Last name",
   "auth.acceptWorkspaceTerms":
     "I agree to process only authorized documents and accept the workspace terms.",
+  "auth.acceptPrivacyPolicy":
+    "I have read and accept the current Privacy and Data Processing Policy.",
   "auth.alreadyHaveAccount": "Already have an account?",
   "auth.logIn": "Log in",
   "authHero.title": "Source-grounded AI for legal contract review",
@@ -2272,6 +2274,8 @@ const vi: TranslationDictionary = {
   "auth.lastName": "Họ",
   "auth.acceptWorkspaceTerms":
     "Tôi đồng ý chỉ xử lý tài liệu được phép và chấp nhận điều khoản workspace.",
+  "auth.acceptPrivacyPolicy":
+    "Tôi đã đọc và đồng ý với Chính sách quyền riêng tư và xử lý dữ liệu hiện hành.",
   "auth.alreadyHaveAccount": "Đã có tài khoản?",
   "auth.logIn": "Đăng nhập",
   "authHero.title": "AI có căn cứ nguồn cho rà soát hợp đồng pháp lý",

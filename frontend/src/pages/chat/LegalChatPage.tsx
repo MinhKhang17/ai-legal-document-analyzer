@@ -267,6 +267,20 @@ export function LegalChatPage() {
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
   const activeRequestControllerRef = useRef<AbortController | null>(null);
   const submissionPendingRef = useRef(false);
+  const pendingPolicyActionRef = useRef<
+    | { type: "UPLOAD" }
+    | {
+        type: "CHAT";
+        request: {
+          requestId: string;
+          message: string;
+          workspaceId: string;
+          sessionId?: string;
+          documentId?: string;
+        };
+      }
+    | null
+  >(null);
   const shouldAutoScrollRef = useRef(true);
   const [showNewResponseButton, setShowNewResponseButton] = useState(false);
   const lastSubmissionRef = useRef<{
@@ -825,6 +839,7 @@ export function LegalChatPage() {
       toast.success(t("chat.documents.uploadedAttachedSuccess"));
     } catch (err) {
       if (getApiErrorCode(err) === "TERMS_NOT_ACCEPTED") {
+        pendingPolicyActionRef.current = { type: "UPLOAD" };
         setPolicyAccepted(false);
         setPolicyModalOpen(true);
         setDocumentActionError("Bạn cần chấp thuận Điều khoản sử dụng và Chính sách xử lý dữ liệu hiện hành trước khi tải tài liệu.");
@@ -1027,9 +1042,18 @@ export function LegalChatPage() {
       if (getApiErrorCode(err) === "TERMS_NOT_ACCEPTED") {
         const message = "Bạn cần chấp thuận chính sách hiện hành trước khi phân tích tài liệu.";
         setError(message);
-        setMessages((previous) => previous.map((item) => item.id === assistantMessageId
-          ? { ...item, status: "error", errorMessage: message }
-          : item));
+        setMessages((previous) => previous.filter((item) =>
+          item.id !== assistantMessageId && item.id !== optimisticUserMessage.id));
+        pendingPolicyActionRef.current = {
+          type: "CHAT",
+          request: {
+            requestId,
+            message: question,
+            workspaceId: targetWorkspaceId,
+            sessionId: targetSessionId || undefined,
+            documentId: targetDocumentId,
+          },
+        };
         setPolicyAccepted(false);
         setPolicyModalOpen(true);
         return;
@@ -1788,9 +1812,15 @@ export function LegalChatPage() {
                 setPolicyAccepting(true);
                 try {
                   await acceptCurrentPolicies(getAccessToken());
+                  const pendingAction = pendingPolicyActionRef.current;
+                  pendingPolicyActionRef.current = null;
                   setPolicyModalOpen(false);
                   setPolicyAccepted(false);
-                  await handleUploadAndAttach();
+                  if (pendingAction?.type === "CHAT") {
+                    await handleSend(pendingAction.request);
+                  } else if (pendingAction?.type === "UPLOAD") {
+                    await handleUploadAndAttach();
+                  }
                 } catch {
                   toast.error("Không thể lưu chấp thuận điều khoản.");
                 } finally {
