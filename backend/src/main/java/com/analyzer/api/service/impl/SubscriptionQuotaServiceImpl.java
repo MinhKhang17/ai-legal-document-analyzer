@@ -13,7 +13,6 @@ import com.analyzer.api.enums.LegalTicketStatus;
 import com.analyzer.api.enums.LegalTicketType;
 import com.analyzer.api.enums.UsageEventType;
 import com.analyzer.api.exception.common.ConflictException;
-import com.analyzer.api.exception.common.ResourceNotFoundException;
 import com.analyzer.api.repository.ChatMessageRepository;
 import com.analyzer.api.repository.CustomerPlanRepository;
 import com.analyzer.api.repository.DocumentRepository;
@@ -37,6 +36,8 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
     private static final String ACTIVE_WORKSPACE_STATUS = "ACTIVE";
     private static final String DELETED_DOCUMENT_STATUS = "DELETED";
     private static final String USER_DOCUMENT_SOURCE_TYPE = "USER_DOCUMENT";
+    private static final String SYSTEM_SANDBOX_NAME = "Contract Assistant Sandbox";
+    private static final String SYSTEM_SANDBOX_DESCRIPTION = "System workspace for general contract assistant chat";
 
     private final SubscriptionPlanRepository subscriptionPlanRepository;
     private final CustomerPlanRepository customerPlanRepository;
@@ -55,8 +56,13 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
             return activePlan.getSubscriptionPlan();
         }
 
-        return subscriptionPlanRepository.findByPlanTypeIgnoreCase("FREE")
-                .orElseThrow(() -> new ResourceNotFoundException("FREE_PLAN_NOT_CONFIGURED"));
+        SubscriptionPlan freePlan = subscriptionPlanRepository.findByPlanTypeIgnoreCase("FREE")
+                .orElseThrow(() -> new ConflictException(
+                        "SUBSCRIPTION_NOT_FOUND", "The default Free subscription is not configured"));
+        if (!Boolean.TRUE.equals(freePlan.getActive())) {
+            throw new ConflictException("SUBSCRIPTION_INACTIVE", "The effective subscription is inactive");
+        }
+        return freePlan;
     }
 
     @Override
@@ -79,7 +85,8 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
                         List.of(LegalTicketStatus.CANCELLED, LegalTicketStatus.REJECTED_BY_ADMIN),
                         periodStart,
                         periodEnd));
-        int workspacesUsed = Math.toIntExact(workspaceRepository.countByUserIdAndStatus(user.getId(), ACTIVE_WORKSPACE_STATUS));
+        int workspacesUsed = Math.toIntExact(workspaceRepository.countQuotaWorkspaces(
+                user.getId(), ACTIVE_WORKSPACE_STATUS, SYSTEM_SANDBOX_NAME, SYSTEM_SANDBOX_DESCRIPTION));
         int documentsUsed = Math.toIntExact(documentRepository.countByUserIdAndStatusNot(user.getId(), DELETED_DOCUMENT_STATUS));
         long storageUsedBytes = documentRepository.sumFileSizeByUserIdAndStatusNot(user.getId(), DELETED_DOCUMENT_STATUS);
 
@@ -108,9 +115,10 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
     @Transactional(readOnly = true)
     public void checkCanCreateWorkspace(User user) {
         SubscriptionPlan plan = getCurrentPlan(user);
-        long currentWorkspaceCount = workspaceRepository.countByUserIdAndStatus(user.getId(), ACTIVE_WORKSPACE_STATUS);
+        long currentWorkspaceCount = workspaceRepository.countQuotaWorkspaces(
+                user.getId(), ACTIVE_WORKSPACE_STATUS, SYSTEM_SANDBOX_NAME, SYSTEM_SANDBOX_DESCRIPTION);
         if (plan.getMaxWorkspaces() != null && currentWorkspaceCount >= plan.getMaxWorkspaces()) {
-            throw new ConflictException("WORKSPACE_LIMIT_EXCEEDED");
+            throw new ConflictException("WORKSPACE_LIMIT_REACHED", "Workspace limit reached for the current plan");
         }
     }
 
@@ -201,7 +209,8 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
         SubscriptionPlan plan = getCurrentPlan(user);
         int ticketQuota = plan.getTicketQuota() == null ? 0 : plan.getTicketQuota();
         if (!Boolean.TRUE.equals(plan.getAllowContactExpertTicket()) || ticketQuota <= 0) {
-            throw new ConflictException("EXPERT_TICKET_REQUIRES_PREMIUM");
+            throw new com.analyzer.api.exception.common.ForbiddenException(
+                    "EXPERT_TICKET_REQUIRES_PREMIUM", "An upgraded plan is required to contact an expert");
         }
 
         SubscriptionQuotaUsageSummaryResponse usage = getCurrentUsage(user);
@@ -223,6 +232,10 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
             activePlan.setStatus(PlanStatus.EXPIRED);
             customerPlanRepository.save(activePlan);
             return null;
+        }
+        if (activePlan != null && (activePlan.getSubscriptionPlan() == null
+                || !Boolean.TRUE.equals(activePlan.getSubscriptionPlan().getActive()))) {
+            throw new ConflictException("SUBSCRIPTION_INACTIVE", "The active subscription record references an inactive plan");
         }
         return activePlan;
     }

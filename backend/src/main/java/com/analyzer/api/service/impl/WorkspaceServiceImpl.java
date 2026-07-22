@@ -57,6 +57,8 @@ public class WorkspaceServiceImpl implements WorkspaceService {
     private static final String STATUS_READY = "READY";
     private static final String STATUS_FAILED = "FAILED";
     private static final String SOURCE_TYPE_USER_DOCUMENT = "USER_DOCUMENT";
+    private static final String SYSTEM_SANDBOX_NAME = "Contract Assistant Sandbox";
+    private static final String SYSTEM_SANDBOX_DESCRIPTION = "System workspace for general contract assistant chat";
 
     private final WorkspaceRepository workspaceRepository;
     private final DocumentRepository documentRepository;
@@ -76,14 +78,23 @@ public class WorkspaceServiceImpl implements WorkspaceService {
     @Override
     @Transactional
     public WorkspaceResponseDTO createWorkspace(Long userId, WorkspaceRequestDTO request) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Khong tim thay nguoi dung"));
-        subscriptionQuotaService.checkCanCreateWorkspace(user);
+        User user = userRepository.findByIdForUpdate(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("USER_NOT_FOUND"));
+        String normalizedName = request.name().trim();
+        if (workspaceRepository.existsByUserIdAndNameIgnoreCaseAndStatus(userId, normalizedName, STATUS_ACTIVE)) {
+            throw new com.analyzer.api.exception.common.ConflictException(
+                    "WORKSPACE_ALREADY_EXISTS", "An active workspace with this name already exists");
+        }
+        if (isSystemSandbox(normalizedName, request.description())) {
+            subscriptionQuotaService.getCurrentPlan(user);
+        } else {
+            subscriptionQuotaService.checkCanCreateWorkspace(user);
+        }
 
         Workspace workspace = Workspace.builder()
                 .id(generateWorkspaceId())
                 .user(user)
-                .name(request.name().trim())
+                .name(normalizedName)
                 .description(request.description())
                 .status(STATUS_ACTIVE)
                 .build();
@@ -297,6 +308,11 @@ public class WorkspaceServiceImpl implements WorkspaceService {
 
     private String generateWorkspaceId() {
         return "ws_" + UUID.randomUUID().toString().replace("-", "");
+    }
+
+    private boolean isSystemSandbox(String name, String description) {
+        return SYSTEM_SANDBOX_NAME.equals(name)
+                && SYSTEM_SANDBOX_DESCRIPTION.equals(description == null ? null : description.trim());
     }
 
     private String generateDocumentId() {

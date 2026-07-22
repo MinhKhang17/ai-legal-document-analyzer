@@ -23,6 +23,7 @@ import { getAccessToken as getSessionAccessToken } from "../../services/authSess
 import { supportedContractScopeText } from "../../config/supportedContractTypes";
 import { formatFileSize, localeForLanguage } from "../../utils/format";
 import { validateDocumentFiles } from "../../config/upload";
+import { getReadableErrorMessage } from "../../services/http";
 const getAccessToken = () => getSessionAccessToken() ?? "";
 
 export function UploadPage() {
@@ -50,6 +51,7 @@ export function UploadPage() {
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [uploadError, setUploadError] = useState<string>('');
   const cancelTokenSourceRef = useRef<any>(null);
+  const creatingWorkspaceRef = useRef(false);
 
   const hasProcessingDocument = documents.some(
     (document) => document.status === "processing",
@@ -132,6 +134,7 @@ export function UploadPage() {
   }, [selectedWorkspaceId, hasProcessingDocument]);
 
   const handleCreateWorkspace = async () => {
+    if (creatingWorkspaceRef.current) return;
     setError("");
 
     if (!workspaceName.trim()) {
@@ -140,6 +143,7 @@ export function UploadPage() {
       return;
     }
     try {
+      creatingWorkspaceRef.current = true;
       setCreatingWorkspace(true);
 
       const workspace = await createWorkspace(getAccessToken(), {
@@ -153,11 +157,12 @@ export function UploadPage() {
       setWorkspaceName("");
       setWorkspaceDescription("");
       toast.success(t("workspace.createSuccess"), t("toast.successTitle"));
-    } catch {
-      const message = t("workspace.createError");
+    } catch (createError) {
+      const message = getReadableErrorMessage(createError, t("workspace.createError"));
       setError(message);
       toast.error(message, t("toast.errorTitle"));
     } finally {
+      creatingWorkspaceRef.current = false;
       setCreatingWorkspace(false);
     }
   };

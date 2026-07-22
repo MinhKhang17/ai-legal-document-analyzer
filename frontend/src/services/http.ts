@@ -5,10 +5,12 @@ export interface ApiResponse<T> {
   code: number;
   message: string;
   data?: T;
+  errorCode?: string;
 }
 
 interface ApiErrorResponse {
   message?: string;
+  errorCode?: string;
   error?: string;
   data?: unknown;
   errors?: unknown;

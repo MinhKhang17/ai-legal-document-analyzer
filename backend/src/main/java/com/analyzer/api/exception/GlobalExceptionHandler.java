@@ -67,7 +67,7 @@ public class GlobalExceptionHandler {
         @ExceptionHandler(ForbiddenException.class)
         public ResponseEntity<ApiResponseDTO<Void>> handleForbiddenException(ForbiddenException ex) {
                 return new ResponseEntity<>(
-                                ApiResponseDTO.error(HttpStatus.FORBIDDEN.value(), ex.getMessage()),
+                                ApiResponseDTO.error(HttpStatus.FORBIDDEN.value(), ex.getErrorCode(), ex.getMessage()),
                                 HttpStatus.FORBIDDEN);
         }
 
@@ -187,7 +187,7 @@ public class GlobalExceptionHandler {
         @ExceptionHandler(ConflictException.class)
         public ResponseEntity<ApiResponseDTO<Void>> handleConflictException(ConflictException ex) {
                 return new ResponseEntity<>(
-                                ApiResponseDTO.error(HttpStatus.CONFLICT.value(), ex.getMessage()),
+                                ApiResponseDTO.error(HttpStatus.CONFLICT.value(), ex.getErrorCode(), ex.getMessage()),
                                 HttpStatus.CONFLICT);
         }
 

@@ -9,6 +9,7 @@ import com.analyzer.api.entity.User;
 import com.analyzer.api.enums.PaymentMethod;
 import com.analyzer.api.enums.PlanStatus;
 import com.analyzer.api.enums.PaymentStatus;
+import com.analyzer.api.exception.common.ConflictException;
 import com.analyzer.api.mapper.CustomerPlanMapper;
 import com.analyzer.api.repository.CustomerPlanRepository;
 import com.analyzer.api.repository.PaymentTransactionRepository;
@@ -136,7 +137,13 @@ public class CustomerPlanServiceImpl implements CustomerPlanService {
         // Chỉ gói ACTIVE mới được xem là gói người dùng đang sở hữu.
         CustomerPlan activePlan = getActivePlanOrUpdateIfExpired(customerId);
         if (activePlan == null) {
-            throw new RuntimeException("Bạn chưa sở hữu gói dịch vụ nào đang kích hoạt");
+            activePlan = createDefaultFreePlan(customerId);
+        }
+        if (activePlan.getSubscriptionPlan() == null) {
+            throw new ConflictException("SUBSCRIPTION_NOT_FOUND", "The active subscription has no plan");
+        }
+        if (!Boolean.TRUE.equals(activePlan.getSubscriptionPlan().getActive())) {
+            throw new ConflictException("SUBSCRIPTION_INACTIVE", "The active subscription references an inactive plan");
         }
 
         return customerPlanMapper.toResponseDTO(activePlan);
@@ -219,6 +226,39 @@ public class CustomerPlanServiceImpl implements CustomerPlanService {
             }
         }
         return activePlan;
+    }
+
+    private CustomerPlan createDefaultFreePlan(Long customerId) {
+        User customer = userRepository.findByIdForUpdate(customerId)
+                .orElseThrow(() -> new RuntimeException("Khong tim thay thong tin khach hang"));
+
+        CustomerPlan concurrentActivePlan = getActivePlanOrUpdateIfExpired(customerId);
+        if (concurrentActivePlan != null) {
+            return concurrentActivePlan;
+        }
+
+        SubscriptionPlan freePlan = subscriptionPlanRepository.findByPlanTypeIgnoreCase("FREE")
+                .orElseThrow(() -> new ConflictException(
+                        "SUBSCRIPTION_NOT_FOUND", "The default Free subscription is not configured"));
+        if (!Boolean.TRUE.equals(freePlan.getActive())) {
+            throw new ConflictException("SUBSCRIPTION_INACTIVE", "The default Free subscription is inactive");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime endDate = now.plusDays(freePlan.getDurationDays());
+        return customerPlanRepository.save(CustomerPlan.builder()
+                .customer(customer)
+                .subscriptionPlan(freePlan)
+                .status(PlanStatus.ACTIVE)
+                .usedQuota(0)
+                .startDate(now)
+                .endDate(endDate)
+                .usageStartAt(now)
+                .usageEndAt(endDate)
+                .billingCycleStartAt(now)
+                .billingCycleEndAt(endDate)
+                .autoRenew(false)
+                .build());
     }
 
     private int planRank(SubscriptionPlan plan) {

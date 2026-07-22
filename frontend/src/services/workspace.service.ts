@@ -20,6 +20,8 @@ type DocumentResponse = Omit<Document, "status"> & {
   status: string;
 };
 
+const createWorkspaceRequests = new Map<string, Promise<Workspace>>();
+
 const normalizeStatus = <T extends { status: string }>(item: T) => ({
   ...item,
   status: item.status.toLowerCase(),
@@ -60,20 +62,31 @@ export async function createWorkspace(
   accessToken: string,
   payload: CreateWorkspaceRequest,
 ): Promise<Workspace> {
-  const data = await requestApiData<WorkspaceResponse>(
-    API_ENDPOINTS.workspaces.create,
-    {
-      method: "POST",
-      headers: buildBearerHeaders(accessToken, {
-        "Content-Type": "application/json",
-      }),
-      credentials: "include",
-      body: JSON.stringify(payload),
-    },
-    "Tạo workspace thất bại",
-  );
+  const normalizedPayload = {
+    name: payload.name.trim(),
+    description: payload.description?.trim() ?? "",
+  };
+  const requestKey = `${accessToken}:${JSON.stringify(normalizedPayload)}`;
+  const existingRequest = createWorkspaceRequests.get(requestKey);
+  if (existingRequest) return existingRequest;
 
-  return normalizeStatus(data) as Workspace;
+  const request = requestApiData<WorkspaceResponse>(
+      API_ENDPOINTS.workspaces.create,
+      {
+        method: "POST",
+        headers: buildBearerHeaders(accessToken, {
+          "Content-Type": "application/json",
+        }),
+        credentials: "include",
+        body: JSON.stringify(normalizedPayload),
+      },
+      "Tạo workspace thất bại",
+    )
+    .then((data) => normalizeStatus(data) as Workspace)
+    .finally(() => createWorkspaceRequests.delete(requestKey));
+
+  createWorkspaceRequests.set(requestKey, request);
+  return request;
 }
 
 export async function uploadDocument(
