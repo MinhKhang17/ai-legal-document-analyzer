@@ -550,6 +550,10 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                     .messageAttachedDocumentIds(messageAttachedDocumentIds)
                     .conversationUserRole(chatSession.getConversationUserRole())
                     .conversationMode(chatSession.getConversationMode())
+                    .draftingAction(sendRequest.getDraftingAction())
+                    .draftingContractType(sendRequest.getDraftingContractType())
+                    .draftingInformation(sendRequest.getDraftingInformation())
+                    .draftingOriginalRequirement(sendRequest.getDraftingOriginalRequirement())
                     .topKUserChunks(5)
                     .topKKnowledgeChunks(5)
                     .build();
@@ -660,6 +664,13 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         assistantMessage.setRiskLevel(aiResponse.getRiskLevel());
         assistantMessage.setLegalDomain(aiResponse.getLegalDomain());
         assistantMessage.setUserActionHint(aiResponse.getUserActionHint());
+        if ("DRAFT_CONTRACT".equals(aiResponse.getIntent())) {
+            try {
+                assistantMessage.setDraftingResponseJson(objectMapper.writeValueAsString(aiResponse));
+            } catch (JacksonException exception) {
+                logger.warn("Unable to persist drafting response metadata requestId={}", requestId, exception);
+            }
+        }
         chatMessageRepository.save(assistantMessage);
         applyConversationMemoryUpdate(chatSession, aiResponse.getConversationMemoryUpdate());
         saveCitations(chatSession.getWorkspace().getId(), aiResponse.getCitations(), assistantMessage);
@@ -694,6 +705,13 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                 .selectedDocumentIds(aiResponse.getSelectedDocumentIds())
                 .draftingPrompt(aiResponse.getDraftingPrompt())
                 .redactionRequired(aiResponse.getRedactionRequired())
+                .contractType(aiResponse.getContractType())
+                .draftingStatus(aiResponse.getDraftingStatus())
+                .questions(aiResponse.getQuestions() == null ? List.of() : aiResponse.getQuestions())
+                .providedInformation(aiResponse.getProvidedInformation() == null ? java.util.Map.of() : aiResponse.getProvidedInformation())
+                .draftingMissingInformation(aiResponse.getDraftingMissingInformation() == null ? List.of() : aiResponse.getDraftingMissingInformation())
+                .privacyWarning(aiResponse.getPrivacyWarning())
+                .draftingOriginalRequirement(aiResponse.getDraftingOriginalRequirement())
                 .build();
     }
 
@@ -829,6 +847,7 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         if (message == null) {
             return null;
         }
+        RagQueryResponse drafting = readPersistedDraftingResponse(message.getDraftingResponseJson());
         return ChatMessageResponse.builder()
                 .messageId(message.getId())
                 .chatSessionId(message.getChatSession().getId())
@@ -851,9 +870,30 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                 .completionTokens(message.getCompletionTokens())
                 .totalTokens(message.getTotalTokens())
                 .errorMessage(message.getErrorMessage())
+                .intent(drafting == null ? null : drafting.getIntent())
+                .suggestedActions(drafting == null ? List.of() : drafting.getSuggestedActions())
+                .draftingPrompt(drafting == null ? null : drafting.getDraftingPrompt())
+                .redactionRequired(drafting == null ? null : drafting.getRedactionRequired())
+                .contractType(drafting == null ? null : drafting.getContractType())
+                .draftingStatus(drafting == null ? null : drafting.getDraftingStatus())
+                .questions(drafting == null || drafting.getQuestions() == null ? List.of() : drafting.getQuestions())
+                .providedInformation(drafting == null || drafting.getProvidedInformation() == null ? java.util.Map.of() : drafting.getProvidedInformation())
+                .draftingMissingInformation(drafting == null || drafting.getDraftingMissingInformation() == null ? List.of() : drafting.getDraftingMissingInformation())
+                .privacyWarning(drafting == null ? null : drafting.getPrivacyWarning())
+                .draftingOriginalRequirement(drafting == null ? null : drafting.getDraftingOriginalRequirement())
                 .createdAt(message.getCreatedAt())
                 .updatedAt(message.getUpdatedAt())
                 .build();
+    }
+
+    private RagQueryResponse readPersistedDraftingResponse(String json) {
+        if (json == null || json.isBlank()) return null;
+        try {
+            return objectMapper.readValue(json, RagQueryResponse.class);
+        } catch (JacksonException exception) {
+            logger.warn("Unable to read persisted drafting response metadata", exception);
+            return null;
+        }
     }
 
     private void saveCitations(String workspaceId, List<RagQueryResponse.Citation> citations,

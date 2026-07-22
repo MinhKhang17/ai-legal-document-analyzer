@@ -60,6 +60,26 @@ class WorkspaceSystemKnowledgeDownloadTest {
     }
 
     @Test
+    void resolvesLegacyStorageDirectoryToOriginalSourceFile() throws Exception {
+        Path legacyDirectory = uploadRoot.resolve("knowledge_base");
+        Files.createDirectories(legacyDirectory);
+        Files.writeString(legacyDirectory.resolve("100.2015.QH13.pdf"), "test legal source");
+        KnowledgeBaseVersion version = KnowledgeBaseVersion.builder()
+                .originalFileName("100.2015.QH13.pdf")
+                .sourceStoragePath(legacyDirectory.toString())
+                .status(KnowledgeStatus.PUBLIC)
+                .visibility(KnowledgeVisibility.PUBLIC)
+                .active(true)
+                .build();
+        when(knowledgeBaseVersionRepository.findByStatusAndVisibilityAndActiveTrueOrderByCreatedAtDesc(
+                KnowledgeStatus.PUBLIC, KnowledgeVisibility.PUBLIC)).thenReturn(List.of(version));
+
+        Resource resource = service().downloadSystemDocumentFile("100.2015.QH13");
+
+        assertEquals("100.2015.QH13.pdf", resource.getFilename());
+    }
+
+    @Test
     void missingPublishedKnowledgeSourceReturnsNotFound() {
         when(knowledgeBaseVersionRepository.findByStatusAndVisibilityAndActiveTrueOrderByCreatedAtDesc(
                 KnowledgeStatus.PUBLIC, KnowledgeVisibility.PUBLIC)).thenReturn(List.of());

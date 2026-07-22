@@ -11,6 +11,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.util.List;
+import java.util.Map;
 
 @Data
 @Builder
@@ -42,6 +43,15 @@ public class SendMessageRequest {
     private String userRole;
 
     private String conversationMode;
+
+    private String draftingAction;
+
+    private String draftingContractType;
+
+    @Builder.Default
+    private Map<String, String> draftingInformation = Map.of();
+
+    private String draftingOriginalRequirement;
 
     @Builder.Default
     private ChatMode mode = ChatMode.AUTO;

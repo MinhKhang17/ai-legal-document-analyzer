@@ -25,18 +25,15 @@ def test_capability_question_is_answered_without_document_retrieval() -> None:
     assert "chưa đính kèm tài liệu" in response.answer
 
 
-def test_contract_creation_returns_anonymized_prompt_and_no_file() -> None:
+def test_contract_creation_without_type_requests_contract_type_and_no_prompt() -> None:
     response = build_contract_prompt_response(
         request("Soạn hợp đồng cho email an.nguyen@example.com, số điện thoại 0912345678, giá 12.000.000 đồng")
     )
 
-    assert response.intent == "CONTRACT_PROMPT_GENERATION"
-    assert response.suggestedActions == ["COPY_PROMPT", "OPEN_CHATGPT"]
-    assert response.draftingPrompt is not None
-    assert "an.nguyen@example.com" not in response.draftingPrompt
-    assert "0912345678" not in response.draftingPrompt
-    assert "[EMAIL_1]" in response.draftingPrompt
-    assert "[PHONE_1]" in response.draftingPrompt
+    assert response.intent == "DRAFT_CONTRACT"
+    assert response.draftingStatus == "NEED_CONTRACT_TYPE"
+    assert response.suggestedActions == ["SELECT_CONTRACT_TYPE"]
+    assert response.draftingPrompt is None
     assert not hasattr(response, "downloadUrl")
 
 

@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.util.List;
+import java.util.Map;
 
 @Data
 @Builder
@@ -70,6 +71,18 @@ public class RagQueryRequest {
 
     @JsonProperty("conversation_mode")
     private String conversationMode;
+
+    @JsonProperty("drafting_action")
+    private String draftingAction;
+
+    @JsonProperty("drafting_contract_type")
+    private String draftingContractType;
+
+    @JsonProperty("drafting_information")
+    private Map<String, String> draftingInformation;
+
+    @JsonProperty("drafting_original_requirement")
+    private String draftingOriginalRequirement;
 
     @Data
     @Builder

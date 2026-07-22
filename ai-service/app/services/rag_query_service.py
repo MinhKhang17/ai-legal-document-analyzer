@@ -141,7 +141,9 @@ class RagQueryService:
             return build_contract_prompt_response(request)
 
         # ── Step 0b: Contract generation shortcut ──
-        if is_contract_generation_intent(request.question) and not follow_up:
+        if request.draftingAction or request.draftingContractType or (
+            is_contract_generation_intent(request.question) and not follow_up
+        ):
             return build_contract_prompt_response(request)
 
         user_hits, legal_search_query, knowledge_hits = self._retrieve(request)
@@ -1182,35 +1184,6 @@ class RagQueryService:
     def _enrich_answer_with_download_links(
         self, answer: str, workspace_id: str, knowledge_hits: list[RagChunkHit]
     ) -> str:
-        if not answer or not knowledge_hits or not workspace_id:
-            return answer
-
-        kb_map = {}
-        for hit in knowledge_hits:
-            if hit.citationId:
-                file_target = (
-                    (hit.fileName or "").strip()
-                    or (hit.lawName or "").strip()
-                    or (hit.title or "").strip()
-                    or (hit.knowledgeDocumentId or "").strip()
-                )
-                if file_target:
-                    kb_map[hit.citationId] = file_target
-
-        logger.info("DEBUG ENRICH DOWNLOAD LINKS: kb_map=%s, answer_has_kb=%s", kb_map, "[KB-" in answer)
-        if not kb_map:
-            return answer
-
-        import re
-        from urllib.parse import quote
-
-        def _replace_tag(match):
-            tag = match.group(1)
-            if tag in kb_map:
-                filename = kb_map[tag]
-                encoded = quote(filename)
-                download_url = f"/api/v1/workspaces/{workspace_id}/documents/system/download?filename={encoded}"
-                return f"[[{tag} 📥 Tải về]]({download_url})"
-            return match.group(0)
-
-        return re.sub(r"\[(KB-\d+)\]", _replace_tag, answer)
+        # Keep citations as plain [KB-x] markers. Download actions are rendered
+        # separately from structured citation metadata in the chat UI.
+        return answer

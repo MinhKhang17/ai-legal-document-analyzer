@@ -29,9 +29,10 @@ import { useI18n } from "../../hooks/useI18n";
 import { useToast } from "../../hooks/useToast";
 import { ChatMessageContent } from "../../components/chat/ChatMessageContent";
 import { ChatMessageFeedbackControls } from "../../components/chat/ChatMessageFeedbackControls";
+import { DraftingWorkflowCard } from "../../components/chat/DraftingWorkflowCard";
 import { CreateTicketModal } from "../../components/tickets/CreateTicketModal";
 import type { CreateLegalTicketRequest } from "../../types/legalTicket";
-import type { ChatMessage, ChatSessionDocument } from "../../types/chat";
+import type { ChatMessage, ChatSessionDocument, DraftingRequestFields } from "../../types/chat";
 import type { Document, Workspace } from "../../types/workspace";
 import type { WorkspaceChatMessage, WorkspaceChatSession } from "../../types/chat";
 import type { AiCitation } from "../../types/aiFeature";
@@ -40,7 +41,8 @@ import { simulateStreaming } from "../../utils/simulateStreaming";
 import { supportedContractScopeText } from "../../config/supportedContractTypes";
 import { DOCUMENT_UPLOAD_ACCEPT, validateDocumentFiles } from "../../config/upload";
 import { finishSubmission, tryStartSubmission } from "../../utils/submissionGuard";
-import { getApiErrorCode, isPlanEntitlementError } from "../../services/http";
+import { buildApiUrl } from "../../config/api";
+import { buildAuthHeaders, getApiErrorCode, isPlanEntitlementError } from "../../services/http";
 import { acceptCurrentPolicies } from "../../services/policy.service";
 
 import { getAccessToken as getSessionAccessToken } from "../../services/authSession";
@@ -154,6 +156,17 @@ const toDisplayMessage = (
   riskLevel: message.riskLevel,
   legalDomain: message.legalDomain,
   userActionHint: message.userActionHint,
+  intent: message.intent,
+  suggestedActions: message.suggestedActions,
+  draftingPrompt: message.draftingPrompt,
+  redactionRequired: message.redactionRequired,
+  contractType: message.contractType,
+  draftingStatus: message.draftingStatus,
+  questions: message.questions,
+  providedInformation: message.providedInformation,
+  draftingMissingInformation: message.draftingMissingInformation,
+  privacyWarning: message.privacyWarning,
+  draftingOriginalRequirement: message.draftingOriginalRequirement,
 });
 
 const createOptimisticUserMessage = (
@@ -289,6 +302,7 @@ export function LegalChatPage() {
     sessionId: string;
     documentId?: string;
     message: string;
+    drafting?: DraftingRequestFields;
   } | null>(null);
 
   const scrollChatToBottom = (behavior: ScrollBehavior = "smooth") => {
@@ -894,6 +908,7 @@ export function LegalChatPage() {
     workspaceId: string;
     sessionId?: string;
     documentId?: string;
+    drafting?: DraftingRequestFields;
   }) => {
     if (sending || submissionPendingRef.current || activeRequestControllerRef.current) return;
 
@@ -970,6 +985,7 @@ export function LegalChatPage() {
       sessionId: targetSessionId ?? "",
       documentId: targetDocumentId,
       message: question,
+      drafting: override?.drafting,
     };
 
     try {
@@ -980,6 +996,7 @@ export function LegalChatPage() {
         undefined,
         controller.signal,
         requestId,
+        override?.drafting,
       );
 
       if (conversation?.chatSession) {
@@ -1015,6 +1032,13 @@ export function LegalChatPage() {
               suggestedActions: conversation.suggestedActions,
               draftingPrompt: conversation.draftingPrompt,
               redactionRequired: conversation.redactionRequired,
+              contractType: conversation.contractType,
+              draftingStatus: conversation.draftingStatus,
+              questions: conversation.questions,
+              providedInformation: conversation.providedInformation,
+              draftingMissingInformation: conversation.draftingMissingInformation,
+              privacyWarning: conversation.privacyWarning,
+              draftingOriginalRequirement: conversation.draftingOriginalRequirement,
             }
           : item));
       }
@@ -1590,32 +1614,18 @@ export function LegalChatPage() {
                               content={message.content}
                               className="text-on-surface dark:text-slate-100"
                             />
-                            {message.intent === "CONTRACT_PROMPT_GENERATION" && message.draftingPrompt && (
-                              <div className="mt-md rounded-lg border border-legal-border bg-surface-container-low p-md dark:border-slate-700 dark:bg-slate-800">
-                                <p className="mb-sm text-xs font-semibold uppercase tracking-wide text-on-surface-variant dark:text-slate-300">
-                                  Drafting prompt {message.redactionRequired ? "· dữ liệu nhạy cảm đã được ẩn" : ""}
-                                </p>
-                                <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-md bg-white p-sm text-xs text-on-surface dark:bg-slate-950 dark:text-slate-100">
-                                  {message.draftingPrompt}
-                                </pre>
-                                <div className="mt-sm flex flex-wrap gap-sm">
-                                  <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    leftIcon={<ClipboardCheck className="h-4 w-4" />}
-                                    onClick={() => void navigator.clipboard.writeText(message.draftingPrompt ?? "")}
-                                  >
-                                    Sao chép prompt
-                                  </Button>
-                                  <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    onClick={() => window.open("https://chatgpt.com/", "_blank", "noopener,noreferrer")}
-                                  >
-                                    Mở ChatGPT
-                                  </Button>
-                                </div>
-                              </div>
+                            {message.intent === "DRAFT_CONTRACT" && (
+                              <DraftingWorkflowCard
+                                message={message}
+                                disabled={sending}
+                                onSubmit={(drafting) => void handleSend({
+                                  message: drafting.message,
+                                  workspaceId: selectedWorkspaceId,
+                                  sessionId: selectedSessionId || undefined,
+                                  documentId: selectedDocumentId || undefined,
+                                  drafting,
+                                })}
+                              />
                             )}
                             {message.status === "streaming" && <span className="ml-1 inline-block h-4 w-0.5 bg-primary motion-safe:animate-pulse" aria-hidden="true" />}
                             {message.status === "cancelled" && <p className="mt-sm text-xs font-medium text-on-surface-variant">{message.statusMessage ?? t("chat.status.stopped")}</p>}
@@ -1978,10 +1988,9 @@ export function LegalChatPage() {
                             leftIcon={<Download className="h-4 w-4" />}
                             onClick={async () => {
                               try {
-                                const response = await fetch(citation.uri!, {
-                                  headers: {
-                                    Authorization: `Bearer ${getAccessToken()}`,
-                                  },
+                                const response = await fetch(buildApiUrl(citation.uri!), {
+                                  headers: buildAuthHeaders({ Accept: "application/octet-stream" }),
+                                  credentials: "include",
                                 });
                                 if (!response.ok) throw new Error("Tải file thất bại");
                                 const blob = await response.blob();

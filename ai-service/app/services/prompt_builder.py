@@ -277,6 +277,8 @@ def build_user_prompt(
     ws_id = workspace_id or "ws_unknown"
     download_instructions = (
         "HƯỚNG DẪN CUNG CẤP ĐƯỜNG DẪN TẢI XUỐNG CHO TÀI LIỆU HỆ THỐNG:\n"
+        "Trong câu trả lời phân tích pháp lý thông thường, chỉ ghi citation [KB-x] và KHÔNG gắn link tải vào citation. "
+        "UI sẽ hiển thị tài liệu nguồn và nút tải riêng.\n"
         "Nếu người dùng muốn tải xuống các tệp ví dụ hoặc tài liệu đối chiếu thuộc danh sách tài liệu hệ thống (Neo4j) nêu trên, bạn có thể tạo đường dẫn tải xuống trực tiếp cho họ bằng định dạng Markdown sau:\n"
         f"- [Tải xuống Tên_Tài_Liệu](/api/v1/workspaces/{ws_id}/documents/system/download?filename=Tên_File_Gốc)\n"
         "Ví dụ:\n"
@@ -396,6 +398,12 @@ def build_user_prompt(
         or message_attached_document_ids
         or focused_document_id
     )
+    response_format_instruction = (
+        "RESPONSE_FORMAT:\n"
+        "- Mỗi tiêu đề, đoạn văn và mục danh sách phải nằm trên dòng riêng.\n"
+        "- Danh sách đánh số phải viết từng mục theo dạng `1.`, `2.`, `3.` trên các dòng riêng biệt.\n"
+        "- Không ghép citation với nút/link tải tài liệu trong nội dung phân tích.\n\n"
+    )
     no_document_response_style = ""
     if not has_attached_user_document:
         no_document_response_style = (
@@ -413,6 +421,7 @@ def build_user_prompt(
         f"DANH SÁCH TÀI LIỆU ĐANG CÓ TRONG HỆ THỐNG:\n{docs_summary}\n\n"
         f"{download_instructions}"
         f"{reference_question_instructions}"
+        f"{response_format_instruction}"
         f"CONVERSATION_SUMMARY:\n{summary_context}\n\n"
         f"RECENT_HISTORY:\n{recent_context}\n\n"
         f"RELEVANT_HISTORY:\n{relevant_context}\n\n"

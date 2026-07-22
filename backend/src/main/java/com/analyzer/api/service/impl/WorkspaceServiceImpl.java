@@ -488,12 +488,31 @@ public class WorkspaceServiceImpl implements WorkspaceService {
 
             java.nio.file.Path baseDir = java.nio.file.Path.of(uploadRoot).toAbsolutePath().normalize();
             java.nio.file.Path filePath = java.nio.file.Path.of(storedPath).toAbsolutePath().normalize();
+            String originalFileName = version.getOriginalFileName();
+            if (Files.isDirectory(filePath) && StringUtils.hasText(originalFileName)) {
+                String safeOriginalName = Path.of(originalFileName).getFileName().toString();
+                filePath = filePath.resolve(safeOriginalName).normalize();
+            }
+
+            // Compatibility for knowledge records imported before source files
+            // were stored under knowledge-source/<entry>/<version>/.
+            if (!Files.isRegularFile(filePath) && StringUtils.hasText(originalFileName)) {
+                String safeOriginalName = Path.of(originalFileName).getFileName().toString();
+                List<Path> legacyCandidates = List.of(
+                        baseDir.resolve("knowledge_base").resolve(safeOriginalName).normalize(),
+                        baseDir.resolve(safeOriginalName).normalize());
+                filePath = legacyCandidates.stream()
+                        .filter(candidate -> candidate.startsWith(baseDir))
+                        .filter(Files::isRegularFile)
+                        .findFirst()
+                        .orElse(filePath);
+            }
             if (!filePath.startsWith(baseDir)) {
                 throw new ForbiddenException("INVALID_KNOWLEDGE_SOURCE_PATH");
             }
 
             org.springframework.core.io.Resource resource = new org.springframework.core.io.UrlResource(filePath.toUri());
-            if (resource.exists() && resource.isReadable()) {
+            if (Files.isRegularFile(filePath) && resource.exists() && resource.isReadable()) {
                 return resource;
             }
             throw new ResourceNotFoundException("KNOWLEDGE_SOURCE_FILE_NOT_FOUND");

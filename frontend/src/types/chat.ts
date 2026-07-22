@@ -20,6 +20,27 @@ export interface ChatMessage {
   suggestedActions?: string[];
   draftingPrompt?: string | null;
   redactionRequired?: boolean;
+  contractType?: string | null;
+  draftingStatus?: string | null;
+  questions?: DraftingQuestion[];
+  providedInformation?: Record<string, string>;
+  draftingMissingInformation?: string[];
+  privacyWarning?: string | null;
+  draftingOriginalRequirement?: string | null;
+}
+
+export interface DraftingQuestion {
+  key: string;
+  label: string;
+  placeholder?: string | null;
+  required?: boolean;
+}
+
+export interface DraftingRequestFields {
+  draftingAction?: string;
+  draftingContractType?: string;
+  draftingInformation?: Record<string, string>;
+  draftingOriginalRequirement?: string;
 }
 
 export interface ChatThread {
@@ -64,6 +85,17 @@ export interface WorkspaceChatMessage {
   completionTokens: number | null;
   totalTokens: number | null;
   errorMessage: string | null;
+  intent?: string | null;
+  suggestedActions?: string[];
+  draftingPrompt?: string | null;
+  redactionRequired?: boolean;
+  contractType?: string | null;
+  draftingStatus?: string | null;
+  questions?: DraftingQuestion[];
+  providedInformation?: Record<string, string>;
+  draftingMissingInformation?: string[];
+  privacyWarning?: string | null;
+  draftingOriginalRequirement?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -85,6 +117,13 @@ export interface WorkspaceChatConversation {
   selectedDocumentIds?: string[];
   draftingPrompt?: string | null;
   redactionRequired?: boolean;
+  contractType?: string | null;
+  draftingStatus?: string | null;
+  questions?: DraftingQuestion[];
+  providedInformation?: Record<string, string>;
+  draftingMissingInformation?: string[];
+  privacyWarning?: string | null;
+  draftingOriginalRequirement?: string | null;
 }
 
 export type ChatMode = 'AUTO' | 'LEGAL_QA' | 'DOCUMENT_ANALYSIS';
@@ -95,6 +134,10 @@ export interface WorkspaceChatRequest {
   documentId?: string;
   documentIds?: string[];
   mode?: ChatMode;
+  draftingAction?: string;
+  draftingContractType?: string;
+  draftingInformation?: Record<string, string>;
+  draftingOriginalRequirement?: string;
 }
 
 export interface DeleteChatSessionResponse {

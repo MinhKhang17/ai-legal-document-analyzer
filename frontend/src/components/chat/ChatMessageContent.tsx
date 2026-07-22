@@ -1,6 +1,7 @@
 import { Fragment, type ReactNode } from "react";
 import { cn } from "../../utils/cn";
 import { buildApiUrl } from "../../config/api";
+import { buildAuthHeaders } from "../../services/http";
 
 type InlineToken =
   | { type: "text"; value: string }
@@ -54,9 +55,9 @@ function renderInline(text: string): ReactNode[] {
           onClick={isApiDownload ? async (e) => {
             e.preventDefault();
             try {
-              const tokenStr = localStorage.getItem("token") || "";
               const response = await fetch(resolvedUrl, {
-                headers: tokenStr ? { Authorization: `Bearer ${tokenStr}` } : {},
+                headers: buildAuthHeaders({ Accept: "application/octet-stream" }),
+                credentials: "include",
               });
               if (!response.ok) throw new Error("Download failed");
               const blob = await response.blob();
@@ -183,17 +184,25 @@ export function sanitizeAndExtractContent(text: string): string {
   return cleaned.trim();
 }
 
+export function normalizeChatMarkdown(text: string): string {
+  return text
+    .replace(/\[\[(KB-\d+)[^\]]*\]\]\([^)]*\/documents\/system\/download[^)]*\)/gi, "[$1]")
+    .replace(/(^|[\s(])((?:USER|KB)-\d+)\]/gim, "$1[$2]")
+    .replace(/\s+(?=\d{1,2}\.\s+(?:\*\*|[#🔴🟠🟡🟢]|[A-ZÀ-Ỹ]))/gu, "\n");
+}
+
 export function ChatMessageContent({ content, className }: ChatMessageContentProps) {
-  const sanitizedContent = sanitizeAndExtractContent(content);
+  const sanitizedContent = normalizeChatMarkdown(sanitizeAndExtractContent(content));
   const lines = sanitizedContent.replace(/\r\n/g, "\n").split("\n");
   const blocks: ReactNode[] = [];
 
   let bulletItems: string[] = [];
+  let orderedItems: string[] = [];
   let paragraphLines: string[] = [];
 
   const flushParagraph = () => {
     if (!paragraphLines.length) return;
-    const text = paragraphLines.join(" ").trim();
+    const text = paragraphLines.join("\n").trim();
     if (text) {
       blocks.push(
         <p key={`p-${blocks.length}`} className="whitespace-pre-wrap break-words">
@@ -218,6 +227,20 @@ export function ChatMessageContent({ content, className }: ChatMessageContentPro
     bulletItems = [];
   };
 
+  const flushOrdered = () => {
+    if (!orderedItems.length) return;
+    blocks.push(
+      <ol key={`ol-${blocks.length}`} className="ml-5 list-decimal space-y-2">
+        {orderedItems.map((item, index) => (
+          <li key={`${item}-${index}`} className="break-words pl-1">
+            {renderInline(item)}
+          </li>
+        ))}
+      </ol>,
+    );
+    orderedItems = [];
+  };
+
   for (const rawLine of lines) {
     const line = rawLine.trimEnd();
     const trimmed = line.trim();
@@ -225,12 +248,14 @@ export function ChatMessageContent({ content, className }: ChatMessageContentPro
     if (!trimmed) {
       flushParagraph();
       flushBullets();
+      flushOrdered();
       continue;
     }
 
     if (/^#{1,3}\s+/.test(trimmed)) {
       flushParagraph();
       flushBullets();
+      flushOrdered();
       const level = trimmed.match(/^#{1,3}/)?.[0].length ?? 1;
       const headingText = trimmed.replace(/^#{1,3}\s+/, "");
       const HeadingTag = level === 1 ? "h1" : level === 2 ? "h2" : "h3";
@@ -251,13 +276,22 @@ export function ChatMessageContent({ content, className }: ChatMessageContentPro
 
     if (/^[-*]\s+/.test(trimmed)) {
       flushParagraph();
+      flushOrdered();
       bulletItems.push(trimmed.replace(/^[-*]\s+/, ""));
+      continue;
+    }
+
+    if (/^\d+\.\s+/.test(trimmed)) {
+      flushParagraph();
+      flushBullets();
+      orderedItems.push(trimmed.replace(/^\d+\.\s+/, ""));
       continue;
     }
 
     if (/^>\s+/.test(trimmed)) {
       flushParagraph();
       flushBullets();
+      flushOrdered();
       blocks.push(
         <blockquote
           key={`q-${blocks.length}`}
@@ -272,16 +306,19 @@ export function ChatMessageContent({ content, className }: ChatMessageContentPro
     if (/^-{3,}$/.test(trimmed)) {
       flushParagraph();
       flushBullets();
+      flushOrdered();
       blocks.push(<hr key={`hr-${blocks.length}`} className="border-outline-variant/60 dark:border-slate-700" />);
       continue;
     }
 
     flushBullets();
+    flushOrdered();
     paragraphLines.push(trimmed);
   }
 
   flushParagraph();
   flushBullets();
+  flushOrdered();
 
   if (!blocks.length) {
     return <p className={className}>{content}</p>;

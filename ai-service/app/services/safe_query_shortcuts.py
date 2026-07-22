@@ -4,6 +4,7 @@ import re
 import unicodedata
 
 from app.schemas import RagQueryRequest, RagQueryResponse, RagUsage
+from app.services.drafting_workflow import build_drafting_response, redact_sensitive_text
 
 
 def _plain(value: str) -> str:
@@ -90,54 +91,5 @@ def build_conversation_shortcut(request: RagQueryRequest) -> RagQueryResponse | 
     return None
 
 
-_REDACTION_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
-    ("EMAIL", re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE)),
-    ("PHONE", re.compile(r"(?<!\d)(?:\+?84|0)(?:[ .-]?\d){8,10}(?!\d)")),
-    ("IDENTITY_NUMBER", re.compile(r"(?<!\d)\d{9,12}(?!\d)")),
-    ("BANK_ACCOUNT", re.compile(r"(?i)(?:tai khoan|tài khoản|stk|account)\s*[:#-]?\s*\d{6,20}")),
-    ("TAX_CODE", re.compile(r"(?i)(?:ma so thue|mã số thuế|mst|tax code)\s*[:#-]?\s*[\d-]{8,16}")),
-    ("AMOUNT", re.compile(r"(?i)(?<!\w)\d[\d., ]{2,}\s*(?:vnd|đồng|dong|usd|\$)(?!\w)")),
-)
-
-
-def redact_sensitive_text(value: str) -> tuple[str, bool]:
-    result = value
-    changed = False
-    counters: dict[str, int] = {}
-    replacements: dict[tuple[str, str], str] = {}
-    for label, pattern in _REDACTION_PATTERNS:
-        def replace(match: re.Match[str], current_label: str = label) -> str:
-            nonlocal changed
-            changed = True
-            key = (current_label, match.group(0).lower())
-            if key not in replacements:
-                counters[current_label] = counters.get(current_label, 0) + 1
-                replacements[key] = f"[{current_label}_{counters[current_label]}]"
-            return replacements[key]
-        result = pattern.sub(replace, result)
-    return result, changed
-
-
 def build_contract_prompt_response(request: RagQueryRequest) -> RagQueryResponse:
-    redacted_request, changed = redact_sensitive_text(request.question.strip())
-    drafting_prompt = (
-        "Bạn là trợ lý soạn thảo hợp đồng theo pháp luật Việt Nam. Hãy tạo BẢN NHÁP để người dùng rà soát, "
-        "không khẳng định đây là tư vấn pháp lý cuối cùng. Yêu cầu của người dùng:\n"
-        f"{redacted_request}\n\n"
-        "Không suy đoán dữ liệu còn thiếu. Dùng các placeholder như [BÊN_A], [BÊN_B], [ĐỊA_CHỈ], [SỐ_TIỀN], "
-        "[NGÀY_HIỆU_LỰC]. Trình bày: thông tin các bên, phạm vi, quyền/nghĩa vụ, thanh toán, thời hạn, "
-        "chấm dứt, vi phạm/bồi thường, giải quyết tranh chấp và mục cần luật sư kiểm tra."
-    )
-    answer = (
-        "Tôi đã tạo drafting prompt bên dưới để bạn tự kiểm tra và sao chép sang ChatGPT. "
-        "Dữ liệu nhận diện trực tiếp phát hiện được đã được thay bằng placeholder; hãy rà soát lại trước khi gửi.\n\n"
-        f"{drafting_prompt}"
-    )
-    return _base_response(
-        request,
-        answer=answer,
-        intent="CONTRACT_PROMPT_GENERATION",
-        actions=["COPY_PROMPT", "OPEN_CHATGPT"],
-        drafting_prompt=drafting_prompt,
-        redaction_required=changed,
-    )
+    return build_drafting_response(request)

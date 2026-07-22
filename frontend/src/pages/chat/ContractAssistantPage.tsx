@@ -22,9 +22,10 @@ import { getWorkspaces, createWorkspace } from "../../api/workspaceApi";
 import { useI18n } from "../../hooks/useI18n";
 import { useToast } from "../../hooks/useToast";
 import { ChatMessageContent } from "../../components/chat/ChatMessageContent";
+import { DraftingWorkflowCard } from "../../components/chat/DraftingWorkflowCard";
 import { CreateTicketModal } from "../../components/tickets/CreateTicketModal";
 import type { CreateLegalTicketRequest } from "../../types/legalTicket";
-import type { ChatMessage } from "../../types/chat";
+import type { ChatMessage, DraftingRequestFields } from "../../types/chat";
 import type { WorkspaceChatMessage, WorkspaceChatSession } from "../../types/chat";
 import { useRef } from "react";
 import { isPlanEntitlementError } from "../../services/http";
@@ -122,6 +123,17 @@ const toDisplayMessage = (
   riskLevel: message.riskLevel,
   legalDomain: message.legalDomain,
   userActionHint: message.userActionHint,
+  intent: message.intent,
+  suggestedActions: message.suggestedActions,
+  draftingPrompt: message.draftingPrompt,
+  redactionRequired: message.redactionRequired,
+  contractType: message.contractType,
+  draftingStatus: message.draftingStatus,
+  questions: message.questions,
+  providedInformation: message.providedInformation,
+  draftingMissingInformation: message.draftingMissingInformation,
+  privacyWarning: message.privacyWarning,
+  draftingOriginalRequirement: message.draftingOriginalRequirement,
 });
 
 const createOptimisticUserMessage = (
@@ -172,6 +184,7 @@ export function ContractAssistantPage() {
     workspaceId: string;
     sessionId: string;
     message: string;
+    drafting?: DraftingRequestFields;
   } | null>(null);
   const submissionPendingRef = useRef(false);
 
@@ -503,6 +516,7 @@ export function ContractAssistantPage() {
     message: string;
     workspaceId: string;
     sessionId?: string;
+    drafting?: DraftingRequestFields;
   }) => {
     const question = (override?.message ?? input).trim();
     const targetWorkspaceId = override?.workspaceId ?? sandboxWorkspaceId;
@@ -530,6 +544,7 @@ export function ContractAssistantPage() {
       workspaceId: targetWorkspaceId,
       sessionId: targetSessionId ?? "",
       message: question,
+      drafting: override?.drafting,
     };
 
     try {
@@ -541,6 +556,7 @@ export function ContractAssistantPage() {
             undefined,
             undefined,
             requestId,
+            override?.drafting,
           )
         : await sendWorkspaceMessage(
             getAccessToken(),
@@ -548,6 +564,7 @@ export function ContractAssistantPage() {
             question,
             undefined,
             requestId,
+            override?.drafting,
           );
 
       if (conversation?.chatSession) {
@@ -568,6 +585,13 @@ export function ContractAssistantPage() {
             suggestedActions: conversation.suggestedActions,
             draftingPrompt: conversation.draftingPrompt,
             redactionRequired: conversation.redactionRequired,
+            contractType: conversation.contractType,
+            draftingStatus: conversation.draftingStatus,
+            questions: conversation.questions,
+            providedInformation: conversation.providedInformation,
+            draftingMissingInformation: conversation.draftingMissingInformation,
+            privacyWarning: conversation.privacyWarning,
+            draftingOriginalRequirement: conversation.draftingOriginalRequirement,
           },
         ]);
       }
@@ -819,32 +843,17 @@ export function ContractAssistantPage() {
                               content={message.content}
                               className={assistant ? "text-on-surface dark:text-slate-100" : "text-white"}
                             />
-                            {message.intent === "CONTRACT_PROMPT_GENERATION" && message.draftingPrompt && (
-                              <div className="mt-md rounded-lg border border-legal-border bg-surface-container-low p-md dark:border-slate-700 dark:bg-slate-800">
-                                <p className="mb-sm text-xs font-semibold uppercase tracking-wide text-on-surface-variant dark:text-slate-300">
-                                  Drafting prompt {message.redactionRequired ? "· dữ liệu nhạy cảm đã được ẩn" : ""}
-                                </p>
-                                <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-md bg-white p-sm text-xs text-on-surface dark:bg-slate-950 dark:text-slate-100">
-                                  {message.draftingPrompt}
-                                </pre>
-                                <div className="mt-sm flex flex-wrap gap-sm">
-                                  <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    leftIcon={<ClipboardCheck className="h-4 w-4" />}
-                                    onClick={() => void navigator.clipboard.writeText(message.draftingPrompt ?? "")}
-                                  >
-                                    Sao chép prompt
-                                  </Button>
-                                  <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    onClick={() => window.open("https://chatgpt.com/", "_blank", "noopener,noreferrer")}
-                                  >
-                                    Mở ChatGPT
-                                  </Button>
-                                </div>
-                              </div>
+                            {message.intent === "DRAFT_CONTRACT" && (
+                              <DraftingWorkflowCard
+                                message={message}
+                                disabled={sending}
+                                onSubmit={(drafting) => void handleSend({
+                                  message: drafting.message,
+                                  workspaceId: sandboxWorkspaceId,
+                                  sessionId: selectedSessionId || undefined,
+                                  drafting,
+                                })}
+                              />
                             )}
                             {shouldShowTicketAction && (
                               <div className="mt-md rounded-lg border border-legal-border bg-surface-container-low p-sm dark:border-slate-700 dark:bg-slate-800">

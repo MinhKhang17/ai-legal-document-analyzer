@@ -100,6 +100,9 @@ public class ChatMessage {
     @Column(name = "context_snapshot_json", columnDefinition = "TEXT")
     private String contextSnapshotJson;
 
+    @Column(name = "drafting_response_json", columnDefinition = "TEXT")
+    private String draftingResponseJson;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "resolved_mode")
     private ChatMode resolvedMode;

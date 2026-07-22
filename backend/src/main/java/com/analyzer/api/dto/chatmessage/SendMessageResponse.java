@@ -12,6 +12,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.util.List;
+import java.util.Map;
 
 @Data
 @Builder
@@ -34,4 +35,11 @@ public class SendMessageResponse {
     private List<String> selectedDocumentIds;
     private String draftingPrompt;
     private Boolean redactionRequired;
+    private String contractType;
+    private String draftingStatus;
+    private List<RagQueryResponse.DraftingQuestion> questions;
+    private Map<String, String> providedInformation;
+    private List<String> draftingMissingInformation;
+    private String privacyWarning;
+    private String draftingOriginalRequirement;
 }

@@ -111,6 +111,10 @@ class RagQueryRequest(BaseModel):
     messageAttachedDocumentIds: list[str] = Field(default_factory=list, alias="message_attached_document_ids")
     conversationUserRole: str | None = Field(default=None, alias="conversation_user_role")
     conversationMode: str | None = Field(default=None, alias="conversation_mode")
+    draftingAction: str | None = Field(default=None, alias="drafting_action")
+    draftingContractType: str | None = Field(default=None, alias="drafting_contract_type")
+    draftingInformation: dict[str, str | None] = Field(default_factory=dict, alias="drafting_information")
+    draftingOriginalRequirement: str | None = Field(default=None, alias="drafting_original_requirement")
     question: str = Field(..., min_length=1)
     topKUserChunks: int = Field(default=5, ge=1, le=20, alias="top_k_user_chunks")
     topKKnowledgeChunks: int = Field(default=5, ge=1, le=20, alias="top_k_knowledge_chunks")
@@ -203,6 +207,13 @@ class AnalysisResult(BaseModel):
     questionsToUser: list[str] = Field(default_factory=list, description="Follow-up questions for the user.")
 
 
+class DraftingQuestion(BaseModel):
+    key: str
+    label: str
+    placeholder: str | None = None
+    required: bool = False
+
+
 class RagQueryResponse(BaseModel):
     requestId: str
     chatSessionId: str | None = None
@@ -263,6 +274,12 @@ class RagQueryResponse(BaseModel):
     selectedDocumentIds: list[str] = Field(default_factory=list)
     draftingPrompt: str | None = None
     redactionRequired: bool = False
+    draftingStatus: str | None = None
+    questions: list[DraftingQuestion] = Field(default_factory=list)
+    providedInformation: dict[str, str] = Field(default_factory=dict)
+    draftingMissingInformation: list[str] = Field(default_factory=list)
+    privacyWarning: str | None = None
+    draftingOriginalRequirement: str | None = None
     model: str | None = None
     usage: RagUsage | None = None
     llmExecuted: bool | None = Field(default=None, description="True only when the prompt was sent to the configured LLM provider.")

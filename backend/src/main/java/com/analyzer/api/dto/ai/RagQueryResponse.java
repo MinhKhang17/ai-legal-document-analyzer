@@ -13,6 +13,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.util.List;
+import java.util.Map;
 
 @Data
 @Builder
@@ -82,6 +83,26 @@ public class RagQueryResponse {
     @JsonProperty("redaction_required")
     @JsonAlias("redactionRequired")
     private Boolean redactionRequired;
+    @JsonProperty("contract_type")
+    @JsonAlias("contractType")
+    private String contractType;
+    @JsonProperty("drafting_status")
+    @JsonAlias("draftingStatus")
+    private String draftingStatus;
+    @JsonProperty("questions")
+    private List<DraftingQuestion> questions;
+    @JsonProperty("provided_information")
+    @JsonAlias("providedInformation")
+    private Map<String, String> providedInformation;
+    @JsonProperty("drafting_missing_information")
+    @JsonAlias("draftingMissingInformation")
+    private List<String> draftingMissingInformation;
+    @JsonProperty("privacy_warning")
+    @JsonAlias("privacyWarning")
+    private String privacyWarning;
+    @JsonProperty("drafting_original_requirement")
+    @JsonAlias("draftingOriginalRequirement")
+    private String draftingOriginalRequirement;
 
     @JsonProperty("conversation_memory_update")
     @JsonAlias("conversationMemoryUpdate")
@@ -114,6 +135,17 @@ public class RagQueryResponse {
         private Integer userDocumentContext;
         private Integer legalKbContext;
         private Integer output;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class DraftingQuestion {
+        private String key;
+        private String label;
+        private String placeholder;
+        private Boolean required;
     }
 
     @Data

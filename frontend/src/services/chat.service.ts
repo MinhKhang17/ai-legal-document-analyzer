@@ -21,6 +21,7 @@ import type {
   AiFeedbackType,
   AiFeedbackSummary,
   ChatMode,
+  DraftingRequestFields,
 } from "../types/chat";
 
 interface ApiResponse<T> {
@@ -43,7 +44,7 @@ type SendMessageRequest = {
   documentId?: string;
   documentIds?: string[];
   mode?: ChatMode;
-};
+} & DraftingRequestFields;
 
 
 const getAuthHeaders = (accessToken: string): HeadersInit => accessToken
@@ -349,10 +350,11 @@ export async function sendWorkspaceMessage(
   message: string,
   documentId?: string,
   requestId?: string,
+  drafting?: DraftingRequestFields,
 ): Promise<WorkspaceChatConversation> {
   const response = await postJson<ApiResponse<WorkspaceChatConversation>>(
     API_ENDPOINTS.chat.workspaceMessages(workspaceId),
-    { requestId, message, ...(documentId ? { documentId } : {}) } satisfies SendMessageRequest,
+    { requestId, message, ...(documentId ? { documentId } : {}), ...drafting } satisfies SendMessageRequest,
     "Không thể gửi câu hỏi",
     accessToken,
   );
@@ -372,10 +374,11 @@ export async function sendChatSessionMessage(
   documentId?: string,
   signal?: AbortSignal,
   requestId?: string,
+  drafting?: DraftingRequestFields,
 ): Promise<WorkspaceChatConversation> {
   const response = await postJson<ApiResponse<WorkspaceChatConversation>>(
     API_ENDPOINTS.chat.sessionMessages(chatSessionId),
-    { requestId, message, ...(documentId ? { documentId } : {}) } satisfies SendMessageRequest,
+    { requestId, message, ...(documentId ? { documentId } : {}), ...drafting } satisfies SendMessageRequest,
     "Không thể gửi câu hỏi",
     accessToken,
     signal,
