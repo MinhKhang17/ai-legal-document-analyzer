@@ -3,11 +3,13 @@ import { getAdminAiFeedback, getAdminAiFeedbackSummary } from '../../api/chatApi
 import { getAccessToken } from '../../services/authSession';
 import type { AiFeedbackSummary, AiFeedbackType, ChatMessageFeedback, ChatMode } from '../../types/chat';
 import { formatDisplayDate } from '../../utils/format';
+import { useI18n } from '../../hooks/useI18n';
 import { Badge } from '../common/Badge';
 import { Card } from '../common/Card';
 import { DataTable, type DataTableColumn } from '../common/DataTable';
 
-export function AdminAiFeedbackPanel({ language }: { language: 'en' | 'vi' }) {
+export function AdminAiFeedbackPanel({ language: _language }: { language: 'en' | 'vi' }) {
+  const { t } = useI18n();
   const [items, setItems] = useState<ChatMessageFeedback[]>([]);
   const [summary, setSummary] = useState<AiFeedbackSummary>({ total: 0, likes: 0, dislikes: 0, likeRate: 0, dislikeRate: 0 });
   const [feedbackType, setFeedbackType] = useState<AiFeedbackType | ''>('');
@@ -37,43 +39,43 @@ export function AdminAiFeedbackPanel({ language }: { language: 'en' | 'vi' }) {
       setItems(page.items ?? []);
       setSummary(totals);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Could not load AI feedback.');
+      setError(reason instanceof Error ? reason.message : t('admin.aiFeedback.loadError'));
     }
-  }, [feedbackType, resolvedMode, riskLevel, fromDate, toDate, keyword]);
+  }, [feedbackType, resolvedMode, riskLevel, fromDate, toDate, keyword, t]);
 
   useEffect(() => { void load(); }, [load]);
 
   const columns: DataTableColumn<ChatMessageFeedback>[] = [
-    { header: language === 'vi' ? 'Người dùng' : 'User', cell: (item) => item.userEmail || item.submittedByName || '-' },
-    { header: language === 'vi' ? 'Phản hồi' : 'Feedback', cell: (item) => <Badge tone={(item.feedbackType === 'LIKE' || item.rating === 'THUMBS_UP') ? 'green' : 'red'}>{item.feedbackType || item.rating}</Badge> },
-    { header: language === 'vi' ? 'Câu hỏi' : 'Question', cell: (item) => <p className="max-w-xs line-clamp-3">{item.questionSnippet || '-'}</p> },
-    { header: language === 'vi' ? 'Câu trả lời AI' : 'AI answer', cell: (item) => <p className="max-w-md line-clamp-3">{item.answerSnippet || item.messageContent}</p> },
-    { header: 'Mode / Risk', cell: (item) => <span className="text-xs">{item.resolvedMode || '-'} / {item.riskLevel || '-'}</span> },
-    { header: language === 'vi' ? 'Nguồn' : 'Sources', cell: (item) => item.sourceCount ?? 0 },
-    { header: language === 'vi' ? 'Thời gian' : 'Created', cell: (item) => formatDisplayDate(item.createdAt, '-') },
+    { header: t('admin.aiFeedback.user'), cell: (item) => item.userEmail || item.submittedByName || '-' },
+    { header: t('admin.aiFeedback.feedback'), cell: (item) => <Badge tone={(item.feedbackType === 'LIKE' || item.rating === 'THUMBS_UP') ? 'green' : 'red'}>{item.feedbackType || item.rating}</Badge> },
+    { header: t('admin.aiFeedback.question'), cell: (item) => <p className="max-w-xs line-clamp-3">{item.questionSnippet || '-'}</p> },
+    { header: t('admin.aiFeedback.answer'), cell: (item) => <p className="max-w-md line-clamp-3">{item.answerSnippet || item.messageContent}</p> },
+    { header: t('admin.aiFeedback.modeRisk'), cell: (item) => <span className="text-xs">{item.resolvedMode || '-'} / {item.riskLevel || '-'}</span> },
+    { header: t('admin.aiFeedback.sources'), cell: (item) => item.sourceCount ?? 0 },
+    { header: t('admin.aiFeedback.created'), cell: (item) => formatDisplayDate(item.createdAt, '-') },
   ];
 
   return <section className="space-y-gutter">
     <div className="grid gap-md sm:grid-cols-2 xl:grid-cols-4">
-      <Card title={language === 'vi' ? 'Tổng phản hồi' : 'Total feedback'}><p className="text-3xl font-bold">{summary.total}</p></Card>
-      <Card title="Likes"><p className="text-3xl font-bold text-success">{summary.likes}</p></Card>
-      <Card title="Dislikes"><p className="text-3xl font-bold text-error">{summary.dislikes}</p></Card>
-      <Card title={language === 'vi' ? 'Tỷ lệ Like' : 'Like rate'}><p className="text-3xl font-bold">{summary.likeRate.toFixed(1)}%</p></Card>
+      <Card title={t('admin.aiFeedback.total')}><p className="text-3xl font-bold">{summary.total}</p></Card>
+      <Card title={t('admin.aiFeedback.likes')}><p className="text-3xl font-bold text-success">{summary.likes}</p></Card>
+      <Card title={t('admin.aiFeedback.dislikes')}><p className="text-3xl font-bold text-error">{summary.dislikes}</p></Card>
+      <Card title={t('admin.aiFeedback.likeRate')}><p className="text-3xl font-bold">{summary.likeRate.toFixed(1)}%</p></Card>
     </div>
-    <Card title={language === 'vi' ? 'AI Feedback' : 'AI Feedback'} actions={<Badge tone="blue">{items.length}</Badge>}>
+    <Card title={t('admin.aiFeedback.title')} actions={<Badge tone="blue">{items.length}</Badge>}>
       <div className="mb-md grid gap-sm md:grid-cols-3 xl:grid-cols-6">
-        <select className="form-field" value={feedbackType} onChange={(event) => setFeedbackType(event.target.value as AiFeedbackType | '')}><option value="">Like / Dislike</option><option value="LIKE">LIKE</option><option value="DISLIKE">DISLIKE</option></select>
-        <select className="form-field" value={resolvedMode} onChange={(event) => setResolvedMode(event.target.value as Exclude<ChatMode, 'AUTO'> | '')}><option value="">Mode</option><option value="LEGAL_QA">LEGAL_QA</option><option value="DOCUMENT_ANALYSIS">DOCUMENT_ANALYSIS</option></select>
+        <select className="form-field" value={feedbackType} onChange={(event) => setFeedbackType(event.target.value as AiFeedbackType | '')}><option value="">{t('admin.aiFeedback.likeDislike')}</option><option value="LIKE">LIKE</option><option value="DISLIKE">DISLIKE</option></select>
+        <select className="form-field" value={resolvedMode} onChange={(event) => setResolvedMode(event.target.value as Exclude<ChatMode, 'AUTO'> | '')}><option value="">{t('admin.aiFeedback.mode')}</option><option value="LEGAL_QA">LEGAL_QA</option><option value="DOCUMENT_ANALYSIS">DOCUMENT_ANALYSIS</option></select>
         <select className="form-field" value={riskLevel} onChange={(event) => setRiskLevel(event.target.value)}>
-          <option value="">Risk level</option>
+          <option value="">{t('admin.aiFeedback.riskLevel')}</option>
           {['NONE', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL', 'UNKNOWN'].map((level) => <option key={level} value={level}>{level}</option>)}
         </select>
         <input className="form-field" type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
         <input className="form-field" type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
-        <input className="form-field" placeholder={language === 'vi' ? 'Tìm nội dung/email' : 'Search content/email'} value={keyword} onChange={(event) => setKeyword(event.target.value)} />
+        <input className="form-field" placeholder={t('admin.aiFeedback.searchPlaceholder')} value={keyword} onChange={(event) => setKeyword(event.target.value)} />
       </div>
       {error && <p className="mb-sm text-sm text-error">{error}</p>}
-      <DataTable columns={columns} data={items} getRowKey={(item) => item.id} emptyMessage={language === 'vi' ? 'Chưa có phản hồi.' : 'No feedback yet.'} />
+      <DataTable columns={columns} data={items} getRowKey={(item) => item.id} emptyMessage={t('admin.aiFeedback.empty')} />
     </Card>
   </section>;
 }
