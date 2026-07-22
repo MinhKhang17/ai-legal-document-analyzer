@@ -5,7 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 
 @Schema(description = "Response payload containing document details")
-public record DocumentResponseDTO(
+public record DocumentResponse(
         @Schema(description = "Document ID", example = "doc_001")
         String documentId,
 

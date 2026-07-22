@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class SurveyResponseDTO {
+public class SurveyResponse {
 
     private String id;
     private String code;

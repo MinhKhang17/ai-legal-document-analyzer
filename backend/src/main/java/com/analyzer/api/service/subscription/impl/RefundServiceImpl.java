@@ -1,7 +1,7 @@
 package com.analyzer.api.service.subscription.impl;
 
-import com.analyzer.api.dto.subscription.RefundRequestDTO;
-import com.analyzer.api.dto.subscription.RefundResponseDTO;
+import com.analyzer.api.dto.subscription.CreateRefundRequest;
+import com.analyzer.api.dto.subscription.RefundResponse;
 import com.analyzer.api.dto.subscription.UpdateRefundStatusRequest;
 import com.analyzer.api.entity.*;
 import com.analyzer.api.enums.*;
@@ -92,7 +92,7 @@ public class RefundServiceImpl implements RefundService {
 
     @Override
     @Transactional
-    public RefundResponseDTO requestRefund(Long customerId, RefundRequestDTO request) {
+    public RefundResponse requestRefund(Long customerId, CreateRefundRequest request) {
         User customer = userRepository.findById(customerId)
                 .orElseThrow(() -> new ResourceNotFoundException("CUSTOMER_NOT_FOUND"));
         PaymentTransaction transaction = paymentTransactionRepository.findByIdForUpdate(request.getPaymentTransactionId())
@@ -145,26 +145,26 @@ public class RefundServiceImpl implements RefundService {
     }
 
     @Override @Transactional(readOnly = true)
-    public RefundResponseDTO getRefund(Long id) {
+    public RefundResponse getRefund(Long id) {
         RefundRequest refund = requireRefund(id);
         if (!canViewRefund(refund)) throw new ForbiddenException("REFUND_ACCESS_DENIED");
         return toResponse(refund);
     }
 
     @Override @Transactional(readOnly = true)
-    public List<RefundResponseDTO> getMyRefunds(Long customerId) {
+    public List<RefundResponse> getMyRefunds(Long customerId) {
         return refundRequestRepository.findByRequestedByIdOrderByCreatedAtDesc(customerId).stream().map(this::toResponse).toList();
     }
 
     @Override @Transactional(readOnly = true)
-    public List<RefundResponseDTO> getRefunds(RefundStatus status) {
+    public List<RefundResponse> getRefunds(RefundStatus status) {
         return (status == null ? refundRequestRepository.findAllByOrderByCreatedAtDesc()
                 : refundRequestRepository.findByStatusOrderByCreatedAtDesc(status)).stream().map(this::toResponse).toList();
     }
 
     @Override
     @Transactional
-    public RefundResponseDTO confirmRefundEmail(String token) {
+    public RefundResponse confirmRefundEmail(String token) {
         String tokenHash = sha256(token);
         var refundWithActiveToken = refundRequestRepository.findByConfirmationTokenHash(tokenHash);
         if (refundWithActiveToken.isEmpty()) {
@@ -191,7 +191,7 @@ public class RefundServiceImpl implements RefundService {
 
     @Override
     @Transactional
-    public RefundResponseDTO updateRefundStatus(Long id, UpdateRefundStatusRequest request) {
+    public RefundResponse updateRefundStatus(Long id, UpdateRefundStatusRequest request) {
         RefundRequest refund = requireRefund(id);
         validateTransition(refund, request.status());
         refund.setStatus(request.status());
@@ -261,7 +261,7 @@ public class RefundServiceImpl implements RefundService {
         return requested;
     }
 
-    private void validateInvoiceReference(RefundRequestDTO request, PaymentTransaction transaction) {
+    private void validateInvoiceReference(CreateRefundRequest request, PaymentTransaction transaction) {
         String code = transaction.getTransactionCode();
         String id = String.valueOf(transaction.getId());
         if (request.getInvoiceId() == null || request.getInvoiceId().isBlank()) return;
@@ -278,8 +278,8 @@ public class RefundServiceImpl implements RefundService {
         return refundRequestRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("REFUND_NOT_FOUND"));
     }
 
-    private RefundResponseDTO toResponse(RefundRequest refund) {
-        return RefundResponseDTO.builder().id(refund.getId()).paymentTransactionId(refund.getPaymentTransaction().getId())
+    private RefundResponse toResponse(RefundRequest refund) {
+        return RefundResponse.builder().id(refund.getId()).paymentTransactionId(refund.getPaymentTransaction().getId())
                 .customerPlanId(refund.getCustomerPlan() == null ? null : refund.getCustomerPlan().getId())
                 .requestedById(refund.getRequestedBy().getId()).reason(refund.getReason()).status(refund.getStatus())
                 .amount(refund.getAmount()).adminNote(refund.getAdminNote())

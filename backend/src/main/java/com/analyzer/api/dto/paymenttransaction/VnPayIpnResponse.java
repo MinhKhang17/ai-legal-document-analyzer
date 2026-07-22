@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 @Schema(description = "VNPAY IPN response")
-public record VnPayIpnResponseDTO(
+public record VnPayIpnResponse(
         @JsonProperty("RspCode")
         @Schema(description = "VNPAY response code", example = "00")
         String rspCode,

@@ -1,16 +1,16 @@
 package com.analyzer.api.service;
 
-import com.analyzer.api.dto.subscriptionplan.SubscriptionPlanRequestDTO;
-import com.analyzer.api.dto.subscriptionplan.SubscriptionPlanResponseDTO;
+import com.analyzer.api.dto.subscriptionplan.SubscriptionPlanRequest;
+import com.analyzer.api.dto.subscriptionplan.SubscriptionPlanResponse;
 import com.analyzer.api.entity.SubscriptionPlan;
 import java.util.List;
 
 public interface SubscriptionPlanService {
-    SubscriptionPlanResponseDTO createPlan(SubscriptionPlanRequestDTO request);
-    List<SubscriptionPlanResponseDTO> getActivePlans();
-    SubscriptionPlanResponseDTO getPlanById(Long id);
-    SubscriptionPlanResponseDTO updatePlan(Long id, SubscriptionPlanRequestDTO request);
+    SubscriptionPlanResponse createPlan(SubscriptionPlanRequest request);
+    List<SubscriptionPlanResponse> getActivePlans();
+    SubscriptionPlanResponse getPlanById(Long id);
+    SubscriptionPlanResponse updatePlan(Long id, SubscriptionPlanRequest request);
     void deletePlan(Long id);
 
-    SubscriptionPlanResponseDTO toResponse(SubscriptionPlan plan);
+    SubscriptionPlanResponse toResponse(SubscriptionPlan plan);
 }

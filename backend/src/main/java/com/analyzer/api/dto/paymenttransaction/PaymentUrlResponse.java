@@ -3,7 +3,7 @@ package com.analyzer.api.dto.paymenttransaction;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 @Schema(description = "Payment URL response")
-public record PaymentUrlResponseDTO(
+public record PaymentUrlResponse(
         @Schema(description = "Transaction ID", example = "1")
         Long transactionId,
 

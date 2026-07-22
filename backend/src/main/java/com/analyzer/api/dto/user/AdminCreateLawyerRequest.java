@@ -7,7 +7,7 @@ import lombok.Data;
 
 @Data
 @Schema(description = "Request payload for admin to create a lawyer account")
-public class AdminCreateLawyerRequestDTO {
+public class AdminCreateLawyerRequest {
 
     @NotBlank(message = "Ten khong duoc de trong")
     @Schema(description = "First name of the lawyer", example = "Nguyen")

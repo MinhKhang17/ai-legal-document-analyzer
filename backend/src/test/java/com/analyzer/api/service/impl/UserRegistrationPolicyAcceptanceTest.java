@@ -1,7 +1,7 @@
 package com.analyzer.api.service.impl;
 
-import com.analyzer.api.dto.auth.RegistrationResponseDTO;
-import com.analyzer.api.dto.user.UserRequestDTO;
+import com.analyzer.api.dto.auth.RegistrationResponse;
+import com.analyzer.api.dto.user.UserRequest;
 import com.analyzer.api.entity.Role;
 import com.analyzer.api.entity.User;
 import com.analyzer.api.enums.RoleName;
@@ -47,7 +47,7 @@ class UserRegistrationPolicyAcceptanceTest {
 
     @Test
     void registrationRequiresPrivacyPolicyAcceptance() {
-        UserRequestDTO request = validRequest();
+        UserRequest request = validRequest();
         request.setAcceptedPrivacyPolicy(false);
 
         RuntimeException exception = assertThrows(RuntimeException.class,
@@ -60,7 +60,7 @@ class UserRegistrationPolicyAcceptanceTest {
 
     @Test
     void registrationRecordsCurrentPolicyAcceptanceWithRequestMetadata() {
-        UserRequestDTO request = validRequest();
+        UserRequest request = validRequest();
         User user = User.builder()
                 .firstName(request.getFirstName())
                 .lastName(request.getLastName())
@@ -79,14 +79,14 @@ class UserRegistrationPolicyAcceptanceTest {
         });
         when(emailService.sendVerificationEmail(any(), any(), any())).thenReturn(true);
 
-        RegistrationResponseDTO response = service.createUser(request, "203.0.113.10", "test-agent");
+        RegistrationResponse response = service.createUser(request, "203.0.113.10", "test-agent");
 
         assertEquals("PENDING_VERIFICATION", response.getRegistrationStatus());
         verify(policyAcceptanceService).acceptCurrent(42L, "203.0.113.10", "test-agent");
     }
 
-    private UserRequestDTO validRequest() {
-        UserRequestDTO request = new UserRequestDTO();
+    private UserRequest validRequest() {
+        UserRequest request = new UserRequest();
         request.setFirstName("Test");
         request.setLastName("User");
         request.setEmail("test@example.com");

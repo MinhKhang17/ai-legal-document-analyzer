@@ -1,7 +1,7 @@
 package com.analyzer.api.mapper;
 
-import com.analyzer.api.dto.user.UserRequestDTO;
-import com.analyzer.api.dto.user.UserResponseDTO;
+import com.analyzer.api.dto.user.UserRequest;
+import com.analyzer.api.dto.user.UserResponse;
 import com.analyzer.api.entity.User;
 
 import org.mapstruct.Mapper;
@@ -28,8 +28,8 @@ public interface UserMapper {
     @Mapping(target = "forgotPasswordToken", ignore = true)
     @Mapping(target = "forgotPasswordTokenExpiry", ignore = true)
     @Mapping(target = "forgotPasswordRequestedAt", ignore = true)
-    User toEntity(UserRequestDTO requestDTO);
+    User toEntity(UserRequest requestDTO);
 
     @Mapping(target = "role", source = "role.name")
-    UserResponseDTO toResponseDTO(User user);
+    UserResponse toResponseDTO(User user);
 }

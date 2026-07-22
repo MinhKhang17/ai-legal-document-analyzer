@@ -1,9 +1,9 @@
 package com.analyzer.api.service.impl;
 
-import com.analyzer.api.dto.auth.JwtResponseDTO;
-import com.analyzer.api.dto.auth.LoginRequestDTO;
-import com.analyzer.api.dto.auth.RegistrationResponseDTO;
-import com.analyzer.api.dto.user.UserResponseDTO;
+import com.analyzer.api.dto.auth.JwtResponse;
+import com.analyzer.api.dto.auth.LoginRequest;
+import com.analyzer.api.dto.auth.RegistrationResponse;
+import com.analyzer.api.dto.user.UserResponse;
 import com.analyzer.api.entity.RefreshToken;
 import com.analyzer.api.entity.User;
 import com.analyzer.api.exception.auth.ExpiredVerificationTokenException;
@@ -52,7 +52,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     @Transactional
-    public JwtResponseDTO login(LoginRequestDTO loginRequest, HttpServletResponse response) {
+    public JwtResponse login(LoginRequest loginRequest, HttpServletResponse response) {
         userRepository.findByEmail(loginRequest.getEmail().trim().toLowerCase()).ifPresent(user -> {
             if (!user.isEmailVerified()) throw new ForbiddenException("EMAIL_NOT_VERIFIED");
             if (!user.isActive()) throw new ForbiddenException("Tài khoản của bạn đã bị vô hiệu hóa hoặc ngừng hoạt động.");
@@ -96,7 +96,7 @@ public class AuthServiceImpl implements AuthService {
                 .orElse("ROLE_CUSTOMER");
         String roleName = roleAuthority.startsWith("ROLE_") ? roleAuthority.substring(5) : roleAuthority;
 
-        return JwtResponseDTO.builder()
+        return JwtResponse.builder()
                 .accessToken(accessToken)
                 .id(userDetails.getId())
                 .email(userDetails.getEmail())
@@ -106,7 +106,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     @Transactional
-    public JwtResponseDTO refreshToken(HttpServletRequest request, HttpServletResponse response) {
+    public JwtResponse refreshToken(HttpServletRequest request, HttpServletResponse response) {
         // 1. Read Refresh Token from HttpOnly Cookie
         String refreshTokenStr = jwtTokenProvider.getRefreshTokenFromCookies(request);
         if (refreshTokenStr == null || refreshTokenStr.isBlank()) {
@@ -153,7 +153,7 @@ public class AuthServiceImpl implements AuthService {
         response.addCookie(jwtTokenProvider.createRefreshTokenCookie(newRefreshTokenStr));
 
         // 9. Return new Access Token in body
-        return JwtResponseDTO.builder()
+        return JwtResponse.builder()
                 .accessToken(newAccessToken)
                 .id(user.getId())
                 .email(user.getEmail())
@@ -189,7 +189,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     @Transactional(readOnly = true)
-    public UserResponseDTO getCurrentUser() {
+    public UserResponse getCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated() ||
                 "anonymousUser".equals(authentication.getPrincipal())) {
@@ -246,7 +246,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     @Transactional
-    public RegistrationResponseDTO resendVerificationEmail(String email, String clientIp) {
+    public RegistrationResponse resendVerificationEmail(String email, String clientIp) {
         String normalized = email.trim().toLowerCase();
         String cooldownKey = sha256(normalized + "|" + clientIp);
         LocalDateTime previous = resendCooldowns.putIfAbsent(cooldownKey, LocalDateTime.now());
@@ -267,7 +267,7 @@ public class AuthServiceImpl implements AuthService {
             user.setEmailDeliveryStatus(sent ? "SENT" : "FAILED");
             userRepository.save(user);
         });
-        return RegistrationResponseDTO.builder().registrationStatus("PENDING_VERIFICATION")
+        return RegistrationResponse.builder().registrationStatus("PENDING_VERIFICATION")
                 .emailDeliveryStatus("SENT").maskedEmail(maskEmail(normalized))
                 .resendAvailableInSeconds(60).build();
     }

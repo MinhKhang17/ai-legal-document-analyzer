@@ -13,7 +13,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @Schema(description = "Response payload after successful authentication")
-public class JwtResponseDTO {
+public class JwtResponse {
 
     @Schema(description = "JWT Access Token", example = "eyJhbGciOiJIUzI1NiIsInR...")
     private String accessToken;

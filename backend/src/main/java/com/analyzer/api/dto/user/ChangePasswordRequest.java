@@ -7,7 +7,7 @@ import lombok.Data;
 
 @Data
 @Schema(description = "Request payload for changing the current user's password")
-public class ChangePasswordRequestDTO {
+public class ChangePasswordRequest {
 
     @Schema(description = "Current password (omit only if the account has no password set yet)", example = "OldPass@123")
     private String oldPassword;

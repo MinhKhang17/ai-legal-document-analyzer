@@ -1,6 +1,6 @@
 package com.analyzer.api.dto.customerplan;
 
-import com.analyzer.api.dto.subscriptionplan.SubscriptionPlanResponseDTO;
+import com.analyzer.api.dto.subscriptionplan.SubscriptionPlanResponse;
 import com.analyzer.api.enums.PlanStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 
 @Data
 @Schema(description = "Response payload containing customer plan details")
-public class CustomerPlanResponseDTO {
+public class CustomerPlanResponse {
 
     @Schema(description = "Customer Plan ID", example = "1")
     private Long id;
@@ -17,9 +17,9 @@ public class CustomerPlanResponseDTO {
     private Long customerId;
 
     @Schema(description = "Subscription Plan Details")
-    private SubscriptionPlanResponseDTO subscriptionPlan;
+    private SubscriptionPlanResponse subscriptionPlan;
 
-    private SubscriptionPlanResponseDTO scheduledSubscriptionPlan;
+    private SubscriptionPlanResponse scheduledSubscriptionPlan;
     private LocalDateTime planChangeEffectiveAt;
 
     @Schema(description = "Plan Status", example = "ACTIVE")

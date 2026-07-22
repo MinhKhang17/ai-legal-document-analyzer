@@ -5,7 +5,7 @@ import lombok.Data;
 
 @Data
 @Builder
-public class ProcessDocumentRequestDTO {
+public class ProcessDocumentRequest {
     private String jobId;
     private String documentId;
     private String workspaceId;

@@ -1,7 +1,7 @@
 package com.analyzer.api.service.impl;
 
-import com.analyzer.api.dto.customerplan.CustomerPlanResponseDTO;
-import com.analyzer.api.dto.customerplan.SubscribeRequestDTO;
+import com.analyzer.api.dto.customerplan.CustomerPlanResponse;
+import com.analyzer.api.dto.customerplan.SubscribeRequest;
 import com.analyzer.api.dto.subscription.SubscriptionQuotaUsageSummaryResponse;
 import com.analyzer.api.entity.CustomerPlan;
 import com.analyzer.api.entity.SubscriptionPlan;
@@ -70,7 +70,7 @@ class CustomerPlanServiceImplTest {
         LocalDateTime endDate = LocalDateTime.now().plusDays(10);
         CustomerPlan paidPlan = CustomerPlan.builder().id(5L).customer(customer).subscriptionPlan(premium)
                 .status(PlanStatus.ACTIVE).usedQuota(12).autoRenew(true).endDate(endDate).build();
-        CustomerPlanResponseDTO response = new CustomerPlanResponseDTO();
+        CustomerPlanResponse response = new CustomerPlanResponse();
 
         when(userRepository.findByIdForUpdate(7L)).thenReturn(Optional.of(customer));
         when(customerPlanRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(paidPlan));
@@ -104,7 +104,7 @@ class CustomerPlanServiceImplTest {
         CustomerPlan paidPlan = CustomerPlan.builder().id(5L).customer(customer).subscriptionPlan(premium)
                 .status(PlanStatus.ACTIVE).endDate(endDate).scheduledSubscriptionPlan(free)
                 .planChangeEffectiveAt(endDate).autoRenew(false).cancelReason("Cancelled by customer, effective at end of paid cycle").build();
-        CustomerPlanResponseDTO response = new CustomerPlanResponseDTO();
+        CustomerPlanResponse response = new CustomerPlanResponse();
 
         when(userRepository.findByIdForUpdate(7L)).thenReturn(Optional.of(customer));
         when(customerPlanRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(paidPlan));
@@ -177,7 +177,7 @@ class CustomerPlanServiceImplTest {
         CustomerPlan paidPlan = CustomerPlan.builder().id(5L).customer(customer).subscriptionPlan(premium)
                 .status(PlanStatus.ACTIVE).usedQuota(12).autoRenew(true)
                 .usageStartAt(usageStart).usageEndAt(usageEnd).build();
-        CustomerPlanResponseDTO response = new CustomerPlanResponseDTO();
+        CustomerPlanResponse response = new CustomerPlanResponse();
 
         when(userRepository.findByIdForUpdate(7L)).thenReturn(Optional.of(customer));
         when(customerPlanRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(paidPlan));
@@ -216,7 +216,7 @@ class CustomerPlanServiceImplTest {
                 .status(PlanStatus.EXPIRED).usedQuota(4).autoRenew(false).build();
         CustomerPlan activePlan = CustomerPlan.builder().id(8L).customer(customer).subscriptionPlan(currentPremium)
                 .status(PlanStatus.ACTIVE).usedQuota(1).autoRenew(true).build();
-        CustomerPlanResponseDTO response = new CustomerPlanResponseDTO();
+        CustomerPlanResponse response = new CustomerPlanResponse();
 
         when(userRepository.findByIdForUpdate(7L)).thenReturn(Optional.of(customer));
         when(customerPlanRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(refundedPlan));
@@ -242,10 +242,10 @@ class CustomerPlanServiceImplTest {
         User customer = User.builder().id(7L).build();
         SubscriptionPlan standard = SubscriptionPlan.builder().id(2L).planType("STANDARD").active(true)
                 .price(BigDecimal.valueOf(79000)).durationDays(30).build();
-        SubscribeRequestDTO request = new SubscribeRequestDTO();
+        SubscribeRequest request = new SubscribeRequest();
         request.setSubscriptionPlanId(2L);
         request.setPaymentMethod(PaymentMethod.VNPAY);
-        CustomerPlanResponseDTO response = new CustomerPlanResponseDTO();
+        CustomerPlanResponse response = new CustomerPlanResponse();
 
         when(userRepository.findByIdForUpdate(7L)).thenReturn(Optional.of(customer));
         when(subscriptionPlanRepository.findById(2L)).thenReturn(Optional.of(standard));
@@ -272,7 +272,7 @@ class CustomerPlanServiceImplTest {
         SubscriptionPlan free = SubscriptionPlan.builder()
                 .id(1L).planType("FREE").price(BigDecimal.ZERO).durationDays(30).active(true).build();
         AtomicReference<CustomerPlan> activePlan = new AtomicReference<>();
-        CustomerPlanResponseDTO response = new CustomerPlanResponseDTO();
+        CustomerPlanResponse response = new CustomerPlanResponse();
 
         when(customerPlanExpiryHelper.getActiveOrHandleExpiry(42L)).thenAnswer(
                 invocation -> activePlan.get());

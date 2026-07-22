@@ -1,9 +1,9 @@
 package com.analyzer.api.controller;
 
 import com.analyzer.api.dto.ApiResponseDTO;
-import com.analyzer.api.dto.user.ChangePasswordRequestDTO;
-import com.analyzer.api.dto.user.UpdateProfileRequestDTO;
-import com.analyzer.api.dto.user.UserResponseDTO;
+import com.analyzer.api.dto.user.ChangePasswordRequest;
+import com.analyzer.api.dto.user.UpdateProfileRequest;
+import com.analyzer.api.dto.user.UserResponse;
 import com.analyzer.api.security.UserDetailsImpl;
 import com.analyzer.api.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -29,23 +29,23 @@ public class UserController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Get user by ID", description = "Retrieves a user's details based on their ID")
-    public ResponseEntity<ApiResponseDTO<UserResponseDTO>> getUserById(
+    public ResponseEntity<ApiResponseDTO<UserResponse>> getUserById(
             @Parameter(description = "ID of the user to be retrieved") @PathVariable Long id) {
         return ResponseEntity.ok(ApiResponseDTO.success(userService.getUserById(id)));
     }
 
     @GetMapping
     @Operation(summary = "Get all users", description = "Retrieves a list of all registered users")
-    public ResponseEntity<ApiResponseDTO<List<UserResponseDTO>>> getAllUsers() {
+    public ResponseEntity<ApiResponseDTO<List<UserResponse>>> getAllUsers() {
         return ResponseEntity.ok(ApiResponseDTO.success(userService.getAllUsers()));
     }
 
     @PutMapping("/profile")
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Update current user profile", description = "Updates profile details for the currently authenticated user.")
-    public ResponseEntity<ApiResponseDTO<UserResponseDTO>> updateProfile(
-            @Valid @RequestBody UpdateProfileRequestDTO request) {
-        UserResponseDTO updatedUser = userService.updateProfile(getCurrentUserId(), request);
+    public ResponseEntity<ApiResponseDTO<UserResponse>> updateProfile(
+            @Valid @RequestBody UpdateProfileRequest request) {
+        UserResponse updatedUser = userService.updateProfile(getCurrentUserId(), request);
         return ResponseEntity.ok(ApiResponseDTO.success("Cập nhật thông tin cá nhân thành công", updatedUser));
     }
 
@@ -53,7 +53,7 @@ public class UserController {
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Change password", description = "Change the password of the currently authenticated user (customer or expert).")
     public ResponseEntity<ApiResponseDTO<Void>> changePassword(
-            @Valid @RequestBody ChangePasswordRequestDTO request) {
+            @Valid @RequestBody ChangePasswordRequest request) {
         userService.changePassword(getCurrentUserId(), request);
         return ResponseEntity.ok(ApiResponseDTO.success("Đổi mật khẩu thành công"));
     }

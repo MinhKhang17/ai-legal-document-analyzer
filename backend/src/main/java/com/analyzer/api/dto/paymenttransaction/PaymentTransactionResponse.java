@@ -7,7 +7,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Schema(description = "Response payload containing payment transaction details")
-public record PaymentTransactionResponseDTO(
+public record PaymentTransactionResponse(
         @Schema(description = "Transaction ID", example = "1")
         Long id,
 

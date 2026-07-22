@@ -1,14 +1,14 @@
 package com.analyzer.api.controller;
 
 import com.analyzer.api.dto.ApiResponseDTO;
-import com.analyzer.api.dto.auth.JwtResponseDTO;
-import com.analyzer.api.dto.auth.LoginRequestDTO;
-import com.analyzer.api.dto.user.UserRequestDTO;
-import com.analyzer.api.dto.user.UserResponseDTO;
-import com.analyzer.api.dto.auth.ResendVerificationEmailRequestDTO;
-import com.analyzer.api.dto.auth.RegistrationResponseDTO;
-import com.analyzer.api.dto.auth.ForgotPasswordRequestDTO;
-import com.analyzer.api.dto.auth.ResetPasswordRequestDTO;
+import com.analyzer.api.dto.auth.JwtResponse;
+import com.analyzer.api.dto.auth.LoginRequest;
+import com.analyzer.api.dto.user.UserRequest;
+import com.analyzer.api.dto.user.UserResponse;
+import com.analyzer.api.dto.auth.ResendVerificationEmailRequest;
+import com.analyzer.api.dto.auth.RegistrationResponse;
+import com.analyzer.api.dto.auth.ForgotPasswordRequest;
+import com.analyzer.api.dto.auth.ResetPasswordRequest;
 import com.analyzer.api.service.AuthService;
 import com.analyzer.api.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -35,10 +35,10 @@ public class AuthController {
             summary = "Register user",
             description = "Creates a new user account in the system"
     )
-    public ResponseEntity<ApiResponseDTO<RegistrationResponseDTO>> register(
-            @Valid @RequestBody UserRequestDTO request,
+    public ResponseEntity<ApiResponseDTO<RegistrationResponse>> register(
+            @Valid @RequestBody UserRequest request,
             HttpServletRequest httpRequest) {
-        RegistrationResponseDTO user = userService.createUser(
+        RegistrationResponse user = userService.createUser(
                 request, httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent"));
         return new ResponseEntity<>(ApiResponseDTO.created("Tạo tài khoản thành công", user), HttpStatus.CREATED);
     }
@@ -46,7 +46,7 @@ public class AuthController {
     @PostMapping("/forgot-password")
     @Operation(summary = "Request password reset", description = "Returns a generic response to prevent email enumeration.")
     public ResponseEntity<ApiResponseDTO<Void>> forgotPassword(
-            @Valid @RequestBody ForgotPasswordRequestDTO request) {
+            @Valid @RequestBody ForgotPasswordRequest request) {
         userService.requestPasswordReset(request.getEmail());
         return new ResponseEntity<>(ApiResponseDTO.accepted(
                 "Neu email ton tai, huong dan dat lai mat khau se duoc gui", null), HttpStatus.ACCEPTED);
@@ -55,7 +55,7 @@ public class AuthController {
     @PostMapping("/reset-password")
     @Operation(summary = "Reset password with a one-time token")
     public ResponseEntity<ApiResponseDTO<Void>> resetPassword(
-            @Valid @RequestBody ResetPasswordRequestDTO request) {
+            @Valid @RequestBody ResetPasswordRequest request) {
         userService.resetPassword(request);
         return ResponseEntity.ok(ApiResponseDTO.success("Dat lai mat khau thanh cong"));
     }
@@ -66,11 +66,11 @@ public class AuthController {
             description = "Authenticate with email/password. Returns Access Token in response body. " +
                     "Sets Refresh Token in HttpOnly Secure Cookie."
     )
-    public ResponseEntity<ApiResponseDTO<JwtResponseDTO>> login(
-            @Valid @RequestBody LoginRequestDTO loginRequest,
+    public ResponseEntity<ApiResponseDTO<JwtResponse>> login(
+            @Valid @RequestBody LoginRequest loginRequest,
             HttpServletResponse response) {
 
-        JwtResponseDTO jwtResponse = authService.login(loginRequest, response);
+        JwtResponse jwtResponse = authService.login(loginRequest, response);
         return ResponseEntity.ok(ApiResponseDTO.success("Đăng nhập thành công", jwtResponse));
     }
 
@@ -81,11 +81,11 @@ public class AuthController {
                     "generates a new Access Token (in body) and a new Refresh Token (in cookie). " +
                     "Old Refresh Token is revoked (token rotation)."
     )
-    public ResponseEntity<ApiResponseDTO<JwtResponseDTO>> refreshToken(
+    public ResponseEntity<ApiResponseDTO<JwtResponse>> refreshToken(
             HttpServletRequest request,
             HttpServletResponse response) {
 
-        JwtResponseDTO jwtResponse = authService.refreshToken(request, response);
+        JwtResponse jwtResponse = authService.refreshToken(request, response);
         return ResponseEntity.ok(ApiResponseDTO.success("Token đã được refresh thành công", jwtResponse));
     }
 
@@ -107,8 +107,8 @@ public class AuthController {
             summary = "Get current authenticated user",
             description = "Get details of the currently authenticated user based on the JWT Bearer Token."
     )
-    public ResponseEntity<ApiResponseDTO<UserResponseDTO>> getCurrentUser() {
-        UserResponseDTO currentUser = authService.getCurrentUser();
+    public ResponseEntity<ApiResponseDTO<UserResponse>> getCurrentUser() {
+        UserResponse currentUser = authService.getCurrentUser();
         return ResponseEntity.ok(ApiResponseDTO.success("Lấy thông tin người dùng thành công", currentUser));
     }
 
@@ -124,9 +124,9 @@ public class AuthController {
 
     @PostMapping("/resend-verification")
     @Operation(summary = "Resend email verification", description = "Issues a fresh verification link when the account exists and is still unverified.")
-    public ResponseEntity<ApiResponseDTO<RegistrationResponseDTO>> resendVerificationEmail(
-            @Valid @RequestBody ResendVerificationEmailRequestDTO request, HttpServletRequest httpRequest) {
-        RegistrationResponseDTO result = authService.resendVerificationEmail(request.getEmail(), httpRequest.getRemoteAddr());
+    public ResponseEntity<ApiResponseDTO<RegistrationResponse>> resendVerificationEmail(
+            @Valid @RequestBody ResendVerificationEmailRequest request, HttpServletRequest httpRequest) {
+        RegistrationResponse result = authService.resendVerificationEmail(request.getEmail(), httpRequest.getRemoteAddr());
         return ResponseEntity.ok(ApiResponseDTO.success("Nếu email hợp lệ, liên kết xác thực mới đã được xử lý", result));
     }
 }

@@ -15,7 +15,7 @@ import java.math.BigDecimal;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class RefundRequestDTO {
+public class CreateRefundRequest {
 
     @NotNull
     private Long paymentTransactionId;

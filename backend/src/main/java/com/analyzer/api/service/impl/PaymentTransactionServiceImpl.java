@@ -1,8 +1,8 @@
 package com.analyzer.api.service.impl;
 
 import com.analyzer.api.config.VnPayProperties;
-import com.analyzer.api.dto.paymenttransaction.PaymentTransactionResponseDTO;
-import com.analyzer.api.dto.paymenttransaction.PaymentUrlResponseDTO;
+import com.analyzer.api.dto.paymenttransaction.PaymentTransactionResponse;
+import com.analyzer.api.dto.paymenttransaction.PaymentUrlResponse;
 import com.analyzer.api.entity.CustomerPlan;
 import com.analyzer.api.entity.PaymentTransaction;
 import com.analyzer.api.enums.PaymentMethod;
@@ -53,7 +53,7 @@ public class PaymentTransactionServiceImpl implements PaymentTransactionService 
 
     @Override
     @Transactional(readOnly = true)
-    public List<PaymentTransactionResponseDTO> getMyTransactions(Long customerId) {
+    public List<PaymentTransactionResponse> getMyTransactions(Long customerId) {
         return paymentTransactionRepository.findByCustomerId(customerId).stream()
                 .sorted((t1, t2) -> t2.getCreatedAt().compareTo(t1.getCreatedAt()))
                 .map(paymentTransactionMapper::toResponseDTO)
@@ -62,7 +62,7 @@ public class PaymentTransactionServiceImpl implements PaymentTransactionService 
 
     @Override
     @Transactional(readOnly = true)
-    public List<PaymentTransactionResponseDTO> getAllTransactions() {
+    public List<PaymentTransactionResponse> getAllTransactions() {
         return paymentTransactionRepository.findAll().stream()
                 .sorted((t1, t2) -> t2.getCreatedAt().compareTo(t1.getCreatedAt()))
                 .map(paymentTransactionMapper::toResponseDTO)
@@ -71,7 +71,7 @@ public class PaymentTransactionServiceImpl implements PaymentTransactionService 
 
     @Override
     @Transactional
-    public PaymentUrlResponseDTO createVnPayPaymentUrl(Long transactionId, Long customerId, String clientIp) {
+    public PaymentUrlResponse createVnPayPaymentUrl(Long transactionId, Long customerId, String clientIp) {
         PaymentTransaction transaction = paymentTransactionRepository.findById(transactionId)
                 .orElseThrow(
                         () -> new ResourceNotFoundException("Khong tim thay giao dich thanh toan voi id: " + transactionId));
@@ -95,7 +95,7 @@ public class PaymentTransactionServiceImpl implements PaymentTransactionService 
         transaction.setPaymentUrl(paymentUrl);
         PaymentTransaction savedTransaction = paymentTransactionRepository.save(transaction);
 
-        return new PaymentUrlResponseDTO(
+        return new PaymentUrlResponse(
                 savedTransaction.getId(),
                 savedTransaction.getTransactionCode(),
                 PaymentMethod.VNPAY.name(),
@@ -105,7 +105,7 @@ public class PaymentTransactionServiceImpl implements PaymentTransactionService 
 
     @Override
     @Transactional
-    public PaymentTransactionResponseDTO handleVnPayCallback(Map<String, String> callbackParams) {
+    public PaymentTransactionResponse handleVnPayCallback(Map<String, String> callbackParams) {
         if (!isValidSignature(callbackParams)) {
             throw new VnPayCallbackException("97", "Invalid signature");
         }

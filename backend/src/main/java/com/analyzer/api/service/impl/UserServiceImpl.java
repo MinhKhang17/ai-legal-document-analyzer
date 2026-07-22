@@ -1,11 +1,11 @@
 package com.analyzer.api.service.impl;
 
 import com.analyzer.api.enums.RoleName;
-import com.analyzer.api.dto.user.AdminCreateLawyerRequestDTO;
-import com.analyzer.api.dto.user.ChangePasswordRequestDTO;
-import com.analyzer.api.dto.user.UserRequestDTO;
-import com.analyzer.api.dto.user.UserResponseDTO;
-import com.analyzer.api.dto.auth.RegistrationResponseDTO;
+import com.analyzer.api.dto.user.AdminCreateLawyerRequest;
+import com.analyzer.api.dto.user.ChangePasswordRequest;
+import com.analyzer.api.dto.user.UserRequest;
+import com.analyzer.api.dto.user.UserResponse;
+import com.analyzer.api.dto.auth.RegistrationResponse;
 import com.analyzer.api.entity.Role;
 import com.analyzer.api.entity.User;
 import com.analyzer.api.exception.common.ConflictException;
@@ -49,8 +49,8 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
-    public RegistrationResponseDTO createUser(
-            UserRequestDTO request, String remoteAddress, String userAgent) {
+    public RegistrationResponse createUser(
+            UserRequest request, String remoteAddress, String userAgent) {
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new RuntimeException("Email already exists");
         }
@@ -87,7 +87,7 @@ public class UserServiceImpl implements UserService {
         boolean sent = emailService.sendVerificationEmail(savedUser.getEmail(), savedUser.getFirstName(), verificationToken);
         savedUser.setEmailDeliveryStatus(sent ? "SENT" : "FAILED");
         userRepository.save(savedUser);
-        return RegistrationResponseDTO.builder().registrationStatus("PENDING_VERIFICATION")
+        return RegistrationResponse.builder().registrationStatus("PENDING_VERIFICATION")
                 .emailDeliveryStatus(savedUser.getEmailDeliveryStatus())
                 .maskedEmail(maskEmail(savedUser.getEmail())).resendAvailableInSeconds(60).build();
     }
@@ -105,7 +105,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional(readOnly = true)
-    public UserResponseDTO getUserById(Long id) {
+    public UserResponse getUserById(Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
 
@@ -114,7 +114,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<UserResponseDTO> getAllUsers() {
+    public List<UserResponse> getAllUsers() {
         return userRepository.findAll().stream()
                 .map(userMapper::toResponseDTO)
                 .collect(Collectors.toList());
@@ -122,7 +122,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
-    public UserResponseDTO updateProfile(Long userId, com.analyzer.api.dto.user.UpdateProfileRequestDTO request) {
+    public UserResponse updateProfile(Long userId, com.analyzer.api.dto.user.UpdateProfileRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với id: " + userId));
 
@@ -148,7 +148,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
-    public void changePassword(Long userId, ChangePasswordRequestDTO request) {
+    public void changePassword(Long userId, ChangePasswordRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
 
@@ -175,7 +175,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
-    public UserResponseDTO createExpertUser(AdminCreateLawyerRequestDTO request) {
+    public UserResponse createExpertUser(AdminCreateLawyerRequest request) {
         String normalizedEmail = request.getEmail().trim().toLowerCase();
         if (userRepository.existsByEmail(normalizedEmail)) {
             throw new ConflictException("Email đã tồn tại trong hệ thống");
@@ -231,7 +231,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<UserResponseDTO> getActiveExperts() {
+    public List<UserResponse> getActiveExperts() {
         return userRepository.findAllByRole_NameAndActiveTrue(RoleName.EXPERT).stream()
                 .map(userMapper::toResponseDTO)
                 .collect(Collectors.toList());
@@ -286,7 +286,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
-    public void resetPassword(com.analyzer.api.dto.auth.ResetPasswordRequestDTO request) {
+    public void resetPassword(com.analyzer.api.dto.auth.ResetPasswordRequest request) {
         if (!request.getNewPassword().equals(request.getConfirmNewPassword())) {
             throw new RuntimeException("Xac nhan mat khau moi khong khop");
         }

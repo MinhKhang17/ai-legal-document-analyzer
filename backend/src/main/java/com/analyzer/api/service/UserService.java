@@ -1,24 +1,24 @@
 package com.analyzer.api.service;
 
-import com.analyzer.api.dto.user.AdminCreateLawyerRequestDTO;
-import com.analyzer.api.dto.user.ChangePasswordRequestDTO;
-import com.analyzer.api.dto.user.UpdateProfileRequestDTO;
-import com.analyzer.api.dto.user.UserRequestDTO;
-import com.analyzer.api.dto.user.UserResponseDTO;
-import com.analyzer.api.dto.auth.RegistrationResponseDTO;
+import com.analyzer.api.dto.user.AdminCreateLawyerRequest;
+import com.analyzer.api.dto.user.ChangePasswordRequest;
+import com.analyzer.api.dto.user.UpdateProfileRequest;
+import com.analyzer.api.dto.user.UserRequest;
+import com.analyzer.api.dto.user.UserResponse;
+import com.analyzer.api.dto.auth.RegistrationResponse;
 import java.util.List;
 
 public interface UserService {
-    default RegistrationResponseDTO createUser(UserRequestDTO request) {
+    default RegistrationResponse createUser(UserRequest request) {
         return createUser(request, null, null);
     }
-    RegistrationResponseDTO createUser(UserRequestDTO request, String remoteAddress, String userAgent);
-    UserResponseDTO getUserById(Long id);
-    List<UserResponseDTO> getAllUsers();
-    UserResponseDTO updateProfile(Long userId, UpdateProfileRequestDTO request);
-    void changePassword(Long userId, ChangePasswordRequestDTO request);
-    UserResponseDTO createExpertUser(AdminCreateLawyerRequestDTO request);
-    List<UserResponseDTO> getActiveExperts();
+    RegistrationResponse createUser(UserRequest request, String remoteAddress, String userAgent);
+    UserResponse getUserById(Long id);
+    List<UserResponse> getAllUsers();
+    UserResponse updateProfile(Long userId, UpdateProfileRequest request);
+    void changePassword(Long userId, ChangePasswordRequest request);
+    UserResponse createExpertUser(AdminCreateLawyerRequest request);
+    List<UserResponse> getActiveExperts();
 
     /**
      * Resets an EXPERT account back to the default temporary password, unlocks it if it was
@@ -38,5 +38,5 @@ public interface UserService {
 
     void requestPasswordReset(String email);
 
-    void resetPassword(com.analyzer.api.dto.auth.ResetPasswordRequestDTO request);
+    void resetPassword(com.analyzer.api.dto.auth.ResetPasswordRequest request);
 }

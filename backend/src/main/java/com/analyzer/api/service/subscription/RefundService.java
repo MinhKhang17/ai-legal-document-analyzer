@@ -1,7 +1,7 @@
 package com.analyzer.api.service.subscription;
 
-import com.analyzer.api.dto.subscription.RefundRequestDTO;
-import com.analyzer.api.dto.subscription.RefundResponseDTO;
+import com.analyzer.api.dto.subscription.CreateRefundRequest;
+import com.analyzer.api.dto.subscription.RefundResponse;
 import com.analyzer.api.dto.subscription.UpdateRefundStatusRequest;
 import com.analyzer.api.enums.RefundStatus;
 
@@ -9,15 +9,15 @@ import java.util.List;
 
 public interface RefundService {
 
-    RefundResponseDTO requestRefund(Long customerId, RefundRequestDTO request);
+    RefundResponse requestRefund(Long customerId, CreateRefundRequest request);
 
-    RefundResponseDTO getRefund(Long refundId);
+    RefundResponse getRefund(Long refundId);
 
-    List<RefundResponseDTO> getMyRefunds(Long customerId);
+    List<RefundResponse> getMyRefunds(Long customerId);
 
-    List<RefundResponseDTO> getRefunds(RefundStatus status);
+    List<RefundResponse> getRefunds(RefundStatus status);
 
-    RefundResponseDTO updateRefundStatus(Long refundId, UpdateRefundStatusRequest request);
+    RefundResponse updateRefundStatus(Long refundId, UpdateRefundStatusRequest request);
 
-    RefundResponseDTO confirmRefundEmail(String token);
+    RefundResponse confirmRefundEmail(String token);
 }

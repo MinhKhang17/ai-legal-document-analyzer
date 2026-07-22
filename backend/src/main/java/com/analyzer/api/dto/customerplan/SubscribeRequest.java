@@ -7,7 +7,7 @@ import lombok.Data;
 
 @Data
 @Schema(description = "Request payload for subscribing to a plan")
-public class SubscribeRequestDTO {
+public class SubscribeRequest {
 
     @NotNull(message = "ID gói không được để trống")
     @Schema(description = "ID of the subscription plan to subscribe", example = "1")

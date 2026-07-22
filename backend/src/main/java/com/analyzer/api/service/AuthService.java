@@ -1,9 +1,9 @@
 package com.analyzer.api.service;
 
-import com.analyzer.api.dto.auth.JwtResponseDTO;
-import com.analyzer.api.dto.auth.LoginRequestDTO;
-import com.analyzer.api.dto.user.UserResponseDTO;
-import com.analyzer.api.dto.auth.RegistrationResponseDTO;
+import com.analyzer.api.dto.auth.JwtResponse;
+import com.analyzer.api.dto.auth.LoginRequest;
+import com.analyzer.api.dto.user.UserResponse;
+import com.analyzer.api.dto.auth.RegistrationResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -13,13 +13,13 @@ public interface AuthService {
      * Authenticate user, generate access + refresh tokens.
      * Access token returned in response body, refresh token set in HttpOnly cookie.
      */
-    JwtResponseDTO login(LoginRequestDTO loginRequest, HttpServletResponse response);
+    JwtResponse login(LoginRequest loginRequest, HttpServletResponse response);
 
     /**
      * Refresh access token using refresh token from HttpOnly cookie.
      * Old refresh token is revoked, new one issued (token rotation).
      */
-    JwtResponseDTO refreshToken(HttpServletRequest request, HttpServletResponse response);
+    JwtResponse refreshToken(HttpServletRequest request, HttpServletResponse response);
 
     /**
      * Logout user: revoke all refresh tokens and clear refresh token cookie.
@@ -29,7 +29,7 @@ public interface AuthService {
     /**
      * Get the current authenticated user's details.
      */
-    UserResponseDTO getCurrentUser();
+    UserResponse getCurrentUser();
 
     /**
      * Verify a user's email using the token sent at registration.
@@ -37,5 +37,5 @@ public interface AuthService {
      */
     void verifyEmail(String token);
 
-    RegistrationResponseDTO resendVerificationEmail(String email, String clientIp);
+    RegistrationResponse resendVerificationEmail(String email, String clientIp);
 }

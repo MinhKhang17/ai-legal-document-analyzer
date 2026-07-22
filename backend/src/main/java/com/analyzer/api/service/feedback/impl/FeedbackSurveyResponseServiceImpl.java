@@ -1,7 +1,7 @@
 package com.analyzer.api.service.feedback.impl;
 
 import com.analyzer.api.dto.feedback.SubmitSurveyResponseRequest;
-import com.analyzer.api.dto.feedback.SurveyResponseDTO;
+import com.analyzer.api.dto.feedback.SurveyResponse;
 import com.analyzer.api.entity.FeedbackSurvey;
 import com.analyzer.api.entity.FeedbackSurveyResponse;
 import com.analyzer.api.entity.User;
@@ -28,7 +28,7 @@ public class FeedbackSurveyResponseServiceImpl implements FeedbackSurveyResponse
 
     @Override
     @Transactional
-    public SurveyResponseDTO submit(String surveyId, SubmitSurveyResponseRequest request) {
+    public SurveyResponse submit(String surveyId, SubmitSurveyResponseRequest request) {
         FeedbackSurvey survey = surveyRepository.findById(surveyId)
                 .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay survey ID: " + surveyId));
         if (survey.getStatus() != FeedbackSurveyStatus.ACTIVE) {

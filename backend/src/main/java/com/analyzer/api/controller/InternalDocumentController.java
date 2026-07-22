@@ -1,8 +1,8 @@
 package com.analyzer.api.controller;
 
 import com.analyzer.api.dto.ApiResponseDTO;
-import com.analyzer.api.dto.document.DocumentResponseDTO;
-import com.analyzer.api.dto.document.ProcessingResultRequestDTO;
+import com.analyzer.api.dto.document.DocumentResponse;
+import com.analyzer.api.dto.document.ProcessingResultRequest;
 import com.analyzer.api.service.WorkspaceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -25,17 +25,17 @@ public class InternalDocumentController {
 
     @PostMapping("/{documentId}/processing-result")
     @Operation(summary = "Receive document processing result", description = "Callback endpoint used by Python AI Service.")
-    public ResponseEntity<ApiResponseDTO<DocumentResponseDTO>> updateProcessingResult(
-            @PathVariable String documentId, @Valid @RequestBody ProcessingResultRequestDTO request) {
-        DocumentResponseDTO response = workspaceService.updateProcessingResult(documentId, request);
+    public ResponseEntity<ApiResponseDTO<DocumentResponse>> updateProcessingResult(
+            @PathVariable String documentId, @Valid @RequestBody ProcessingResultRequest request) {
+        DocumentResponse response = workspaceService.updateProcessingResult(documentId, request);
         return ResponseEntity.ok(ApiResponseDTO.success("Cập nhật kết quả xử lý document thành công", response));
     }
 
     @PostMapping("/register-generated")
     @Operation(summary = "Register generated document", description = "Endpoint used by Python AI Service to register generated contracts in PostgreSQL.")
-    public ResponseEntity<ApiResponseDTO<DocumentResponseDTO>> registerGeneratedDocument(
-            @Valid @RequestBody com.analyzer.api.dto.document.RegisterDocumentRequestDTO request) {
-        DocumentResponseDTO response = workspaceService.registerGeneratedDocument(request);
+    public ResponseEntity<ApiResponseDTO<DocumentResponse>> registerGeneratedDocument(
+            @Valid @RequestBody com.analyzer.api.dto.document.RegisterDocumentRequest request) {
+        DocumentResponse response = workspaceService.registerGeneratedDocument(request);
         return ResponseEntity.ok(ApiResponseDTO.success("Đăng ký document tạo tự động thành công", response));
     }
 }

@@ -5,7 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 
 @Schema(description = "Response payload containing workspace details")
-public record WorkspaceResponseDTO(
+public record WorkspaceResponse(
         @Schema(description = "Workspace ID", example = "ws_001")
         String workspaceId,
 

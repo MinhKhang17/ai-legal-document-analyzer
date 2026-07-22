@@ -7,7 +7,7 @@ import lombok.Data;
 
 @Data
 @Schema(description = "Request payload from Python AI service after document processing")
-public class ProcessingResultRequestDTO {
+public class ProcessingResultRequest {
 
     @Schema(description = "Processing job ID", example = "job_001")
     private String jobId;

@@ -12,7 +12,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class RegisterDocumentRequestDTO {
+public class RegisterDocumentRequest {
     @NotBlank(message = "workspaceId khong duoc de trong")
     private String workspaceId;
 

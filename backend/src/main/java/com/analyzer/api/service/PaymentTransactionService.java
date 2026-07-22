@@ -1,14 +1,14 @@
 package com.analyzer.api.service;
 
-import com.analyzer.api.dto.paymenttransaction.PaymentTransactionResponseDTO;
-import com.analyzer.api.dto.paymenttransaction.PaymentUrlResponseDTO;
+import com.analyzer.api.dto.paymenttransaction.PaymentTransactionResponse;
+import com.analyzer.api.dto.paymenttransaction.PaymentUrlResponse;
 
 import java.util.Map;
 import java.util.List;
 
 public interface PaymentTransactionService {
-    List<PaymentTransactionResponseDTO> getMyTransactions(Long customerId);
-    List<PaymentTransactionResponseDTO> getAllTransactions();
-    PaymentUrlResponseDTO createVnPayPaymentUrl(Long transactionId, Long customerId, String clientIp);
-    PaymentTransactionResponseDTO handleVnPayCallback(Map<String, String> callbackParams);
+    List<PaymentTransactionResponse> getMyTransactions(Long customerId);
+    List<PaymentTransactionResponse> getAllTransactions();
+    PaymentUrlResponse createVnPayPaymentUrl(Long transactionId, Long customerId, String clientIp);
+    PaymentTransactionResponse handleVnPayCallback(Map<String, String> callbackParams);
 }

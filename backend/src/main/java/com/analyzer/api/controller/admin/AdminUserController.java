@@ -1,9 +1,9 @@
 package com.analyzer.api.controller.admin;
 
 import com.analyzer.api.dto.ApiResponseDTO;
-import com.analyzer.api.dto.user.AdminCreateLawyerRequestDTO;
-import com.analyzer.api.dto.user.ResendExpertActivationRequestDTO;
-import com.analyzer.api.dto.user.UserResponseDTO;
+import com.analyzer.api.dto.user.AdminCreateLawyerRequest;
+import com.analyzer.api.dto.user.ResendExpertActivationRequest;
+import com.analyzer.api.dto.user.UserResponse;
 import com.analyzer.api.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -31,9 +31,9 @@ public class AdminUserController {
     @PostMapping("/experts")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Create expert account", description = "Creates an active, email-verified EXPERT user account for a lawyer.")
-    public ResponseEntity<ApiResponseDTO<UserResponseDTO>> createExpert(
-            @Valid @RequestBody AdminCreateLawyerRequestDTO request) {
-        UserResponseDTO user = userService.createExpertUser(request);
+    public ResponseEntity<ApiResponseDTO<UserResponse>> createExpert(
+            @Valid @RequestBody AdminCreateLawyerRequest request) {
+        UserResponse user = userService.createExpertUser(request);
         return new ResponseEntity<>(
                 ApiResponseDTO.created("Tạo tài khoản Expert thành công", user),
                 HttpStatus.CREATED);
@@ -42,7 +42,7 @@ public class AdminUserController {
     @GetMapping("/experts")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "List active experts", description = "Retrieves all active EXPERT users for assignment purposes.")
-    public ResponseEntity<ApiResponseDTO<List<UserResponseDTO>>> getActiveExperts() {
+    public ResponseEntity<ApiResponseDTO<List<UserResponse>>> getActiveExperts() {
         return ResponseEntity.ok(ApiResponseDTO.success(userService.getActiveExperts()));
     }
 
@@ -51,7 +51,7 @@ public class AdminUserController {
     @Operation(summary = "Resend expert account activation",
             description = "Resets an expert account's password back to the default temporary password, unlocks it if it was locked for missing the password-change deadline, and resends the account-info email.")
     public ResponseEntity<ApiResponseDTO<Void>> resendExpertActivation(
-            @Valid @RequestBody ResendExpertActivationRequestDTO request) {
+            @Valid @RequestBody ResendExpertActivationRequest request) {
         userService.resendExpertActivation(request.getEmail());
         return ResponseEntity.ok(ApiResponseDTO.success("Đã gửi lại thông tin đăng nhập cho Expert"));
     }

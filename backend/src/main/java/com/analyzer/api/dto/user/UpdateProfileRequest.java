@@ -6,7 +6,7 @@ import lombok.Data;
 
 @Data
 @Schema(description = "Request payload for updating current user profile")
-public class UpdateProfileRequestDTO {
+public class UpdateProfileRequest {
 
     @NotBlank(message = "Tên không được để trống")
     @Schema(description = "First name of the user", example = "John")

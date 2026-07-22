@@ -1,7 +1,7 @@
 package com.analyzer.api.mapper;
 
-import com.analyzer.api.dto.subscriptionplan.SubscriptionPlanRequestDTO;
-import com.analyzer.api.dto.subscriptionplan.SubscriptionPlanResponseDTO;
+import com.analyzer.api.dto.subscriptionplan.SubscriptionPlanRequest;
+import com.analyzer.api.dto.subscriptionplan.SubscriptionPlanResponse;
 import com.analyzer.api.entity.SubscriptionPlan;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -21,7 +21,7 @@ public interface SubscriptionPlanMapper {
     @Mapping(target = "allowSystemErrorTicket", ignore = true)
     @Mapping(target = "allowQueryErrorTicket", ignore = true)
     @Mapping(target = "allowContactExpertTicket", ignore = true)
-    SubscriptionPlan toEntity(SubscriptionPlanRequestDTO requestDTO);
+    SubscriptionPlan toEntity(SubscriptionPlanRequest requestDTO);
 
     @Mapping(target = "name", ignore = true)
     @Mapping(target = "displayName", ignore = true)
@@ -34,5 +34,5 @@ public interface SubscriptionPlanMapper {
     @Mapping(target = "contractDraftLimit", ignore = true)
     @Mapping(target = "expertTicketLimit", ignore = true)
     @Mapping(target = "features", ignore = true)
-    SubscriptionPlanResponseDTO toResponseDTO(SubscriptionPlan plan);
+    SubscriptionPlanResponse toResponseDTO(SubscriptionPlan plan);
 }

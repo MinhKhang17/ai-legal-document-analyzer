@@ -7,7 +7,7 @@ import lombok.Data;
 
 @Data
 @Schema(description = "Request payload for user login")
-public class LoginRequestDTO {
+public class LoginRequest {
 
     @NotBlank(message = "Email không được để trống")
     @Email(message = "Email is invalid")

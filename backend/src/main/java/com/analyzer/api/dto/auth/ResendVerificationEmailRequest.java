@@ -5,7 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 @Data
-public class ResendVerificationEmailRequestDTO {
+public class ResendVerificationEmailRequest {
     @NotBlank(message = "Email khong duoc de trong")
     @Email(message = "Email khong hop le")
     private String email;

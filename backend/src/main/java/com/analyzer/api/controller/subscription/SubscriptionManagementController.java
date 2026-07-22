@@ -2,15 +2,15 @@ package com.analyzer.api.controller.subscription;
 
 import com.analyzer.api.dto.ApiResponseDTO;
 import com.analyzer.api.dto.PageResponse;
-import com.analyzer.api.dto.customerplan.CustomerPlanResponseDTO;
-import com.analyzer.api.dto.customerplan.SubscribeRequestDTO;
-import com.analyzer.api.dto.subscription.RefundRequestDTO;
-import com.analyzer.api.dto.subscription.RefundResponseDTO;
+import com.analyzer.api.dto.customerplan.CustomerPlanResponse;
+import com.analyzer.api.dto.customerplan.SubscribeRequest;
+import com.analyzer.api.dto.subscription.CreateRefundRequest;
+import com.analyzer.api.dto.subscription.RefundResponse;
 import com.analyzer.api.dto.subscription.SubscriptionQuotaUsageSummaryResponse;
 import com.analyzer.api.dto.subscription.SubscriptionUsageResponse;
 import com.analyzer.api.dto.subscription.UpdateRefundStatusRequest;
-import com.analyzer.api.dto.subscriptionplan.SubscriptionPlanRequestDTO;
-import com.analyzer.api.dto.subscriptionplan.SubscriptionPlanResponseDTO;
+import com.analyzer.api.dto.subscriptionplan.SubscriptionPlanRequest;
+import com.analyzer.api.dto.subscriptionplan.SubscriptionPlanResponse;
 import com.analyzer.api.entity.User;
 import com.analyzer.api.enums.RefundStatus;
 import com.analyzer.api.security.UserDetailsImpl;
@@ -49,7 +49,7 @@ public class SubscriptionManagementController {
     @GetMapping("/plans")
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Get active subscription plans")
-    public ResponseEntity<ApiResponseDTO<List<SubscriptionPlanResponseDTO>>> getActivePlans() {
+    public ResponseEntity<ApiResponseDTO<List<SubscriptionPlanResponse>>> getActivePlans() {
         return ResponseEntity.ok(ApiResponseDTO.success("Lay danh sach goi dich vu thanh cong",
                 subscriptionPlanService.getActivePlans()));
     }
@@ -57,9 +57,9 @@ public class SubscriptionManagementController {
     @GetMapping("/me")
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Get my current subscription plan")
-    public ResponseEntity<ApiResponseDTO<SubscriptionPlanResponseDTO>> getCurrentPlan() {
+    public ResponseEntity<ApiResponseDTO<SubscriptionPlanResponse>> getCurrentPlan() {
         User user = User.builder().id(getCurrentUserId()).build();
-        SubscriptionPlanResponseDTO response = subscriptionPlanService.toResponse(
+        SubscriptionPlanResponse response = subscriptionPlanService.toResponse(
                 subscriptionQuotaService.getCurrentPlan(user));
         return ResponseEntity.ok(ApiResponseDTO.success("Lay goi hien tai thanh cong", response));
     }
@@ -76,8 +76,8 @@ public class SubscriptionManagementController {
     @PostMapping("/change-plan")
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Change plan")
-    public ResponseEntity<ApiResponseDTO<CustomerPlanResponseDTO>> changePlan(
-            @Valid @RequestBody SubscribeRequestDTO request) {
+    public ResponseEntity<ApiResponseDTO<CustomerPlanResponse>> changePlan(
+            @Valid @RequestBody SubscribeRequest request) {
         Long customerId = getCurrentUserId();
         return new ResponseEntity<>(ApiResponseDTO.created("Thay doi goi dich vu thanh cong",
                 customerPlanService.subscribe(customerId, request)), HttpStatus.CREATED);
@@ -85,24 +85,24 @@ public class SubscriptionManagementController {
 
     @PostMapping("/plans")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponseDTO<SubscriptionPlanResponseDTO>> createPlan(
-            @Valid @RequestBody SubscriptionPlanRequestDTO request) {
+    public ResponseEntity<ApiResponseDTO<SubscriptionPlanResponse>> createPlan(
+            @Valid @RequestBody SubscriptionPlanRequest request) {
         return new ResponseEntity<>(ApiResponseDTO.created("Tao goi dich vu thanh cong",
                 subscriptionPlanService.createPlan(request)), HttpStatus.CREATED);
     }
 
     @GetMapping("/plans/{id}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponseDTO<SubscriptionPlanResponseDTO>> getPlanById(@PathVariable Long id) {
+    public ResponseEntity<ApiResponseDTO<SubscriptionPlanResponse>> getPlanById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponseDTO.success("Lay thong tin goi dich vu thanh cong",
                 subscriptionPlanService.getPlanById(id)));
     }
 
     @PutMapping("/plans/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponseDTO<SubscriptionPlanResponseDTO>> updatePlan(
+    public ResponseEntity<ApiResponseDTO<SubscriptionPlanResponse>> updatePlan(
             @PathVariable Long id,
-            @Valid @RequestBody SubscriptionPlanRequestDTO request) {
+            @Valid @RequestBody SubscriptionPlanRequest request) {
         return ResponseEntity.ok(ApiResponseDTO.success("Cap nhat goi dich vu thanh cong",
                 subscriptionPlanService.updatePlan(id, request)));
     }
@@ -116,8 +116,8 @@ public class SubscriptionManagementController {
 
     @PostMapping("/subscribe")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponseDTO<CustomerPlanResponseDTO>> subscribe(
-            @Valid @RequestBody SubscribeRequestDTO request) {
+    public ResponseEntity<ApiResponseDTO<CustomerPlanResponse>> subscribe(
+            @Valid @RequestBody SubscribeRequest request) {
         Long customerId = getCurrentUserId();
         return new ResponseEntity<>(ApiResponseDTO.created("Dang ky goi dich vu thanh cong",
                 customerPlanService.subscribe(customerId, request)), HttpStatus.CREATED);
@@ -125,7 +125,7 @@ public class SubscriptionManagementController {
 
     @GetMapping("/my-plan")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponseDTO<CustomerPlanResponseDTO>> getMyPlan() {
+    public ResponseEntity<ApiResponseDTO<CustomerPlanResponse>> getMyPlan() {
         Long customerId = getCurrentUserId();
         return ResponseEntity.ok(ApiResponseDTO.success("Lay goi dang su dung thanh cong",
                 customerPlanService.getMyPlan(customerId)));
@@ -133,7 +133,7 @@ public class SubscriptionManagementController {
 
     @PutMapping("/my-plan/{id}/cancel")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponseDTO<CustomerPlanResponseDTO>> cancelPlan(@PathVariable Long id) {
+    public ResponseEntity<ApiResponseDTO<CustomerPlanResponse>> cancelPlan(@PathVariable Long id) {
         Long customerId = getCurrentUserId();
         return ResponseEntity.ok(ApiResponseDTO.success("Huy goi dich vu thanh cong",
                 customerPlanService.cancelPlan(customerId, id)));
@@ -156,8 +156,8 @@ public class SubscriptionManagementController {
 
     @PostMapping("/refunds")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponseDTO<RefundResponseDTO>> requestRefund(
-            @Valid @RequestBody RefundRequestDTO request) {
+    public ResponseEntity<ApiResponseDTO<RefundResponse>> requestRefund(
+            @Valid @RequestBody CreateRefundRequest request) {
         Long customerId = getCurrentUserId();
         return new ResponseEntity<>(ApiResponseDTO.created("Gui yeu cau hoan tien thanh cong",
                 refundService.requestRefund(customerId, request)), HttpStatus.CREATED);
@@ -166,7 +166,7 @@ public class SubscriptionManagementController {
     @GetMapping("/refunds/me")
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Get my refund requests")
-    public ResponseEntity<ApiResponseDTO<List<RefundResponseDTO>>> getMyRefunds() {
+    public ResponseEntity<ApiResponseDTO<List<RefundResponse>>> getMyRefunds() {
         return ResponseEntity.ok(ApiResponseDTO.success("Lay danh sach hoan tien thanh cong",
                 refundService.getMyRefunds(getCurrentUserId())));
     }
@@ -174,7 +174,7 @@ public class SubscriptionManagementController {
     @GetMapping("/refunds")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Get refund requests for administration")
-    public ResponseEntity<ApiResponseDTO<List<RefundResponseDTO>>> getRefunds(
+    public ResponseEntity<ApiResponseDTO<List<RefundResponse>>> getRefunds(
             @RequestParam(required = false) RefundStatus status) {
         return ResponseEntity.ok(ApiResponseDTO.success("Lay danh sach hoan tien thanh cong",
                 refundService.getRefunds(status)));
@@ -182,7 +182,7 @@ public class SubscriptionManagementController {
 
     @GetMapping("/refunds/{id}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponseDTO<RefundResponseDTO>> getRefund(@PathVariable("id") Long refundId) {
+    public ResponseEntity<ApiResponseDTO<RefundResponse>> getRefund(@PathVariable("id") Long refundId) {
         return ResponseEntity.ok(ApiResponseDTO.success("Lay thong tin hoan tien thanh cong",
                 refundService.getRefund(refundId)));
     }
@@ -190,7 +190,7 @@ public class SubscriptionManagementController {
     @PatchMapping("/refunds/{id}/status")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Approve, reject, process, or complete a refund request")
-    public ResponseEntity<ApiResponseDTO<RefundResponseDTO>> updateRefundStatus(
+    public ResponseEntity<ApiResponseDTO<RefundResponse>> updateRefundStatus(
             @PathVariable("id") Long refundId,
             @Valid @RequestBody UpdateRefundStatusRequest request) {
         return ResponseEntity.ok(ApiResponseDTO.success("Cap nhat trang thai hoan tien thanh cong",
@@ -200,7 +200,7 @@ public class SubscriptionManagementController {
     @GetMapping("/refunds/confirm")
     @PreAuthorize("permitAll()")
     @Operation(summary = "Confirm a refund request from the email link")
-    public ResponseEntity<ApiResponseDTO<RefundResponseDTO>> confirmRefundEmail(@RequestParam String token) {
+    public ResponseEntity<ApiResponseDTO<RefundResponse>> confirmRefundEmail(@RequestParam String token) {
         return ResponseEntity.ok(ApiResponseDTO.success("CONFIRMATION_SUCCESS",
                 refundService.confirmRefundEmail(token)));
     }

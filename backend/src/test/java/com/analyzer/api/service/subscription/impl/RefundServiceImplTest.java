@@ -1,6 +1,6 @@
 package com.analyzer.api.service.subscription.impl;
 
-import com.analyzer.api.dto.subscription.RefundRequestDTO;
+import com.analyzer.api.dto.subscription.CreateRefundRequest;
 import com.analyzer.api.dto.subscription.UpdateRefundStatusRequest;
 import com.analyzer.api.entity.CustomerPlan;
 import com.analyzer.api.entity.PaymentTransaction;
@@ -66,7 +66,7 @@ class RefundServiceImplTest {
                 .amount(new BigDecimal("100000"))
                 .paymentStatus(PaymentStatus.SUCCESS)
                 .build();
-        RefundRequestDTO request = RefundRequestDTO.builder()
+        CreateRefundRequest request = CreateRefundRequest.builder()
                 .paymentTransactionId(11L)
                 .reason("Khong con nhu cau")
                 .amount(new BigDecimal("30000"))

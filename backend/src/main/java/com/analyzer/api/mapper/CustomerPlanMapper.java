@@ -1,6 +1,6 @@
 package com.analyzer.api.mapper;
 
-import com.analyzer.api.dto.customerplan.CustomerPlanResponseDTO;
+import com.analyzer.api.dto.customerplan.CustomerPlanResponse;
 import com.analyzer.api.entity.CustomerPlan;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -13,5 +13,5 @@ public interface CustomerPlanMapper {
     @Mapping(target = "remainingQuota", expression = "java(plan.getRemainingQuota())")
     @Mapping(target = "latestTransactionId", ignore = true)
     @Mapping(target = "latestTransactionCode", ignore = true)
-    CustomerPlanResponseDTO toResponseDTO(CustomerPlan plan);
+    CustomerPlanResponse toResponseDTO(CustomerPlan plan);
 }

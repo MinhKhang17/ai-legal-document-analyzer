@@ -1,7 +1,7 @@
 package com.analyzer.api.service.impl;
 
-import com.analyzer.api.dto.customerplan.CustomerPlanResponseDTO;
-import com.analyzer.api.dto.customerplan.SubscribeRequestDTO;
+import com.analyzer.api.dto.customerplan.CustomerPlanResponse;
+import com.analyzer.api.dto.customerplan.SubscribeRequest;
 import com.analyzer.api.dto.subscription.SubscriptionQuotaUsageSummaryResponse;
 import com.analyzer.api.entity.CustomerPlan;
 import com.analyzer.api.entity.PaymentTransaction;
@@ -50,7 +50,7 @@ public class CustomerPlanServiceImpl implements CustomerPlanService {
 
     @Override
     @Transactional
-    public CustomerPlanResponseDTO subscribe(Long customerId, SubscribeRequestDTO request) {
+    public CustomerPlanResponse subscribe(Long customerId, SubscribeRequest request) {
 
         User user = userRepository.findByIdForUpdate(customerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin khách hàng"));
@@ -147,7 +147,7 @@ public class CustomerPlanServiceImpl implements CustomerPlanService {
 
         paymentTransactionRepository.save(transaction);
 
-        CustomerPlanResponseDTO response = toResponseWithAccurateQuota(customerPlan);
+        CustomerPlanResponse response = toResponseWithAccurateQuota(customerPlan);
         response.setLatestTransactionId(transaction.getId());
         response.setLatestTransactionCode(transaction.getTransactionCode());
         return response;
@@ -155,7 +155,7 @@ public class CustomerPlanServiceImpl implements CustomerPlanService {
 
     @Override
     @Transactional
-    public CustomerPlanResponseDTO getMyPlan(Long customerId) {
+    public CustomerPlanResponse getMyPlan(Long customerId) {
         // Chỉ gói ACTIVE mới được xem là gói người dùng đang sở hữu.
         CustomerPlan activePlan = getActivePlanOrUpdateIfExpired(customerId);
         if (activePlan == null) {
@@ -173,7 +173,7 @@ public class CustomerPlanServiceImpl implements CustomerPlanService {
 
     @Override
     @Transactional
-    public CustomerPlanResponseDTO cancelPlan(Long customerId, Long customerPlanId) {
+    public CustomerPlanResponse cancelPlan(Long customerId, Long customerPlanId) {
         userRepository.findByIdForUpdate(customerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin khách hàng"));
 
@@ -205,7 +205,7 @@ public class CustomerPlanServiceImpl implements CustomerPlanService {
 
     @Override
     @Transactional
-    public CustomerPlanResponseDTO cancelPlanAndActivateFree(Long customerId, Long customerPlanId, String reason) {
+    public CustomerPlanResponse cancelPlanAndActivateFree(Long customerId, Long customerPlanId, String reason) {
         // Lock the user row first (same order subscribe() uses) so cancel can't interleave
         // with a concurrent subscribe()/upgrade for the same customer, then lock the specific
         // CustomerPlan row so it can't interleave with a VNPay callback activating it (both
@@ -287,8 +287,8 @@ public class CustomerPlanServiceImpl implements CustomerPlanService {
         paymentTransactionRepository.saveAll(stalePending);
     }
 
-    private CustomerPlanResponseDTO toResponseWithAccurateQuota(CustomerPlan plan) {
-        CustomerPlanResponseDTO dto = customerPlanMapper.toResponseDTO(plan);
+    private CustomerPlanResponse toResponseWithAccurateQuota(CustomerPlan plan) {
+        CustomerPlanResponse dto = customerPlanMapper.toResponseDTO(plan);
         Integer maxQuota = plan.getAnalysisLimitSnapshot() != null
                 ? plan.getAnalysisLimitSnapshot()
                 : (plan.getSubscriptionPlan() != null ? plan.getSubscriptionPlan().getMaxQuota() : null);

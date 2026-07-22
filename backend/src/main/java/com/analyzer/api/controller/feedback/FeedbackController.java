@@ -25,7 +25,7 @@ public class FeedbackController {
 
     @PostMapping("/admin/feedback/surveys")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponseDTO<SurveyResponseDTO>> createSurvey(
+    public ResponseEntity<ApiResponseDTO<SurveyResponse>> createSurvey(
             @Valid @RequestBody CreateSurveyRequest request) {
         return ResponseEntity.status(201)
                 .body(ApiResponseDTO.created("Tao survey feedback thanh cong", feedbackSurveyService.create(request)));
@@ -33,7 +33,7 @@ public class FeedbackController {
 
     @PutMapping("/admin/feedback/surveys/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponseDTO<SurveyResponseDTO>> updateSurvey(
+    public ResponseEntity<ApiResponseDTO<SurveyResponse>> updateSurvey(
             @PathVariable("id") String id,
             @Valid @RequestBody UpdateSurveyRequest request) {
         return ResponseEntity.ok(ApiResponseDTO.success("Cap nhat survey feedback thanh cong",
@@ -42,14 +42,14 @@ public class FeedbackController {
 
     @GetMapping("/admin/feedback/surveys")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponseDTO<PageResponse<SurveyResponseDTO>>> listSurveys(Pageable pageable) {
-        Page<SurveyResponseDTO> page = feedbackSurveyService.getAll(pageable);
+    public ResponseEntity<ApiResponseDTO<PageResponse<SurveyResponse>>> listSurveys(Pageable pageable) {
+        Page<SurveyResponse> page = feedbackSurveyService.getAll(pageable);
         return ResponseEntity.ok(ApiResponseDTO.success("Lay danh sach survey feedback thanh cong", toPageResponse(page)));
     }
 
     @PostMapping("/feedback/surveys/{id}/responses")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponseDTO<SurveyResponseDTO>> submitSurveyResponse(
+    public ResponseEntity<ApiResponseDTO<SurveyResponse>> submitSurveyResponse(
             @PathVariable("id") String surveyId,
             @Valid @RequestBody SubmitSurveyResponseRequest request) {
         return ResponseEntity.status(201)

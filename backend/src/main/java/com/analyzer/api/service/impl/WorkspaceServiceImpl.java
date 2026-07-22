@@ -1,10 +1,10 @@
 package com.analyzer.api.service.impl;
 
-import com.analyzer.api.dto.document.DocumentResponseDTO;
-import com.analyzer.api.dto.document.ProcessDocumentRequestDTO;
-import com.analyzer.api.dto.document.ProcessingResultRequestDTO;
-import com.analyzer.api.dto.workspace.WorkspaceRequestDTO;
-import com.analyzer.api.dto.workspace.WorkspaceResponseDTO;
+import com.analyzer.api.dto.document.DocumentResponse;
+import com.analyzer.api.dto.document.ProcessDocumentRequest;
+import com.analyzer.api.dto.document.ProcessingResultRequest;
+import com.analyzer.api.dto.workspace.WorkspaceRequest;
+import com.analyzer.api.dto.workspace.WorkspaceResponse;
 import com.analyzer.api.entity.Document;
 import com.analyzer.api.entity.User;
 import com.analyzer.api.entity.Workspace;
@@ -84,7 +84,7 @@ public class WorkspaceServiceImpl implements WorkspaceService {
 
     @Override
     @Transactional
-    public WorkspaceResponseDTO createWorkspace(Long userId, WorkspaceRequestDTO request) {
+    public WorkspaceResponse createWorkspace(Long userId, WorkspaceRequest request) {
         User user = userRepository.findByIdForUpdate(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("USER_NOT_FOUND"));
         String normalizedName = request.name().trim();
@@ -112,7 +112,7 @@ public class WorkspaceServiceImpl implements WorkspaceService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<WorkspaceResponseDTO> getWorkspaces(Long userId) {
+    public List<WorkspaceResponse> getWorkspaces(Long userId) {
         return workspaceRepository
                 .findAllByUserIdAndStatusOrderByCreatedAtDesc(userId, STATUS_ACTIVE)
                 .stream()
@@ -122,7 +122,7 @@ public class WorkspaceServiceImpl implements WorkspaceService {
 
     @Override
     @Transactional(readOnly = true)
-    public WorkspaceResponseDTO getWorkspaceById(Long userId, String workspaceId) {
+    public WorkspaceResponse getWorkspaceById(Long userId, String workspaceId) {
         Workspace workspace = workspaceRepository.findByIdAndUserIdAndStatus(workspaceId, userId, STATUS_ACTIVE)
                 .orElseThrow(() -> new RuntimeException("Workspace khong ton tai hoac khong thuoc user hien tai"));
         return toWorkspaceResponse(workspace);
@@ -130,7 +130,7 @@ public class WorkspaceServiceImpl implements WorkspaceService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<DocumentResponseDTO> getDocuments(Long userId, String workspaceId) {
+    public List<DocumentResponse> getDocuments(Long userId, String workspaceId) {
         workspaceRepository.findByIdAndUserIdAndStatus(workspaceId, userId, STATUS_ACTIVE)
                 .orElseThrow(() -> new RuntimeException("Workspace khong ton tai hoac khong thuoc user hien tai"));
 
@@ -143,7 +143,7 @@ public class WorkspaceServiceImpl implements WorkspaceService {
 
     @Override
     @Transactional(noRollbackFor = DocumentProcessingDispatchException.class)
-    public DocumentResponseDTO uploadDocument(Long userId, String workspaceId, MultipartFile file) throws IOException {
+    public DocumentResponse uploadDocument(Long userId, String workspaceId, MultipartFile file) throws IOException {
         if (file == null || file.isEmpty()) {
             throw new RuntimeException("File khong duoc de trong");
         }
@@ -192,7 +192,7 @@ public class WorkspaceServiceImpl implements WorkspaceService {
 
     @Override
     @Transactional
-    public DocumentResponseDTO updateProcessingResult(String documentId, ProcessingResultRequestDTO request) {
+    public DocumentResponse updateProcessingResult(String documentId, ProcessingResultRequest request) {
         Document document = documentRepository.findById(documentId)
                 .orElseThrow(() -> new RuntimeException("Khong tim thay document voi id: " + documentId));
 
@@ -218,7 +218,7 @@ public class WorkspaceServiceImpl implements WorkspaceService {
 
     private Document sendProcessingRequest(Document document) {
         String jobId = "job_" + UUID.randomUUID().toString().replace("-", "");
-        ProcessDocumentRequestDTO request = ProcessDocumentRequestDTO.builder()
+        ProcessDocumentRequest request = ProcessDocumentRequest.builder()
                 .jobId(jobId)
                 .documentId(document.getId())
                 .workspaceId(document.getWorkspace().getId())
@@ -329,8 +329,8 @@ public class WorkspaceServiceImpl implements WorkspaceService {
         return "doc_" + UUID.randomUUID().toString().replace("-", "");
     }
 
-    private WorkspaceResponseDTO toWorkspaceResponse(Workspace workspace) {
-        return new WorkspaceResponseDTO(
+    private WorkspaceResponse toWorkspaceResponse(Workspace workspace) {
+        return new WorkspaceResponse(
                 workspace.getId(),
                 workspace.getName(),
                 workspace.getDescription(),
@@ -339,8 +339,8 @@ public class WorkspaceServiceImpl implements WorkspaceService {
         );
     }
 
-    private DocumentResponseDTO toDocumentResponse(Document document) {
-        return new DocumentResponseDTO(
+    private DocumentResponse toDocumentResponse(Document document) {
+        return new DocumentResponse(
                 document.getId(),
                 document.getWorkspace().getId(),
                 document.getOriginalFileName(),
@@ -438,7 +438,7 @@ public class WorkspaceServiceImpl implements WorkspaceService {
 
     @Override
     @org.springframework.transaction.annotation.Transactional
-    public DocumentResponseDTO registerGeneratedDocument(com.analyzer.api.dto.document.RegisterDocumentRequestDTO request) {
+    public DocumentResponse registerGeneratedDocument(com.analyzer.api.dto.document.RegisterDocumentRequest request) {
         String documentId = generateDocumentId();
         Document document = Document.builder()
                 .id(documentId)

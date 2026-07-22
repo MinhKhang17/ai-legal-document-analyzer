@@ -1,6 +1,6 @@
 package com.analyzer.api.service.impl;
 
-import com.analyzer.api.dto.auth.ResetPasswordRequestDTO;
+import com.analyzer.api.dto.auth.ResetPasswordRequest;
 import com.analyzer.api.entity.User;
 import com.analyzer.api.mapper.UserMapper;
 import com.analyzer.api.repository.RoleRepository;
@@ -42,7 +42,7 @@ class UserServicePasswordResetTest {
         when(userRepository.findByForgotPasswordToken(user.getForgotPasswordToken())).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("NewPass@123", "old-hash")).thenReturn(false);
         when(passwordEncoder.encode("NewPass@123")).thenReturn("new-hash");
-        ResetPasswordRequestDTO request = new ResetPasswordRequestDTO();
+        ResetPasswordRequest request = new ResetPasswordRequest();
         request.setToken(rawToken.getValue());
         request.setNewPassword("NewPass@123");
         request.setConfirmNewPassword("NewPass@123");
@@ -58,7 +58,7 @@ class UserServicePasswordResetTest {
         User user = User.builder().password("old-hash").forgotPasswordToken("hash")
                 .forgotPasswordTokenExpiry(LocalDateTime.now().minusMinutes(1)).build();
         when(userRepository.findByForgotPasswordToken(anyString())).thenReturn(Optional.of(user));
-        ResetPasswordRequestDTO request = new ResetPasswordRequestDTO();
+        ResetPasswordRequest request = new ResetPasswordRequest();
         request.setToken("expired");
         request.setNewPassword("NewPass@123");
         request.setConfirmNewPassword("NewPass@123");

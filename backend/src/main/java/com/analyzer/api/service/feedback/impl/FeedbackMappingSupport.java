@@ -1,7 +1,7 @@
 package com.analyzer.api.service.feedback.impl;
 
 import com.analyzer.api.dto.feedback.AiReportResponse;
-import com.analyzer.api.dto.feedback.SurveyResponseDTO;
+import com.analyzer.api.dto.feedback.SurveyResponse;
 import com.analyzer.api.entity.AiReport;
 import com.analyzer.api.entity.FeedbackSurvey;
 
@@ -10,8 +10,8 @@ final class FeedbackMappingSupport {
     private FeedbackMappingSupport() {
     }
 
-    static SurveyResponseDTO toSurveyResponse(FeedbackSurvey survey) {
-        return SurveyResponseDTO.builder()
+    static SurveyResponse toSurveyResponse(FeedbackSurvey survey) {
+        return SurveyResponse.builder()
                 .id(survey.getId())
                 .code(survey.getCode())
                 .title(survey.getTitle())

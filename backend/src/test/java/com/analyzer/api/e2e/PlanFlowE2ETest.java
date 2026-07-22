@@ -1,10 +1,10 @@
 package com.analyzer.api.e2e;
 
-import com.analyzer.api.dto.customerplan.CustomerPlanResponseDTO;
-import com.analyzer.api.dto.customerplan.SubscribeRequestDTO;
+import com.analyzer.api.dto.customerplan.CustomerPlanResponse;
+import com.analyzer.api.dto.customerplan.SubscribeRequest;
 import com.analyzer.api.dto.subscription.SubscriptionQuotaUsageSummaryResponse;
-import com.analyzer.api.dto.subscriptionplan.SubscriptionPlanRequestDTO;
-import com.analyzer.api.dto.workspace.WorkspaceRequestDTO;
+import com.analyzer.api.dto.subscriptionplan.SubscriptionPlanRequest;
+import com.analyzer.api.dto.workspace.WorkspaceRequest;
 import com.analyzer.api.entity.CustomerPlan;
 import com.analyzer.api.entity.PaymentTransaction;
 import com.analyzer.api.entity.SubscriptionPlan;
@@ -48,8 +48,8 @@ class PlanFlowE2ETest extends AbstractPlanFlowE2ETest {
                 .isInstanceOf(ResourceNotFoundException.class);
 
         String workspaceId = workspaceService.createWorkspace(user.getId(),
-                new WorkspaceRequestDTO("WS1", null)).workspaceId();
-        assertThatThrownBy(() -> workspaceService.createWorkspace(user.getId(), new WorkspaceRequestDTO("WS2", null)))
+                new WorkspaceRequest("WS1", null)).workspaceId();
+        assertThatThrownBy(() -> workspaceService.createWorkspace(user.getId(), new WorkspaceRequest("WS2", null)))
                 .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("WORKSPACE_LIMIT_EXCEEDED");
 
@@ -75,10 +75,10 @@ class PlanFlowE2ETest extends AbstractPlanFlowE2ETest {
         User user = createCustomer("e2e02");
         SubscriptionPlan standard = planByType("STANDARD");
 
-        SubscribeRequestDTO request = new SubscribeRequestDTO();
+        SubscribeRequest request = new SubscribeRequest();
         request.setSubscriptionPlanId(standard.getId());
         request.setPaymentMethod(PaymentMethod.VNPAY);
-        CustomerPlanResponseDTO pending = customerPlanService.subscribe(user.getId(), request);
+        CustomerPlanResponse pending = customerPlanService.subscribe(user.getId(), request);
         PaymentTransaction transaction = paymentTransactionRepository.findById(pending.getLatestTransactionId()).orElseThrow();
 
         Map<String, String> callback = signedVnPayCallback(transaction.getTransactionCode(), transaction.getAmount(), "00", "00");
@@ -121,10 +121,10 @@ class PlanFlowE2ETest extends AbstractPlanFlowE2ETest {
         assertThat(beforeUpgrade.getContractAnalysisUsed()).isEqualTo(20);
         assertThat(beforeUpgrade.getAiTokensUsed()).isEqualTo(500_000);
 
-        SubscribeRequestDTO upgrade = new SubscribeRequestDTO();
+        SubscribeRequest upgrade = new SubscribeRequest();
         upgrade.setSubscriptionPlanId(premium.getId());
         upgrade.setPaymentMethod(PaymentMethod.VNPAY);
-        CustomerPlanResponseDTO pending = customerPlanService.subscribe(user.getId(), upgrade);
+        CustomerPlanResponse pending = customerPlanService.subscribe(user.getId(), upgrade);
         PaymentTransaction transaction = paymentTransactionRepository.findById(pending.getLatestTransactionId()).orElseThrow();
         paymentTransactionService.handleVnPayCallback(
                 signedVnPayCallback(transaction.getTransactionCode(), transaction.getAmount(), "00", "00"));
@@ -154,7 +154,7 @@ class PlanFlowE2ETest extends AbstractPlanFlowE2ETest {
         SubscriptionPlan resolved = subscriptionQuotaService.getCurrentPlan(user);
         assertThat(resolved.getPlanType()).isEqualToIgnoringCase("STANDARD");
 
-        CustomerPlanResponseDTO myPlan = customerPlanService.getMyPlan(user.getId());
+        CustomerPlanResponse myPlan = customerPlanService.getMyPlan(user.getId());
         assertThat(myPlan.getStatus()).isEqualTo(PlanStatus.ACTIVE);
         assertThat(myPlan.getSubscriptionPlan().getPlanType()).isEqualToIgnoringCase("STANDARD");
 
@@ -192,10 +192,10 @@ class PlanFlowE2ETest extends AbstractPlanFlowE2ETest {
     void e2e06_concurrentVnPayCallbacksActivateExactlyOnce() throws InterruptedException {
         User user = createCustomer("e2e06");
         SubscriptionPlan standard = planByType("STANDARD");
-        SubscribeRequestDTO request = new SubscribeRequestDTO();
+        SubscribeRequest request = new SubscribeRequest();
         request.setSubscriptionPlanId(standard.getId());
         request.setPaymentMethod(PaymentMethod.VNPAY);
-        CustomerPlanResponseDTO pending = customerPlanService.subscribe(user.getId(), request);
+        CustomerPlanResponse pending = customerPlanService.subscribe(user.getId(), request);
         PaymentTransaction transaction = paymentTransactionRepository.findById(pending.getLatestTransactionId()).orElseThrow();
         Map<String, String> callback = signedVnPayCallback(transaction.getTransactionCode(), transaction.getAmount(), "00", "00");
 
@@ -282,7 +282,7 @@ class PlanFlowE2ETest extends AbstractPlanFlowE2ETest {
         LocalDateTime now = LocalDateTime.now();
         persistCustomerPlan(existingCustomer, premium, PlanStatus.ACTIVE, now.minusDays(5), now.plusDays(25));
 
-        SubscriptionPlanRequestDTO editRequest = new SubscriptionPlanRequestDTO();
+        SubscriptionPlanRequest editRequest = new SubscriptionPlanRequest();
         editRequest.setPlanName(premium.getPlanName());
         editRequest.setPlanType(premium.getPlanType());
         editRequest.setPrice(premium.getPrice());
@@ -302,10 +302,10 @@ class PlanFlowE2ETest extends AbstractPlanFlowE2ETest {
         assertThat(existingUsage.getContractAnalysisLimit()).isEqualTo(originalMaxQuota);
 
         User newCustomer = createCustomer("e2e08-new");
-        SubscribeRequestDTO subscribeRequest = new SubscribeRequestDTO();
+        SubscribeRequest subscribeRequest = new SubscribeRequest();
         subscribeRequest.setSubscriptionPlanId(premium.getId());
         subscribeRequest.setPaymentMethod(PaymentMethod.VNPAY);
-        CustomerPlanResponseDTO pending = customerPlanService.subscribe(newCustomer.getId(), subscribeRequest);
+        CustomerPlanResponse pending = customerPlanService.subscribe(newCustomer.getId(), subscribeRequest);
         PaymentTransaction transaction = paymentTransactionRepository.findById(pending.getLatestTransactionId()).orElseThrow();
         paymentTransactionService.handleVnPayCallback(
                 signedVnPayCallback(transaction.getTransactionCode(), transaction.getAmount(), "00", "00"));

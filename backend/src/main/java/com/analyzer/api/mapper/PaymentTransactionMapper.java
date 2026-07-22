@@ -1,6 +1,6 @@
 package com.analyzer.api.mapper;
 
-import com.analyzer.api.dto.paymenttransaction.PaymentTransactionResponseDTO;
+import com.analyzer.api.dto.paymenttransaction.PaymentTransactionResponse;
 import com.analyzer.api.entity.PaymentTransaction;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -13,5 +13,5 @@ public interface PaymentTransactionMapper {
     @Mapping(target = "subscriptionPlanId", source = "subscriptionPlan.id")
     @Mapping(target = "planName", source = "subscriptionPlan.planName")
     @Mapping(target = "customerPlanId", source = "customerPlan.id")
-    PaymentTransactionResponseDTO toResponseDTO(PaymentTransaction transaction);
+    PaymentTransactionResponse toResponseDTO(PaymentTransaction transaction);
 }

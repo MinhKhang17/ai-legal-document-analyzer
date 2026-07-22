@@ -1,7 +1,7 @@
 package com.analyzer.api.service.impl;
 
-import com.analyzer.api.dto.subscriptionplan.SubscriptionPlanRequestDTO;
-import com.analyzer.api.dto.subscriptionplan.SubscriptionPlanResponseDTO;
+import com.analyzer.api.dto.subscriptionplan.SubscriptionPlanRequest;
+import com.analyzer.api.dto.subscriptionplan.SubscriptionPlanResponse;
 import com.analyzer.api.entity.SubscriptionPlan;
 import com.analyzer.api.exception.common.ConflictException;
 import com.analyzer.api.mapper.SubscriptionPlanMapper;
@@ -30,7 +30,7 @@ public class SubscriptionPlanServiceImpl implements SubscriptionPlanService {
 
     @Override
     @Transactional
-    public SubscriptionPlanResponseDTO createPlan(SubscriptionPlanRequestDTO request) {
+    public SubscriptionPlanResponse createPlan(SubscriptionPlanRequest request) {
         applyLegacyDefaults(request, null);
         normalizeAndValidate(request);
         if (subscriptionPlanRepository.existsByPlanNameIgnoreCase(request.getPlanName())
@@ -45,20 +45,20 @@ public class SubscriptionPlanServiceImpl implements SubscriptionPlanService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<SubscriptionPlanResponseDTO> getActivePlans() {
+    public List<SubscriptionPlanResponse> getActivePlans() {
         return subscriptionPlanRepository.findByActiveTrue().stream().map(this::toResponse).toList();
     }
 
     @Override
     @Transactional(readOnly = true)
-    public SubscriptionPlanResponseDTO getPlanById(Long id) {
+    public SubscriptionPlanResponse getPlanById(Long id) {
         return toResponse(subscriptionPlanRepository.findById(id)
                 .orElseThrow(() -> new ConflictException("SUBSCRIPTION_PLAN_NOT_FOUND")));
     }
 
     @Override
     @Transactional
-    public SubscriptionPlanResponseDTO updatePlan(Long id, SubscriptionPlanRequestDTO request) {
+    public SubscriptionPlanResponse updatePlan(Long id, SubscriptionPlanRequest request) {
         SubscriptionPlan plan = subscriptionPlanRepository.findById(id)
                 .orElseThrow(() -> new ConflictException("SUBSCRIPTION_PLAN_NOT_FOUND"));
         applyLegacyDefaults(request, plan);
@@ -84,7 +84,7 @@ public class SubscriptionPlanServiceImpl implements SubscriptionPlanService {
     // them before either commits); uk_subscription_plan_name_lower / uk_subscription_plan_type_lower
     // are the real guarantee. Translate a DB-level violation into the same clean 409 instead of
     // letting a raw DataIntegrityViolationException reach the client as an unexpected 500.
-    private SubscriptionPlanResponseDTO saveOrConflict(SubscriptionPlan plan) {
+    private SubscriptionPlanResponse saveOrConflict(SubscriptionPlan plan) {
         try {
             // saveAndFlush, not save: an UPDATE on an already-persisted entity is normally
             // deferred to transaction commit by Hibernate's dirty checking, which would happen
@@ -110,7 +110,7 @@ public class SubscriptionPlanServiceImpl implements SubscriptionPlanService {
         }
     }
 
-    private void normalizeAndValidate(SubscriptionPlanRequestDTO request) {
+    private void normalizeAndValidate(SubscriptionPlanRequest request) {
         request.setPlanType(firstText(request.getName(), request.getPlanType()));
         request.setPlanName(firstText(request.getDisplayName(), request.getPlanName()));
         request.setPrice(request.getPriceVnd() != null ? request.getPriceVnd() : request.getPrice());
@@ -134,7 +134,7 @@ public class SubscriptionPlanServiceImpl implements SubscriptionPlanService {
         }
     }
 
-    private void applyLegacyDefaults(SubscriptionPlanRequestDTO request, SubscriptionPlan existing) {
+    private void applyLegacyDefaults(SubscriptionPlanRequest request, SubscriptionPlan existing) {
         if (request.getAiTokenLimit() == null && request.getAiQuota() == null) request.setAiQuota(existing == null ? 0 : safe(existing.getAiQuota()));
         if (request.getWorkspaceLimit() == null && request.getMaxWorkspaces() == null) request.setMaxWorkspaces(existing == null ? 0 : safe(existing.getMaxWorkspaces()));
         if (request.getDocumentPerWorkspaceLimit() == null && request.getMaxContractsPerWorkspace() == null) request.setMaxContractsPerWorkspace(existing == null ? 0 : safe(existing.getMaxContractsPerWorkspace()));
@@ -152,7 +152,7 @@ public class SubscriptionPlanServiceImpl implements SubscriptionPlanService {
 
     private int safe(Integer value) { return value == null ? 0 : value; }
 
-    private void applyNewFields(SubscriptionPlan plan, SubscriptionPlanRequestDTO request) {
+    private void applyNewFields(SubscriptionPlan plan, SubscriptionPlanRequest request) {
         plan.setAiQuota(request.getAiQuota());
         plan.setTicketQuota(request.getTicketQuota());
         plan.setMaxWorkspaces(request.getMaxWorkspaces());
@@ -174,8 +174,8 @@ public class SubscriptionPlanServiceImpl implements SubscriptionPlanService {
     }
 
     @Override
-    public SubscriptionPlanResponseDTO toResponse(SubscriptionPlan plan) {
-        SubscriptionPlanResponseDTO response = subscriptionPlanMapper.toResponseDTO(plan);
+    public SubscriptionPlanResponse toResponse(SubscriptionPlan plan) {
+        SubscriptionPlanResponse response = subscriptionPlanMapper.toResponseDTO(plan);
         response.setName(plan.getPlanType());
         response.setDisplayName(plan.getPlanName());
         response.setPriceVnd(plan.getPrice());

@@ -1,9 +1,9 @@
 package com.analyzer.api.controller;
 
 import com.analyzer.api.dto.ApiResponseDTO;
-import com.analyzer.api.dto.document.DocumentResponseDTO;
-import com.analyzer.api.dto.workspace.WorkspaceRequestDTO;
-import com.analyzer.api.dto.workspace.WorkspaceResponseDTO;
+import com.analyzer.api.dto.document.DocumentResponse;
+import com.analyzer.api.dto.workspace.WorkspaceRequest;
+import com.analyzer.api.dto.workspace.WorkspaceResponse;
 import com.analyzer.api.security.UserDetailsImpl;
 import com.analyzer.api.service.WorkspaceService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -40,9 +40,9 @@ public class WorkspaceController {
     @PostMapping
     @PreAuthorize("hasRole('CUSTOMER')")
     @Operation(summary = "Create workspace", description = "Create a new workspace for the current authenticated user.")
-    public ResponseEntity<ApiResponseDTO<WorkspaceResponseDTO>> createWorkspace(
-            @Valid @RequestBody WorkspaceRequestDTO request) {
-        WorkspaceResponseDTO response = workspaceService.createWorkspace(getCurrentUserId(), request);
+    public ResponseEntity<ApiResponseDTO<WorkspaceResponse>> createWorkspace(
+            @Valid @RequestBody WorkspaceRequest request) {
+        WorkspaceResponse response = workspaceService.createWorkspace(getCurrentUserId(), request);
         return new ResponseEntity<>(
                 ApiResponseDTO.created("Tạo workspace thành công", response),
                 HttpStatus.CREATED
@@ -52,34 +52,34 @@ public class WorkspaceController {
     @GetMapping
     @PreAuthorize("hasRole('CUSTOMER')")
     @Operation(summary = "List my workspaces", description = "Get all active workspaces of the current authenticated user.")
-    public ResponseEntity<ApiResponseDTO<List<WorkspaceResponseDTO>>> getMyWorkspaces() {
-        List<WorkspaceResponseDTO> response = workspaceService.getWorkspaces(getCurrentUserId());
+    public ResponseEntity<ApiResponseDTO<List<WorkspaceResponse>>> getMyWorkspaces() {
+        List<WorkspaceResponse> response = workspaceService.getWorkspaces(getCurrentUserId());
         return ResponseEntity.ok(ApiResponseDTO.success("Lấy danh sách workspace thành công", response));
     }
 
     @GetMapping("/{workspaceId}")
     @PreAuthorize("hasRole('CUSTOMER')")
     @Operation(summary = "Get workspace detail", description = "Get a single active workspace by id for the current authenticated user.")
-    public ResponseEntity<ApiResponseDTO<WorkspaceResponseDTO>> getWorkspaceById(@PathVariable String workspaceId) {
-        WorkspaceResponseDTO response = workspaceService.getWorkspaceById(getCurrentUserId(), workspaceId);
+    public ResponseEntity<ApiResponseDTO<WorkspaceResponse>> getWorkspaceById(@PathVariable String workspaceId) {
+        WorkspaceResponse response = workspaceService.getWorkspaceById(getCurrentUserId(), workspaceId);
         return ResponseEntity.ok(ApiResponseDTO.success("Lấy thông tin workspace thành công", response));
     }
 
     @GetMapping("/{workspaceId}/documents")
     @PreAuthorize("hasRole('CUSTOMER')")
     @Operation(summary = "List workspace documents", description = "Get non-deleted documents in the workspace of the current authenticated user.")
-    public ResponseEntity<ApiResponseDTO<List<DocumentResponseDTO>>> getDocuments(@PathVariable String workspaceId) {
-        List<DocumentResponseDTO> response = workspaceService.getDocuments(getCurrentUserId(), workspaceId);
+    public ResponseEntity<ApiResponseDTO<List<DocumentResponse>>> getDocuments(@PathVariable String workspaceId) {
+        List<DocumentResponse> response = workspaceService.getDocuments(getCurrentUserId(), workspaceId);
         return ResponseEntity.ok(ApiResponseDTO.success("Lấy danh sách document thành công", response));
     }
 
     @PostMapping("/{workspaceId}/documents")
     @PreAuthorize("hasRole('CUSTOMER')")
     @Operation(summary = "Upload workspace document", description = "Upload a document and request AI processing. Contract type is detected internally when possible.")
-    public ResponseEntity<ApiResponseDTO<DocumentResponseDTO>> uploadDocument(
+    public ResponseEntity<ApiResponseDTO<DocumentResponse>> uploadDocument(
             @PathVariable String workspaceId,
             @RequestPart("file") MultipartFile file) throws IOException {
-        DocumentResponseDTO response = workspaceService.uploadDocument(getCurrentUserId(), workspaceId, file);
+        DocumentResponse response = workspaceService.uploadDocument(getCurrentUserId(), workspaceId, file);
         return new ResponseEntity<>(
                 ApiResponseDTO.accepted("Upload document thành công, đang gửi yêu cầu xử lý", response),
                 HttpStatus.ACCEPTED

@@ -1,7 +1,7 @@
 package com.analyzer.api.service.feedback.impl;
 
 import com.analyzer.api.dto.feedback.CreateSurveyRequest;
-import com.analyzer.api.dto.feedback.SurveyResponseDTO;
+import com.analyzer.api.dto.feedback.SurveyResponse;
 import com.analyzer.api.dto.feedback.UpdateSurveyRequest;
 import com.analyzer.api.entity.FeedbackSurvey;
 import com.analyzer.api.entity.User;
@@ -31,7 +31,7 @@ public class FeedbackSurveyServiceImpl implements FeedbackSurveyService {
 
     @Override
     @Transactional
-    public SurveyResponseDTO create(CreateSurveyRequest request) {
+    public SurveyResponse create(CreateSurveyRequest request) {
         surveyRepository.findByCode(request.getCode().trim())
                 .ifPresent(survey -> {
                     throw new ConflictException("Ma survey da ton tai: " + survey.getCode());
@@ -57,7 +57,7 @@ public class FeedbackSurveyServiceImpl implements FeedbackSurveyService {
 
     @Override
     @Transactional
-    public SurveyResponseDTO update(String id, UpdateSurveyRequest request) {
+    public SurveyResponse update(String id, UpdateSurveyRequest request) {
         FeedbackSurvey survey = surveyRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay survey ID: " + id));
         survey.setTitle(request.getTitle().trim());
@@ -70,13 +70,13 @@ public class FeedbackSurveyServiceImpl implements FeedbackSurveyService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<SurveyResponseDTO> getAll(Pageable pageable) {
+    public Page<SurveyResponse> getAll(Pageable pageable) {
         return surveyRepository.findAll(pageable).map(FeedbackMappingSupport::toSurveyResponse);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public SurveyResponseDTO getById(String id) {
+    public SurveyResponse getById(String id) {
         return FeedbackMappingSupport.toSurveyResponse(surveyRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay survey ID: " + id)));
     }

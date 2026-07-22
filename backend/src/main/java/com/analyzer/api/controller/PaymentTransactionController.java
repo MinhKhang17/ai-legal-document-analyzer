@@ -1,9 +1,9 @@
 package com.analyzer.api.controller;
 
 import com.analyzer.api.dto.ApiResponseDTO;
-import com.analyzer.api.dto.paymenttransaction.PaymentTransactionResponseDTO;
-import com.analyzer.api.dto.paymenttransaction.PaymentUrlResponseDTO;
-import com.analyzer.api.dto.paymenttransaction.VnPayIpnResponseDTO;
+import com.analyzer.api.dto.paymenttransaction.PaymentTransactionResponse;
+import com.analyzer.api.dto.paymenttransaction.PaymentUrlResponse;
+import com.analyzer.api.dto.paymenttransaction.VnPayIpnResponse;
 import com.analyzer.api.exception.payment.VnPayCallbackException;
 import com.analyzer.api.security.UserDetailsImpl;
 import com.analyzer.api.service.PaymentTransactionService;
@@ -53,9 +53,9 @@ public class PaymentTransactionController {
             summary = "Lấy lịch sử giao dịch của tôi",
             description = "Khách hàng xem danh sách giao dịch thanh toán của chính mình."
     )
-    public ResponseEntity<ApiResponseDTO<List<PaymentTransactionResponseDTO>>> getMyTransactions() {
+    public ResponseEntity<ApiResponseDTO<List<PaymentTransactionResponse>>> getMyTransactions() {
         Long customerId = getCurrentUserId();
-        List<PaymentTransactionResponseDTO> response = paymentTransactionService.getMyTransactions(customerId);
+        List<PaymentTransactionResponse> response = paymentTransactionService.getMyTransactions(customerId);
         return ResponseEntity.ok(ApiResponseDTO.success("Lấy lịch sử thanh toán thành công", response));
     }
 
@@ -65,8 +65,8 @@ public class PaymentTransactionController {
             summary = "Lấy toàn bộ lịch sử giao dịch",
             description = "Admin xem toàn bộ giao dịch thanh toán trong hệ thống."
     )
-    public ResponseEntity<ApiResponseDTO<List<PaymentTransactionResponseDTO>>> getAllTransactions() {
-        List<PaymentTransactionResponseDTO> response = paymentTransactionService.getAllTransactions();
+    public ResponseEntity<ApiResponseDTO<List<PaymentTransactionResponse>>> getAllTransactions() {
+        List<PaymentTransactionResponse> response = paymentTransactionService.getAllTransactions();
         return ResponseEntity.ok(ApiResponseDTO.success("Lấy toàn bộ lịch sử thanh toán thành công", response));
     }
 
@@ -76,11 +76,11 @@ public class PaymentTransactionController {
             summary = "Tạo URL thanh toán VNPAY",
             description = "Tạo đường dẫn thanh toán VNPAY cho một giao dịch đang chờ thanh toán."
     )
-    public ResponseEntity<ApiResponseDTO<PaymentUrlResponseDTO>> createVnPayPaymentUrl(
+    public ResponseEntity<ApiResponseDTO<PaymentUrlResponse>> createVnPayPaymentUrl(
             @PathVariable Long id,
             HttpServletRequest request) {
         Long customerId = getCurrentUserId();
-        PaymentUrlResponseDTO response = paymentTransactionService.createVnPayPaymentUrl(
+        PaymentUrlResponse response = paymentTransactionService.createVnPayPaymentUrl(
                 id,
                 customerId,
                 getClientIp(request)
@@ -114,16 +114,16 @@ public class PaymentTransactionController {
             summary = "Xử lý IPN từ VNPAY",
             description = "Xác thực thông báo IPN từ VNPAY và cập nhật trạng thái giao dịch."
     )
-    public ResponseEntity<VnPayIpnResponseDTO> handleVnPayIpn(@RequestParam Map<String, String> params) {
+    public ResponseEntity<VnPayIpnResponse> handleVnPayIpn(@RequestParam Map<String, String> params) {
         try {
             paymentTransactionService.handleVnPayCallback(params);
-            return ResponseEntity.ok(new VnPayIpnResponseDTO("00", "Confirm Success"));
+            return ResponseEntity.ok(new VnPayIpnResponse("00", "Confirm Success"));
         } catch (VnPayCallbackException ex) {
             log.warn("VNPay IPN rejected: rspCode={} message={}", ex.getRspCode(), ex.getMessage());
-            return ResponseEntity.ok(new VnPayIpnResponseDTO(ex.getRspCode(), ex.getMessage()));
+            return ResponseEntity.ok(new VnPayIpnResponse(ex.getRspCode(), ex.getMessage()));
         } catch (Exception ex) {
             log.warn("VNPay IPN callback failed unexpectedly", ex);
-            return ResponseEntity.ok(new VnPayIpnResponseDTO("99", "Unknown error"));
+            return ResponseEntity.ok(new VnPayIpnResponse("99", "Unknown error"));
         }
     }
 

@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 
 @Data
 @Schema(description = "Response payload containing user details")
-public class UserResponseDTO {
+public class UserResponse {
 
     @Schema(description = "Unique identifier", example = "1")
     private Long id;

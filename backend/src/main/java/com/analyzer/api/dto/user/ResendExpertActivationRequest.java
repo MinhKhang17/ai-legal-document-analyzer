@@ -7,7 +7,7 @@ import lombok.Data;
 
 @Data
 @Schema(description = "Request payload for admin to resend/reactivate an expert account's temporary credentials")
-public class ResendExpertActivationRequestDTO {
+public class ResendExpertActivationRequest {
 
     @NotBlank(message = "Email khong duoc de trong")
     @Email(message = "Email is invalid")

@@ -5,7 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 @Data
-public class ForgotPasswordRequestDTO {
+public class ForgotPasswordRequest {
     @NotBlank
     @Email
     private String email;

@@ -9,7 +9,7 @@ import lombok.Data;
 
 @Data
 @Schema(description = "Request payload for registering a new user")
-public class UserRequestDTO {
+public class UserRequest {
 
     @NotBlank(message = "Tên không được để trống")
     @Schema(description = "First name of the user", example = "Nguyen")

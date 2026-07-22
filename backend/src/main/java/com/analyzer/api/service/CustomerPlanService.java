@@ -1,16 +1,16 @@
 package com.analyzer.api.service;
 
-import com.analyzer.api.dto.customerplan.CustomerPlanResponseDTO;
-import com.analyzer.api.dto.customerplan.SubscribeRequestDTO;
+import com.analyzer.api.dto.customerplan.CustomerPlanResponse;
+import com.analyzer.api.dto.customerplan.SubscribeRequest;
 
 public interface CustomerPlanService {
-    CustomerPlanResponseDTO subscribe(Long customerId, SubscribeRequestDTO request);
+    CustomerPlanResponse subscribe(Long customerId, SubscribeRequest request);
 
-    CustomerPlanResponseDTO getMyPlan(Long customerId);
+    CustomerPlanResponse getMyPlan(Long customerId);
 
-    CustomerPlanResponseDTO cancelPlan(Long customerId, Long customerPlanId);
+    CustomerPlanResponse cancelPlan(Long customerId, Long customerPlanId);
 
-    CustomerPlanResponseDTO cancelPlanAndActivateFree(Long customerId, Long customerPlanId, String reason);
+    CustomerPlanResponse cancelPlanAndActivateFree(Long customerId, Long customerPlanId, String reason);
 
     void expireDuePlans();
 }

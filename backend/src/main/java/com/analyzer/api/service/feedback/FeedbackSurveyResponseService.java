@@ -1,9 +1,9 @@
 package com.analyzer.api.service.feedback;
 
 import com.analyzer.api.dto.feedback.SubmitSurveyResponseRequest;
-import com.analyzer.api.dto.feedback.SurveyResponseDTO;
+import com.analyzer.api.dto.feedback.SurveyResponse;
 
 public interface FeedbackSurveyResponseService {
 
-    SurveyResponseDTO submit(String surveyId, SubmitSurveyResponseRequest request);
+    SurveyResponse submit(String surveyId, SubmitSurveyResponseRequest request);
 }

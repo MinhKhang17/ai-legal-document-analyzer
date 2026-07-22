@@ -1,6 +1,6 @@
 package com.analyzer.api.service.impl;
 
-import com.analyzer.api.dto.workspace.WorkspaceRequestDTO;
+import com.analyzer.api.dto.workspace.WorkspaceRequest;
 import com.analyzer.api.entity.User;
 import com.analyzer.api.entity.Workspace;
 import com.analyzer.api.exception.common.ConflictException;
@@ -40,7 +40,7 @@ class WorkspaceServiceImplTest {
         when(workspaceRepository.existsByUserIdAndNameIgnoreCaseAndStatus(7L, "Matter A", "ACTIVE"))
                 .thenReturn(true);
 
-        assertThatThrownBy(() -> service.createWorkspace(7L, new WorkspaceRequestDTO(" Matter A ", "description")))
+        assertThatThrownBy(() -> service.createWorkspace(7L, new WorkspaceRequest(" Matter A ", "description")))
                 .isInstanceOf(ConflictException.class)
                 .extracting(error -> ((ConflictException) error).getErrorCode())
                 .isEqualTo("WORKSPACE_ALREADY_EXISTS");
@@ -57,7 +57,7 @@ class WorkspaceServiceImplTest {
                 7L, "Contract Assistant Sandbox", "ACTIVE")).thenReturn(false);
         when(workspaceRepository.save(any(Workspace.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        service.createWorkspace(7L, new WorkspaceRequestDTO(
+        service.createWorkspace(7L, new WorkspaceRequest(
                 "Contract Assistant Sandbox",
                 "System workspace for general contract assistant chat"));
 
