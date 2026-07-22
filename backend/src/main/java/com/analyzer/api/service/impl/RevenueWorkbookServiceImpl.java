@@ -2,6 +2,8 @@ package com.analyzer.api.service.impl;
 
 import com.analyzer.api.dto.revenue.RevenuePayrollDtos;
 import com.analyzer.api.exception.common.*;
+import com.analyzer.api.service.RevenuePayrollService;
+import com.analyzer.api.service.RevenueWorkbookService;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -12,13 +14,13 @@ import java.math.BigDecimal;
 import java.util.*;
 
 @Service @RequiredArgsConstructor
-public class RevenueWorkbookService {
+public class RevenueWorkbookServiceImpl implements RevenueWorkbookService {
     private final RevenuePayrollService payroll;
-    @Transactional(readOnly=true) public byte[] adminPeriod(String periodId,Long expertId){
+    @Override @Transactional(readOnly=true) public byte[] adminPeriod(String periodId,Long expertId){
         List<RevenuePayrollDtos.Statement> statements=payroll.periodStatements(periodId).stream().filter(s->expertId==null||s.expertId().equals(expertId)).map(s->payroll.adminStatement(s.id())).toList();
         if(statements.isEmpty())throw new ResourceNotFoundException("REVENUE_EXPORT_EMPTY"); return workbook(statements);
     }
-    @Transactional(readOnly=true) public byte[] expertStatement(Long expertId,String statementId){return workbook(List.of(payroll.expertStatement(expertId,statementId)));}
+    @Override @Transactional(readOnly=true) public byte[] expertStatement(Long expertId,String statementId){return workbook(List.of(payroll.expertStatement(expertId,statementId)));}
     private byte[] workbook(List<RevenuePayrollDtos.Statement> statements){
         try(XSSFWorkbook wb=new XSSFWorkbook();ByteArrayOutputStream out=new ByteArrayOutputStream()){
             summary(wb,statements);tickets(wb,statements);adjustments(wb,statements);payouts(wb,statements);

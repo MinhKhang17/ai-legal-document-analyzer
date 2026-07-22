@@ -5,7 +5,9 @@ import com.analyzer.api.entity.*;
 import com.analyzer.api.enums.*;
 import com.analyzer.api.exception.common.*;
 import com.analyzer.api.repository.*;
+import com.analyzer.api.service.CommissionPolicyManagementService;
 import com.analyzer.api.service.EmailService;
+import com.analyzer.api.service.FinancialAuditService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -18,7 +20,7 @@ import java.time.*;
 import java.util.*;
 
 @Service @RequiredArgsConstructor
-public class CommissionPolicyManagementService {
+public class CommissionPolicyManagementServiceImpl implements CommissionPolicyManagementService {
     static final ZoneId ZONE=ZoneId.of("Asia/Ho_Chi_Minh");
     private static final Set<CommissionPolicyStatus> LIVE=Set.of(CommissionPolicyStatus.ACTIVE,CommissionPolicyStatus.SCHEDULED);
     private final CommissionPolicyRepository policyRepository;
@@ -30,6 +32,7 @@ public class CommissionPolicyManagementService {
     private final FinancialAuditService audit;
     @Value("${app.mail.frontend-base-url:http://localhost:5173}") private String frontendBaseUrl;
 
+    @Override
     @Transactional(readOnly=true)
     public BigDecimal rateFor(LocalDate date){
         var scheduled=policyRepository.applicable(date,List.of(CommissionPolicyStatus.SCHEDULED));
@@ -40,8 +43,9 @@ public class CommissionPolicyManagementService {
         return matches.getFirst().getRate();
     }
 
-    @Transactional(readOnly=true) public List<RevenuePayrollDtos.Policy> listPolicies(){ return policyRepository.findAllByOrderByEffectiveFromDesc().stream().map(this::policyDto).toList(); }
+    @Override @Transactional(readOnly=true) public List<RevenuePayrollDtos.Policy> listPolicies(){ return policyRepository.findAllByOrderByEffectiveFromDesc().stream().map(this::policyDto).toList(); }
 
+    @Override
     @Transactional
     public RevenuePayrollDtos.ChangeRequest requestChange(Long adminId,RevenuePayrollDtos.CreateCommissionChange input){
         User admin=user(adminId); LocalDate today=LocalDate.now(ZONE); LocalDate effective=input.applicationType()==CommissionApplicationType.NEXT_MONTH
@@ -58,6 +62,7 @@ public class CommissionPolicyManagementService {
         return requestDto(request);
     }
 
+    @Override
     @Transactional
     public RevenuePayrollDtos.ChangeRequest resend(Long adminId,String id){
         CommissionPolicyChangeRequest request=requestRepository.lockById(id).orElseThrow(()->new ResourceNotFoundException("COMMISSION_CHANGE_REQUEST_NOT_FOUND"));
@@ -67,6 +72,7 @@ public class CommissionPolicyManagementService {
         sendVerification(request,token); return requestDto(request);
     }
 
+    @Override
     @Transactional
     public RevenuePayrollDtos.Policy verify(Long adminId,String requestId,String rawToken){
         CommissionPolicyChangeRequest request=requestRepository.lockById(requestId).orElseThrow(()->new ResourceNotFoundException("COMMISSION_CHANGE_REQUEST_NOT_FOUND"));
@@ -85,6 +91,7 @@ public class CommissionPolicyManagementService {
         notifyExperts(policy,false); return policyDto(policy);
     }
 
+    @Override
     @Transactional
     public RevenuePayrollDtos.Policy cancel(Long adminId,String policyId,String reason){
         CommissionPolicy policy=policyRepository.lockById(policyId).orElseThrow(()->new ResourceNotFoundException("COMMISSION_POLICY_NOT_FOUND"));
@@ -95,6 +102,7 @@ public class CommissionPolicyManagementService {
         notifyExperts(policy,true); return policyDto(policy);
     }
 
+    @Override
     @Transactional
     public void activateDuePolicies(){
         LocalDate today=LocalDate.now(ZONE);
@@ -109,9 +117,9 @@ public class CommissionPolicyManagementService {
         }
     }
 
-    @Transactional(readOnly=true) public List<RevenuePayrollDtos.PolicyNotification> expertNotifications(Long expertId){ return notificationRepository.findByExpertIdOrderByIdDesc(expertId).stream().map(this::notificationDto).toList(); }
-    @Transactional public RevenuePayrollDtos.PolicyNotification readNotification(Long expertId,Long id){ var n=notificationRepository.findByIdAndExpertId(id,expertId).orElseThrow(()->new ResourceNotFoundException("POLICY_NOTIFICATION_NOT_FOUND")); if(n.getReadAt()==null)n.setReadAt(LocalDateTime.now(ZONE)); return notificationDto(n); }
-    @Transactional public void retryFailed(){ notificationRepository.findByStatusIn(List.of(NotificationDeliveryStatus.FAILED,NotificationDeliveryStatus.PENDING)).forEach(n->deliver(n,false)); }
+    @Override @Transactional(readOnly=true) public List<RevenuePayrollDtos.PolicyNotification> expertNotifications(Long expertId){ return notificationRepository.findByExpertIdOrderByIdDesc(expertId).stream().map(this::notificationDto).toList(); }
+    @Override @Transactional public RevenuePayrollDtos.PolicyNotification readNotification(Long expertId,Long id){ var n=notificationRepository.findByIdAndExpertId(id,expertId).orElseThrow(()->new ResourceNotFoundException("POLICY_NOTIFICATION_NOT_FOUND")); if(n.getReadAt()==null)n.setReadAt(LocalDateTime.now(ZONE)); return notificationDto(n); }
+    @Override @Transactional public void retryFailed(){ notificationRepository.findByStatusIn(List.of(NotificationDeliveryStatus.FAILED,NotificationDeliveryStatus.PENDING)).forEach(n->deliver(n,false)); }
 
     private void notifyExperts(CommissionPolicy policy,boolean cancelled){
         for(User expert:userRepository.findAllByRole_NameAndActiveTrue(RoleName.EXPERT)){

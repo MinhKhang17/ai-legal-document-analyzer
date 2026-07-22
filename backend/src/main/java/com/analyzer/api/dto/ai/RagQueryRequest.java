@@ -1,6 +1,8 @@
 package com.analyzer.api.dto.ai;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+
+import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -15,12 +17,15 @@ import java.util.Map;
 @AllArgsConstructor
 public class RagQueryRequest {
 
+    @NotBlank(message = "request_id khong duoc de trong")
     @JsonProperty("request_id")
     private String requestId;
 
+    @NotBlank(message = "user_id khong duoc de trong")
     @JsonProperty("user_id")
     private String userId;
 
+    @NotBlank(message = "workspace_id khong duoc de trong")
     @JsonProperty("workspace_id")
     private String workspaceId;
 
@@ -33,6 +38,7 @@ public class RagQueryRequest {
     @JsonProperty("chat_session_id")
     private String chatSessionId;
 
+    @NotBlank(message = "question khong duoc de trong")
     @JsonProperty("question")
     private String question;
 

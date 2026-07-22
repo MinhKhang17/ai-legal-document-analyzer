@@ -112,7 +112,7 @@ public class LegalTicketController {
     @Operation(summary = "Cancel ticket", description = "Allows a customer to cancel a ticket that is pending review.")
     public ResponseEntity<ApiResponseDTO<LegalTicketResponse>> cancelTicket(
             @PathVariable("id") String ticketId,
-            @RequestBody(required = false) CancelLegalTicketRequest request) {
+            @Valid @RequestBody(required = false) CancelLegalTicketRequest request) {
         Long currentUserId = getCurrentUserId();
         return ResponseEntity.ok(ApiResponseDTO.success("Ticket cancelled successfully",
                 legalTicketService.cancelTicket(currentUserId, ticketId, request)));
@@ -134,7 +134,7 @@ public class LegalTicketController {
     @Operation(summary = "Close ticket by customer", description = "Allows a customer to close a resolved ticket.")
     public ResponseEntity<ApiResponseDTO<LegalTicketResponse>> closeTicket(
             @PathVariable("id") String ticketId,
-            @RequestBody(required = false) CloseLegalTicketRequest request) {
+            @Valid @RequestBody(required = false) CloseLegalTicketRequest request) {
         Long currentUserId = getCurrentUserId();
         return ResponseEntity.ok(ApiResponseDTO.success("Ticket closed successfully",
                 legalTicketService.closeTicket(currentUserId, ticketId, request)));

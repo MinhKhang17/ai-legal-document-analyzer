@@ -18,6 +18,7 @@ import com.analyzer.api.enums.TicketSlaStatus;
 import com.analyzer.api.enums.FailureResponsibleParty;
 import jakarta.persistence.*;
 import lombok.*;
+import lombok.experimental.SuperBuilder;
 
 import java.time.LocalDateTime;
 import java.math.BigDecimal;
@@ -37,8 +38,8 @@ import java.util.UUID;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
-public class LegalTicket {
+@SuperBuilder
+public class LegalTicket extends BaseEntity {
 
     @Id
     private String id;
@@ -369,12 +370,6 @@ public class LegalTicket {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
-
-    @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
-
     @Version
     private Long version;
 
@@ -395,13 +390,6 @@ public class LegalTicket {
         if (this.totalPausedDurationSeconds == null) this.totalPausedDurationSeconds = 0L;
         if (this.recipientType == null) this.recipientType = TicketRecipientType.EXPERT;
         if (this.conversationScope == null) this.conversationScope = ConversationScope.SELECTED_RESPONSE;
-        this.createdAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
         this.deleted = false;
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        this.updatedAt = LocalDateTime.now();
     }
 }

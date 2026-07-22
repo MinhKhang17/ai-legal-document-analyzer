@@ -1,0 +1,8 @@
+package com.analyzer.api.service;
+
+public interface RevenueWorkbookService {
+
+    byte[] adminPeriod(String periodId, Long expertId);
+
+    byte[] expertStatement(Long expertId, String statementId);
+}

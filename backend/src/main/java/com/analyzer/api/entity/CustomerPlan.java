@@ -3,6 +3,7 @@ package com.analyzer.api.entity;
 import com.analyzer.api.enums.PlanStatus;
 import jakarta.persistence.*;
 import lombok.*;
+import lombok.experimental.SuperBuilder;
 import java.time.LocalDateTime;
 
 @Entity
@@ -11,8 +12,8 @@ import java.time.LocalDateTime;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
-public class CustomerPlan {
+@SuperBuilder
+public class CustomerPlan extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -111,27 +112,10 @@ public class CustomerPlan {
     @Transient
     private Integer remainingQuota;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
-
-    @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
-
     public Integer getRemainingQuota() {
         if (subscriptionPlan != null && subscriptionPlan.getMaxQuota() != null) {
             return subscriptionPlan.getMaxQuota() - (usedQuota != null ? usedQuota : 0);
         }
         return 0;
-    }
-
-    @PrePersist
-    protected void onCreate() {
-        createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
     }
 }

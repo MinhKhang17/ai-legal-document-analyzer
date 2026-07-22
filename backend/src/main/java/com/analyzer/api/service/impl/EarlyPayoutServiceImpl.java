@@ -6,7 +6,9 @@ import com.analyzer.api.entity.*;
 import com.analyzer.api.enums.*;
 import com.analyzer.api.exception.common.*;
 import com.analyzer.api.repository.*;
+import com.analyzer.api.service.EarlyPayoutService;
 import com.analyzer.api.service.EmailService;
+import com.analyzer.api.service.FinancialAuditService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
@@ -17,7 +19,7 @@ import java.time.*;
 import java.util.*;
 
 @Service @RequiredArgsConstructor
-public class EarlyPayoutService {
+public class EarlyPayoutServiceImpl implements EarlyPayoutService {
     private static final ZoneId ZONE=ZoneId.of("Asia/Ho_Chi_Minh");
     private static final Set<EarlyPayoutStatus> OPEN=Set.of(EarlyPayoutStatus.PENDING_ADMIN_REVIEW,EarlyPayoutStatus.NEED_MORE_INFO,EarlyPayoutStatus.EXPERT_RESPONDED,EarlyPayoutStatus.APPROVED,EarlyPayoutStatus.PAYMENT_PENDING);
     private final EarlyPayoutRequestRepository requestRepository;
@@ -28,6 +30,7 @@ public class EarlyPayoutService {
     private final EmailService emailService;
     private final FinancialAuditService audit;
 
+    @Override
     @Transactional
     public RevenuePayrollDtos.EarlyPayout create(Long expertId,RevenuePayrollDtos.CreateEarlyPayout input){
         ExpertRevenueStatement statement=statementRepository.lockById(input.statementId()).orElseThrow(()->new ResourceNotFoundException("REVENUE_STATEMENT_NOT_FOUND"));
@@ -41,24 +44,24 @@ public class EarlyPayoutService {
         notifyAdmins(request); return dto(request);
     }
 
-    @Transactional(readOnly=true) public PageResponse<RevenuePayrollDtos.EarlyPayout> expertList(Long id,int page,int size){var p=requestRepository.findByExpertIdOrderByRequestedAtDesc(id,PageRequest.of(page,Math.min(Math.max(size,1),100)));return page(p);}
-    @Transactional(readOnly=true) public RevenuePayrollDtos.EarlyPayout expertDetail(Long expertId,String id){return dto(requestRepository.findByIdAndExpertId(id,expertId).orElseThrow(()->new ResourceNotFoundException("EARLY_PAYOUT_NOT_FOUND")));}
-    @Transactional(readOnly=true) public PageResponse<RevenuePayrollDtos.EarlyPayout> adminList(int page,int size){return page(requestRepository.findAllByOrderByRequestedAtDesc(PageRequest.of(page,Math.min(Math.max(size,1),100))));}
-    @Transactional(readOnly=true) public RevenuePayrollDtos.EarlyPayout adminDetail(String id){return dto(requestRepository.findById(id).orElseThrow(()->new ResourceNotFoundException("EARLY_PAYOUT_NOT_FOUND")));}
+    @Override @Transactional(readOnly=true) public PageResponse<RevenuePayrollDtos.EarlyPayout> expertList(Long id,int page,int size){var p=requestRepository.findByExpertIdOrderByRequestedAtDesc(id,PageRequest.of(page,Math.min(Math.max(size,1),100)));return page(p);}
+    @Override @Transactional(readOnly=true) public RevenuePayrollDtos.EarlyPayout expertDetail(Long expertId,String id){return dto(requestRepository.findByIdAndExpertId(id,expertId).orElseThrow(()->new ResourceNotFoundException("EARLY_PAYOUT_NOT_FOUND")));}
+    @Override @Transactional(readOnly=true) public PageResponse<RevenuePayrollDtos.EarlyPayout> adminList(int page,int size){return page(requestRepository.findAllByOrderByRequestedAtDesc(PageRequest.of(page,Math.min(Math.max(size,1),100))));}
+    @Override @Transactional(readOnly=true) public RevenuePayrollDtos.EarlyPayout adminDetail(String id){return dto(requestRepository.findById(id).orElseThrow(()->new ResourceNotFoundException("EARLY_PAYOUT_NOT_FOUND")));}
 
-    @Transactional public RevenuePayrollDtos.EarlyPayout cancel(Long expertId,String id){EarlyPayoutRequest r=lock(id);owned(r,expertId);if(!Set.of(EarlyPayoutStatus.PENDING_ADMIN_REVIEW,EarlyPayoutStatus.NEED_MORE_INFO,EarlyPayoutStatus.EXPERT_RESPONDED).contains(r.getStatus()))throw new ConflictException("INVALID_STATUS_TRANSITION");r.setStatus(EarlyPayoutStatus.CANCELLED);return dto(r);}
-    @Transactional public RevenuePayrollDtos.EarlyPayout reply(Long expertId,String id,RevenuePayrollDtos.EarlyPayoutNote input){EarlyPayoutRequest r=lock(id);owned(r,expertId);if(r.getStatus()!=EarlyPayoutStatus.NEED_MORE_INFO)throw new ConflictException("INVALID_STATUS_TRANSITION");r.setExpertNote(input.note());r.setStatus(EarlyPayoutStatus.EXPERT_RESPONDED);notifyAdmins(r);return dto(r);}
-    @Transactional public RevenuePayrollDtos.EarlyPayout requestMoreInfo(Long adminId,String id,RevenuePayrollDtos.EarlyPayoutNote input){EarlyPayoutRequest r=lock(id);if(!Set.of(EarlyPayoutStatus.PENDING_ADMIN_REVIEW,EarlyPayoutStatus.EXPERT_RESPONDED).contains(r.getStatus()))throw new ConflictException("INVALID_STATUS_TRANSITION");r.setStatus(EarlyPayoutStatus.NEED_MORE_INFO);r.setAdminNote(input.note());review(r,user(adminId));notifyExpert(r,"EARLY_PAYOUT_MORE_INFO","Admin cần bổ sung thông tin");return dto(r);}
-    @Transactional public RevenuePayrollDtos.EarlyPayout approve(Long adminId,String id,RevenuePayrollDtos.ApproveEarlyPayout input){
+    @Override @Transactional public RevenuePayrollDtos.EarlyPayout cancel(Long expertId,String id){EarlyPayoutRequest r=lock(id);owned(r,expertId);if(!Set.of(EarlyPayoutStatus.PENDING_ADMIN_REVIEW,EarlyPayoutStatus.NEED_MORE_INFO,EarlyPayoutStatus.EXPERT_RESPONDED).contains(r.getStatus()))throw new ConflictException("INVALID_STATUS_TRANSITION");r.setStatus(EarlyPayoutStatus.CANCELLED);return dto(r);}
+    @Override @Transactional public RevenuePayrollDtos.EarlyPayout reply(Long expertId,String id,RevenuePayrollDtos.EarlyPayoutNote input){EarlyPayoutRequest r=lock(id);owned(r,expertId);if(r.getStatus()!=EarlyPayoutStatus.NEED_MORE_INFO)throw new ConflictException("INVALID_STATUS_TRANSITION");r.setExpertNote(input.note());r.setStatus(EarlyPayoutStatus.EXPERT_RESPONDED);notifyAdmins(r);return dto(r);}
+    @Override @Transactional public RevenuePayrollDtos.EarlyPayout requestMoreInfo(Long adminId,String id,RevenuePayrollDtos.EarlyPayoutNote input){EarlyPayoutRequest r=lock(id);if(!Set.of(EarlyPayoutStatus.PENDING_ADMIN_REVIEW,EarlyPayoutStatus.EXPERT_RESPONDED).contains(r.getStatus()))throw new ConflictException("INVALID_STATUS_TRANSITION");r.setStatus(EarlyPayoutStatus.NEED_MORE_INFO);r.setAdminNote(input.note());review(r,user(adminId));notifyExpert(r,"EARLY_PAYOUT_MORE_INFO","Admin cần bổ sung thông tin");return dto(r);}
+    @Override @Transactional public RevenuePayrollDtos.EarlyPayout approve(Long adminId,String id,RevenuePayrollDtos.ApproveEarlyPayout input){
         EarlyPayoutRequest r=lock(id);if(!Set.of(EarlyPayoutStatus.PENDING_ADMIN_REVIEW,EarlyPayoutStatus.EXPERT_RESPONDED).contains(r.getStatus()))throw new ConflictException("INVALID_STATUS_TRANSITION");
         ExpertRevenueStatement s=statementRepository.lockById(r.getStatement().getId()).orElseThrow();BigDecimal available=available(s,r.getId());BigDecimal amount=money(input.approvedAmount());
         if(amount.compareTo(r.getRequestedAmount())>0||amount.compareTo(available)>0)throw new ConflictException("INSUFFICIENT_AVAILABLE_BALANCE");
         r.setApprovedAmount(amount);r.setAdminNote(input.adminNote());r.setStatus(EarlyPayoutStatus.APPROVED);r.setApprovedAt(LocalDateTime.now(ZONE));review(r,user(adminId));
         audit.record("EARLY_PAYOUT_APPROVED",r.getReviewedBy(),"EARLY_PAYOUT_REQUEST",r.getId(),null,amountJson(amount),input.adminNote(),r.getId());notifyExpert(r,"EARLY_PAYOUT_APPROVED","Yêu cầu ứng doanh thu đã được duyệt");return dto(r);
     }
-    @Transactional public RevenuePayrollDtos.EarlyPayout reject(Long adminId,String id,RevenuePayrollDtos.RejectEarlyPayout input){EarlyPayoutRequest r=lock(id);if(!Set.of(EarlyPayoutStatus.PENDING_ADMIN_REVIEW,EarlyPayoutStatus.EXPERT_RESPONDED,EarlyPayoutStatus.NEED_MORE_INFO).contains(r.getStatus()))throw new ConflictException("INVALID_STATUS_TRANSITION");r.setStatus(EarlyPayoutStatus.REJECTED);r.setAdminNote(input.reason());r.setRejectedAt(LocalDateTime.now(ZONE));review(r,user(adminId));audit.record("EARLY_PAYOUT_REJECTED",r.getReviewedBy(),"EARLY_PAYOUT_REQUEST",r.getId(),null,"{\"status\":\"REJECTED\"}",input.reason(),r.getId());notifyExpert(r,"EARLY_PAYOUT_REJECTED","Yêu cầu ứng doanh thu bị từ chối");return dto(r);}
-    @Transactional public RevenuePayrollDtos.EarlyPayout markPending(Long adminId,String id){EarlyPayoutRequest r=lock(id);if(r.getStatus()!=EarlyPayoutStatus.APPROVED)throw new ConflictException("INVALID_STATUS_TRANSITION");r.setStatus(EarlyPayoutStatus.PAYMENT_PENDING);review(r,user(adminId));audit.record("EARLY_PAYOUT_PAYMENT_PENDING",r.getReviewedBy(),"EARLY_PAYOUT_REQUEST",r.getId(),null,"{\"status\":\"PAYMENT_PENDING\"}",null,r.getId());notifyExpert(r,"EARLY_PAYOUT_PAYMENT_PENDING","Khoản ứng đang chờ chuyển tiền");return dto(r);}
-    @Transactional public RevenuePayrollDtos.EarlyPayout markPaid(Long adminId,String id,RevenuePayrollDtos.MarkPayoutPaid input){
+    @Override @Transactional public RevenuePayrollDtos.EarlyPayout reject(Long adminId,String id,RevenuePayrollDtos.RejectEarlyPayout input){EarlyPayoutRequest r=lock(id);if(!Set.of(EarlyPayoutStatus.PENDING_ADMIN_REVIEW,EarlyPayoutStatus.EXPERT_RESPONDED,EarlyPayoutStatus.NEED_MORE_INFO).contains(r.getStatus()))throw new ConflictException("INVALID_STATUS_TRANSITION");r.setStatus(EarlyPayoutStatus.REJECTED);r.setAdminNote(input.reason());r.setRejectedAt(LocalDateTime.now(ZONE));review(r,user(adminId));audit.record("EARLY_PAYOUT_REJECTED",r.getReviewedBy(),"EARLY_PAYOUT_REQUEST",r.getId(),null,"{\"status\":\"REJECTED\"}",input.reason(),r.getId());notifyExpert(r,"EARLY_PAYOUT_REJECTED","Yêu cầu ứng doanh thu bị từ chối");return dto(r);}
+    @Override @Transactional public RevenuePayrollDtos.EarlyPayout markPending(Long adminId,String id){EarlyPayoutRequest r=lock(id);if(r.getStatus()!=EarlyPayoutStatus.APPROVED)throw new ConflictException("INVALID_STATUS_TRANSITION");r.setStatus(EarlyPayoutStatus.PAYMENT_PENDING);review(r,user(adminId));audit.record("EARLY_PAYOUT_PAYMENT_PENDING",r.getReviewedBy(),"EARLY_PAYOUT_REQUEST",r.getId(),null,"{\"status\":\"PAYMENT_PENDING\"}",null,r.getId());notifyExpert(r,"EARLY_PAYOUT_PAYMENT_PENDING","Khoản ứng đang chờ chuyển tiền");return dto(r);}
+    @Override @Transactional public RevenuePayrollDtos.EarlyPayout markPaid(Long adminId,String id,RevenuePayrollDtos.MarkPayoutPaid input){
         EarlyPayoutRequest r=lock(id);if(r.getStatus()==EarlyPayoutStatus.PAID)return dto(r);if(r.getStatus()!=EarlyPayoutStatus.PAYMENT_PENDING)throw new ConflictException("INVALID_STATUS_TRANSITION");
         ExpertRevenueStatement s=statementRepository.lockById(r.getStatement().getId()).orElseThrow();BigDecimal amount=r.getApprovedAmount();if(amount==null)throw new ConflictException("INVALID_STATUS_TRANSITION");
         if(s.getRemainingAmount().compareTo(amount)<0)throw new ConflictException("INSUFFICIENT_AVAILABLE_BALANCE");User admin=user(adminId);

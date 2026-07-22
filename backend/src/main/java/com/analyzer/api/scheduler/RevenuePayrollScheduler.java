@@ -1,6 +1,6 @@
 package com.analyzer.api.scheduler;
-import com.analyzer.api.service.impl.CommissionPolicyManagementService;
-import com.analyzer.api.service.impl.RevenuePayrollService;
+import com.analyzer.api.service.CommissionPolicyManagementService;
+import com.analyzer.api.service.RevenuePayrollService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;

@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -25,7 +26,7 @@ public class InternalDocumentController {
     @PostMapping("/{documentId}/processing-result")
     @Operation(summary = "Receive document processing result", description = "Callback endpoint used by Python AI Service.")
     public ResponseEntity<ApiResponseDTO<DocumentResponseDTO>> updateProcessingResult(
-            @PathVariable String documentId, @RequestBody ProcessingResultRequestDTO request) {
+            @PathVariable String documentId, @Valid @RequestBody ProcessingResultRequestDTO request) {
         DocumentResponseDTO response = workspaceService.updateProcessingResult(documentId, request);
         return ResponseEntity.ok(ApiResponseDTO.success("Cập nhật kết quả xử lý document thành công", response));
     }
@@ -33,7 +34,7 @@ public class InternalDocumentController {
     @PostMapping("/register-generated")
     @Operation(summary = "Register generated document", description = "Endpoint used by Python AI Service to register generated contracts in PostgreSQL.")
     public ResponseEntity<ApiResponseDTO<DocumentResponseDTO>> registerGeneratedDocument(
-            @RequestBody com.analyzer.api.dto.document.RegisterDocumentRequestDTO request) {
+            @Valid @RequestBody com.analyzer.api.dto.document.RegisterDocumentRequestDTO request) {
         DocumentResponseDTO response = workspaceService.registerGeneratedDocument(request);
         return ResponseEntity.ok(ApiResponseDTO.success("Đăng ký document tạo tự động thành công", response));
     }

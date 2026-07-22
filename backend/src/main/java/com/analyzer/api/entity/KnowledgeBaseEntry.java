@@ -4,8 +4,8 @@ import com.analyzer.api.enums.KnowledgeScope;
 import com.analyzer.api.enums.KnowledgeStatus;
 import jakarta.persistence.*;
 import lombok.*;
+import lombok.experimental.SuperBuilder;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -17,8 +17,8 @@ import java.util.List;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
-public class KnowledgeBaseEntry {
+@SuperBuilder
+public class KnowledgeBaseEntry extends BaseEntity {
 
     @Id
     private String id;
@@ -59,21 +59,4 @@ public class KnowledgeBaseEntry {
     @OneToMany(mappedBy = "knowledgeBaseEntry", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<KnowledgeBaseVersion> versions = new ArrayList<>();
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
-
-    @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
-
-    @PrePersist
-    protected void onCreate() {
-        createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
-    }
 }

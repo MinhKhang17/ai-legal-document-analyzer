@@ -4,8 +4,8 @@ import com.analyzer.api.enums.AiFeedbackType;
 import com.analyzer.api.enums.FeedbackRating;
 import jakarta.persistence.*;
 import lombok.*;
+import lombok.experimental.SuperBuilder;
 
-import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
@@ -16,8 +16,8 @@ import java.util.UUID;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
-public class ChatMessageFeedback {
+@SuperBuilder
+public class ChatMessageFeedback extends BaseEntity {
     @Id
     private String id;
 
@@ -50,21 +50,8 @@ public class ChatMessageFeedback {
     @Column(columnDefinition = "TEXT")
     private String comment;
 
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
-
-    @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
-
     @PrePersist
     protected void onCreate() {
         if (id == null || id.isBlank()) id = "feedback_" + UUID.randomUUID().toString().replace("-", "");
-        createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
     }
 }

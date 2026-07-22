@@ -9,6 +9,7 @@ import com.analyzer.api.exception.common.ForbiddenException;
 import com.analyzer.api.exception.common.ResourceNotFoundException;
 import com.analyzer.api.mapper.LegalTicketMapper;
 import com.analyzer.api.repository.*;
+import com.analyzer.api.service.RevenuePayrollService;
 import com.analyzer.api.service.TicketCollaborationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;

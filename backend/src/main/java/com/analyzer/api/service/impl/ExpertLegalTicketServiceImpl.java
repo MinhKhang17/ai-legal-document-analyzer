@@ -20,6 +20,7 @@ import com.analyzer.api.repository.UserRepository;
 import com.analyzer.api.service.ExpertLegalTicketService;
 import com.analyzer.api.service.ExpertRevenueService;
 import com.analyzer.api.service.EmailService;
+import com.analyzer.api.service.RevenuePayrollService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;

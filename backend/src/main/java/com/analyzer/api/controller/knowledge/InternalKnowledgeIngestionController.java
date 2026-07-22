@@ -4,6 +4,7 @@ import com.analyzer.api.dto.ApiResponseDTO;
 import com.analyzer.api.dto.knowledge.KnowledgeIngestionJobResponse;
 import com.analyzer.api.dto.knowledge.KnowledgeIngestionProgressRequest;
 import com.analyzer.api.service.knowledge.KnowledgeIngestionService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -22,7 +23,7 @@ public class InternalKnowledgeIngestionController {
     @PostMapping("/{jobId}/progress")
     public ResponseEntity<ApiResponseDTO<KnowledgeIngestionJobResponse>> updateProgress(
             @PathVariable String jobId,
-            @RequestBody KnowledgeIngestionProgressRequest request) {
+            @Valid @RequestBody KnowledgeIngestionProgressRequest request) {
         return ResponseEntity.ok(ApiResponseDTO.success("Cap nhat ingest progress thanh cong",
                 knowledgeIngestionService.updateProgress(jobId, request)));
     }

@@ -9,8 +9,7 @@ import com.analyzer.api.enums.UserActionHint;
 import com.analyzer.api.enums.ChatMode;
 import jakarta.persistence.*;
 import lombok.*;
-
-import java.time.LocalDateTime;
+import lombok.experimental.SuperBuilder;
 
 @Entity
 @Table(name = "chat_messages", indexes = {
@@ -20,8 +19,8 @@ import java.time.LocalDateTime;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
-public class ChatMessage {
+@SuperBuilder
+public class ChatMessage extends BaseEntity {
 
     @Id
     private String id;
@@ -107,31 +106,4 @@ public class ChatMessage {
     @Column(name = "resolved_mode")
     private ChatMode resolvedMode;
 
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
-
-    @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
-
-    @PrePersist
-    protected void onCreate() {
-        LocalDateTime now = LocalDateTime.now();
-        if (createdAt == null) {
-            createdAt = now;
-        }
-        if (updatedAt == null) {
-            updatedAt = now;
-        }
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        LocalDateTime now = LocalDateTime.now();
-        // Assigned IDs make Spring Data use merge(). Keep detached instances from
-        // accidentally overwriting the immutable creation timestamp with null.
-        if (createdAt == null) {
-            createdAt = now;
-        }
-        updatedAt = now;
-    }
 }

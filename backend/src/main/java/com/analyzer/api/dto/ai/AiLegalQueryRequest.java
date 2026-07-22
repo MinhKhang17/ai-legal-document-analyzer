@@ -2,6 +2,7 @@ package com.analyzer.api.dto.ai;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -22,10 +23,12 @@ public class AiLegalQueryRequest {
     @Schema(description = "Stable correlation id for the AI call")
     private String requestId;
 
+    @NotBlank(message = "user_id khong duoc de trong")
     @JsonProperty("user_id")
     @Schema(description = "Authenticated user id as a string for the AI service")
     private String userId;
 
+    @NotBlank(message = "workspace_id khong duoc de trong")
     @JsonProperty("workspace_id")
     @Schema(description = "Workspace identifier used to scope retrieval")
     private String workspaceId;
@@ -34,6 +37,7 @@ public class AiLegalQueryRequest {
     @Schema(description = "Optional document identifier when a single document is in focus")
     private String documentId;
 
+    @NotBlank(message = "question khong duoc de trong")
     @JsonProperty("question")
     @Schema(description = "User's legal question")
     private String question;
