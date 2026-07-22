@@ -47,6 +47,8 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
     private static final String SYSTEM_SANDBOX_NAME = "Contract Assistant Sandbox";
     private static final String SYSTEM_SANDBOX_DESCRIPTION = "System workspace for general contract assistant chat";
     private static final int FREE_SUPPORT_TICKET_LIMIT = 3;
+    private static final String QUOTA_UPGRADE_MESSAGE =
+            "The current plan quota is exhausted. Please purchase or upgrade your service plan.";
 
     private final SubscriptionPlanRepository subscriptionPlanRepository;
     private final WorkspaceRepository workspaceRepository;
@@ -148,7 +150,7 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
         long currentWorkspaceCount = workspaceRepository.countQuotaWorkspaces(
                 user.getId(), ACTIVE_WORKSPACE_STATUS, SYSTEM_SANDBOX_NAME, SYSTEM_SANDBOX_DESCRIPTION);
         if (plan.getMaxWorkspaces() != null && currentWorkspaceCount >= plan.getMaxWorkspaces()) {
-            throw new ConflictException("WORKSPACE_LIMIT_REACHED", "Workspace limit reached for the current plan");
+            throw new ConflictException("WORKSPACE_LIMIT_REACHED", QUOTA_UPGRADE_MESSAGE);
         }
     }
 
@@ -166,21 +168,21 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
         SubscriptionQuotaUsageSummaryResponse usage = getCurrentUsage(user);
 
         if (plan.getMaxQuota() != null && usage.getContractAnalysisUsed() >= plan.getMaxQuota()) {
-            throw new ConflictException("CONTRACT_ANALYSIS_QUOTA_EXCEEDED");
+            throw new ConflictException("CONTRACT_ANALYSIS_QUOTA_EXCEEDED", QUOTA_UPGRADE_MESSAGE);
         }
 
         long workspaceContractCount = documentRepository.countByWorkspaceIdAndUserIdAndStatusNot(
                 workspaceId, user.getId(), DELETED_DOCUMENT_STATUS);
         if (plan.getMaxContractsPerWorkspace() != null && workspaceContractCount >= plan.getMaxContractsPerWorkspace()) {
-            throw new ConflictException("CONTRACTS_PER_WORKSPACE_LIMIT_EXCEEDED");
+            throw new ConflictException("CONTRACTS_PER_WORKSPACE_LIMIT_EXCEEDED", QUOTA_UPGRADE_MESSAGE);
         }
         if (plan.getMaxFileSizeMb() != null && fileSizeBytes > plan.getMaxFileSizeMb() * 1024L * 1024L) {
-            throw new ConflictException("MAX_FILE_SIZE_EXCEEDED");
+            throw new ConflictException("MAX_FILE_SIZE_EXCEEDED", QUOTA_UPGRADE_MESSAGE);
         }
         long storageUsed = documentRepository.sumFileSizeByUserIdAndStatusNot(user.getId(), DELETED_DOCUMENT_STATUS);
         if (plan.getStorageLimitMb() != null
                 && storageUsed + Math.max(fileSizeBytes, 0) > plan.getStorageLimitMb() * 1024L * 1024L) {
-            throw new ConflictException("STORAGE_LIMIT_EXCEEDED");
+            throw new ConflictException("STORAGE_LIMIT_EXCEEDED", QUOTA_UPGRADE_MESSAGE);
         }
     }
 
@@ -198,7 +200,7 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
         long currentlyAttached = chatSessionDocumentRepository.countByChatSessionIdAndUserIdAndActiveTrue(
                 chatSessionId, user.getId());
         if (currentlyAttached >= plan.getMaxAttachedDocumentsPerSession()) {
-            throw new ConflictException("ATTACHED_DOCUMENT_LIMIT_EXCEEDED");
+            throw new ConflictException("ATTACHED_DOCUMENT_LIMIT_EXCEEDED", QUOTA_UPGRADE_MESSAGE);
         }
     }
 
@@ -216,7 +218,7 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
 
         SubscriptionQuotaUsageSummaryResponse usage = getCurrentUsage(user);
         if (usage.getAiTokensUsed() + Math.max(estimatedInputTokens, 0L) > plan.getAiQuota()) {
-            throw new ConflictException("AI_TOKEN_QUOTA_EXCEEDED");
+            throw new ConflictException("AI_TOKEN_QUOTA_EXCEEDED", QUOTA_UPGRADE_MESSAGE);
         }
     }
 
@@ -239,7 +241,7 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
 
         SubscriptionQuotaUsageSummaryResponse usage = getCurrentUsage(user);
         if (usage.getDraftContractsUsed() >= plan.getMaxDraftContracts()) {
-            throw new ConflictException("DRAFT_CONTRACT_QUOTA_EXCEEDED");
+            throw new ConflictException("DRAFT_CONTRACT_QUOTA_EXCEEDED", QUOTA_UPGRADE_MESSAGE);
         }
     }
 
@@ -289,8 +291,7 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
                 user.getId(), AiQueryExecutionStatus.PROCESSING, periodStart, periodEnd, requestId);
         if (plan.getAiQuota() != null
                 && completedUsage + activeReservations + normalizedEstimate > plan.getAiQuota()) {
-            throw new com.analyzer.api.exception.common.TooManyRequestsException(
-                    "TOKEN_QUOTA_EXCEEDED", "AI token quota exceeded for the current plan");
+            throw new ConflictException("TOKEN_QUOTA_EXCEEDED", QUOTA_UPGRADE_MESSAGE);
         }
 
         AiQueryExecution execution = existing != null ? existing : AiQueryExecution.builder()
@@ -375,7 +376,7 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
         if (supportTicketsUsed >= FREE_SUPPORT_TICKET_LIMIT) {
             throw new ConflictException(
                     "FREE_SUPPORT_TICKET_LIMIT_REACHED",
-                    "Free plan allows up to 3 system or query support tickets per billing period");
+                    QUOTA_UPGRADE_MESSAGE);
         }
     }
 

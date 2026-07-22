@@ -203,6 +203,17 @@ def is_export_docx_intent(question: str) -> bool:
     ]
     has_direct = any(pat in question_lower for pat in direct_patterns)
 
+    extraction_patterns = [
+        "trích xuất", "trích điều khoản", "rút trích",
+        "extract clause", "extract terms", "extract information",
+    ]
+    # "Trích xuất ... trong tài liệu" describes reading the input document;
+    # the embedded word "xuất" is not an instruction to export a new file.
+    # Keep supporting combined requests that explicitly say "ra file", DOCX,
+    # Word, etc.; those already match a high-confidence direct pattern above.
+    if any(pattern in question_lower for pattern in extraction_patterns) and not has_direct:
+        return False
+
     return (has_export and has_file) or has_direct
 
 

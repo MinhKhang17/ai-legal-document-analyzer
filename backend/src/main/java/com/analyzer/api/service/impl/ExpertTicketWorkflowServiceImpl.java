@@ -278,7 +278,9 @@ public class ExpertTicketWorkflowServiceImpl implements ExpertTicketWorkflowServ
         long used = creditRepository.countByUser_IdAndQuotaCycleAndStatusIn(user.getId(), cycle,
                 List.of(TicketQuotaReservationStatus.RESERVED, TicketQuotaReservationStatus.CONSUMED));
         if (limit <= 0 || used >= limit) {
-            throw new ConflictException("EXPERT_TICKET_CREDIT_UNAVAILABLE_REQUIRES_PAID_QUOTE");
+            throw new ConflictException(
+                    "EXPERT_TICKET_CREDIT_UNAVAILABLE_REQUIRES_PAID_QUOTE",
+                    "The current plan quota is exhausted. Please purchase an additional expert ticket or upgrade your service plan.");
         }
         ExpertTicketCreditReservation reservation = creditRepository.findByTicket_Id(ticket.getId())
                 .orElseGet(() -> ExpertTicketCreditReservation.builder().ticket(ticket).user(user).build());

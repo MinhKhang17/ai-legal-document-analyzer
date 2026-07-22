@@ -1,5 +1,8 @@
 from app.schemas import RagQueryRequest
-from app.services.contract_generation_service import is_contract_generation_intent
+from app.services.contract_generation_service import (
+    is_contract_generation_intent,
+    is_export_docx_intent,
+)
 from app.services.llm_intent_detector import detect_intent_smart
 from app.services.safe_query_shortcuts import (
     build_contract_prompt_response,
@@ -50,6 +53,7 @@ def test_clause_extraction_is_not_misrouted_to_contract_drafting() -> None:
     question = "Hãy trích xuất các điều khoản quan trọng trong hợp đồng này."
 
     assert is_contract_generation_intent(question) is False
+    assert is_export_docx_intent(question) is False
     result = detect_intent_smart(
         question,
         has_user_chunks=True,
@@ -60,3 +64,9 @@ def test_clause_extraction_is_not_misrouted_to_contract_drafting() -> None:
 
 def test_explicit_contract_creation_still_routes_to_drafting() -> None:
     assert is_contract_generation_intent("Tạo hợp đồng thuê nhà cho tôi") is True
+
+
+def test_clause_extraction_can_explicitly_request_a_word_export() -> None:
+    question = "Hãy trích xuất các điều khoản rồi xuất ra file Word"
+
+    assert is_export_docx_intent(question) is True

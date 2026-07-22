@@ -15,12 +15,14 @@ class GlobalExceptionHandlerTest {
         GlobalExceptionHandler handler = new GlobalExceptionHandler();
 
         ResponseEntity<ApiResponseDTO<Void>> response = handler.handleConflictException(
-                new ConflictException("WORKSPACE_LIMIT_REACHED", "Workspace limit reached for the current plan"));
+                new ConflictException("WORKSPACE_LIMIT_REACHED",
+                        "The current plan quota is exhausted. Please purchase or upgrade your service plan."));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().code()).isEqualTo(409);
         assertThat(response.getBody().errorCode()).isEqualTo("WORKSPACE_LIMIT_REACHED");
-        assertThat(response.getBody().message()).isEqualTo("Workspace limit reached for the current plan");
+        assertThat(response.getBody().message())
+                .isEqualTo("The current plan quota is exhausted. Please purchase or upgrade your service plan.");
     }
 }
