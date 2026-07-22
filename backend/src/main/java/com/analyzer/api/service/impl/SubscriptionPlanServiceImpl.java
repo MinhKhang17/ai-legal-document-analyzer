@@ -9,8 +9,8 @@ import com.analyzer.api.repository.CustomerPlanRepository;
 import com.analyzer.api.repository.PaymentTransactionRepository;
 import com.analyzer.api.repository.SubscriptionPlanRepository;
 import com.analyzer.api.service.SubscriptionPlanService;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -26,7 +26,7 @@ public class SubscriptionPlanServiceImpl implements SubscriptionPlanService {
     private final CustomerPlanRepository customerPlanRepository;
     private final PaymentTransactionRepository paymentTransactionRepository;
     private final SubscriptionPlanMapper subscriptionPlanMapper;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
     @Override
     @Transactional

@@ -9,7 +9,7 @@ import com.analyzer.api.dto.ai.GenerateContractApiResponse;
 import com.analyzer.api.service.AiClient;
 import com.analyzer.api.exception.ai.AiServiceTimeoutException;
 import com.analyzer.api.exception.ai.AiServiceUnavailableException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -28,12 +28,14 @@ import java.time.Duration;
 @Component
 public class PythonAiClient implements AiClient {
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
     private final RestTemplate restTemplate;
 
     public PythonAiClient(
+            ObjectMapper objectMapper,
             @Value("${app.ai-service.connect-timeout:5s}") Duration connectTimeout,
             @Value("${app.ai-service.read-timeout:130s}") Duration readTimeout) {
+        this.objectMapper = objectMapper;
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(connectTimeout);
         requestFactory.setReadTimeout(readTimeout);

@@ -2,8 +2,9 @@ package com.analyzer.api.client;
 
 import com.analyzer.api.dto.PageResponse;
 import com.analyzer.api.dto.knowledge.KnowledgeBaseIngestedDocumentResponse;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
@@ -23,9 +24,10 @@ import java.util.Map;
 
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class KnowledgeBaseAiClient {
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
     private final RestTemplate restTemplate = new RestTemplate();
 
     @Value("${app.ai-service.base-url:http://localhost:8000}")

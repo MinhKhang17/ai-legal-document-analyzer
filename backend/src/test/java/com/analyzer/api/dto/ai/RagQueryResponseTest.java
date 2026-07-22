@@ -3,7 +3,7 @@ package com.analyzer.api.dto.ai;
 import com.analyzer.api.enums.RiskLevel;
 import com.analyzer.api.enums.SuggestionType;
 import com.analyzer.api.enums.UserActionHint;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;

@@ -11,8 +11,8 @@ import com.analyzer.api.repository.ChatSessionRepository;
 import com.analyzer.api.repository.DocumentRepository;
 import com.analyzer.api.service.chatsession.ChatSessionDocumentService;
 import com.analyzer.api.service.SubscriptionQuotaService;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,7 +26,7 @@ public class ChatSessionDocumentServiceImpl implements ChatSessionDocumentServic
     private final DocumentRepository documentRepository;
     private final ChatSessionDocumentRepository mappingRepository;
     private final SubscriptionQuotaService subscriptionQuotaService;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
     @Override
     @Transactional(readOnly = true)
@@ -96,7 +96,7 @@ public class ChatSessionDocumentServiceImpl implements ChatSessionDocumentServic
                 .stream().map(mapping -> mapping.getDocument().getId()).distinct().toList();
         try {
             session.setActiveDocumentIdsJson(objectMapper.writeValueAsString(activeDocumentIds));
-        } catch (JsonProcessingException exception) {
+        } catch (JacksonException exception) {
             throw new IllegalStateException("Unable to serialize active document state", exception);
         }
         if (session.getFocusedDocumentId() != null && !activeDocumentIds.contains(session.getFocusedDocumentId())) {

@@ -45,8 +45,8 @@ import com.analyzer.api.service.ChatMessageService;
 import com.analyzer.api.service.SubscriptionQuotaService;
 import com.analyzer.api.service.PolicyAcceptanceService;
 import com.analyzer.api.service.conversation.ConversationHistoryAssembler;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -592,7 +592,7 @@ public class ChatMessageServiceImpl implements ChatMessageService {
             chatMessageRepository.save(userMessage);
             subscriptionQuotaService.failAiChatQuota(currentUser, requestId, "DOCUMENT_NOT_READY");
             throw ex;
-        } catch (JsonProcessingException ex) {
+        } catch (JacksonException ex) {
             subscriptionQuotaService.failAiChatQuota(currentUser, requestId, "INVALID_QUERY_SNAPSHOT");
             throw new InvalidAiResponseException("Unable to create a safe immutable query context");
         } catch (InvalidAiResponseException ex) {
@@ -946,7 +946,7 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         try {
             session.setActiveDocumentIdsJson(objectMapper.writeValueAsString(activeDocumentIds));
             session.setMessageAttachedDocumentIdsJson(objectMapper.writeValueAsString(messageAttachedDocumentIds));
-        } catch (JsonProcessingException exception) {
+        } catch (JacksonException exception) {
             logger.warn("Unable to serialize conversation document state for session {}", session.getId());
         }
         session.setFocusedDocumentId(focusedDocumentId);

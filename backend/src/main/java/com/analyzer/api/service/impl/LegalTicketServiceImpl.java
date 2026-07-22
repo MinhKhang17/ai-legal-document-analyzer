@@ -24,7 +24,7 @@ import com.analyzer.api.service.EmailService;
 import com.analyzer.api.service.ExpertRevenueService;
 import com.analyzer.api.service.SubscriptionQuotaService;
 import com.analyzer.api.service.TicketCollaborationService;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
