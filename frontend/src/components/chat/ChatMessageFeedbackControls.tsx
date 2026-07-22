@@ -17,10 +17,9 @@ const reasons: ChatFeedbackReason[] = [
 
 interface ChatMessageFeedbackControlsProps {
   messageId: string;
-  language: 'en' | 'vi';
 }
 
-export function ChatMessageFeedbackControls({ messageId, language }: ChatMessageFeedbackControlsProps) {
+export function ChatMessageFeedbackControls({ messageId }: ChatMessageFeedbackControlsProps) {
   const { t } = useI18n();
   const [rating, setRating] = useState<ChatFeedbackRating | null>(null);
   const [selectedReasons, setSelectedReasons] = useState<ChatFeedbackReason[]>([]);
@@ -48,7 +47,7 @@ export function ChatMessageFeedbackControls({ messageId, language }: ChatMessage
     } catch (reason) {
       setError(reason instanceof Error
         ? reason.message
-        : (language === 'vi' ? 'Không thể lưu đánh giá.' : 'Could not save feedback.'));
+        : t('chat.feedback.saveError'));
     } finally {
       setSaving(false);
     }

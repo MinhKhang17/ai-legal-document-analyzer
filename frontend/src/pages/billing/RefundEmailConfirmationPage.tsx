@@ -5,12 +5,12 @@ import { Button } from '../../components/common/Button';
 import { useI18n } from '../../hooks/useI18n';
 import { confirmSubscriptionRefundEmail } from '../../services/subscription.service';
 
-const confirmationErrorMessage = (error: unknown) => {
+const confirmationErrorKey = (error: unknown) => {
   const message = error instanceof Error ? error.message : '';
-  if (message.includes('TOKEN_EXPIRED')) return 'Liên kết đã hết hạn.';
-  if (message.includes('TOKEN_ALREADY_USED')) return 'Liên kết đã được sử dụng.';
-  if (message.includes('TOKEN_INVALID')) return 'Liên kết không hợp lệ.';
-  return message || 'Liên kết đã hết hạn hoặc không hợp lệ.';
+  if (message.includes('TOKEN_EXPIRED')) return 'refund.emailConfirmation.expired';
+  if (message.includes('TOKEN_ALREADY_USED')) return 'refund.emailConfirmation.used';
+  if (message.includes('TOKEN_INVALID')) return 'refund.emailConfirmation.invalidLink';
+  return 'refund.emailConfirmation.expired';
 };
 
 export function RefundEmailConfirmationPage() {
@@ -33,7 +33,7 @@ export function RefundEmailConfirmationPage() {
       })
       .catch((error) => {
         setState('error');
-        setMessage(confirmationErrorMessage(error));
+        setMessage(t(confirmationErrorKey(error)));
       });
   }, [params, t]);
 

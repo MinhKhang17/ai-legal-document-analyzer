@@ -1452,7 +1452,7 @@ export function LegalChatPage() {
                             />
                             {message.status === "streaming" && <span className="ml-1 inline-block h-4 w-0.5 bg-primary motion-safe:animate-pulse" aria-hidden="true" />}
                             {message.status === "cancelled" && <p className="mt-sm text-xs font-medium text-on-surface-variant">{message.statusMessage ?? t("chat.status.stopped")}</p>}
-                            {assistant && isCompleted && !message.id.startsWith('local-') && <ChatMessageFeedbackControls messageId={message.id} language={language} />}
+                            {assistant && isCompleted && !message.id.startsWith('local-') && <ChatMessageFeedbackControls messageId={message.id} />}
                             {shouldShowTicketAction && (
                               <div className="mt-md rounded-lg border border-legal-border bg-surface-container-low p-sm dark:border-slate-700 dark:bg-slate-800">
                                 <div className="flex flex-wrap gap-xs">
@@ -1561,8 +1561,8 @@ export function LegalChatPage() {
                     }
                   }}
                   placeholder={attachedDocuments.length > 0
-                    ? (language === "vi" ? "Hỏi về tài liệu hoặc vấn đề pháp lý liên quan..." : "Ask about the document or a related legal issue...")
-                    : (language === "vi" ? "Nhập câu hỏi pháp luật của bạn..." : "Enter your legal question...")}
+                    ? t("chat.inputPlaceholderWithDocuments")
+                    : t("chat.inputPlaceholder")}
                   disabled={!selectedWorkspaceId || chatBlockedByAttachedDocuments}
                 />
                 {sending ? (
@@ -1747,7 +1747,7 @@ export function LegalChatPage() {
                                     Authorization: `Bearer ${getAccessToken()}`,
                                   },
                                 });
-                                if (!response.ok) throw new Error("Tải file thất bại");
+                                if (!response.ok) throw new Error(t("chat.documents.downloadError"));
                                 const blob = await response.blob();
                                 const blobUrl = URL.createObjectURL(blob);
                                 const anchor = document.createElement("a");
@@ -1764,12 +1764,12 @@ export function LegalChatPage() {
                                 window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
                               } catch (downloadError) {
                                 toast.error(
-                                  downloadError instanceof Error ? downloadError.message : "Unable to download document."
+                                  downloadError instanceof Error ? downloadError.message : t("chat.documents.downloadError")
                                 );
                               }
                             }}
                           >
-                            {language === "vi" ? "Tải xuống" : "Download"}
+                            {t("actions.download")}
                           </Button>
                         )}
                       </div>

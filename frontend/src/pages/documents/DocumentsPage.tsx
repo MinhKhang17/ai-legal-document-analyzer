@@ -140,7 +140,7 @@ export function DocumentsPage() {
             size="sm"
             className="text-error hover:bg-error/10 hover:text-error dark:text-red-400 dark:hover:bg-red-950/40"
             onClick={() => setDocumentToDelete(document)}
-            aria-label={`Xóa tài liệu ${document.originalFileName}`}
+            aria-label={t('documents.deleteAria', { name: document.originalFileName })}
           >
             <Trash2 className="h-4 w-4" />
           </Button>
@@ -233,7 +233,7 @@ export function DocumentsPage() {
                 disabled={deleting}
                 onClick={handleConfirmDelete}
               >
-                {deleting ? 'Đang xóa...' : t('documents.deleteConfirmTitle')}
+                {deleting ? t('documents.deleting') : t('documents.deleteConfirmTitle')}
               </Button>
             </div>
           </div>

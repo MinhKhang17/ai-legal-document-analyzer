@@ -1,5 +1,5 @@
 import { API_ENDPOINTS, buildApiUrl } from '../config/api';
-import { ACCESS_DENIED_MESSAGE, BACKEND_API_UNAVAILABLE_MESSAGE } from './http';
+import { getAccessDeniedMessage, getBackendUnavailableMessage } from './http';
 import { getAccessToken } from './authSession';
 import type {
   ApiResponse,
@@ -100,7 +100,7 @@ const getApiErrorMessage = (
 ): string => {
   const normalizeMessage = (message: string) =>
     message.trim().toLowerCase() === 'access denied'
-      ? ACCESS_DENIED_MESSAGE
+      ? getAccessDeniedMessage()
       : message.trim();
 
   if (errorResponse?.message && errorResponse.message.trim().length > 0) {
@@ -144,7 +144,7 @@ const requestJson = async <TResponse>(
     const rawText = error instanceof Error ? error.message : '';
     throw new SubscriptionRequestError(
       0,
-      BACKEND_API_UNAVAILABLE_MESSAGE,
+      getBackendUnavailableMessage(),
       { error: rawText },
       rawText,
     );

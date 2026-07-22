@@ -379,7 +379,7 @@ export function AdminFeedbackPage() {
       )}
 
       <div className="mb-gutter">
-        <AdminAiFeedbackPanel language={language} />
+        <AdminAiFeedbackPanel />
       </div>
 
       <div className="grid gap-gutter xl:grid-cols-[minmax(0,1fr)_420px]">

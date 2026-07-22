@@ -1,5 +1,6 @@
 import { buildAiServiceUrl, buildApiUrl } from "../config/api";
 import { getAccessToken } from "./authSession";
+import { getRuntimeLanguage, translate } from "../utils/i18n";
 
 export interface ApiResponse<T> {
   code: number;
@@ -14,11 +15,10 @@ interface ApiErrorResponse {
   errors?: unknown;
 }
 
-export const ACCESS_DENIED_MESSAGE = "Tài khoản hiện tại không có quyền truy cập chức năng này.";
-export const BACKEND_API_UNAVAILABLE_MESSAGE =
-  "Không thể kết nối backend API. Vui lòng kiểm tra VITE_API_BASE_URL hoặc trạng thái backend.";
-export const AI_SERVICE_UNAVAILABLE_MESSAGE =
-  "Không thể kết nối AI-service. Vui lòng kiểm tra VITE_AI_SERVICE_BASE_URL hoặc trạng thái ai-service.";
+const runtimeMessage = (key: string) => translate(getRuntimeLanguage(), key);
+export const getAccessDeniedMessage = () => runtimeMessage("errors.accessDenied");
+export const getBackendUnavailableMessage = () => runtimeMessage("errors.backendUnavailable");
+export const getAiServiceUnavailableMessage = () => runtimeMessage("errors.aiServiceUnavailable");
 
 type ParsedResponse<T> = {
   data: T | null;
@@ -113,37 +113,19 @@ const getApiErrorMessage = (
   rawText: string,
   fallback: string,
 ): string => {
-  const normalizeErrorMessage = (message: string): string => {
-    const normalizedMessage = message.trim();
-    return normalizedMessage.toLowerCase() === "access denied"
-      ? ACCESS_DENIED_MESSAGE
-      : normalizedMessage;
-  };
-
-  if (errorResponse?.message && errorResponse.message.trim().length > 0) {
-    return normalizeErrorMessage(errorResponse.message);
-  }
-
-  if (errorResponse?.error && errorResponse.error.trim().length > 0) {
-    return normalizeErrorMessage(errorResponse.error);
-  }
-
-  const normalizedText = rawText.trim();
-
-  if (normalizedText.length > 0) {
-    return normalizeErrorMessage(normalizedText);
-  }
-
-  return fallback;
+  void errorResponse;
+  void rawText;
+  void fallback;
+  return runtimeMessage("errors.requestFailed");
 };
 
 const getStatusFallbackMessage = (status: number, fallback: string): string => {
   if (status === 401) {
-    return "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.";
+    return runtimeMessage("errors.sessionExpired");
   }
 
   if (status === 403) {
-    return ACCESS_DENIED_MESSAGE;
+    return getAccessDeniedMessage();
   }
 
   return fallback;
@@ -170,7 +152,7 @@ export const requestJson = async <TResponse>(
   const response = await fetchOrThrow(
     buildApiUrl(endpointPath),
     requestInit,
-    BACKEND_API_UNAVAILABLE_MESSAGE,
+    getBackendUnavailableMessage(),
   );
   const { data, rawText } = await readResponseBody<TResponse | ApiErrorResponse>(response);
 
@@ -199,7 +181,7 @@ export const requestAiJson = async <TResponse>(
   const response = await fetchOrThrow(
     buildAiServiceUrl(endpointPath),
     requestInit,
-    AI_SERVICE_UNAVAILABLE_MESSAGE,
+    getAiServiceUnavailableMessage(),
   );
   const { data, rawText } = await readResponseBody<TResponse | ApiErrorResponse>(response);
 

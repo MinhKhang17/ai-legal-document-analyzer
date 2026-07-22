@@ -304,13 +304,10 @@ export function AdminConsolePage() {
     setDeletingUserId(userToDelete.id);
     try {
       await deleteUser(userToDelete.id);
-      toast.success(
-        language === 'vi' ? 'Đã xóa (vô hiệu hóa) người dùng thành công.' : 'User deactivated successfully.',
-        t('toast.successTitle'),
-      );
+      toast.success(t('admin.users.deactivateSuccess'), t('toast.successTitle'));
       await loadAdminData();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Unable to deactivate user.', t('toast.errorTitle'));
+      toast.error(error instanceof Error ? error.message : t('admin.users.deactivateError'), t('toast.errorTitle'));
     } finally {
       setDeletingUserId(null);
       setIsDeleteUserModalOpen(false);
@@ -321,13 +318,10 @@ export function AdminConsolePage() {
   const handleRestoreUser = async (userId: string) => {
     try {
       await restoreUser(userId);
-      toast.success(
-        language === 'vi' ? 'Đã khôi phục tài khoản người dùng thành công.' : 'User restored successfully.',
-        t('toast.successTitle'),
-      );
+      toast.success(t('admin.users.restoreSuccess'), t('toast.successTitle'));
       await loadAdminData();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Unable to restore user.', t('toast.errorTitle'));
+      toast.error(error instanceof Error ? error.message : t('admin.users.restoreError'), t('toast.errorTitle'));
     }
   };
 
@@ -518,7 +512,7 @@ export function AdminConsolePage() {
             <Button
               variant="ghost"
               size="icon"
-              title={language === 'vi' ? 'Xem chi tiết' : 'View details'}
+              title={t('actions.viewDetails')}
               aria-label={t('admin.users.userActions')}
               onClick={() => void handleOpenUserDetail(user.id)}
             >
@@ -529,8 +523,8 @@ export function AdminConsolePage() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  title={language === 'vi' ? 'Xóa người dùng (Soft Delete)' : 'Deactivate user'}
-                  aria-label={language === 'vi' ? 'Xóa người dùng' : 'Deactivate user'}
+                  title={t('admin.users.deactivate')}
+                  aria-label={t('admin.users.deactivate')}
                   className="text-error hover:bg-error/10"
                   onClick={() => handleSoftDeleteUserClick(user)}
                 >
@@ -540,8 +534,8 @@ export function AdminConsolePage() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  title={language === 'vi' ? 'Khôi phục người dùng' : 'Restore user'}
-                  aria-label={language === 'vi' ? 'Khôi phục người dùng' : 'Restore user'}
+                  title={t('admin.users.restore')}
+                  aria-label={t('admin.users.restore')}
                   className="text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/30"
                   onClick={() => void handleRestoreUser(user.id)}
                 >

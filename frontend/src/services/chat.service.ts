@@ -1,7 +1,7 @@
 import { API_ENDPOINTS, buildApiUrl } from "../config/api";
 import {
-  ACCESS_DENIED_MESSAGE,
-  BACKEND_API_UNAVAILABLE_MESSAGE,
+  getAccessDeniedMessage,
+  getBackendUnavailableMessage,
 } from "./http";
 import type {
   DeleteChatSessionResponse,
@@ -76,7 +76,7 @@ const getApiErrorMessage = (
 ): string => {
   const normalizeMessage = (message: string) =>
     message.trim().toLowerCase() === "access denied"
-      ? ACCESS_DENIED_MESSAGE
+      ? getAccessDeniedMessage()
       : message.trim();
 
   if (errorResponse?.message?.trim()) {
@@ -104,7 +104,7 @@ const requestJson = async <TResponse>(
     if (error instanceof DOMException && error.name === "AbortError") {
       throw error;
     }
-    throw new Error(BACKEND_API_UNAVAILABLE_MESSAGE);
+    throw new Error(getBackendUnavailableMessage());
   }
 
   const { data, rawText } = await readResponseBody<TResponse | ApiResponse<TResponse> | ApiErrorResponse>(response);

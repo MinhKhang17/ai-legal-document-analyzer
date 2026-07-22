@@ -222,7 +222,7 @@ export function KnowledgeBaseDetailPage() {
                     <Button className="mt-sm" variant="secondary" disabled={saving || !versions[0].sourceFileAvailable} onClick={() => void retryIngest()}>{t("knowledge.retryIngest")}</Button>
                   </div>
                 )}
-                {entry.currentStatus === "PUBLIC" ? <p className="rounded-lg bg-emerald-500/10 p-sm text-sm font-semibold text-emerald-600">{t("knowledge.activeForAi")}</p> : <p className="rounded-lg bg-slate-500/10 p-sm text-sm text-on-surface-variant">{t("knowledge.privateInactiveForAi")}</p>}
+                {entry.currentStatus === "PUBLIC" && <p className="rounded-lg bg-emerald-500/10 p-sm text-sm font-semibold text-emerald-600">{t("knowledge.activeForAi")}</p>}
                 <textarea className="form-field min-h-24" value={note} onChange={(event) => setNote(event.target.value)} placeholder={t("knowledge.noteReason")} />
                 <div className="flex flex-col gap-sm">
                   <Button
