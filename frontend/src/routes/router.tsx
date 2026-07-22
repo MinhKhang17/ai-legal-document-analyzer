@@ -7,7 +7,6 @@ import {
   CustomerRoute,
   PublicRoute,
   ExpertRoute,
-  AdminOrExpertRoute,
 } from "../components/auth/AuthGuards";
 import { AuthLayout } from "../layouts/AuthLayout";
 import { LoginPage } from "../pages/auth/LoginPage";
@@ -64,6 +63,7 @@ const MyContractsPage = lazy(() => import("../pages/contracts/MyContractsPage").
 export const router = createBrowserRouter([
   { path: "/verify-email", element: <VerifyEmailPage /> },
   { path: "/billing/refunds/confirm", element: <RefundEmailConfirmationPage /> },
+  { path: "/shared/chat/:shareToken", element: <SharedChatPage /> },
   {
     path: "/",
     element: <Navigate to="/login" replace />,
@@ -342,7 +342,6 @@ export const router = createBrowserRouter([
         ),
       },
       { path: "/lawyer/revenue/:statementId", element: <ExpertRoute><RevenueStatementDetailPage /></ExpertRoute> },
-      { path: "/shared/chat/:shareToken", element: <AdminOrExpertRoute><SharedChatPage /></AdminOrExpertRoute> },
       { path: "/shared-conversation/:token", element: <SharedTicketConversationPage /> },
     ],
   },

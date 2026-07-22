@@ -49,6 +49,8 @@ def check_completeness(
         LegalQueryIntent.INVALID_OR_MEANINGLESS_QUERY,
         LegalQueryIntent.LEGAL_BUT_NOT_CONTRACT_SCOPE,
         LegalQueryIntent.LEGAL_KB_QUESTION,
+        LegalQueryIntent.GENERAL_LEGAL_QUESTION,
+        LegalQueryIntent.CONTRACT_TYPE_ANALYSIS,
         LegalQueryIntent.FOREIGN_LAW_QUERY,
         LegalQueryIntent.UNSAFE_LEGAL_REQUEST,
         LegalQueryIntent.PROMPT_INJECTION_OR_POLICY_BYPASS,

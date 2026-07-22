@@ -28,6 +28,7 @@ import {
   toLegalTicketFilter,
 } from "../../types/legalTicketStatus";
 import { formatDisplayDate } from "../../utils/format";
+import { isPlanEntitlementError } from "../../services/http";
 
 const getRiskTone = (risk?: string | null) => {
   if (risk === "HIGH") return "red";
@@ -217,6 +218,11 @@ export function CustomerTicketsPage() {
       navigate(`/tickets/${ticket.id}`);
     } catch (error) {
       console.error("Failed to create legal ticket", error);
+      if (isPlanEntitlementError(error)) {
+        toast.warning(t("legalTickets.planRequired"), t("toast.warningTitle"));
+        navigate("/billing/subscribe?reason=plan-required");
+        return;
+      }
       toast.error(t("legalTickets.createError"), t("toast.errorTitle"));
     } finally {
       setTicketSubmitting(false);

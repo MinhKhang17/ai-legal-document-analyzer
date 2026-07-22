@@ -1,6 +1,6 @@
 import { Bot, Check, ClipboardCheck, Pencil, Plus, RefreshCw, Send, Trash2, UserRound, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Badge } from "../../components/common/Badge";
 import { Button } from "../../components/common/Button";
 import { Card } from "../../components/common/Card";
@@ -27,6 +27,7 @@ import type { CreateLegalTicketRequest } from "../../types/legalTicket";
 import type { ChatMessage } from "../../types/chat";
 import type { WorkspaceChatMessage, WorkspaceChatSession } from "../../types/chat";
 import { useRef } from "react";
+import { isPlanEntitlementError } from "../../services/http";
 
 import { getAccessToken as getSessionAccessToken } from "../../services/authSession";
 const getAccessToken = () => getSessionAccessToken() ?? "";
@@ -141,6 +142,7 @@ export function ContractAssistantPage() {
   const { t, language } = useI18n();
   const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [sandboxWorkspaceId, setSandboxWorkspaceId] = useState("");
   const [chatSessions, setChatSessions] = useState<WorkspaceChatSession[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState(
@@ -198,8 +200,12 @@ export function ContractAssistantPage() {
         if (sandbox && active) {
           setSandboxWorkspaceId(sandbox.workspaceId);
         }
-      } catch {
+      } catch (initError) {
         if (active) {
+          if (isPlanEntitlementError(initError)) {
+            navigate("/billing/subscribe?reason=plan-required");
+            return;
+          }
           setError(t("chat.contractAssistantInitError"));
         }
       } finally {
@@ -214,7 +220,7 @@ export function ContractAssistantPage() {
     return () => {
       active = false;
     };
-  }, [t]);
+  }, [navigate, t]);
 
   // Phase 2: Load chat sessions once sandbox workspace is resolved
   useEffect(() => {
@@ -451,6 +457,14 @@ export function ContractAssistantPage() {
       toast.success(`${t("chat.ticketCreated")} ${ticket.id}.`, t("toast.successTitle"));
       setTicketDraft(null);
     } catch (err) {
+      if (isPlanEntitlementError(err)) {
+        const message = t("legalTickets.planRequired");
+        setError(message);
+        toast.warning(message, t("toast.warningTitle"));
+        setTicketDraft(null);
+        navigate("/billing/subscribe?reason=plan-required");
+        return;
+      }
       const message = t("chat.ticketCreateError");
       setError(message);
       toast.error(message, t("toast.errorTitle"));

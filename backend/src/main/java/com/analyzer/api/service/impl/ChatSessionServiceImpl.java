@@ -219,8 +219,10 @@ public class ChatSessionServiceImpl implements ChatSessionService {
             chatSession.setIsShared(true);
             chatSession.setSharedAt(LocalDateTime.now());
         }
-        chatSession.setShareAccessLevel(accessLevel == null
-                ? com.analyzer.api.enums.ShareAccessLevel.RESTRICTED : accessLevel);
+        // Product rule: possession of the share URL grants read-only access.
+        // Normalize every newly generated/reused link to PUBLIC even if an older
+        // client still sends the legacy RESTRICTED value.
+        chatSession.setShareAccessLevel(com.analyzer.api.enums.ShareAccessLevel.PUBLIC);
 
         ChatSession savedSession = chatSessionRepository.save(chatSession);
 
@@ -230,22 +232,19 @@ public class ChatSessionServiceImpl implements ChatSessionService {
                 .shareUrl(frontendBaseUrl + "/shared/chat/" + savedSession.getShareToken())
                 .sharedAt(savedSession.getSharedAt())
                 .accessLevel(savedSession.getShareAccessLevel())
-                .authenticationRequired(savedSession.getShareAccessLevel()
-                        != com.analyzer.api.enums.ShareAccessLevel.PUBLIC)
+                .authenticationRequired(false)
                 .build();
     }
 
     @Override
     @Transactional(readOnly = true)
-    public SharedChatSessionResponse getSharedChatSession(String shareToken, boolean adminOrExpert) {
+    public SharedChatSessionResponse getSharedChatSession(String shareToken) {
         ChatSession chatSession = chatSessionRepository.findByShareTokenAndIsSharedTrue(shareToken)
                 .orElseThrow(() -> new ResourceNotFoundException("Shared chat session not found or no longer shared"));
 
-        com.analyzer.api.enums.ShareAccessLevel accessLevel = chatSession.getShareAccessLevel() == null
-                ? com.analyzer.api.enums.ShareAccessLevel.RESTRICTED : chatSession.getShareAccessLevel();
-        if (accessLevel == com.analyzer.api.enums.ShareAccessLevel.RESTRICTED && !adminOrExpert) {
-            throw new ForbiddenException("This share link is restricted to Admin and Expert accounts");
-        }
+        // Legacy links may still be stored as RESTRICTED. They are intentionally
+        // treated as public so existing share URLs follow the current product rule.
+        com.analyzer.api.enums.ShareAccessLevel accessLevel = com.analyzer.api.enums.ShareAccessLevel.PUBLIC;
 
         List<ChatMessageResponse> messages = chatMessageRepository
                 .findByChatSessionIdOrderByCreatedAtAsc(chatSession.getId())

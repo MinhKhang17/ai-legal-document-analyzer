@@ -48,9 +48,9 @@ type SendMessageRequest = {
 };
 
 
-const getAuthHeaders = (accessToken: string): HeadersInit => ({
-  Authorization: `Bearer ${accessToken}`,
-});
+const getAuthHeaders = (accessToken: string): HeadersInit => accessToken
+  ? { Authorization: `Bearer ${accessToken}` }
+  : {};
 
 const readResponseBody = async <T>(
   response: Response,

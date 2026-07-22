@@ -21,7 +21,7 @@ public class ShareChatSessionResponse {
     @Schema(description = "Random share token identifying the shared session")
     private String shareToken;
 
-    @Schema(description = "Full read-only share URL for Admin/Expert access")
+    @Schema(description = "Full public read-only share URL")
     private String shareUrl;
 
     @Schema(description = "Timestamp the session was first shared")

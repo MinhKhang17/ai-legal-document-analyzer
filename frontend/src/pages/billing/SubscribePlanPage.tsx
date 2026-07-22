@@ -1,6 +1,6 @@
 import { ArrowLeft, CheckCircle2, CreditCard, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { SubscriptionStatusBadge } from '../../components/billing/SubscriptionStatusBadge';
 import { Badge } from '../../components/common/Badge';
 import { Button } from '../../components/common/Button';
@@ -47,6 +47,8 @@ export function SubscribePlanPage() {
   const { t, language } = useI18n();
   const toast = useToast();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const planRequired = searchParams.get('reason') === 'plan-required';
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('VNPAY');
@@ -221,6 +223,12 @@ export function SubscribePlanPage() {
           </>
         }
       />
+
+      {planRequired && (
+        <div className="mb-lg rounded-xl border border-amber-300 bg-amber-50 px-lg py-md text-sm font-semibold text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100" role="alert">
+          {t('legalTickets.planRequired')}
+        </div>
+      )}
 
       {errorMessage && (
         <div className="mb-lg rounded-xl border border-error/30 bg-error-container px-lg py-md text-sm font-semibold text-risk-high-text dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">

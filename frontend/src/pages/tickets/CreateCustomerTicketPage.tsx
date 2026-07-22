@@ -14,6 +14,7 @@ import { PageHeader } from "../../components/common/PageHeader";
 import { useI18n } from "../../hooks/useI18n";
 import { useToast } from "../../hooks/useToast";
 import type { LegalTicketType } from "../../types/legalTicket";
+import { isPlanEntitlementError } from "../../services/http";
 
 import { getAccessToken as getSessionAccessToken } from "../../services/authSession";
 const getAccessToken = () => getSessionAccessToken() ?? "";
@@ -141,6 +142,11 @@ export function CreateCustomerTicketPage() {
       navigate(`/tickets/${ticket.id}`);
     } catch (error) {
       console.error("Failed to create legal ticket", error);
+      if (isPlanEntitlementError(error)) {
+        toast.warning(t("legalTickets.planRequired"), t("toast.warningTitle"));
+        navigate("/billing/subscribe?reason=plan-required");
+        return;
+      }
       toast.error(t("legalTickets.create.submitError"), t("toast.errorTitle"));
     } finally {
       setSubmitting(false);

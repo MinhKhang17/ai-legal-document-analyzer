@@ -50,6 +50,41 @@ def test_contract_summary_instruction_requires_per_document_output():
     assert "tóm tắt riêng từng tài liệu" in prompt
 
 
+def test_prompt_without_attached_document_requires_explanatory_answer():
+    prompt = build_user_prompt(
+        "What is a force majeure clause?",
+        [],
+        [],
+        session_active_document_ids=[],
+        message_attached_document_ids=[],
+    )
+
+    assert "NO_USER_DOCUMENT_RESPONSE_STYLE" in prompt
+    assert "educational explanation, not as a terse conclusion" in prompt
+    assert "Do not refuse the question or require an upload" in prompt
+
+
+def test_prompt_with_attached_document_does_not_add_no_document_style():
+    user_hit = RagChunkHit(
+        citationId="USER-1",
+        sourceType="USER_DOCUMENT",
+        score=0.9,
+        chunkText="A sample contract clause.",
+        documentId="doc_1",
+        fileName="contract.pdf",
+    )
+
+    prompt = build_user_prompt(
+        "Explain this clause",
+        [user_hit],
+        [],
+        session_active_document_ids=["doc_1"],
+        message_attached_document_ids=["doc_1"],
+    )
+
+    assert "NO_USER_DOCUMENT_RESPONSE_STYLE" not in prompt
+
+
 def test_signing_decision_prompt_never_encourages_signing_and_offers_expert_ticket():
     from app.services.prompt_builder import build_intent_instruction
 

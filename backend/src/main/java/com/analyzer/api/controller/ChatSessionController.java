@@ -120,12 +120,12 @@ public class ChatSessionController {
 
     @PostMapping("/api/v1/chat-sessions/{chatSessionId}/share")
     @PreAuthorize("hasRole('CUSTOMER')")
-    @Operation(summary = "Share chat session", description = "Generates (or reuses) a read-only share link for Admin/Expert to view this chat session's history.")
+    @Operation(summary = "Share chat session", description = "Generates (or reuses) a public, read-only share link for anyone with the URL to view this chat session's history.")
     public ResponseEntity<ApiResponseDTO<ShareChatSessionResponse>> shareChatSession(
             @PathVariable String chatSessionId,
             @RequestBody(required = false) com.analyzer.api.dto.chatsession.ShareChatSessionRequest request) {
         com.analyzer.api.enums.ShareAccessLevel accessLevel = request == null
-                ? com.analyzer.api.enums.ShareAccessLevel.RESTRICTED : request.getAccessLevel();
+                ? com.analyzer.api.enums.ShareAccessLevel.PUBLIC : request.getAccessLevel();
         ShareChatSessionResponse response = chatSessionService.shareChatSession(
                 getCurrentUserId(), chatSessionId, accessLevel);
         return ResponseEntity.ok(ApiResponseDTO.success("Chat session shared successfully", response));

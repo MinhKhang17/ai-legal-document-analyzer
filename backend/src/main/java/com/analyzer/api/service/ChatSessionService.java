@@ -16,5 +16,5 @@ public interface ChatSessionService {
     ChatSessionResponse updateChatSession(Long userId, String chatSessionId, UpdateChatSessionRequest request);
     DeleteChatSessionResponse deleteChatSession(Long userId, String chatSessionId);
     ShareChatSessionResponse shareChatSession(Long userId, String chatSessionId, com.analyzer.api.enums.ShareAccessLevel accessLevel);
-    SharedChatSessionResponse getSharedChatSession(String shareToken, boolean adminOrExpert);
+    SharedChatSessionResponse getSharedChatSession(String shareToken);
 }

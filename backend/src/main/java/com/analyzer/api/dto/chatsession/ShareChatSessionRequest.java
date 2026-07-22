@@ -5,5 +5,5 @@ import lombok.Data;
 
 @Data
 public class ShareChatSessionRequest {
-    private ShareAccessLevel accessLevel = ShareAccessLevel.RESTRICTED;
+    private ShareAccessLevel accessLevel = ShareAccessLevel.PUBLIC;
 }

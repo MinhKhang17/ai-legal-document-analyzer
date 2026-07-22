@@ -77,4 +77,11 @@ public interface LegalTicketRepository extends JpaRepository<LegalTicket, String
             Collection<LegalTicketStatus> excludedStatuses,
             LocalDateTime start,
             LocalDateTime end);
+
+    long countByCreatedByIdAndTicketTypeInAndDeletedFalseAndStatusNotInAndCreatedAtBetween(
+            Long createdById,
+            Collection<LegalTicketType> ticketTypes,
+            Collection<LegalTicketStatus> excludedStatuses,
+            LocalDateTime start,
+            LocalDateTime end);
 }

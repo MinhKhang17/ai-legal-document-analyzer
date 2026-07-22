@@ -41,6 +41,36 @@ export class ApiRequestError extends Error {
   }
 }
 
+const PLAN_ENTITLEMENT_ERROR_CODES = new Set([
+  "WORKSPACE_LIMIT_REACHED",
+  "CONTRACT_ANALYSIS_QUOTA_EXCEEDED",
+  "ATTACHED_DOCUMENT_LIMIT_EXCEEDED",
+  "AI_TOKEN_QUOTA_EXCEEDED",
+  "DRAFT_CONTRACT_QUOTA_EXCEEDED",
+  "EXPERT_TICKET_REQUIRES_PREMIUM",
+  "EXPERT_TICKET_QUOTA_EXCEEDED",
+  "FREE_SUPPORT_TICKET_LIMIT_REACHED",
+  "SYSTEM_ERROR_TICKET_NOT_ALLOWED",
+  "QUERY_ERROR_TICKET_NOT_ALLOWED",
+  "SUBSCRIPTION_NOT_FOUND",
+  "SUBSCRIPTION_INACTIVE",
+]);
+
+export const getApiErrorCode = (error: unknown): string | undefined => {
+  if (!(error instanceof ApiRequestError)) return undefined;
+  const explicitCode = error.details?.errorCode?.trim();
+  if (explicitCode) return explicitCode.toUpperCase();
+
+  const normalizedMessage = error.message.toUpperCase();
+  return [...PLAN_ENTITLEMENT_ERROR_CODES].find((code) => normalizedMessage.includes(code));
+};
+
+export const isPlanEntitlementError = (error: unknown): boolean => {
+  if (!(error instanceof ApiRequestError) || ![403, 409].includes(error.status)) return false;
+  const errorCode = getApiErrorCode(error);
+  return Boolean(errorCode && PLAN_ENTITLEMENT_ERROR_CODES.has(errorCode));
+};
+
 export const getReadableErrorMessage = (error: unknown, fallback: string): string => {
   if (error instanceof Error && error.message.trim().length > 0) {
     return error.message.trim();

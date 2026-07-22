@@ -28,5 +28,7 @@ public interface SubscriptionQuotaService {
 
     void checkCanCreateExpertTicket(User user);
 
+    void checkCanCreateSupportTicket(User user);
+
     void recordExpertTicketUsage(User user);
 }

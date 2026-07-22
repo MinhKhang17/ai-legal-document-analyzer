@@ -799,6 +799,8 @@ const en: TranslationDictionary = {
   "legalTickets.createSubmitting": "Creating ticket...",
   "legalTickets.createSuccess": "Legal ticket created successfully.",
   "legalTickets.createError": "Unable to create legal ticket.",
+  "legalTickets.planRequired":
+    "This service requires an eligible plan. Free users may create up to 3 system or query-error tickets per billing period; expert tickets require a higher plan.",
   "legalTickets.createWorkspaceRequired": "Please select a workspace.",
   "legalTickets.createQuestionRequired": "Please enter your question.",
   "legalTickets.emptyTitle": "No legal tickets yet",
@@ -3030,6 +3032,8 @@ const vi: TranslationDictionary = {
   "legalTickets.createSubmitting": "Đang tạo ticket...",
   "legalTickets.createSuccess": "Đã tạo ticket pháp lý thành công.",
   "legalTickets.createError": "Không thể tạo ticket pháp lý.",
+  "legalTickets.planRequired":
+    "Dịch vụ này của bạn yêu cầu gói plan phù hợp. Người dùng Free được tạo tối đa 3 ticket về hệ thống hoặc lỗi truy vấn trong mỗi chu kỳ; ticket với chuyên gia yêu cầu gói cao hơn.",
   "legalTickets.createWorkspaceRequired": "Vui lòng chọn workspace.",
   "legalTickets.createQuestionRequired": "Vui lòng nhập câu hỏi.",
   "legalTickets.emptyTitle": "Chưa có ticket pháp lý",

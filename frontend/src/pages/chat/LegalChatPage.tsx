@@ -1,6 +1,6 @@
 import { ArrowDown, Bot, Check, ChevronDown, ChevronUp, ClipboardCheck, Download, FileText, Files, Info, MoreHorizontal, Paperclip, Pencil, Plus, RefreshCw, Send, Share2, Square, Trash2, UserRound, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Badge } from "../../components/common/Badge";
 import { Button } from "../../components/common/Button";
 import { Card } from "../../components/common/Card";
@@ -38,6 +38,8 @@ import type { AiCitation } from "../../types/aiFeature";
 import { formatDisplayDateTime, formatNumber, formatPercent } from "../../utils/format";
 import { simulateStreaming } from "../../utils/simulateStreaming";
 import { supportedContractScopeText } from "../../config/supportedContractTypes";
+import { finishSubmission, tryStartSubmission } from "../../utils/submissionGuard";
+import { isPlanEntitlementError } from "../../services/http";
 
 import { getAccessToken as getSessionAccessToken } from "../../services/authSession";
 const getAccessToken = () => getSessionAccessToken() ?? "";
@@ -211,6 +213,7 @@ export function LegalChatPage() {
   const toast = useToast();
   const locale = language === "vi" ? "vi-VN" : "en-US";
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [workspaceDocuments, setWorkspaceDocuments] = useState<Document[]>([]);
   const [chatSessions, setChatSessions] = useState<WorkspaceChatSession[]>([]);
@@ -258,6 +261,7 @@ export function LegalChatPage() {
   const chatScrollContainerRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
   const activeRequestControllerRef = useRef<AbortController | null>(null);
+  const submissionPendingRef = useRef(false);
   const shouldAutoScrollRef = useRef(true);
   const [showNewResponseButton, setShowNewResponseButton] = useState(false);
   const lastSubmissionRef = useRef<{
@@ -508,6 +512,23 @@ export function LegalChatPage() {
 
   useEffect(() => () => activeRequestControllerRef.current?.abort(), []);
 
+  const handleWorkspaceChange = (nextWorkspaceId: string) => {
+    if (nextWorkspaceId === selectedWorkspaceId) return;
+
+    activeRequestControllerRef.current?.abort();
+    setSelectedWorkspaceId(nextWorkspaceId);
+    setSelectedSessionId("");
+    setSelectedDocumentId("");
+    setWorkspaceDocuments([]);
+    setAttachedDocuments([]);
+    setMessages([]);
+    setDocumentModalOpen(false);
+    setDocumentsExpanded(false);
+    setDocumentActionError("");
+    setError("");
+    setSearchParams(nextWorkspaceId ? { workspaceId: nextWorkspaceId } : {});
+  };
+
   const handleCreateSession = async () => {
     if (!selectedWorkspaceId) {
       return;
@@ -677,6 +698,14 @@ export function LegalChatPage() {
       toast.success(`${t("chat.ticketCreated")} ${ticket.id}.`, t("toast.successTitle"));
       setTicketDraft(null);
     } catch (err) {
+      if (isPlanEntitlementError(err)) {
+        const message = t("legalTickets.planRequired");
+        setError(message);
+        toast.warning(message, t("toast.warningTitle"));
+        setTicketDraft(null);
+        navigate("/billing/subscribe?reason=plan-required");
+        return;
+      }
       const message = getCreateTicketErrorMessage(err);
       setError(message);
       toast.error(message, t("toast.errorTitle"));
@@ -824,18 +853,14 @@ export function LegalChatPage() {
     sessionId?: string;
     documentId?: string;
   }) => {
-    if (sending || activeRequestControllerRef.current) return;
+    if (sending || submissionPendingRef.current || activeRequestControllerRef.current) return;
 
     const question = (override?.message ?? input).trim();
     const targetWorkspaceId = override?.workspaceId ?? selectedWorkspaceId;
-    const targetSessionId = override?.sessionId ?? selectedSessionId;
+    let targetSessionId = override?.sessionId ?? selectedSessionId;
     const targetDocumentId = override?.documentId ?? (selectedDocumentId || undefined);
 
     if (!question || !targetWorkspaceId) {
-      return;
-    }
-
-    if (!targetSessionId) {
       return;
     }
 
@@ -846,6 +871,33 @@ export function LegalChatPage() {
       setError(message);
       toast.error(message);
       return;
+    }
+
+    if (!tryStartSubmission(submissionPendingRef)) return;
+    setSending(true);
+
+    if (!targetSessionId) {
+      try {
+        const session = await createChatSession(
+          getAccessToken(),
+          targetWorkspaceId,
+          t("chat.sessionDefaultTitle").replace("{time}", new Date().toLocaleString(locale)),
+        );
+        targetSessionId = session.chatSessionId;
+        setChatSessions((previous) => [
+          session,
+          ...previous.filter((item) => item.chatSessionId !== session.chatSessionId),
+        ]);
+        setSelectedSessionId(session.chatSessionId);
+        setSearchParams({ workspaceId: targetWorkspaceId, sessionId: session.chatSessionId });
+      } catch {
+        const message = t("chat.sessionCreateError");
+        setError(message);
+        toast.error(message, t("toast.errorTitle"));
+        finishSubmission(submissionPendingRef);
+        setSending(false);
+        return;
+      }
     }
 
     const optimisticUserMessage = createOptimisticUserMessage(question, language, t("common.justNow"));
@@ -866,7 +918,6 @@ export function LegalChatPage() {
       },
     ]);
     setInput("");
-    setSending(true);
     setError("");
     shouldAutoScrollRef.current = true;
     window.requestAnimationFrame(() => chatInputRef.current?.focus());
@@ -939,6 +990,7 @@ export function LegalChatPage() {
       if (activeRequestControllerRef.current === controller) {
         activeRequestControllerRef.current = null;
       }
+      finishSubmission(submissionPendingRef);
       setSending(false);
       window.requestAnimationFrame(() => chatInputRef.current?.focus());
     }
@@ -1073,20 +1125,7 @@ export function LegalChatPage() {
               <select
                 className="form-field"
                 value={selectedWorkspaceId}
-                onChange={(event) => {
-                  const nextWorkspaceId = event.target.value;
-                  setSelectedWorkspaceId(nextWorkspaceId);
-                  setSelectedSessionId("");
-                  setSelectedDocumentId("");
-                  setMessages([]);
-                  if (nextWorkspaceId) {
-                    if (searchParams.get("workspaceId") !== nextWorkspaceId) {
-                      setSearchParams({ workspaceId: nextWorkspaceId });
-                    }
-                  } else {
-                    setSearchParams({});
-                  }
-                }}
+                onChange={(event) => handleWorkspaceChange(event.target.value)}
                 disabled={loading}
               >
                 <option value="">
@@ -1290,6 +1329,29 @@ export function LegalChatPage() {
 
         <section className="h-full min-h-0 min-w-0">
           <div className="relative flex h-full min-h-0 min-w-0 flex-col gap-xs sm:gap-sm">
+            <section className="shrink-0 rounded-xl border border-legal-border bg-white px-sm py-xs shadow-sm dark:border-slate-700 dark:bg-slate-900">
+              <div className="flex items-center gap-sm">
+                <label className="shrink-0 text-sm font-semibold text-on-surface-variant" htmlFor="chat-workspace-select">
+                  {t("chatHistory.workspaceFilter")}
+                </label>
+                <select
+                  id="chat-workspace-select"
+                  className="form-field min-w-0 flex-1"
+                  value={selectedWorkspaceId}
+                  onChange={(event) => handleWorkspaceChange(event.target.value)}
+                  disabled={loading || sending}
+                >
+                  <option value="">
+                    {loading ? t("chat.loadingWorkspaces") : t("chat.selectWorkspace")}
+                  </option>
+                  {workspaces.map((workspace) => (
+                    <option key={workspace.workspaceId} value={workspace.workspaceId}>
+                      {workspace.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </section>
             <section className={`shrink-0 rounded-xl border bg-white p-xs shadow-sm dark:bg-slate-900 ${chatBlockedByAttachedDocuments ? "border-amber-300 dark:border-amber-900" : "border-legal-border dark:border-slate-700"}`} aria-labelledby="chat-documents-heading">
               <div className="flex min-w-0 items-center gap-xs">
                 {attachedDocuments.length > 0 ? (

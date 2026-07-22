@@ -209,13 +209,19 @@ public class LegalTicketServiceImpl implements LegalTicketService {
             case CONTACT_EXPERT -> subscriptionQuotaService.checkCanCreateExpertTicket(customer);
             case SYSTEM_ERROR -> {
                 if (!Boolean.TRUE.equals(plan.getAllowSystemErrorTicket())) {
-                    throw new ConflictException("SYSTEM_ERROR_TICKET_NOT_ALLOWED");
+                    throw new ForbiddenException(
+                            "SYSTEM_ERROR_TICKET_NOT_ALLOWED",
+                            "The current plan does not allow system error tickets");
                 }
+                subscriptionQuotaService.checkCanCreateSupportTicket(customer);
             }
             case QUERY_ERROR -> {
                 if (!Boolean.TRUE.equals(plan.getAllowQueryErrorTicket())) {
-                    throw new ConflictException("QUERY_ERROR_TICKET_NOT_ALLOWED");
+                    throw new ForbiddenException(
+                            "QUERY_ERROR_TICKET_NOT_ALLOWED",
+                            "The current plan does not allow query error tickets");
                 }
+                subscriptionQuotaService.checkCanCreateSupportTicket(customer);
             }
             case REFUND_REQUEST -> { /* Refund tickets never consume expert quota. */ }
         }

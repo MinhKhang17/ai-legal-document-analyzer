@@ -388,6 +388,24 @@ def build_user_prompt(
     elif is_asking_for_source:
         suffix = "BẮT BUỘC: Bạn phải giải thích rõ nguồn gốc từ các trang web chính phủ Việt Nam và liệt kê danh sách tài liệu kèm link tải xuống. Không thêm phần gợi ý câu hỏi tiếp theo hay lưu ý rườm rà ở cuối."
 
+    has_attached_user_document = bool(
+        user_hits
+        or session_active_document_ids
+        or message_attached_document_ids
+        or focused_document_id
+    )
+    no_document_response_style = ""
+    if not has_attached_user_document:
+        no_document_response_style = (
+            "NO_USER_DOCUMENT_RESPONSE_STYLE:\n"
+            "- No user document is attached. Answer as an educational explanation, not as a terse conclusion.\n"
+            "- Explain the relevant concept or rule, why it matters, applicable conditions and exceptions, "
+            "and include a practical example or next step when useful.\n"
+            "- Do not pretend to analyze or reach a conclusion about a specific contract that was not provided.\n"
+            "- Do not refuse the question or require an upload merely because no document is attached; "
+            "use SYSTEM_KB_CONTEXT for general legal guidance when available.\n\n"
+        )
+
     return (
         f"QUESTION:\n{question.strip()}\n\n"
         f"DANH SÁCH TÀI LIỆU ĐANG CÓ TRONG HỆ THỐNG:\n{docs_summary}\n\n"
@@ -405,6 +423,7 @@ def build_user_prompt(
         f"SESSION_ACTIVE_DOCS:\n{describe_documents(session_active_document_ids)}\n\n"
         f"MESSAGE_ATTACHED_DOCS:\n{describe_documents(message_attached_document_ids)}\n\n"
         f"FOCUSED_DOCUMENT_ID:\n{focused_document_id or '[none]'}\n\n"
+        f"{no_document_response_style}"
         f"AVAILABLE_SYSTEM_KB_DOCS:\n{available_kb_docs}\n\n"
         f"USER_DOCUMENT_CONTEXT:\n{user_context}\n\n"
         f"SYSTEM_KB_CONTEXT:\n{knowledge_context}\n\n"

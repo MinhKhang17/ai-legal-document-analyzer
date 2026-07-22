@@ -26,6 +26,8 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -96,6 +98,37 @@ class SubscriptionQuotaServiceImplTest {
                 .isInstanceOf(ConflictException.class)
                 .extracting(error -> ((ConflictException) error).getErrorCode())
                 .isEqualTo("SUBSCRIPTION_INACTIVE");
+    }
+
+    @Test
+    void freeUserCreatesSystemOrQueryTicketWithinThreeTicketLimit() {
+        User user = User.builder().id(40L).build();
+        when(customerPlanExpiryHelper.getActiveOrHandleExpiry(40L)).thenReturn(null);
+        when(subscriptionPlanRepository.findByPlanTypeIgnoreCase("FREE"))
+                .thenReturn(Optional.of(plan("FREE", 1, true)));
+        when(legalTicketRepository
+                .countByCreatedByIdAndTicketTypeInAndDeletedFalseAndStatusNotInAndCreatedAtBetween(
+                        any(), anyList(), anyList(), any(), any()))
+                .thenReturn(2L);
+
+        assertThatCode(() -> service.checkCanCreateSupportTicket(user)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void freeUserAtSystemAndQueryTicketLimitGetsExplicitConflict() {
+        User user = User.builder().id(41L).build();
+        when(customerPlanExpiryHelper.getActiveOrHandleExpiry(41L)).thenReturn(null);
+        when(subscriptionPlanRepository.findByPlanTypeIgnoreCase("FREE"))
+                .thenReturn(Optional.of(plan("FREE", 1, true)));
+        when(legalTicketRepository
+                .countByCreatedByIdAndTicketTypeInAndDeletedFalseAndStatusNotInAndCreatedAtBetween(
+                        any(), anyList(), anyList(), any(), any()))
+                .thenReturn(3L);
+
+        assertThatThrownBy(() -> service.checkCanCreateSupportTicket(user))
+                .isInstanceOf(ConflictException.class)
+                .extracting(error -> ((ConflictException) error).getErrorCode())
+                .isEqualTo("FREE_SUPPORT_TICKET_LIMIT_REACHED");
     }
 
     private SubscriptionPlan plan(String type, int maxWorkspaces, boolean active) {

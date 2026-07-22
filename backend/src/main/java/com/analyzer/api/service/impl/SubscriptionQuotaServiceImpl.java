@@ -43,6 +43,7 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
     private static final String USER_DOCUMENT_SOURCE_TYPE = "USER_DOCUMENT";
     private static final String SYSTEM_SANDBOX_NAME = "Contract Assistant Sandbox";
     private static final String SYSTEM_SANDBOX_DESCRIPTION = "System workspace for general contract assistant chat";
+    private static final int FREE_SUPPORT_TICKET_LIMIT = 3;
 
     private final SubscriptionPlanRepository subscriptionPlanRepository;
     private final WorkspaceRepository workspaceRepository;
@@ -258,6 +259,36 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
         SubscriptionQuotaUsageSummaryResponse usage = getCurrentUsage(user);
         if (usage.getExpertTicketsUsed() >= ticketQuota) {
             throw new ConflictException("EXPERT_TICKET_QUOTA_EXCEEDED");
+        }
+    }
+
+    @Override
+    @Transactional
+    public void checkCanCreateSupportTicket(User user) {
+        userQuotaLock.acquire(user.getId());
+        SubscriptionPlan plan = getCurrentPlan(user);
+        if (!"FREE".equalsIgnoreCase(plan.getPlanType())) {
+            return;
+        }
+
+        CustomerPlan activePlan = getActiveCustomerPlan(user.getId());
+        LocalDateTime periodStart = activePlan != null && activePlan.getBillingCycleStartAt() != null
+                ? activePlan.getBillingCycleStartAt()
+                : AppClock.now().withDayOfMonth(1).toLocalDate().atStartOfDay();
+        LocalDateTime periodEnd = activePlan != null && activePlan.getBillingCycleEndAt() != null
+                ? activePlan.getBillingCycleEndAt()
+                : periodStart.plusMonths(1);
+        long supportTicketsUsed = legalTicketRepository
+                .countByCreatedByIdAndTicketTypeInAndDeletedFalseAndStatusNotInAndCreatedAtBetween(
+                        user.getId(),
+                        List.of(LegalTicketType.SYSTEM_ERROR, LegalTicketType.QUERY_ERROR),
+                        List.of(LegalTicketStatus.CANCELLED, LegalTicketStatus.REJECTED_BY_ADMIN),
+                        periodStart,
+                        periodEnd);
+        if (supportTicketsUsed >= FREE_SUPPORT_TICKET_LIMIT) {
+            throw new ConflictException(
+                    "FREE_SUPPORT_TICKET_LIMIT_REACHED",
+                    "Free plan allows up to 3 system or query support tickets per billing period");
         }
     }
 

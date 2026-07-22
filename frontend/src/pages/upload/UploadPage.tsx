@@ -23,7 +23,7 @@ import { getAccessToken as getSessionAccessToken } from "../../services/authSess
 import { supportedContractScopeText } from "../../config/supportedContractTypes";
 import { formatFileSize, localeForLanguage } from "../../utils/format";
 import { validateDocumentFiles } from "../../config/upload";
-import { getReadableErrorMessage } from "../../services/http";
+import { getReadableErrorMessage, isPlanEntitlementError } from "../../services/http";
 const getAccessToken = () => getSessionAccessToken() ?? "";
 
 export function UploadPage() {
@@ -158,6 +158,13 @@ export function UploadPage() {
       setWorkspaceDescription("");
       toast.success(t("workspace.createSuccess"), t("toast.successTitle"));
     } catch (createError) {
+      if (isPlanEntitlementError(createError)) {
+        const message = t("legalTickets.planRequired");
+        setError(message);
+        toast.warning(message, t("toast.warningTitle"));
+        navigate("/billing/subscribe?reason=plan-required");
+        return;
+      }
       const message = getReadableErrorMessage(createError, t("workspace.createError"));
       setError(message);
       toast.error(message, t("toast.errorTitle"));
