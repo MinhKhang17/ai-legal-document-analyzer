@@ -1,5 +1,4 @@
 import {
-  Activity,
   BookOpen,
   ChevronLeft,
   ChevronRight,
@@ -12,7 +11,6 @@ import {
   Receipt,
   CircleDollarSign,
   UserRound,
-  ShieldCheck,
   TicketCheck,
   UploadCloud,
   UsersRound,
@@ -81,13 +79,6 @@ const navItems: NavItem[] = [
     allowedRoles: ['EXPERT'],
   },
   {
-    to: '/editor/risk-review',
-    labelKey: 'nav.riskReview',
-    icon: ShieldCheck,
-    section: 'intelligence',
-    allowedRoles: ['ADMIN'],
-  },
-  {
     to: '/chat',
     labelKey: 'nav.legalChat',
     icon: MessageSquareText,
@@ -106,13 +97,6 @@ const navItems: NavItem[] = [
     to: '/tickets',
     labelKey: 'nav.legalTickets',
     icon: TicketCheck,
-    section: 'intelligence',
-    allowedRoles: ['CUSTOMER'],
-  },
-  {
-    to: '/contracts',
-    labelKey: 'nav.contracts',
-    icon: FileText,
     section: 'intelligence',
     allowedRoles: ['CUSTOMER'],
   },
@@ -151,13 +135,7 @@ const navItems: NavItem[] = [
     section: 'admin',
     allowedRoles: ['ADMIN'],
   },
-  {
-    to: '/admin/system-health',
-    labelKey: 'nav.systemHealth',
-    icon: Activity,
-    section: 'admin',
-    allowedRoles: ['ADMIN'],
-  },
+
   {
     to: '/admin/feedback',
     labelKey: 'nav.feedback',
