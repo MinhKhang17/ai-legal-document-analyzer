@@ -6,7 +6,6 @@ import { Badge } from '../../components/common/Badge';
 import { Button } from '../../components/common/Button';
 import { Card } from '../../components/common/Card';
 import { DataTable, type DataTableColumn } from '../../components/common/DataTable';
-import { EmptyState } from '../../components/common/EmptyState';
 import { Modal } from '../../components/common/Modal';
 import { PageHeader } from '../../components/common/PageHeader';
 import { Pagination } from '../../components/common/Pagination';
@@ -35,7 +34,7 @@ import { getAdminTicketLoadErrorMessage, getSafeApiErrorStatus } from '../../uti
 import { formatDisplayDate, formatNumber, formatVndCurrency, localeForLanguage } from '../../utils/format';
 import { clampPage } from '../../utils/pagination';
 
-type AdminTabId = 'users' | 'plans' | 'tickets' | 'workspace' | 'language' | 'theme' | 'security' | 'aiConfig';
+type AdminTabId = 'users' | 'plans' | 'tickets' | 'workspace' | 'language' | 'theme' | 'aiConfig';
 
 const adminTabs: Array<{ id: AdminTabId; labelKey?: string; label?: string }> = [
   { id: 'users', labelKey: 'admin.tabs.users' },
@@ -44,7 +43,6 @@ const adminTabs: Array<{ id: AdminTabId; labelKey?: string; label?: string }> = 
   { id: 'workspace', labelKey: 'admin.tabs.workspace' },
   { id: 'language', labelKey: 'admin.tabs.language' },
   { id: 'theme', labelKey: 'admin.tabs.theme' },
-  { id: 'security', labelKey: 'admin.tabs.security' },
   { id: 'aiConfig', labelKey: 'admin.tabs.aiConfig' },
 ];
 
@@ -90,13 +88,12 @@ const getInitials = (user: BackendUser) => {
     .slice(0, 2);
 };
 
-const toWorkspaceUser = (user: BackendUser, lastAccess: string): WorkspaceUser => ({
+const toWorkspaceUser = (user: BackendUser): WorkspaceUser => ({
   id: String(user.id),
   name: `${user.firstName} ${user.lastName}`.trim() || user.email,
   email: user.email,
   role: user.role,
   status: user.active ? 'active' : 'offline',
-  lastAccess,
   initials: getInitials(user),
 });
 
@@ -188,7 +185,7 @@ export function AdminConsolePage() {
 
     if (usersResult.status === 'fulfilled') {
       setBackendUsers(usersResult.value);
-      setAdminUsers(usersResult.value.map((user) => toWorkspaceUser(user, t('admin.users.lastAccessUnavailable'))));
+      setAdminUsers(usersResult.value.map(toWorkspaceUser));
     } else {
       setBackendUsers([]);
       setAdminUsers([]);
@@ -486,7 +483,6 @@ export function AdminConsolePage() {
         </div>
       ),
     },
-    { header: t('admin.users.lastAccess'), cell: (user) => <span className="whitespace-nowrap">{user.lastAccess}</span> },
     {
       header: t('table.actions'),
       cell: (user) => {
@@ -643,8 +639,7 @@ export function AdminConsolePage() {
         <AdminMetricCard label={t('admin.users.paymentRowsLabel')} value={isLoadingAdminData ? '...' : String(paymentTransactions.length)} detail={t('admin.users.paymentRowsDetail')} icon={<Receipt className="h-5 w-5" />} tone="gold" />
       </section>
 
-      <div className="mt-xl grid gap-gutter xl:grid-cols-[1.2fr_0.8fr]">
-        <div className="space-y-gutter">
+      <div className="mt-xl space-y-gutter">
           <Card
             title={t('admin.users')}
             actions={
@@ -688,23 +683,6 @@ export function AdminConsolePage() {
               />
             )}
           </Card>
-        </div>
-
-        <aside className="space-y-gutter">
-          <Card tone="ai">
-            <EmptyState
-              title={t('admin.users.aiRecommendationUnavailableTitle')}
-              description={t('admin.users.aiRecommendationUnavailableDescription')}
-            />
-          </Card>
-
-          <Card title={t('admin.security')}>
-            <EmptyState
-              title={t('admin.securityMetricsUnavailableTitle')}
-              description={t('admin.securityMetricsUnavailableDescription')}
-            />
-          </Card>
-        </aside>
       </div>
     </>
   );
@@ -1058,24 +1036,6 @@ export function AdminConsolePage() {
     </div>
   );
 
-  const renderSecurityTab = () => (
-    <div className="grid gap-gutter xl:grid-cols-[1.15fr_0.85fr]">
-      <Card title={t('admin.security')} subtitle={t('admin.security.subtitle')}>
-        <EmptyState
-          title={t('admin.securityMetricsUnavailableTitle')}
-          description={t('admin.securityMetricsUnavailableDescription')}
-        />
-      </Card>
-
-      <Card tone="ai">
-        <EmptyState
-          title={t('admin.securityGuidanceUnavailableTitle')}
-          description={t('admin.securityGuidanceUnavailableDescription')}
-        />
-      </Card>
-    </div>
-  );
-
   const renderAiConfigTab = () => (
     <div className="grid gap-gutter xl:grid-cols-[1.15fr_0.85fr]">
       <Card title={t('admin.aiConfig')} subtitle={t('admin.aiConfig.subtitle')}>
@@ -1125,8 +1085,6 @@ export function AdminConsolePage() {
         return renderLanguageTab();
       case 'theme':
         return renderThemeTab();
-      case 'security':
-        return renderSecurityTab();
       case 'aiConfig':
         return renderAiConfigTab();
       default:

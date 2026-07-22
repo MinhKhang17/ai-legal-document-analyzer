@@ -6,6 +6,5 @@ export interface WorkspaceUser {
   email: string;
   role: string;
   status: Status;
-  lastAccess: string;
   initials: string;
 }
