@@ -10,5 +10,6 @@ public interface PaymentTransactionService {
     List<PaymentTransactionResponseDTO> getMyTransactions(Long customerId);
     List<PaymentTransactionResponseDTO> getAllTransactions();
     PaymentUrlResponseDTO createVnPayPaymentUrl(Long transactionId, Long customerId, String clientIp);
+    PaymentUrlResponseDTO createExpertTicketVnPayPaymentUrl(String ticketId, Long customerId, String clientIp);
     PaymentTransactionResponseDTO handleVnPayCallback(Map<String, String> callbackParams);
 }

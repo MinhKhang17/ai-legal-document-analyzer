@@ -97,7 +97,25 @@ public class ExpertTicketWorkflowServiceImpl implements ExpertTicketWorkflowServ
             audit(ticket, expert, "RECLASSIFICATION_REQUESTED",
                     request.getProposedType() + ":" + request.getReason());
         } else {
-            if (ticket.getPricingType() == TicketPricingType.PLAN_INCLUDED) reserveCredit(ticket);
+            if (ticket.getPricingType() == TicketPricingType.PLAN_INCLUDED) {
+                try {
+                    reserveCredit(ticket);
+                } catch (ConflictException exception) {
+                    if (!"EXPERT_TICKET_CREDIT_UNAVAILABLE_REQUIRES_PAID_QUOTE"
+                            .equals(exception.getErrorCode())) {
+                        throw exception;
+                    }
+                    ticket.setStatus(LegalTicketStatus.RECLASSIFICATION_REQUESTED);
+                    ticket.setClassificationReason(
+                            "Included expert-ticket quota is exhausted; a paid quote is required.");
+                    ticket.setPricingType(null);
+                    ticket.setUserPrice(null);
+                    ticket.setQuoteStatus(TicketQuoteStatus.DRAFT);
+                    ticket.setCustomerPaymentStatus(TicketPaymentStatus.UNPAID);
+                    audit(ticket, expert, "PAID_RECLASSIFICATION_REQUIRED", "included-credit-exhausted");
+                    return expertResponse(ticketRepository.save(ticket));
+                }
+            }
             ticket.setQuoteStatus(TicketQuoteStatus.SENT);
             ticket.setStatus(LegalTicketStatus.WAITING_USER_ACCEPTANCE);
             audit(ticket, expert, "EXPERT_ACCEPTED", "assessment");

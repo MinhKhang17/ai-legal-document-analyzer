@@ -13,5 +13,7 @@ public interface PaymentTransactionMapper {
     @Mapping(target = "subscriptionPlanId", source = "subscriptionPlan.id")
     @Mapping(target = "planName", source = "subscriptionPlan.planName")
     @Mapping(target = "customerPlanId", source = "customerPlan.id")
+    @Mapping(target = "legalTicketId", source = "legalTicket.id")
+    @Mapping(target = "legalTicketTitle", source = "legalTicket.title")
     PaymentTransactionResponseDTO toResponseDTO(PaymentTransaction transaction);
 }

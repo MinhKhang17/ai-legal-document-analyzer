@@ -36,3 +36,16 @@ export const createVnPayPaymentUrl = async (
     },
     "Không thể tạo URL thanh toán VNPAY",
   );
+
+export const createExpertTicketVnPayPaymentUrl = async (
+  ticketId: string,
+): Promise<PaymentUrlResponse> =>
+  requestApiData<PaymentUrlResponse>(
+    API_ENDPOINTS.paymentTransactions.expertTicketVnPayUrl(ticketId),
+    {
+      method: "POST",
+      headers: buildAuthHeaders({ Accept: "application/json" }),
+      credentials: "include",
+    },
+    "Không thể tạo URL thanh toán ticket chuyên gia",
+  );

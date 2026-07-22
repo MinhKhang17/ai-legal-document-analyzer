@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 SourceType = Literal["USER_DOCUMENT", "SYSTEM_KB"]
@@ -124,6 +124,13 @@ class RagQueryRequest(BaseModel):
     model_config = {
         "populate_by_name": True
     }
+
+    @field_validator("draftingInformation", mode="before")
+    @classmethod
+    def normalize_null_drafting_information(cls, value):
+        # Older backend images sent an explicit null for ordinary LEGAL_QA
+        # requests. Treat that exactly like an omitted optional drafting map.
+        return {} if value is None else value
 
 
 class RagCitation(BaseModel):

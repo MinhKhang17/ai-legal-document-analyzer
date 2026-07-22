@@ -1,6 +1,7 @@
 package com.analyzer.api.entity;
 
 import com.analyzer.api.enums.PaymentMethod;
+import com.analyzer.api.enums.PaymentPurpose;
 import com.analyzer.api.enums.PaymentStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -25,8 +26,12 @@ public class PaymentTransaction {
     private User customer;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "subscription_plan_id", nullable = false)
+    @JoinColumn(name = "subscription_plan_id")
     private SubscriptionPlan subscriptionPlan;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "legal_ticket_id")
+    private LegalTicket legalTicket;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "customer_plan_id", nullable = true)
@@ -42,6 +47,11 @@ public class PaymentTransaction {
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_status", nullable = false)
     private PaymentStatus paymentStatus;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_purpose", nullable = false)
+    @Builder.Default
+    private PaymentPurpose paymentPurpose = PaymentPurpose.SUBSCRIPTION;
 
     @Column(name = "transaction_code", nullable = false, unique = true)
     private String transactionCode;
@@ -66,6 +76,7 @@ public class PaymentTransaction {
 
     @PrePersist
     protected void onCreate() {
+        if (paymentPurpose == null) paymentPurpose = PaymentPurpose.SUBSCRIPTION;
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
     }

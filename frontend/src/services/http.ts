@@ -68,7 +68,7 @@ export const getApiErrorCode = (error: unknown): string | undefined => {
 
 let refreshRequest: Promise<string | undefined> | undefined;
 
-const refreshAccessTokenOnce = (): Promise<string | undefined> => {
+export const refreshAccessTokenOnce = (): Promise<string | undefined> => {
   if (!refreshRequest) {
     refreshRequest = fetch(buildApiUrl(API_ENDPOINTS.auth.refresh), {
       method: "POST",

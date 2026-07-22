@@ -8,6 +8,7 @@ import com.analyzer.api.mapper.LegalTicketMapper;
 import com.analyzer.api.repository.*;
 import com.analyzer.api.service.*;
 import com.analyzer.api.service.support.UserQuotaLock;
+import com.analyzer.api.dto.subscription.SubscriptionQuotaUsageSummaryResponse;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -75,6 +76,34 @@ class ExpertTicketWorkflowServiceImplTest {
                 ExpertAssignmentDecisionRequest.builder().decision("ACCEPT").build()))
                 .isInstanceOf(ConflictException.class);
         assertThat(ticket.getAssignedLawyer()).isNull();
+    }
+
+    @Test
+    void exhaustedIncludedCreditReturnsTicketForPaidReclassification() {
+        User expert = user(2L, RoleName.EXPERT);
+        LegalTicket ticket = ticket(LegalTicketStatus.PENDING_EXPERT_ASSESSMENT);
+        ticket.setProposedExpert(expert);
+        ticket.setPricingType(TicketPricingType.PLAN_INCLUDED);
+        ticket.setQuoteStatus(TicketQuoteStatus.DRAFT);
+        when(ticketRepository.findByIdAndDeletedFalse("ticket-1")).thenReturn(Optional.of(ticket));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(expert));
+        when(quotaService.getCurrentUsage(ticket.getCreatedBy())).thenReturn(
+                SubscriptionQuotaUsageSummaryResponse.builder()
+                        .periodStart(LocalDateTime.of(2026, 7, 1, 0, 0))
+                        .periodEnd(LocalDateTime.of(2026, 8, 1, 0, 0))
+                        .expertTicketsLimit(1)
+                        .build());
+        when(creditRepository.countByUser_IdAndQuotaCycleAndStatusIn(
+                eq(ticket.getCreatedBy().getId()), anyString(), anyList())).thenReturn(1L);
+
+        service.assess(2L, "ticket-1", ExpertTicketAssessmentRequest.builder()
+                .decision("ACCEPT").build());
+
+        assertThat(ticket.getStatus()).isEqualTo(LegalTicketStatus.RECLASSIFICATION_REQUESTED);
+        assertThat(ticket.getPricingType()).isNull();
+        assertThat(ticket.getCustomerPaymentStatus()).isEqualTo(TicketPaymentStatus.UNPAID);
+        verify(collaborationService).auditTicket(ticket, expert, "PAID_RECLASSIFICATION_REQUIRED",
+                "{\"reason\":\"included-credit-exhausted\"}");
     }
 
     @Test

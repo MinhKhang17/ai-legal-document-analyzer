@@ -4,16 +4,23 @@ import com.analyzer.api.config.VnPayProperties;
 import com.analyzer.api.dto.paymenttransaction.PaymentTransactionResponseDTO;
 import com.analyzer.api.dto.paymenttransaction.PaymentUrlResponseDTO;
 import com.analyzer.api.entity.CustomerPlan;
+import com.analyzer.api.entity.LegalTicket;
 import com.analyzer.api.entity.PaymentTransaction;
 import com.analyzer.api.enums.PaymentMethod;
+import com.analyzer.api.enums.PaymentPurpose;
 import com.analyzer.api.enums.PaymentStatus;
 import com.analyzer.api.enums.PlanStatus;
+import com.analyzer.api.enums.LegalTicketStatus;
+import com.analyzer.api.enums.TicketPaymentStatus;
+import com.analyzer.api.enums.TicketPricingType;
+import com.analyzer.api.enums.TicketQuoteStatus;
 import com.analyzer.api.exception.common.ConflictException;
 import com.analyzer.api.exception.common.ForbiddenException;
 import com.analyzer.api.exception.common.ResourceNotFoundException;
 import com.analyzer.api.exception.payment.VnPayCallbackException;
 import com.analyzer.api.mapper.PaymentTransactionMapper;
 import com.analyzer.api.repository.CustomerPlanRepository;
+import com.analyzer.api.repository.LegalTicketRepository;
 import com.analyzer.api.repository.PaymentTransactionRepository;
 import com.analyzer.api.service.PaymentTransactionService;
 import com.analyzer.api.util.AppClock;
@@ -34,6 +41,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -48,6 +56,7 @@ public class PaymentTransactionServiceImpl implements PaymentTransactionService 
 
     private final PaymentTransactionRepository paymentTransactionRepository;
     private final CustomerPlanRepository customerPlanRepository;
+    private final LegalTicketRepository legalTicketRepository;
     private final PaymentTransactionMapper paymentTransactionMapper;
     private final VnPayProperties vnPayProperties;
 
@@ -105,6 +114,70 @@ public class PaymentTransactionServiceImpl implements PaymentTransactionService 
 
     @Override
     @Transactional
+    public PaymentUrlResponseDTO createExpertTicketVnPayPaymentUrl(
+            String ticketId, Long customerId, String clientIp) {
+        LegalTicket ticket = legalTicketRepository.findByIdForPaymentUpdate(ticketId)
+                .orElseThrow(() -> new ResourceNotFoundException("TICKET_NOT_FOUND"));
+        if (!ticket.getCreatedBy().getId().equals(customerId)) {
+            throw new ForbiddenException("TICKET_ACCESS_DENIED");
+        }
+        if (ticket.getCustomerPaymentStatus() == TicketPaymentStatus.PAID) {
+            throw new ConflictException("EXPERT_TICKET_ALREADY_PAID", "Ticket này đã được thanh toán");
+        }
+        if (ticket.getStatus() != LegalTicketStatus.WAITING_PAYMENT
+                || ticket.getPricingType() != TicketPricingType.PAID
+                || ticket.getQuoteStatus() != TicketQuoteStatus.ACCEPTED
+                || ticket.getUserPrice() == null
+                || ticket.getUserPrice().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ConflictException(
+                    "EXPERT_TICKET_PAYMENT_NOT_AVAILABLE",
+                    "Ticket phải có báo giá trả phí đã được chấp nhận trước khi thanh toán");
+        }
+        if (!isValidVnPayAmount(ticket.getUserPrice())) {
+            throw new ConflictException(
+                    "EXPERT_TICKET_PAYMENT_AMOUNT_INVALID",
+                    "Giá ticket phải từ 5.000 VND đến dưới 1 tỷ VND để thanh toán VNPAY");
+        }
+
+        PaymentTransaction transaction = paymentTransactionRepository
+                .findTopByLegalTicket_IdAndPaymentStatusOrderByCreatedAtDesc(ticketId, PaymentStatus.PENDING)
+                .orElseGet(() -> paymentTransactionRepository.save(PaymentTransaction.builder()
+                        .customer(ticket.getCreatedBy())
+                        .legalTicket(ticket)
+                        .amount(ticket.getUserPrice())
+                        .paymentMethod(PaymentMethod.VNPAY)
+                        .paymentStatus(PaymentStatus.PENDING)
+                        .paymentPurpose(PaymentPurpose.EXPERT_TICKET)
+                        .transactionCode("ET" + UUID.randomUUID().toString().replace("-", "")
+                                .substring(0, 12).toUpperCase())
+                        .build()));
+        if (transaction.getAmount().compareTo(ticket.getUserPrice()) != 0) {
+            transaction.setPaymentStatus(PaymentStatus.CANCELLED);
+            paymentTransactionRepository.save(transaction);
+            transaction = paymentTransactionRepository.save(PaymentTransaction.builder()
+                    .customer(ticket.getCreatedBy())
+                    .legalTicket(ticket)
+                    .amount(ticket.getUserPrice())
+                    .paymentMethod(PaymentMethod.VNPAY)
+                    .paymentStatus(PaymentStatus.PENDING)
+                    .paymentPurpose(PaymentPurpose.EXPERT_TICKET)
+                    .transactionCode("ET" + UUID.randomUUID().toString().replace("-", "")
+                            .substring(0, 12).toUpperCase())
+                    .build());
+        }
+        ticket.setCustomerPaymentStatus(TicketPaymentStatus.PENDING);
+        legalTicketRepository.save(ticket);
+
+        String paymentUrl = createPaymentUrl(transaction, clientIp);
+        transaction.setPaymentUrl(paymentUrl);
+        transaction = paymentTransactionRepository.save(transaction);
+        return new PaymentUrlResponseDTO(
+                transaction.getId(), transaction.getTransactionCode(), PaymentMethod.VNPAY.name(),
+                paymentUrl, vnPayProperties.getReturnUrl());
+    }
+
+    @Override
+    @Transactional
     public PaymentTransactionResponseDTO handleVnPayCallback(Map<String, String> callbackParams) {
         if (!isValidSignature(callbackParams)) {
             throw new VnPayCallbackException("97", "Invalid signature");
@@ -145,6 +218,10 @@ public class PaymentTransactionServiceImpl implements PaymentTransactionService 
         transaction.setPaidAt(AppClock.now());
         PaymentTransaction savedTransaction = paymentTransactionRepository.save(transaction);
 
+        if (transaction.getPaymentPurpose() == PaymentPurpose.EXPERT_TICKET) {
+            activatePaidExpertTicket(transaction);
+        }
+
         CustomerPlan customerPlanRef = transaction.getCustomerPlan();
         if (customerPlanRef != null) {
             // Lock the CustomerPlan row: a customer can switch their PENDING plan selection
@@ -171,6 +248,30 @@ public class PaymentTransactionServiceImpl implements PaymentTransactionService 
         }
 
         return savedTransaction;
+    }
+
+    private void activatePaidExpertTicket(PaymentTransaction transaction) {
+        LegalTicket reference = transaction.getLegalTicket();
+        if (reference == null) {
+            throw new VnPayCallbackException("01", "Expert ticket payment has no ticket reference");
+        }
+        LegalTicket ticket = legalTicketRepository.findByIdForPaymentUpdate(reference.getId())
+                .orElseThrow(() -> new VnPayCallbackException("01", "Expert ticket not found"));
+        if (!ticket.getCreatedBy().getId().equals(transaction.getCustomer().getId())
+                || ticket.getPricingType() != TicketPricingType.PAID
+                || ticket.getQuoteStatus() != TicketQuoteStatus.ACCEPTED
+                || ticket.getUserPrice() == null
+                || ticket.getUserPrice().compareTo(transaction.getAmount()) != 0) {
+            throw new VnPayCallbackException("04", "Expert ticket payment does not match quote");
+        }
+        if (ticket.getCustomerPaymentStatus() == TicketPaymentStatus.PAID) return;
+        if (ticket.getStatus() != LegalTicketStatus.WAITING_PAYMENT) {
+            throw new VnPayCallbackException("02", "Expert ticket is no longer waiting for payment");
+        }
+        ticket.setCustomerPaymentStatus(TicketPaymentStatus.PAID);
+        ticket.setCustomerPaymentReference(transaction.getTransactionCode());
+        ticket.setStatus(LegalTicketStatus.READY_FOR_ASSIGNMENT);
+        legalTicketRepository.save(ticket);
     }
 
     private void activateCustomerPlan(PaymentTransaction transaction, CustomerPlan customerPlan) {
@@ -222,7 +323,10 @@ public class PaymentTransactionServiceImpl implements PaymentTransactionService 
         params.put("vnp_Amount", toVnPayAmount(transaction.getAmount()));
         params.put("vnp_CurrCode", vnPayProperties.getCurrCode());
         params.put("vnp_TxnRef", transaction.getTransactionCode());
-        params.put("vnp_OrderInfo", "Thanh toan goi dich vu " + transaction.getSubscriptionPlan().getPlanName());
+        String orderInfo = transaction.getPaymentPurpose() == PaymentPurpose.EXPERT_TICKET
+                ? "Thanh toan ticket chuyen gia " + transaction.getLegalTicket().getId()
+                : "Thanh toan goi dich vu " + transaction.getSubscriptionPlan().getPlanName();
+        params.put("vnp_OrderInfo", orderInfo);
         params.put("vnp_OrderType", vnPayProperties.getOrderType());
         params.put("vnp_Locale", vnPayProperties.getLocale());
         params.put("vnp_ReturnUrl", vnPayProperties.getReturnUrl());

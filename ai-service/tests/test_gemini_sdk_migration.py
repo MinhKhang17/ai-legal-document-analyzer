@@ -86,6 +86,29 @@ def test_project_wrapper_retries_incomplete_max_tokens_response() -> None:
     assert retry_config.max_output_tokens == 8192
 
 
+def test_project_wrapper_falls_back_when_primary_model_returns_empty_text() -> None:
+    sdk_client = Mock()
+    sdk_client.models.generate_content.side_effect = [
+        _response(""),
+        _response("fallback answer"),
+    ]
+
+    with patch("app.services.gemini_client.build_genai_client", return_value=sdk_client):
+        client = GeminiClient(
+            api_key="secret",
+            model="gemini-primary",
+            fallback_model="gemini-fallback",
+        )
+        result = client.generate_text(system_prompt="system", user_prompt="question")
+
+    assert result.text == "fallback answer"
+    assert result.model == "gemini-fallback"
+    assert [call.kwargs["model"] for call in sdk_client.models.generate_content.call_args_list] == [
+        "gemini-primary",
+        "gemini-fallback",
+    ]
+
+
 def test_gemini_service_uses_new_sync_and_streaming_apis() -> None:
     sdk_client = Mock()
     sdk_client.models.generate_content.return_value = _response("review")
