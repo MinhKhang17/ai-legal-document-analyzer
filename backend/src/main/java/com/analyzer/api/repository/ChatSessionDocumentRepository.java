@@ -16,4 +16,6 @@ public interface ChatSessionDocumentRepository extends JpaRepository<ChatSession
 
     @EntityGraph(attributePaths = {"document", "chatSession", "user"})
     Optional<ChatSessionDocument> findByChatSessionIdAndDocumentIdAndUserId(String sessionId, String documentId, Long userId);
+
+    long countByChatSessionIdAndUserIdAndActiveTrue(String chatSessionId, Long userId);
 }

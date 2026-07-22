@@ -1,5 +1,28 @@
 # History Code - Nguyen Huu Dat
 
+**Date:** 2026-07-22 (Ngày 22 tháng 7 năm 2026)
+
+## Tasks Completed:
+- **Rà soát toàn diện `backend/docs/Plan_Flow_Test_Cases.md` đối chiếu source code thật** (không sửa code ở vòng đầu): xác nhận cả 4 rủi ro P0 ở mục 4 (hai API current plan không đồng nhất, scheduled downgrade xử lý khác nhau giữa service, VNPay return/IPN race, quota bypass bằng concurrency) đều có cơ chế xử lý; phát hiện mục 5 (snapshot/version plan) và phần lớn mục 19 (quyết định nghiệp vụ) **chưa được implement**.
+- **Chốt và code 4 quyết định nghiệp vụ ở mục 19 theo lựa chọn của leader**:
+  - **Cancel plan chuyển sang graceful** (giữ quyền đến hết chu kỳ đã trả, chỉ tắt auto-renew): viết lại `CustomerPlanServiceImpl.cancelPlan()` để `scheduleSubscriptionPlan = FREE` + `planChangeEffectiveAt = endDate` thay vì set `CANCELLED` ngay; tách riêng `cancelPlanAndActivateFree()` (hủy ngay lập tức) chỉ dùng cho luồng refund (`RefundServiceImpl`) — nơi cắt quyền ngay là đúng vì tiền đã hoàn.
+  - **Usage "theo tháng" đổi sang chu kỳ CustomerPlan** (`billingCycleStartAt`/`billingCycleEndAt`) thay vì tháng lịch, trong `SubscriptionQuotaServiceImpl.getCurrentUsage()`.
+  - **Snapshot giá/quota tại thời điểm subscribe()`**: thêm entity mới `CustomerPlanSnapshotHelper` (`service/support/`), 13 cột `*Snapshot` trên `CustomerPlan` (migration `V20260722_01`), áp dụng ở `subscribe()`, khi scheduled downgrade có hiệu lực (`CustomerPlanExpiryHelper`), và khi refund tạo lại gói Free — đảm bảo Admin sửa giá/quota gói master không ảnh hưởng ngược user đang trong chu kỳ đã mua.
+  - **Analysis quota chỉ tính document đã phân tích thành công** (`status = READY`, theo `processedAt`) thay vì đếm mọi upload — thêm `DocumentRepository.countByUserIdAndSourceTypeAndStatusAndProcessedAtBetween`.
+- **Fix thêm 2 gap phát hiện trong lúc code**: `CustomerPlanExpiryHelper.applyExpiryOrScheduledChange()` kiểm tra `scheduled.getActive()`, fallback về FREE nếu plan đã lên lịch downgrade/cancel-vào bị Admin disable trước `effectiveAt` (PLAN-DOWN-09); hardening row-lock (`findByIdForUpdate`) trong `getActiveOrHandleExpiry()`/`expireDuePlans()` để tránh lost-update khi nhiều request đụng cùng lúc ngay sau `endDate`.
+- **Viết bộ E2E test thật cho 8 kịch bản mục 18** (`backend/src/test/java/com/analyzer/api/e2e/`), dùng **Testcontainers Postgres** (không mock) vì cơ chế đang test (`pg_advisory_xact_lock`, unique partial index, VNPay HMAC) không thể giả lập đúng bằng H2/Mockito. Thêm dependency `spring-boot-testcontainers`/`testcontainers-postgresql`/`testcontainers-junit-jupiter` vào `pom.xml`.
+- **Phát hiện và fix 3 bug production thật qua quá trình chạy E2E** (không unit test nào bắt được):
+  1. **Flyway chưa từng thực sự chạy ở bất kỳ môi trường nào**: Spring Boot 4.0.6 tách auto-config Flyway ra module riêng `spring-boot-flyway`; project chỉ khai báo `flyway-core`/`flyway-database-postgresql` trực tiếp (thiếu module cầu nối) nên `spring.flyway.*` bị bỏ qua hoàn toàn, kể cả production. Đã thêm đúng dependency vào `pom.xml`.
+  2. **2 cặp file migration trùng version** (`V20260721_01` và `V20260721_05` mỗi cái có 2 file, đã commit sẵn từ trước bởi 2 người khác nhau) khiến Flyway crash ngay khi khởi động một khi đã fix (1) ở trên. Xử lý bằng cách chỉ rename 1 file (`V20260721_01__ticket_message_idempotency.sql` → `_06`) — không đụng nội dung/tên bất kỳ file nào khác đã commit, tránh rủi ro checksum cho teammate đã từng chạy migration cũ.
+  3. **`SubscriptionQuotaServiceImpl.getCurrentPlan()`/`getCurrentUsage()` đánh dấu `readOnly = true`** nhưng có thể kích hoạt ghi (lock hết hạn/scheduled downgrade qua `CustomerPlanExpiryHelper`) — Postgres từ chối `SELECT ... FOR UPDATE` trong transaction read-only, đổi cả 2 (và 1 overload liên quan) sang `@Transactional` thường.
+- **Sửa `EntityMigrationCoverageTest`** để quét toàn bộ thư mục `db/migration` thay vì 2 file cố định (baseline + reconciliation) — tránh việc cột mới bắt buộc phải sửa vào file người khác đã commit; cập nhật `backend/docs/database-migrations.md` cho khớp hành vi mới.
+- **Rà soát an toàn deploy toàn bộ 18 file migration**: xác nhận mọi `CREATE TABLE`/`ADD COLUMN` đều `IF NOT EXISTS`, mọi `SET NOT NULL` có backfill trước, mọi `ADD CONSTRAINT`/FK đều bọc `DO $$ ... EXCEPTION/IF NOT EXISTS $$` hoặc `NOT VALID` — an toàn cho lần đầu Flyway thật sự chạy trên DB server đã tồn tại dữ liệu (baseline-on-migrate không xóa dữ liệu).
+- Sửa 2 unit test bị lỗi biên dịch từ trước (không liên quan phần việc trên, phát hiện khi chạy `mvn test` toàn bộ): `CustomerPlanServiceImplTest` (constructor cũ thiếu 3 dependency mới + assertion theo hành vi cancel cũ), `ExpertLegalTicketServiceImplTest` (thiếu mock `ExpertRevenueService`).
+- Build & test cuối cùng: `mvn clean compile` **BUILD SUCCESS**, `mvn test` **86/86 PASS** (78 unit + 8 E2E Testcontainers).
+- Ghi báo cáo chi tiết tại `backend/docs/plan_flow_test_report_2026-07-22.md`.
+
+---
+
 **Date:** 2026-07-18 (Ngày 18 tháng 7 năm 2026)
 
 ## Tasks Completed:
