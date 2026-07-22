@@ -8,14 +8,13 @@ import com.analyzer.api.entity.User;
 import com.analyzer.api.enums.ChatMessageRole;
 import com.analyzer.api.enums.ChatMessageStatus;
 import com.analyzer.api.enums.ContractGenerationStatus;
-import com.analyzer.api.enums.PlanStatus;
 import com.analyzer.api.enums.LegalTicketStatus;
 import com.analyzer.api.enums.LegalTicketType;
 import com.analyzer.api.enums.UsageEventType;
 import com.analyzer.api.exception.common.ConflictException;
 import com.analyzer.api.exception.common.ResourceNotFoundException;
 import com.analyzer.api.repository.ChatMessageRepository;
-import com.analyzer.api.repository.CustomerPlanRepository;
+import com.analyzer.api.repository.ChatSessionDocumentRepository;
 import com.analyzer.api.repository.DocumentRepository;
 import com.analyzer.api.repository.LegalTicketRepository;
 import com.analyzer.api.repository.SubscriptionPlanRepository;
@@ -23,8 +22,13 @@ import com.analyzer.api.repository.WorkspaceRepository;
 import com.analyzer.api.repository.contract.ContractGenerationJobRepository;
 import com.analyzer.api.repository.subscription.SubscriptionUsageRepository;
 import com.analyzer.api.service.SubscriptionQuotaService;
+import com.analyzer.api.service.support.CustomerPlanExpiryHelper;
+import com.analyzer.api.service.support.CustomerPlanSnapshotHelper;
+import com.analyzer.api.service.support.UserQuotaLock;
+import com.analyzer.api.util.AppClock;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -36,23 +40,27 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
 
     private static final String ACTIVE_WORKSPACE_STATUS = "ACTIVE";
     private static final String DELETED_DOCUMENT_STATUS = "DELETED";
+    private static final String READY_DOCUMENT_STATUS = "READY";
     private static final String USER_DOCUMENT_SOURCE_TYPE = "USER_DOCUMENT";
 
     private final SubscriptionPlanRepository subscriptionPlanRepository;
-    private final CustomerPlanRepository customerPlanRepository;
     private final WorkspaceRepository workspaceRepository;
     private final DocumentRepository documentRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final ContractGenerationJobRepository contractGenerationJobRepository;
     private final LegalTicketRepository legalTicketRepository;
     private final SubscriptionUsageRepository subscriptionUsageRepository;
+    private final ChatSessionDocumentRepository chatSessionDocumentRepository;
+    private final CustomerPlanExpiryHelper customerPlanExpiryHelper;
+    private final CustomerPlanSnapshotHelper customerPlanSnapshotHelper;
+    private final UserQuotaLock userQuotaLock;
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public SubscriptionPlan getCurrentPlan(User user) {
         CustomerPlan activePlan = getActiveCustomerPlan(user.getId());
         if (activePlan != null && activePlan.getSubscriptionPlan() != null) {
-            return activePlan.getSubscriptionPlan();
+            return customerPlanSnapshotHelper.effectivePlanView(activePlan);
         }
 
         return subscriptionPlanRepository.findByPlanTypeIgnoreCase("FREE")
@@ -60,14 +68,23 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public SubscriptionQuotaUsageSummaryResponse getCurrentUsage(User user) {
-        LocalDateTime periodStart = LocalDateTime.now().withDayOfMonth(1).toLocalDate().atStartOfDay();
-        LocalDateTime periodEnd = periodStart.plusMonths(1);
-        SubscriptionPlan plan = getCurrentPlan(user);
+        CustomerPlan activePlan = getActiveCustomerPlan(user.getId());
+        SubscriptionPlan plan = activePlan != null && activePlan.getSubscriptionPlan() != null
+                ? customerPlanSnapshotHelper.effectivePlanView(activePlan)
+                : subscriptionPlanRepository.findByPlanTypeIgnoreCase("FREE")
+                        .orElseThrow(() -> new ResourceNotFoundException("FREE_PLAN_NOT_CONFIGURED"));
 
-        int contractAnalysisUsed = Math.toIntExact(documentRepository.countByUserIdAndSourceTypeAndUploadedAtBetween(
-                user.getId(), USER_DOCUMENT_SOURCE_TYPE, periodStart, periodEnd));
+        LocalDateTime periodStart = activePlan != null && activePlan.getBillingCycleStartAt() != null
+                ? activePlan.getBillingCycleStartAt()
+                : AppClock.now().withDayOfMonth(1).toLocalDate().atStartOfDay();
+        LocalDateTime periodEnd = activePlan != null && activePlan.getBillingCycleEndAt() != null
+                ? activePlan.getBillingCycleEndAt()
+                : periodStart.plusMonths(1);
+
+        int contractAnalysisUsed = Math.toIntExact(documentRepository.countByUserIdAndSourceTypeAndStatusAndProcessedAtBetween(
+                user.getId(), USER_DOCUMENT_SOURCE_TYPE, READY_DOCUMENT_STATUS, periodStart, periodEnd));
         long aiTokensUsed = chatMessageRepository.sumTotalTokensByUserAndRoleAndStatusBetween(
                 user.getId(), ChatMessageRole.ASSISTANT, ChatMessageStatus.COMPLETED, periodStart, periodEnd);
         int draftContractsUsed = Math.toIntExact(contractGenerationJobRepository.countByRequesterIdAndStatusAndCreatedAtBetween(
@@ -105,8 +122,9 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public void checkCanCreateWorkspace(User user) {
+        userQuotaLock.acquire(user.getId());
         SubscriptionPlan plan = getCurrentPlan(user);
         long currentWorkspaceCount = workspaceRepository.countByUserIdAndStatus(user.getId(), ACTIVE_WORKSPACE_STATUS);
         if (plan.getMaxWorkspaces() != null && currentWorkspaceCount >= plan.getMaxWorkspaces()) {
@@ -115,14 +133,15 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public void checkCanUploadOrAnalyzeContract(User user, String workspaceId) {
         checkCanUploadOrAnalyzeContract(user, workspaceId, 0);
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public void checkCanUploadOrAnalyzeContract(User user, String workspaceId, long fileSizeBytes) {
+        userQuotaLock.acquire(user.getId());
         SubscriptionPlan plan = getCurrentPlan(user);
         SubscriptionQuotaUsageSummaryResponse usage = getCurrentUsage(user);
 
@@ -146,18 +165,30 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public void checkCanAttachDocument(User user, int currentlyAttached) {
+    @Transactional
+    public void checkCanAttachDocument(User user, String chatSessionId) {
+        userQuotaLock.acquire(user.getId());
         SubscriptionPlan plan = getCurrentPlan(user);
-        if (plan.getMaxAttachedDocumentsPerSession() != null
-                && currentlyAttached >= plan.getMaxAttachedDocumentsPerSession()) {
+        if (plan.getMaxAttachedDocumentsPerSession() == null) {
+            return;
+        }
+        // Count fresh, after acquiring the lock — a count taken by the caller before the lock
+        // would let concurrent attach-different-document requests all read the same stale
+        // count and all pass, bypassing the limit.
+        long currentlyAttached = chatSessionDocumentRepository.countByChatSessionIdAndUserIdAndActiveTrue(
+                chatSessionId, user.getId());
+        if (currentlyAttached >= plan.getMaxAttachedDocumentsPerSession()) {
             throw new ConflictException("ATTACHED_DOCUMENT_LIMIT_EXCEEDED");
         }
     }
 
+    // REQUIRES_NEW: caller holds this transaction open across the (slow) AI call that follows
+    // the check. Running the lock+check in its own short transaction releases the advisory
+    // lock and DB connection immediately instead of pinning them for the AI call's duration.
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void checkCanUseAiChat(User user, int estimatedInputTokens) {
+        userQuotaLock.acquire(user.getId());
         SubscriptionPlan plan = getCurrentPlan(user);
         if (plan.getAiQuota() == null) {
             return;
@@ -175,9 +206,12 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
         recordUsage(user, UsageEventType.AI_QUERY, inputTokens + outputTokens, "ai-chat");
     }
 
+    // REQUIRES_NEW: same reasoning as checkCanUseAiChat — contract drafting calls the AI
+    // service synchronously right after this check, within the caller's transaction.
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void checkCanDraftContract(User user) {
+        userQuotaLock.acquire(user.getId());
         SubscriptionPlan plan = getCurrentPlan(user);
         if (plan.getMaxDraftContracts() == null) {
             return;
@@ -196,8 +230,9 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public void checkCanCreateExpertTicket(User user) {
+        userQuotaLock.acquire(user.getId());
         SubscriptionPlan plan = getCurrentPlan(user);
         int ticketQuota = plan.getTicketQuota() == null ? 0 : plan.getTicketQuota();
         if (!Boolean.TRUE.equals(plan.getAllowContactExpertTicket()) || ticketQuota <= 0) {
@@ -217,14 +252,7 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
     }
 
     private CustomerPlan getActiveCustomerPlan(Long userId) {
-        CustomerPlan activePlan = customerPlanRepository.findTopByCustomerIdAndStatusOrderByCreatedAtDesc(userId, PlanStatus.ACTIVE)
-                .orElse(null);
-        if (activePlan != null && activePlan.getEndDate() != null && LocalDateTime.now().isAfter(activePlan.getEndDate())) {
-            activePlan.setStatus(PlanStatus.EXPIRED);
-            customerPlanRepository.save(activePlan);
-            return null;
-        }
-        return activePlan;
+        return customerPlanExpiryHelper.getActiveOrHandleExpiry(userId);
     }
 
     private void recordUsage(User user, UsageEventType usageType, int consumedUnits, String referenceId) {

@@ -59,8 +59,8 @@ public class SubscriptionManagementController {
     @Operation(summary = "Get my current subscription plan")
     public ResponseEntity<ApiResponseDTO<SubscriptionPlanResponseDTO>> getCurrentPlan() {
         User user = User.builder().id(getCurrentUserId()).build();
-        SubscriptionPlanResponseDTO response = subscriptionPlanService.getPlanById(
-                subscriptionQuotaService.getCurrentPlan(user).getId());
+        SubscriptionPlanResponseDTO response = subscriptionPlanService.toResponse(
+                subscriptionQuotaService.getCurrentPlan(user));
         return ResponseEntity.ok(ApiResponseDTO.success("Lay goi hien tai thanh cong", response));
     }
 

@@ -11,6 +11,7 @@ import com.analyzer.api.exception.common.ResourceNotFoundException;
 import com.analyzer.api.repository.*;
 import com.analyzer.api.repository.subscription.RefundRequestRepository;
 import com.analyzer.api.security.UserDetailsImpl;
+import com.analyzer.api.service.CustomerPlanService;
 import com.analyzer.api.service.EmailService;
 import com.analyzer.api.service.subscription.RefundService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,6 +46,7 @@ public class RefundServiceImpl implements RefundService {
     private final LegalTicketRepository legalTicketRepository;
     private final LegalTicketMessageRepository legalTicketMessageRepository;
     private final EmailService emailService;
+    private final CustomerPlanService customerPlanService;
 
     @Autowired
     public RefundServiceImpl(
@@ -55,7 +57,8 @@ public class RefundServiceImpl implements RefundService {
             WorkspaceRepository workspaceRepository,
             LegalTicketRepository legalTicketRepository,
             LegalTicketMessageRepository legalTicketMessageRepository,
-            EmailService emailService) {
+            EmailService emailService,
+            CustomerPlanService customerPlanService) {
         this.refundRequestRepository = refundRequestRepository;
         this.paymentTransactionRepository = paymentTransactionRepository;
         this.customerPlanRepository = customerPlanRepository;
@@ -64,6 +67,7 @@ public class RefundServiceImpl implements RefundService {
         this.legalTicketRepository = legalTicketRepository;
         this.legalTicketMessageRepository = legalTicketMessageRepository;
         this.emailService = emailService;
+        this.customerPlanService = customerPlanService;
     }
 
     /** Backward-compatible constructor retained for existing unit tests and integrations. */
@@ -73,7 +77,17 @@ public class RefundServiceImpl implements RefundService {
             CustomerPlanRepository customerPlanRepository,
             UserRepository userRepository) {
         this(refundRequestRepository, paymentTransactionRepository, customerPlanRepository, userRepository,
-                null, null, null, null);
+                null, null, null, null, null);
+    }
+
+    public RefundServiceImpl(
+            RefundRequestRepository refundRequestRepository,
+            PaymentTransactionRepository paymentTransactionRepository,
+            CustomerPlanRepository customerPlanRepository,
+            UserRepository userRepository,
+            CustomerPlanService customerPlanService) {
+        this(refundRequestRepository, paymentTransactionRepository, customerPlanRepository, userRepository,
+                null, null, null, null, customerPlanService);
     }
 
     @Override
@@ -226,9 +240,14 @@ public class RefundServiceImpl implements RefundService {
         paymentTransactionRepository.save(transaction);
         if (transaction.getCustomerPlan() != null) {
             CustomerPlan plan = transaction.getCustomerPlan();
-            plan.setStatus(PlanStatus.CANCELLED); plan.setAutoRenew(false);
-            plan.setCancelReason("Refund " + transaction.getTransactionCode());
-            customerPlanRepository.save(plan);
+            if (customerPlanService != null) {
+                customerPlanService.cancelPlanAndActivateFree(transaction.getCustomer().getId(), plan.getId(),
+                        "Refund " + transaction.getTransactionCode());
+            } else {
+                plan.setStatus(PlanStatus.CANCELLED); plan.setAutoRenew(false);
+                plan.setCancelReason("Refund " + transaction.getTransactionCode());
+                customerPlanRepository.save(plan);
+            }
         }
     }
 

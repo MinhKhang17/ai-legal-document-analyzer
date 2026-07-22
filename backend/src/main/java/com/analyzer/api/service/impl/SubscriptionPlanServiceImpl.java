@@ -12,6 +12,7 @@ import com.analyzer.api.service.SubscriptionPlanService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,14 +33,14 @@ public class SubscriptionPlanServiceImpl implements SubscriptionPlanService {
     public SubscriptionPlanResponseDTO createPlan(SubscriptionPlanRequestDTO request) {
         applyLegacyDefaults(request, null);
         normalizeAndValidate(request);
-        if (subscriptionPlanRepository.existsByPlanName(request.getPlanName())
+        if (subscriptionPlanRepository.existsByPlanNameIgnoreCase(request.getPlanName())
                 || subscriptionPlanRepository.existsByPlanTypeIgnoreCase(request.getPlanType())) {
             throw new ConflictException("SUBSCRIPTION_PLAN_NAME_ALREADY_EXISTS");
         }
         SubscriptionPlan plan = subscriptionPlanMapper.toEntity(request);
         plan.setActive(request.getActive() == null || request.getActive());
         applyNewFields(plan, request);
-        return toResponse(subscriptionPlanRepository.save(plan));
+        return saveOrConflict(plan);
     }
 
     @Override
@@ -63,7 +64,7 @@ public class SubscriptionPlanServiceImpl implements SubscriptionPlanService {
         applyLegacyDefaults(request, plan);
         normalizeAndValidate(request);
         if ((!plan.getPlanName().equalsIgnoreCase(request.getPlanName())
-                && subscriptionPlanRepository.existsByPlanName(request.getPlanName()))
+                && subscriptionPlanRepository.existsByPlanNameIgnoreCase(request.getPlanName()))
                 || (!plan.getPlanType().equalsIgnoreCase(request.getPlanType())
                 && subscriptionPlanRepository.existsByPlanTypeIgnoreCase(request.getPlanType()))) {
             throw new ConflictException("SUBSCRIPTION_PLAN_NAME_ALREADY_EXISTS");
@@ -76,7 +77,23 @@ public class SubscriptionPlanServiceImpl implements SubscriptionPlanService {
         plan.setMaxQuota(request.getMaxQuota());
         if (request.getActive() != null) plan.setActive(request.getActive());
         applyNewFields(plan, request);
-        return toResponse(subscriptionPlanRepository.save(plan));
+        return saveOrConflict(plan);
+    }
+
+    // The existsBy* checks above are TOCTOU-racy (two concurrent admin requests can both pass
+    // them before either commits); uk_subscription_plan_name_lower / uk_subscription_plan_type_lower
+    // are the real guarantee. Translate a DB-level violation into the same clean 409 instead of
+    // letting a raw DataIntegrityViolationException reach the client as an unexpected 500.
+    private SubscriptionPlanResponseDTO saveOrConflict(SubscriptionPlan plan) {
+        try {
+            // saveAndFlush, not save: an UPDATE on an already-persisted entity is normally
+            // deferred to transaction commit by Hibernate's dirty checking, which would happen
+            // after this method (and its catch block) has already returned. Flushing forces the
+            // constraint check to run synchronously, inside the try block, for both create and update.
+            return toResponse(subscriptionPlanRepository.saveAndFlush(plan));
+        } catch (DataIntegrityViolationException ex) {
+            throw new ConflictException("SUBSCRIPTION_PLAN_NAME_ALREADY_EXISTS");
+        }
     }
 
     @Override
@@ -156,7 +173,8 @@ public class SubscriptionPlanServiceImpl implements SubscriptionPlanService {
         }
     }
 
-    private SubscriptionPlanResponseDTO toResponse(SubscriptionPlan plan) {
+    @Override
+    public SubscriptionPlanResponseDTO toResponse(SubscriptionPlan plan) {
         SubscriptionPlanResponseDTO response = subscriptionPlanMapper.toResponseDTO(plan);
         response.setName(plan.getPlanType());
         response.setDisplayName(plan.getPlanName());

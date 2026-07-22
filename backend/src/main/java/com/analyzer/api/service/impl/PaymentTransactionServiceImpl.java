@@ -8,10 +8,15 @@ import com.analyzer.api.entity.PaymentTransaction;
 import com.analyzer.api.enums.PaymentMethod;
 import com.analyzer.api.enums.PaymentStatus;
 import com.analyzer.api.enums.PlanStatus;
+import com.analyzer.api.exception.common.ConflictException;
+import com.analyzer.api.exception.common.ForbiddenException;
+import com.analyzer.api.exception.common.ResourceNotFoundException;
+import com.analyzer.api.exception.payment.VnPayCallbackException;
 import com.analyzer.api.mapper.PaymentTransactionMapper;
 import com.analyzer.api.repository.CustomerPlanRepository;
 import com.analyzer.api.repository.PaymentTransactionRepository;
 import com.analyzer.api.service.PaymentTransactionService;
+import com.analyzer.api.util.AppClock;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -69,18 +74,18 @@ public class PaymentTransactionServiceImpl implements PaymentTransactionService 
     public PaymentUrlResponseDTO createVnPayPaymentUrl(Long transactionId, Long customerId, String clientIp) {
         PaymentTransaction transaction = paymentTransactionRepository.findById(transactionId)
                 .orElseThrow(
-                        () -> new RuntimeException("Khong tim thay giao dich thanh toan voi id: " + transactionId));
+                        () -> new ResourceNotFoundException("Khong tim thay giao dich thanh toan voi id: " + transactionId));
 
         validateVnPayConfig();
 
         if (!transaction.getCustomer().getId().equals(customerId)) {
-            throw new RuntimeException("Ban khong co quyen thanh toan giao dich nay");
+            throw new ForbiddenException("Ban khong co quyen thanh toan giao dich nay");
         }
         if (transaction.getPaymentMethod() != PaymentMethod.VNPAY) {
-            throw new RuntimeException("Giao dich nay khong su dung phuong thuc VNPAY");
+            throw new ConflictException("Giao dich nay khong su dung phuong thuc VNPAY");
         }
         if (transaction.getPaymentStatus() != PaymentStatus.PENDING) {
-            throw new RuntimeException("Giao dich nay da duoc xu ly truoc do");
+            throw new ConflictException("Giao dich nay da duoc xu ly truoc do");
         }
         if (!isValidVnPayAmount(transaction.getAmount())) {
             throw new RuntimeException("So tien thanh toan VNPAY phai tu 5,000 VND den duoi 1 ty VND");
@@ -102,12 +107,17 @@ public class PaymentTransactionServiceImpl implements PaymentTransactionService 
     @Transactional
     public PaymentTransactionResponseDTO handleVnPayCallback(Map<String, String> callbackParams) {
         if (!isValidSignature(callbackParams)) {
-            throw new RuntimeException("Chu ky VNPAY khong hop le");
+            throw new VnPayCallbackException("97", "Invalid signature");
         }
 
         String transactionCode = callbackParams.get("vnp_TxnRef");
-        PaymentTransaction transaction = paymentTransactionRepository.findByTransactionCode(transactionCode)
-                .orElseThrow(() -> new RuntimeException("Khong tim thay giao dich VNPAY: " + transactionCode));
+        PaymentTransaction transaction = paymentTransactionRepository.findByTransactionCodeForUpdate(transactionCode)
+                .orElseThrow(() -> new VnPayCallbackException("01", "Order not found"));
+
+        String expectedAmount = toVnPayAmount(transaction.getAmount());
+        if (!expectedAmount.equals(callbackParams.get("vnp_Amount"))) {
+            throw new VnPayCallbackException("04", "Invalid amount");
+        }
 
         transaction.setGatewayTransactionNo(callbackParams.get("vnp_TransactionNo"));
         transaction.setGatewayResponseCode(callbackParams.get("vnp_ResponseCode"));
@@ -128,40 +138,68 @@ public class PaymentTransactionServiceImpl implements PaymentTransactionService 
             return transaction;
         }
         if (transaction.getPaymentStatus() != PaymentStatus.PENDING) {
-            throw new RuntimeException("Giao dich nay da duoc xu ly truoc do");
+            throw new VnPayCallbackException("02", "Order already confirmed");
         }
 
         transaction.setPaymentStatus(PaymentStatus.SUCCESS);
-        transaction.setPaidAt(LocalDateTime.now());
+        transaction.setPaidAt(AppClock.now());
         PaymentTransaction savedTransaction = paymentTransactionRepository.save(transaction);
 
-        CustomerPlan customerPlan = transaction.getCustomerPlan();
-        if (customerPlan != null) {
-            Long customerId = transaction.getCustomer().getId();
+        CustomerPlan customerPlanRef = transaction.getCustomerPlan();
+        if (customerPlanRef != null) {
+            // Lock the CustomerPlan row: a customer can switch their PENDING plan selection
+            // (subscribe() reuses the same row) while an older transaction for a previous
+            // selection is still in flight. Without this lock+check, that stale transaction
+            // could activate the customer onto whatever plan the row currently references,
+            // with an endDate computed from the *old* transaction's plan duration.
+            CustomerPlan customerPlan = customerPlanRepository.findByIdForUpdate(customerPlanRef.getId())
+                    .orElse(null);
+            boolean staleSelection = customerPlan != null
+                    && customerPlan.getSubscriptionPlan() != null
+                    && transaction.getSubscriptionPlan() != null
+                    && !customerPlan.getSubscriptionPlan().getId().equals(transaction.getSubscriptionPlan().getId());
 
-            CustomerPlan oldActivePlan = customerPlanRepository.findByCustomerIdAndStatus(customerId, PlanStatus.ACTIVE).orElse(null);
-            if (oldActivePlan != null && !oldActivePlan.getId().equals(customerPlan.getId())) {
-                customerPlan.setUsedQuota(oldActivePlan.getUsedQuota());
-                customerPlan.setUsageStartAt(oldActivePlan.getUsageStartAt());
-                customerPlan.setUsageEndAt(oldActivePlan.getUsageEndAt());
-                customerPlan.setBillingCycleStartAt(oldActivePlan.getBillingCycleStartAt());
-                customerPlan.setBillingCycleEndAt(oldActivePlan.getBillingCycleEndAt());
-                oldActivePlan.setStatus(PlanStatus.EXPIRED);
-                customerPlanRepository.save(oldActivePlan);
+            if (staleSelection) {
+                log.warn("Payment {} succeeded for plan '{}' but the customer plan has since moved to '{}'; "
+                                + "leaving entitlement untouched, flag for manual refund/reconciliation.",
+                        transaction.getTransactionCode(),
+                        transaction.getSubscriptionPlan().getPlanName(),
+                        customerPlan.getSubscriptionPlan().getPlanName());
+            } else if (customerPlan != null) {
+                activateCustomerPlan(transaction, customerPlan);
             }
-
-            customerPlan.setStatus(PlanStatus.ACTIVE);
-            customerPlan.setStartDate(LocalDateTime.now());
-            if (transaction.getSubscriptionPlan() != null) {
-                customerPlan
-                        .setEndDate(LocalDateTime.now().plusDays(transaction.getSubscriptionPlan().getDurationDays()));
-            } else {
-                customerPlan.setEndDate(LocalDateTime.now().plusDays(30));
-            }
-            customerPlanRepository.save(customerPlan);
         }
 
         return savedTransaction;
+    }
+
+    private void activateCustomerPlan(PaymentTransaction transaction, CustomerPlan customerPlan) {
+        Long customerId = transaction.getCustomer().getId();
+
+        CustomerPlan oldActivePlan = customerPlanRepository.findByCustomerIdAndStatus(customerId, PlanStatus.ACTIVE)
+                .orElse(null);
+        if (oldActivePlan != null && !oldActivePlan.getId().equals(customerPlan.getId())) {
+            customerPlan.setUsedQuota(oldActivePlan.getUsedQuota());
+            customerPlan.setUsageStartAt(oldActivePlan.getUsageStartAt());
+            customerPlan.setUsageEndAt(oldActivePlan.getUsageEndAt());
+            customerPlan.setBillingCycleStartAt(oldActivePlan.getBillingCycleStartAt());
+            customerPlan.setBillingCycleEndAt(oldActivePlan.getBillingCycleEndAt());
+            oldActivePlan.setStatus(PlanStatus.EXPIRED);
+            // Flush before activating the new row: a DB constraint enforces at most one
+            // ACTIVE customer_plan per customer, and Hibernate may otherwise order the new
+            // row's ACTIVE update before this row's EXPIRED update within the same flush.
+            customerPlanRepository.saveAndFlush(oldActivePlan);
+        }
+
+        LocalDateTime now = AppClock.now();
+        customerPlan.setStatus(PlanStatus.ACTIVE);
+        customerPlan.setStartDate(now);
+        if (transaction.getSubscriptionPlan() != null) {
+            customerPlan.setEndDate(now.plusDays(transaction.getSubscriptionPlan().getDurationDays()));
+        } else {
+            customerPlan.setEndDate(now.plusDays(30));
+        }
+        customerPlanRepository.save(customerPlan);
     }
 
     private PaymentTransaction markFailed(PaymentTransaction transaction) {
@@ -169,7 +207,7 @@ public class PaymentTransactionServiceImpl implements PaymentTransactionService 
             return transaction;
         }
         if (transaction.getPaymentStatus() != PaymentStatus.PENDING) {
-            throw new RuntimeException("Giao dich nay da duoc xu ly truoc do");
+            throw new VnPayCallbackException("02", "Order already confirmed");
         }
 
         transaction.setPaymentStatus(PaymentStatus.FAILED);
@@ -203,7 +241,8 @@ public class PaymentTransactionServiceImpl implements PaymentTransactionService 
         if (!vnPayProperties.isDebugLogCredentials()) {
             return;
         }
-        log.warn("VNPAY DEBUG ONLY - tmnCode='{}', hashSecret='{}'. Disable VNPAY_DEBUG_LOG_CREDENTIALS after debugging.",
+        log.warn(
+                "VNPAY DEBUG ONLY - tmnCode='{}', hashSecret='{}'. Disable VNPAY_DEBUG_LOG_CREDENTIALS after debugging.",
                 vnPayProperties.getTmnCode(), vnPayProperties.getHashSecret());
     }
 

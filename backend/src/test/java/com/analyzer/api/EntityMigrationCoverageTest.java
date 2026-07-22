@@ -5,18 +5,18 @@ import org.hibernate.boot.MetadataSources;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Comparator;
 import java.util.HashSet;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class EntityMigrationCoverageTest {
     private static final Path ENTITY_CLASSES = Path.of("target/classes/com/analyzer/api/entity");
-    private static final Path BASELINE = Path.of(
-            "src/main/resources/db/migration/V20260717_00__complete_entity_baseline.sql");
-    private static final Path RECONCILIATION = Path.of(
-            "src/main/resources/db/migration/V20260720_02__complete_entity_column_reconciliation.sql");
+    private static final Path MIGRATION_DIR = Path.of("src/main/resources/db/migration");
 
     @Test
     void everyJpaEntityTableAndColumnIsCoveredByMigrations() throws Exception {
@@ -37,25 +37,47 @@ class EntityMigrationCoverageTest {
                         .forEach(sources::addAnnotatedClass);
             }
 
-            String baselineSql = Files.readString(BASELINE).toLowerCase();
-            String reconciliationSql = Files.readString(RECONCILIATION).toLowerCase();
+            // Every *.sql file counts, not just one hardcoded baseline/reconciliation pair: a
+            // new column can land in its own dedicated migration (as V20260722_01 does for
+            // customer_plans' snapshot columns) without ever needing to edit an already-applied
+            // migration file just to keep this test passing. Whitespace (including newlines) is
+            // collapsed to single spaces since different migrations format multi-column ALTER
+            // TABLE statements across several lines.
+            String allMigrationsSql = allMigrationSql().toLowerCase().replaceAll("\\s+", " ");
             var seenColumns = new HashSet<String>();
             var metadata = sources.buildMetadata();
             metadata.getEntityBindings().forEach(binding -> {
                 String table = binding.getTable().getName().toLowerCase();
-                assertTrue(baselineSql.contains("create table if not exists " + table + " "),
-                        () -> "Missing baseline CREATE TABLE for " + table);
+                assertTrue(allMigrationsSql.contains("create table if not exists " + table + " "),
+                        () -> "Missing CREATE TABLE for " + table + " in any migration");
                 binding.getTable().getColumns().forEach(column -> {
                     String key = table + "." + column.getName().toLowerCase();
                     if (seenColumns.add(key)) {
-                        assertTrue(reconciliationSql.contains("alter table " + table
+                        assertTrue(allMigrationsSql.contains("alter table " + table
                                         + " add column if not exists " + column.getName().toLowerCase() + " "),
-                                () -> "Missing reconciliation column " + key);
+                                () -> "Missing column " + key + " in any migration");
                     }
                 });
             });
         } finally {
             StandardServiceRegistryBuilder.destroy(registry);
+        }
+    }
+
+    private static String allMigrationSql() throws IOException {
+        try (var paths = Files.list(MIGRATION_DIR)) {
+            return paths.filter(path -> path.toString().endsWith(".sql"))
+                    .sorted(Comparator.naturalOrder())
+                    .map(EntityMigrationCoverageTest::readQuietly)
+                    .collect(Collectors.joining("\n"));
+        }
+    }
+
+    private static String readQuietly(Path path) {
+        try {
+            return Files.readString(path);
+        } catch (IOException exception) {
+            throw new IllegalStateException(exception);
         }
     }
 

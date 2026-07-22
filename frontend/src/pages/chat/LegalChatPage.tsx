@@ -1,4 +1,4 @@
-import { ArrowDown, Bot, Check, ClipboardCheck, Download, FileText, Files, Info, MoreHorizontal, Paperclip, Pencil, Plus, RefreshCw, Send, Settings, Share2, Square, Trash2, UserRound, X } from "lucide-react";
+import { ArrowDown, Bot, Check, ChevronDown, ChevronUp, ClipboardCheck, Download, FileText, Files, Info, MoreHorizontal, Paperclip, Pencil, Plus, RefreshCw, Send, Share2, Square, Trash2, UserRound, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Badge } from "../../components/common/Badge";
@@ -246,6 +246,7 @@ export function LegalChatPage() {
   const [exportingMarkdown, setExportingMarkdown] = useState(false);
   const [shareUrl, setShareUrl] = useState("");
   const [attachedDocuments, setAttachedDocuments] = useState<ChatSessionDocument[]>([]);
+  const [documentsExpanded, setDocumentsExpanded] = useState(false);
   const [documentModalOpen, setDocumentModalOpen] = useState(false);
   const [documentActionBusy, setDocumentActionBusy] = useState(false);
   const [openingDocumentModal, setOpeningDocumentModal] = useState(false);
@@ -295,6 +296,13 @@ export function LegalChatPage() {
     [unavailableAttachedDocuments],
   );
   const chatBlockedByAttachedDocuments = unavailableAttachedDocuments.length > 0;
+  const sourceStatusText = chatBlockedByAttachedDocuments
+    ? failedAttachedDocuments.length > 0
+      ? t("chat.documents.bannerFailed")
+      : t("chat.documents.bannerProcessing", { count: formatNumber(unavailableAttachedDocuments.length, locale) })
+    : attachedDocuments.length > 0
+      ? t("chat.documents.bannerGrounded", { count: formatNumber(attachedDocuments.length, locale) })
+      : t("chat.documents.bannerSystemKnowledge");
 
   useEffect(() => {
     let active = true;
@@ -483,6 +491,20 @@ export function LegalChatPage() {
     shouldAutoScrollRef.current = true;
     setShowNewResponseButton(false);
   }, [selectedSessionId]);
+
+  useEffect(() => {
+    if (attachedDocuments.length === 0) setDocumentsExpanded(false);
+  }, [attachedDocuments.length]);
+
+  useEffect(() => {
+    const textarea = chatInputRef.current;
+    if (!textarea) return;
+
+    const maximumHeight = 112;
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, maximumHeight)}px`;
+    textarea.style.overflowY = textarea.scrollHeight > maximumHeight ? "auto" : "hidden";
+  }, [input]);
 
   useEffect(() => () => activeRequestControllerRef.current?.abort(), []);
 
@@ -935,15 +957,18 @@ export function LegalChatPage() {
         subtitle={t("chat.workspaceContext", {
           workspace: selectedWorkspace?.name ?? "—",
         })}
-        className="mb-md shrink-0"
+        className="shrink-0"
+        compact
         actions={
           <>
             {selectedSessionId && (
               <Button
                 variant="secondary"
-                leftIcon={<Download className="h-4 w-4" />}
+                size="icon"
+                className="h-10 w-10 sm:h-9 sm:w-9 2xl:w-auto 2xl:px-sm"
                 disabled={!canExportMarkdown || exportingMarkdown}
-                title={!canExportMarkdown ? t("chat.exportUnavailable") : undefined}
+                aria-label={exportingMarkdown ? t("chat.exporting") : t("chat.exportMarkdown")}
+                title={!canExportMarkdown ? t("chat.exportUnavailable") : t("chat.exportMarkdown")}
                 onClick={async () => {
                   setExportingMarkdown(true);
                   try {
@@ -956,14 +981,18 @@ export function LegalChatPage() {
                   }
                 }}
               >
-                {exportingMarkdown ? t("chat.exporting") : t("chat.exportMarkdown")}
+                {exportingMarkdown ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                <span className="hidden 2xl:inline">{exportingMarkdown ? t("chat.exporting") : t("chat.exportMarkdown")}</span>
               </Button>
             )}
             {selectedSessionId && (
               <Button
                 variant="secondary"
-                leftIcon={<Share2 className="h-4 w-4" />}
+                size="icon"
+                className="h-10 w-10 sm:h-9 sm:w-9 2xl:w-auto 2xl:px-sm"
                 disabled={sharing}
+                aria-label={t("actions.share")}
+                title={t("actions.share")}
                 onClick={async () => {
                   setSharing(true);
                   try {
@@ -978,12 +1007,16 @@ export function LegalChatPage() {
                   }
                 }}
               >
-                {t("actions.share")}
+                <Share2 className="h-4 w-4" />
+                <span className="hidden 2xl:inline">{t("actions.share")}</span>
               </Button>
             )}
             <Button
               variant="secondary"
-              leftIcon={<RefreshCw className="h-4 w-4" />}
+              size="icon"
+              className="h-10 w-10 sm:h-9 sm:w-9 2xl:w-auto 2xl:px-sm"
+              aria-label={t("chat.refreshContext")}
+              title={t("chat.refreshContext")}
               onClick={() => {
                 if (!selectedWorkspaceId) return;
                 setSearchParams({
@@ -992,26 +1025,39 @@ export function LegalChatPage() {
                 });
               }}
             >
-              {t("chat.refreshContext")}
+              <RefreshCw className="h-4 w-4" />
+              <span className="hidden 2xl:inline">{t("chat.refreshContext")}</span>
             </Button>
             <Button
+              size="sm"
+              className="h-10 sm:h-9"
               leftIcon={<Plus className="h-4 w-4" />}
               onClick={handleCreateSession}
               disabled={!selectedWorkspaceId}
             >
               {t("chat.newSession")}
             </Button>
+            <Button
+              size="icon"
+              className="h-10 w-10 sm:h-9 sm:w-9"
+              variant={activeDrawer === "session" ? "primary" : "ghost"}
+              aria-label={t("chat.drawer.sessionInformation")}
+              title={t("chat.drawer.sessionInformation")}
+              onClick={() => setActiveDrawer((current) => current === "session" ? null : "session")}
+            >
+              <Info className="h-4 w-4" />
+            </Button>
           </>
         }
       />
 
       {error && (
-        <div className="mb-md shrink-0 rounded-xl border border-error/40 bg-error/10 p-md text-sm text-error" role="alert">
+        <div className="mb-sm shrink-0 rounded-xl border border-error/40 bg-error/10 p-sm text-sm text-error" role="alert">
           {error}
         </div>
       )}
 
-      <div className="grid min-h-0 flex-1 gap-md md:grid-cols-[minmax(0,1fr)_60px]">
+      <div className="relative min-h-0 flex-1">
         {activeDrawer && <button type="button" aria-label={t("chat.drawer.close")} className="fixed inset-0 z-30 bg-slate-950/30" onClick={() => setActiveDrawer(null)} />}
         <aside className={`fixed inset-y-0 right-0 z-40 w-[min(400px,calc(100vw-24px))] overflow-y-auto border-l border-legal-border bg-white p-md shadow-2xl transition-transform dark:border-slate-700 dark:bg-slate-950 ${activeDrawer ? "translate-x-0" : "translate-x-full"}`}>
           <div className="mb-md flex items-center justify-between"><p className="font-semibold">{activeDrawer === "session" ? t("chat.drawer.session") : activeDrawer === "documents" ? t("chat.drawer.documents") : t("chat.drawer.options")}</p><Button size="icon" variant="ghost" aria-label={t("actions.close")} onClick={() => setActiveDrawer(null)}><X className="h-5 w-5" /></Button></div>
@@ -1242,74 +1288,91 @@ export function LegalChatPage() {
 
         </aside>
 
-
-        <section className="order-1 min-w-0 space-y-gutter">
-          <Card
-            className="relative flex min-h-[680px] flex-col overflow-hidden border-legal-border p-0 xl:h-[calc(100vh-3rem)] xl:max-h-[900px]"
-          >
-            <div className="border-b border-legal-border bg-white p-md dark:border-slate-700 dark:bg-slate-900">
-              <div className="mb-sm flex items-center justify-between gap-md">
-                <p className="text-sm font-semibold">{t("chat.documents.usedCount", { count: formatNumber(attachedDocuments.length, locale) })}</p>
-                <Badge tone={attachedDocuments.length > 0 ? "blue" : "green"}>
-                  {attachedDocuments.length > 0
-                    ? (language === "vi" ? "Phân tích tài liệu" : "Document analysis")
-                    : (language === "vi" ? "Hỏi đáp pháp luật" : "Legal Q&A")}
-                </Badge>
-              </div>
-              <div className="mt-sm flex gap-sm overflow-x-auto pb-xs">
-                {attachedDocuments.map((document) => (
-                  <article key={document.documentId} className="min-w-[min(17rem,78vw)] max-w-[19rem] flex-1 rounded-lg border border-legal-border bg-surface-container-low p-sm dark:border-slate-700 dark:bg-slate-800">
-                    <div className="flex items-center gap-sm">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary dark:bg-slate-700 dark:text-inverse-primary"><FileText className="h-4 w-4" aria-hidden="true" /></div>
-                      <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold" title={document.originalFileName}>{document.originalFileName}</p><p className="truncate text-xs text-on-surface-variant dark:text-slate-400">{formatMegabytes(document.size, locale)}</p></div>
-                      <button type="button" className="shrink-0 rounded-md p-xs text-on-surface-variant transition hover:bg-surface-container-high hover:text-error disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-400 dark:hover:bg-slate-700" aria-label={t("chat.documents.detachAria", { name: document.originalFileName })} disabled={documentActionBusy} onClick={() => void handleDetachDocument(document.documentId)}><X className="h-4 w-4" aria-hidden="true" /></button>
-                    </div>
-                    <DocumentProcessingProgress status={document.uploadStatus} />
-                  </article>
-                ))}
-                <button
+        <section className="h-full min-h-0 min-w-0">
+          <div className="relative flex h-full min-h-0 min-w-0 flex-col gap-xs sm:gap-sm">
+            <section className={`shrink-0 rounded-xl border bg-white p-xs shadow-sm dark:bg-slate-900 ${chatBlockedByAttachedDocuments ? "border-amber-300 dark:border-amber-900" : "border-legal-border dark:border-slate-700"}`} aria-labelledby="chat-documents-heading">
+              <div className="flex min-w-0 items-center gap-xs">
+                {attachedDocuments.length > 0 ? (
+                  <button
+                    type="button"
+                    className="group flex min-h-10 min-w-0 flex-1 items-center gap-sm rounded-lg p-xs text-left transition hover:bg-surface-container-low dark:hover:bg-slate-800"
+                    aria-expanded={documentsExpanded}
+                    aria-controls="chat-attached-document-details"
+                    onClick={() => setDocumentsExpanded((current) => !current)}
+                  >
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary dark:bg-slate-800 dark:text-inverse-primary"><Files className="h-4 w-4" aria-hidden="true" /></span>
+                    <span className="min-w-0 flex-1">
+                      <span id="chat-documents-heading" className="block truncate text-sm font-semibold text-on-surface dark:text-slate-100">
+                        {t("chat.documents.usedCount", { count: formatNumber(attachedDocuments.length, locale) })}
+                      </span>
+                      <span className="block truncate text-xs font-medium text-on-surface-variant dark:text-slate-400">{sourceStatusText}</span>
+                    </span>
+                    {documentsExpanded ? <ChevronUp className="h-4 w-4 shrink-0" aria-hidden="true" /> : <ChevronDown className="h-4 w-4 shrink-0" aria-hidden="true" />}
+                  </button>
+                ) : (
+                  <div className="flex min-h-10 min-w-0 flex-1 items-center gap-sm px-xs">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary dark:bg-slate-800 dark:text-inverse-primary"><Bot className="h-4 w-4" aria-hidden="true" /></span>
+                    <span className="min-w-0 flex-1">
+                      <span id="chat-documents-heading" className="block truncate text-sm font-semibold text-on-surface dark:text-slate-100">
+                        {t("chat.documents.usedCount", { count: formatNumber(0, locale) })}
+                      </span>
+                      <span className="block truncate text-xs font-medium text-on-surface-variant dark:text-slate-400">{sourceStatusText}</span>
+                    </span>
+                  </div>
+                )}
+                <Badge tone="gold">RAG</Badge>
+                <Button
                   type="button"
-                  onClick={() => void handleOpenDocumentModal()}
+                  size="icon"
+                  variant="ghost"
+                  className="h-10 w-10 shrink-0 sm:h-9 sm:w-9"
+                  aria-label={openingDocumentModal ? t("chat.documents.opening") : t("chat.documents.add")}
+                  title={openingDocumentModal ? t("chat.documents.opening") : t("chat.documents.add")}
                   disabled={!selectedWorkspaceId || openingDocumentModal}
-                  className="group flex min-w-[min(15rem,78vw)] max-w-[17rem] shrink-0 items-center gap-sm rounded-lg border border-outline-variant bg-surface-container-low px-sm py-sm text-left text-primary transition hover:border-primary/50 hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-inverse-primary dark:hover:border-inverse-primary/50 dark:hover:bg-slate-700"
-                  aria-describedby="chat-add-document-hint"
+                  onClick={() => void handleOpenDocumentModal()}
                 >
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-white shadow-sm transition group-hover:bg-primary-container dark:bg-inverse-primary dark:text-slate-950">
-                    {openingDocumentModal ? <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Plus className="h-4 w-4" aria-hidden="true" />}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block text-sm font-semibold">{openingDocumentModal ? t("chat.documents.opening") : t("chat.documents.add")}</span>
-                    <span id="chat-add-document-hint" className="block truncate text-xs font-normal text-on-surface-variant dark:text-slate-400">{t("chat.documents.addHint")}</span>
-                  </span>
-                </button>
+                  {openingDocumentModal ? <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Paperclip className="h-4 w-4" aria-hidden="true" />}
+                </Button>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant={activeDrawer === "documents" ? "primary" : "ghost"}
+                  className="h-10 w-10 shrink-0 sm:h-9 sm:w-9"
+                  aria-label={t("chat.viewSources")}
+                  title={t("chat.viewSources")}
+                  onClick={() => setActiveDrawer((current) => current === "documents" ? null : "documents")}
+                >
+                  <Info className="h-4 w-4" aria-hidden="true" />
+                </Button>
               </div>
-              {documentActionError && !documentModalOpen && <p className="mt-sm rounded-lg bg-error/10 px-sm py-xs text-xs font-medium text-error" role="alert">{documentActionError}</p>}
-            </div>
-            <div className={`flex shrink-0 flex-col gap-sm rounded-lg border px-sm py-sm text-xs font-medium sm:flex-row sm:items-center ${chatBlockedByAttachedDocuments ? "border-amber-200 bg-amber-50/70 text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200" : "border-primary/15 bg-primary/5 text-primary dark:border-inverse-primary/20 dark:bg-blue-950/20 dark:text-blue-200"}`}>
-              <div className="flex min-w-0 flex-1 items-start gap-sm">
-                <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/70 dark:bg-slate-900/60"><Bot className="h-3.5 w-3.5" aria-hidden="true" /></span>
-                <span className="min-w-0 leading-5">
-                  {chatBlockedByAttachedDocuments
-                    ? failedAttachedDocuments.length > 0
-                      ? t("chat.documents.bannerFailed")
-                      : t("chat.documents.bannerProcessing", { count: formatNumber(unavailableAttachedDocuments.length, locale) })
-                    : attachedDocuments.length > 0
-                      ? t("chat.documents.bannerGrounded", { count: formatNumber(attachedDocuments.length, locale) })
-                      : t("chat.documents.bannerSystemKnowledge")}
-                </span>
-              </div>
-              <button type="button" className="self-start rounded-md px-sm py-xs font-semibold underline-offset-4 transition hover:bg-white/70 hover:underline sm:self-auto dark:hover:bg-slate-900/60" onClick={() => setActiveDrawer("documents")}>{t("chat.viewSources")}</button>
-            </div>
-            <div
-              ref={chatScrollContainerRef}
-              onScroll={(event) => {
-                const container = event.currentTarget;
-                const nearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 120;
-                shouldAutoScrollRef.current = nearBottom;
-                if (nearBottom) setShowNewResponseButton(false);
-              }}
-              className="min-h-0 flex-1 space-y-md overflow-y-auto overflow-x-hidden px-xs py-sm sm:px-md"
-            >
+
+              {documentsExpanded && attachedDocuments.length > 0 && (
+                <div id="chat-attached-document-details" role="region" aria-labelledby="chat-documents-heading" className="mt-xs flex max-w-full gap-sm overflow-x-auto border-t border-legal-border pb-xs pt-sm dark:border-slate-700">
+                  {attachedDocuments.map((document) => (
+                    <article key={document.documentId} className="min-w-[min(17rem,78vw)] max-w-[19rem] flex-1 rounded-lg border border-legal-border bg-surface-container-low p-sm dark:border-slate-700 dark:bg-slate-800">
+                      <div className="flex items-center gap-sm">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary dark:bg-slate-700 dark:text-inverse-primary"><FileText className="h-4 w-4" aria-hidden="true" /></div>
+                        <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold" title={document.originalFileName}>{document.originalFileName}</p><p className="truncate text-xs text-on-surface-variant dark:text-slate-400">{formatMegabytes(document.size, locale)}</p></div>
+                        <button type="button" className="shrink-0 rounded-md p-xs text-on-surface-variant transition hover:bg-surface-container-high hover:text-error disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-400 dark:hover:bg-slate-700" aria-label={t("chat.documents.detachAria", { name: document.originalFileName })} disabled={documentActionBusy} onClick={() => void handleDetachDocument(document.documentId)}><X className="h-4 w-4" aria-hidden="true" /></button>
+                      </div>
+                      <DocumentProcessingProgress status={document.uploadStatus} />
+                    </article>
+                  ))}
+                </div>
+              )}
+              {documentActionError && !documentModalOpen && <p className="mt-xs rounded-lg bg-error/10 px-sm py-xs text-xs font-medium text-error" role="alert">{documentActionError}</p>}
+            </section>
+            <div className="relative min-h-0 flex-1">
+              <div
+                ref={chatScrollContainerRef}
+                onScroll={(event) => {
+                  const container = event.currentTarget;
+                  const nearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 120;
+                  shouldAutoScrollRef.current = nearBottom;
+                  if (nearBottom) setShowNewResponseButton(false);
+                }}
+                className="h-full min-h-0 space-y-md overflow-y-auto overflow-x-hidden px-xs py-sm sm:px-md"
+              >
                 {messages.length === 0 ? (
                   <div className="flex min-h-full items-center justify-center py-lg">
                     <div className="w-full max-w-xl rounded-xl border border-legal-border bg-white/80 p-xl text-center shadow-sm dark:border-slate-700 dark:bg-slate-900/80">
@@ -1337,15 +1400,15 @@ export function LegalChatPage() {
                     return (
                     <article
                       key={message.id}
-                      className="mx-auto flex w-full max-w-6xl items-start gap-md"
+                      className="mx-auto flex w-full max-w-6xl items-start gap-sm sm:gap-md"
                     >
-                      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white ${assistant ? "bg-primary" : "bg-blue-600"}`}>
+                      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white sm:h-9 sm:w-9 ${assistant ? "bg-primary" : "bg-blue-600"}`}>
                         {assistant ? <Bot className="h-5 w-5" aria-hidden="true" /> : <UserRound className="h-5 w-5" aria-hidden="true" />}
                       </div>
-                      <div className="min-w-0 max-w-[88%] overflow-hidden sm:max-w-[82%]">
+                      <div className="min-w-0 max-w-[calc(100%-2.5rem)] overflow-hidden sm:max-w-[88%] xl:max-w-[85%]">
                         <div className="mb-xs flex items-center justify-between gap-lg text-xs"><span className="font-semibold text-on-surface dark:text-slate-100">{assistant ? "LexiGuard AI" : t("chat.role.user")}</span><span className="text-on-surface-variant">{message.timestamp}</span></div>
                         <div
-                          className={`min-w-0 overflow-hidden rounded-xl border p-md text-sm leading-6 shadow-sm [overflow-wrap:anywhere] ${
+                          className={`min-w-0 overflow-hidden rounded-xl border p-sm text-sm leading-6 shadow-sm [overflow-wrap:anywhere] sm:p-md ${
                             assistant
                               ? "border-legal-border bg-white text-on-surface dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                               : "border-blue-100 bg-blue-50 text-on-surface dark:border-blue-900 dark:bg-blue-950/40 dark:text-slate-100"
@@ -1451,18 +1514,19 @@ export function LegalChatPage() {
                   );
                 })
               )}
-            </div>
+              </div>
 
-            {showNewResponseButton && (
-              <button
-                type="button"
-                onClick={() => scrollChatToBottom()}
-                className="absolute bottom-36 left-1/2 z-10 flex -translate-x-1/2 items-center gap-xs rounded-full border border-primary/30 bg-white px-md py-sm text-xs font-semibold text-primary shadow-lg hover:bg-primary/5 dark:bg-slate-900"
-              >
-                <ArrowDown className="h-4 w-4" />
-                {t("chat.viewNewResponse")}
-              </button>
-            )}
+              {showNewResponseButton && (
+                <button
+                  type="button"
+                  onClick={() => scrollChatToBottom()}
+                  className="absolute bottom-sm left-1/2 z-10 flex max-w-[calc(100%-1rem)] -translate-x-1/2 items-center gap-xs whitespace-nowrap rounded-full border border-primary/30 bg-white px-md py-sm text-xs font-semibold text-primary shadow-lg hover:bg-primary/5 dark:bg-slate-900"
+                >
+                  <ArrowDown className="h-4 w-4" />
+                  {t("chat.viewNewResponse")}
+                </button>
+              )}
+            </div>
 
             <form
               className="shrink-0"
@@ -1481,13 +1545,13 @@ export function LegalChatPage() {
               <label className="sr-only" htmlFor="legal-chat-input">
                 {t("chat.inputLabel")}
               </label>
-              <div className="rounded-xl border border-legal-border bg-white p-sm shadow-sm dark:border-slate-700 dark:bg-slate-950">
-                <div className="flex gap-sm">
+              <div className="rounded-xl border border-legal-border bg-white p-xs shadow-sm dark:border-slate-700 dark:bg-slate-950 2xl:p-sm">
+                <div className="flex items-end gap-xs sm:gap-sm">
                 <textarea
                   ref={chatInputRef}
                   id="legal-chat-input"
                   rows={1}
-                  className="max-h-32 min-h-12 min-w-0 flex-1 resize-none border-0 bg-transparent px-sm py-md outline-none placeholder:text-on-surface-variant"
+                  className="max-h-28 min-h-10 min-w-0 flex-1 resize-none border-0 bg-transparent px-sm py-sm outline-none placeholder:text-on-surface-variant"
                   value={input}
                   onChange={(event) => setInput(event.target.value)}
                   onKeyDown={(event) => {
@@ -1523,23 +1587,16 @@ export function LegalChatPage() {
                   </Button>
                 )}
                 </div>
-                <div className="mt-sm flex flex-wrap gap-xs border-t border-legal-border pt-sm dark:border-slate-800">
-                  <Button type="button" size="sm" variant="ghost" leftIcon={<Paperclip className="h-4 w-4" />} onClick={() => void handleOpenDocumentModal()}>{t("chat.documents.add")}</Button>
-                  <Button type="button" size="sm" variant="ghost" onClick={() => setInput(t("chat.quick.extractPrompt"))}>{t("chat.quick.extract")}</Button>
-                  <Button type="button" size="sm" variant="ghost" onClick={() => setInput(t("chat.quick.summarizePrompt"))}>{t("chat.quick.summarize")}</Button>
-                  <Button type="button" size="sm" variant="ghost" leftIcon={<MoreHorizontal className="h-4 w-4" />} onClick={() => setActiveDrawer("settings")}>{t("chat.more")}</Button>
+                <div className="mt-xs flex max-w-full gap-xs overflow-x-auto border-t border-legal-border pt-xs dark:border-slate-800 2xl:mt-sm 2xl:pt-sm">
+                  <Button className="min-h-9 shrink-0" type="button" size="sm" variant="ghost" leftIcon={<Paperclip className="h-4 w-4" />} onClick={() => void handleOpenDocumentModal()}>{t("chat.documents.add")}</Button>
+                  <Button className="min-h-9 shrink-0" type="button" size="sm" variant="ghost" onClick={() => setInput(t("chat.quick.extractPrompt"))}>{t("chat.quick.extract")}</Button>
+                  <Button className="min-h-9 shrink-0" type="button" size="sm" variant="ghost" onClick={() => setInput(t("chat.quick.summarizePrompt"))}>{t("chat.quick.summarize")}</Button>
+                  <Button className="min-h-9 shrink-0" type="button" size="sm" variant="ghost" leftIcon={<MoreHorizontal className="h-4 w-4" />} onClick={() => setActiveDrawer("settings")}>{t("chat.more")}</Button>
                 </div>
               </div>
             </form>
-          </Card>
+          </div>
         </section>
-        <aside className="order-1 flex min-w-0 items-start justify-center md:order-2">
-          <nav aria-label={t("chat.utilities")} className="flex w-auto max-w-full items-center gap-sm rounded-xl border border-legal-border bg-white p-sm shadow-sm dark:border-slate-700 dark:bg-slate-900 md:sticky md:top-4 md:w-[60px] md:flex-col">
-            <Button size="icon" variant={activeDrawer === "session" ? "primary" : "ghost"} aria-label={t("chat.drawer.sessionInformation")} title={t("chat.drawer.sessionInformation")} onClick={() => setActiveDrawer((current) => current === "session" ? null : "session")}><Info className="h-5 w-5" /></Button>
-            <Button size="icon" variant={activeDrawer === "documents" ? "primary" : "ghost"} aria-label={t("chat.drawer.documents")} title={t("chat.drawer.documents")} onClick={() => setActiveDrawer((current) => current === "documents" ? null : "documents")}><Files className="h-5 w-5" /></Button>
-            <Button size="icon" variant={activeDrawer === "settings" ? "primary" : "ghost"} aria-label={t("chat.drawer.options")} title={t("chat.drawer.options")} onClick={() => setActiveDrawer((current) => current === "settings" ? null : "settings")}><Settings className="h-5 w-5" /></Button>
-          </nav>
-        </aside>
       </div>
 
       {ticketDraft && <CreateTicketModal

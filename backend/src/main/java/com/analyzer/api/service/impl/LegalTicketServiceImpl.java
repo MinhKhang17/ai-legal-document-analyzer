@@ -374,6 +374,13 @@ public class LegalTicketServiceImpl implements LegalTicketService {
             throw new ForbiddenException("Ban khong co quyen phan hoi ticket nay");
         }
 
+        String clientMessageId = request.getClientMessageId() == null || request.getClientMessageId().isBlank()
+                ? null : request.getClientMessageId().trim();
+        if (clientMessageId != null && legalTicketMessageRepository
+                .findByTicket_IdAndSender_IdAndClientMessageId(ticketId, customerId, clientMessageId).isPresent()) {
+            return toResponse(ticket);
+        }
+
         if (ticket.getStatus() != LegalTicketStatus.ASSIGNED_TO_LAWYER &&
             ticket.getStatus() != LegalTicketStatus.IN_REVIEW &&
             ticket.getStatus() != LegalTicketStatus.NEED_MORE_INFO &&
@@ -388,6 +395,7 @@ public class LegalTicketServiceImpl implements LegalTicketService {
         LegalTicketMessage msg = LegalTicketMessage.builder()
                 .ticket(ticket)
                 .sender(ticket.getCreatedBy())
+                .clientMessageId(clientMessageId)
                 .content(request.getMessage())
                 .messageType(LegalTicketMessageType.CUSTOMER_REPLY)
                 .internalOnly(false)
@@ -595,6 +603,8 @@ public class LegalTicketServiceImpl implements LegalTicketService {
 
     private LegalTicketResponse toResponse(LegalTicket ticket) {
         LegalTicketResponse response = collaborationService.enrich(legalTicketMapper.toResponse(ticket), ticket);
+        // Customer-facing ticket APIs must not expose notes intended only for experts/admins.
+        response.setExpertInternalNote(null);
         snapshotRepository.findByTicket_Id(ticket.getId()).ifPresent(snapshot -> response.setContextSnapshot(
                 TicketContextSnapshotResponse.builder().id(snapshot.getId()).userQuestion(snapshot.getUserQuestion())
                         .assistantAnswer(snapshot.getAssistantAnswer()).conversationTitle(snapshot.getConversationTitle())

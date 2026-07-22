@@ -1,6 +1,8 @@
 package com.analyzer.api.service;
 
 import com.analyzer.api.dto.legalticket.CreateConversationShareRequest;
+import com.analyzer.api.dto.legalticket.CreateTicketMessageRequest;
+import com.analyzer.api.dto.legalticket.LegalTicketMessageResponse;
 import com.analyzer.api.entity.*;
 import com.analyzer.api.enums.ConversationScope;
 import com.analyzer.api.enums.TicketUploadStatus;
@@ -91,5 +93,25 @@ class TicketCollaborationServiceTest {
         assertThat(captor.getValue().getShareTokenHash()).hasSize(64);
         assertThat(response.getShareUrl()).doesNotContain(captor.getValue().getShareTokenHash());
         assertThat(response.getExpiresAt()).isAfter(LocalDateTime.now().plusDays(6));
+    }
+
+    @Test
+    void repeatedClientMessageIdReturnsExistingMessageWithoutSavingDuplicate() {
+        User owner = User.builder().id(1L).build();
+        LegalTicket ticket = LegalTicket.builder().id("ticket_1").createdBy(owner).build();
+        LegalTicketMessage existing = LegalTicketMessage.builder().id("msg_1").ticket(ticket).sender(owner)
+                .clientMessageId("client-1").content("hello").build();
+        LegalTicketMessageResponse mapped = LegalTicketMessageResponse.builder().id("msg_1").build();
+        when(ticketRepository.findByIdAndDeletedFalse("ticket_1")).thenReturn(Optional.of(ticket));
+        when(messageRepository.findByTicket_IdAndSender_IdAndClientMessageId("ticket_1", 1L, "client-1"))
+                .thenReturn(Optional.of(existing));
+        when(mapper.toMessageResponse(existing)).thenReturn(mapped);
+
+        var response = service.addMessage(1L, "CUSTOMER", "ticket_1",
+                CreateTicketMessageRequest.builder().content("hello").clientMessageId("client-1").build());
+
+        assertThat(response.getId()).isEqualTo("msg_1");
+        verify(messageRepository, never()).save(any());
+        verifyNoInteractions(auditRepository);
     }
 }
