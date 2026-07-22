@@ -110,13 +110,6 @@ const navItems: NavItem[] = [
     allowedRoles: ['CUSTOMER'],
   },
   {
-    to: '/contracts',
-    labelKey: 'nav.contracts',
-    icon: FileText,
-    section: 'intelligence',
-    allowedRoles: ['CUSTOMER'],
-  },
-  {
     to: '/knowledge-base',
     labelKey: 'nav.knowledgeBase',
     icon: BookOpen,

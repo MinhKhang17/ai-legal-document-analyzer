@@ -32,7 +32,6 @@ const routeLabels: Array<{ prefix: string; key: string }> = [
   { prefix: '/shared/chat', key: 'sharedChat.title' },
   { prefix: '/shared-conversation', key: 'sharedTicket.title' },
   { prefix: '/tickets', key: 'nav.legalTickets' },
-  { prefix: '/contracts', key: 'nav.contracts' },
   { prefix: '/settings', key: 'nav.settings' },
 ];
 
