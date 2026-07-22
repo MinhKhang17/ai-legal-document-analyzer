@@ -6,6 +6,7 @@ import { useI18n } from "../../hooks/useI18n";
 import { getAttachmentPolicy, removeTicketAttachment, uploadTicketAttachment } from "../../services/legalTicket.service";
 import type { AttachmentPolicy, ConversationScope, CreateLegalTicketRequest, TicketPriority, TicketRecipientType } from "../../types/legalTicket";
 import { ApiRequestError } from "../../services/http";
+import { getMissingExpertTicketFields, type ExpertTicketRequiredField } from "../../utils/ticketComposerValidation";
 
 type SharedDocument = { id: string; name: string };
 type PendingFile = { key: string; file: File; status: "SELECTED" | "UPLOADING" | "UPLOADED" | "FAILED"; progress: number; attachmentId?: string; error?: string };
@@ -33,6 +34,7 @@ const sizeKb = (size: number) => Math.ceil(size / 1024);
 
 export function CreateTicketModal(props: Props) {
   const { t } = useI18n();
+  const documentSelectionKey = props.documents.map((item) => item.id).join("|");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [legalIssueCategory, setLegalIssueCategory] = useState("");
@@ -64,7 +66,7 @@ export function CreateTicketModal(props: Props) {
     setError("");
     setDraftId(`draft_${crypto.randomUUID().replaceAll("-", "")}`);
     void getAttachmentPolicy().then(setPolicy).catch(() => setPolicy(defaultPolicy));
-  }, [props.open, props.question, props.documents, t]);
+  }, [props.open, props.question, props.assistantMessageId, documentSelectionKey, t]);
 
   const uploading = files.some((item) => item.status === "UPLOADING");
   const policyText = useMemo(() => t("ticketComposer.attachmentPolicy", { size: policy.maxAttachmentSizeKb, count: policy.maxAttachmentsPerMessage }), [policy, t]);
@@ -111,8 +113,23 @@ export function CreateTicketModal(props: Props) {
   };
 
   const submit = async () => {
-    if (!title.trim() || !description.trim() || !legalIssueCategory.trim() || !expectedOutcome.trim()) {
-      setError(t("ticketComposer.requiredFields")); return;
+    const missingFields = getMissingExpertTicketFields({
+      title,
+      description,
+      legalIssueCategory,
+      userExpectedOutcome: expectedOutcome,
+    });
+    if (missingFields.length > 0) {
+      const labelKeys: Record<ExpertTicketRequiredField, string> = {
+        title: "ticketComposer.subject",
+        description: "ticketComposer.description",
+        legalIssueCategory: "ticketComposer.legalIssueCategory",
+        userExpectedOutcome: "ticketComposer.expectedOutcome",
+      };
+      setError(t("ticketComposer.missingFields", {
+        fields: missingFields.map((field) => t(labelKeys[field])).join(", "),
+      }));
+      return;
     }
     if (!consentGranted) { setError("Bạn cần xác nhận phạm vi dữ liệu được chia sẻ."); return; }
     setError("");
@@ -144,13 +161,13 @@ export function CreateTicketModal(props: Props) {
     footer={<><Button variant="secondary" onClick={props.onClose} disabled={uploading || props.submitting}>{t("actions.cancel")}</Button><Button onClick={() => void submit()} disabled={uploading || props.submitting}>{props.submitting ? t("legalTickets.createSubmitting") : t("legalTickets.createSubmit")}</Button></>}>
     <div className="space-y-md">
       {error && <p className="rounded-lg bg-error/10 p-sm text-sm text-error">{error}</p>}
-      <div><label className="mb-xs block text-sm font-semibold">{t("ticketComposer.subject")}</label><input className="form-field" maxLength={255} value={title} onChange={(e) => setTitle(e.target.value)} /></div>
-      <div><label className="mb-xs block text-sm font-semibold">{t("ticketComposer.description")}</label><textarea className="form-field min-h-24" maxLength={5000} value={description} onChange={(e) => setDescription(e.target.value)} /></div>
+      <div><label className="mb-xs block text-sm font-semibold">{t("ticketComposer.subject")} *</label><input className="form-field" maxLength={255} value={title} onChange={(e) => setTitle(e.target.value)} required /></div>
+      <div><label className="mb-xs block text-sm font-semibold">{t("ticketComposer.description")} *</label><textarea className="form-field min-h-24" maxLength={5000} value={description} onChange={(e) => setDescription(e.target.value)} required /></div>
       <div className="grid gap-sm sm:grid-cols-2">
-        <div><label className="mb-xs block text-sm font-semibold">Nhóm vấn đề pháp lý *</label><input className="form-field" maxLength={255} value={legalIssueCategory} onChange={(e) => setLegalIssueCategory(e.target.value)} placeholder="Ví dụ: Tranh chấp hợp đồng" /></div>
+        <div><label className="mb-xs block text-sm font-semibold">{t("ticketComposer.legalIssueCategory")} *</label><input className="form-field" maxLength={255} value={legalIssueCategory} onChange={(e) => setLegalIssueCategory(e.target.value)} placeholder="Ví dụ: Tranh chấp hợp đồng" required /></div>
         <div><label className="mb-xs block text-sm font-semibold">Loại hợp đồng</label><input className="form-field" maxLength={255} value={contractType} onChange={(e) => setContractType(e.target.value)} placeholder="Không bắt buộc" /></div>
       </div>
-      <div><label className="mb-xs block text-sm font-semibold">Kết quả bạn mong muốn *</label><textarea className="form-field min-h-20" maxLength={5000} value={expectedOutcome} onChange={(e) => setExpectedOutcome(e.target.value)} /></div>
+      <div><label className="mb-xs block text-sm font-semibold">{t("ticketComposer.expectedOutcome")} *</label><textarea className="form-field min-h-20" maxLength={5000} value={expectedOutcome} onChange={(e) => setExpectedOutcome(e.target.value)} required /></div>
       <div className="grid gap-sm sm:grid-cols-2">
         <div><label className="mb-xs block text-sm font-semibold">{t("ticketComposer.recipient")}</label><select className="form-field" value={recipientType} onChange={(e) => setRecipientType(e.target.value as TicketRecipientType)}><option value="EXPERT">{t("role.expert")}</option><option value="ADMIN">{t("role.admin")}</option></select></div>
         <div><label className="mb-xs block text-sm font-semibold">{t("ticketComposer.priority")}</label><select className="form-field" value={priority} onChange={(e) => setPriority(e.target.value as TicketPriority)}><option value="LOW">{t("priority.LOW")}</option><option value="NORMAL">{t("priority.NORMAL")}</option><option value="HIGH">{t("priority.HIGH")}</option><option value="URGENT">{t("priority.URGENT")}</option></select></div>

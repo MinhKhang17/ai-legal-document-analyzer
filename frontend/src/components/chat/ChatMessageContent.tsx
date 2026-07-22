@@ -188,6 +188,10 @@ export function normalizeChatMarkdown(text: string): string {
   return text
     .replace(/\[\[(KB-\d+)[^\]]*\]\]\([^)]*\/documents\/system\/download[^)]*\)/gi, "[$1]")
     .replace(/(^|[\s(])((?:USER|KB)-\d+)\]/gim, "$1[$2]")
+    // Legacy messages do not retain a reliable ID-to-label map. Hide internal
+    // IDs and direct users to the structured source list for the exact file.
+    .replace(/\[USER-\d+\]/gi, "(Nguồn: hợp đồng/tài liệu người dùng đã đính kèm)")
+    .replace(/\[KB-\d+\]/gi, "(Nguồn: tài liệu pháp lý của hệ thống)")
     .replace(/\s+(?=\d{1,2}\.\s+(?:\*\*|[#🔴🟠🟡🟢]|[A-ZÀ-Ỹ]))/gu, "\n");
 }
 
