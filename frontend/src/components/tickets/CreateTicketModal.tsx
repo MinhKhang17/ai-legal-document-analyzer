@@ -1,5 +1,5 @@
 import { FileText, Paperclip, RotateCcw, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../common/Button";
 import { Modal } from "../common/Modal";
 import { useI18n } from "../../hooks/useI18n";
@@ -34,6 +34,7 @@ const sizeKb = (size: number) => Math.ceil(size / 1024);
 
 export function CreateTicketModal(props: Props) {
   const { t } = useI18n();
+  const submitLockRef = useRef(false);
   const documentSelectionKey = props.documents.map((item) => item.id).join("|");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -53,6 +54,7 @@ export function CreateTicketModal(props: Props) {
 
   useEffect(() => {
     if (!props.open) return;
+    submitLockRef.current = false;
     setTitle(t("ticketComposer.defaultTitle", { question: props.question.slice(0, 90) }));
     setDescription(props.question);
     setLegalIssueCategory("");
@@ -113,6 +115,7 @@ export function CreateTicketModal(props: Props) {
   };
 
   const submit = async () => {
+    if (submitLockRef.current || props.submitting) return;
     const missingFields = getMissingExpertTicketFields({
       title,
       description,
@@ -132,6 +135,7 @@ export function CreateTicketModal(props: Props) {
       return;
     }
     if (!consentGranted) { setError("Bạn cần xác nhận phạm vi dữ liệu được chia sẻ."); return; }
+    submitLockRef.current = true;
     setError("");
     try {
       const attachmentIds: string[] = [];
@@ -154,6 +158,8 @@ export function CreateTicketModal(props: Props) {
       } else {
         setError(cause instanceof Error ? cause.message : t("legalTickets.createError"));
       }
+    } finally {
+      submitLockRef.current = false;
     }
   };
 

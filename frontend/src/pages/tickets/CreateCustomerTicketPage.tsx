@@ -1,5 +1,5 @@
 import { ArrowLeft, RefreshCw, Send } from "lucide-react";
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { createLegalTicket } from "../../api/legalTicketApi";
 import {
@@ -45,6 +45,7 @@ export function CreateCustomerTicketPage() {
   const [loadingWorkspaces, setLoadingWorkspaces] = useState(true);
   const [loadingDocuments, setLoadingDocuments] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const submitLockRef = useRef(false);
 
   const loadWorkspaces = useCallback(async () => {
     setLoadingWorkspaces(true);
@@ -119,6 +120,7 @@ export function CreateCustomerTicketPage() {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (submitLockRef.current || submitting) return;
 
     if (
       !selectedWorkspaceId ||
@@ -133,6 +135,7 @@ export function CreateCustomerTicketPage() {
       return;
     }
 
+    submitLockRef.current = true;
     setSubmitting(true);
 
     try {
@@ -170,6 +173,7 @@ export function CreateCustomerTicketPage() {
         toast.error(error instanceof Error ? error.message : t("legalTickets.create.submitError"), t("toast.errorTitle"));
       }
     } finally {
+      submitLockRef.current = false;
       setSubmitting(false);
     }
   };

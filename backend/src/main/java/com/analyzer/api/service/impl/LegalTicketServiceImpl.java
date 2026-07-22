@@ -26,6 +26,7 @@ import com.analyzer.api.service.SubscriptionQuotaService;
 import com.analyzer.api.service.TicketCollaborationService;
 import tools.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -50,6 +51,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class LegalTicketServiceImpl implements LegalTicketService {
 
     private final LegalTicketRepository legalTicketRepository;
@@ -108,7 +110,9 @@ public class LegalTicketServiceImpl implements LegalTicketService {
             Optional<LegalTicket> existingTicket = legalTicketRepository
                     .findByRequestIdAndCreatedByIdAndDeletedFalse(requestId, customerId);
             if (existingTicket.isPresent()) {
-                throw new ConflictException("DUPLICATE_TICKET");
+                log.info("Returning existing legal ticket {} for repeated request {} from customer {}",
+                        existingTicket.get().getId(), requestId, customerId);
+                return toResponse(existingTicket.get());
             }
         } else {
             requestId = "req_" + UUID.randomUUID().toString().replace("-", "");
@@ -117,9 +121,12 @@ public class LegalTicketServiceImpl implements LegalTicketService {
         if (requestId == null || requestId.isBlank()) {
             requestId = "req_" + UUID.randomUUID().toString().replace("-", "");
         }
-        if (legalTicketRepository
-                .findByRequestIdAndCreatedByIdAndDeletedFalse(requestId, customerId).isPresent()) {
-            throw new ConflictException("DUPLICATE_TICKET");
+        Optional<LegalTicket> existingTicket = legalTicketRepository
+                .findByRequestIdAndCreatedByIdAndDeletedFalse(requestId, customerId);
+        if (existingTicket.isPresent()) {
+            log.info("Returning existing legal ticket {} for repeated request {} from customer {}",
+                    existingTicket.get().getId(), requestId, customerId);
+            return toResponse(existingTicket.get());
         }
 
         ChatMessage userMessage = null;

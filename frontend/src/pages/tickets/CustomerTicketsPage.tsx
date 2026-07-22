@@ -1,5 +1,5 @@
 import { RefreshCw, TicketCheck, Plus } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Pagination } from "../../components/common/Pagination";
 import { parsePageParam, toPageParam } from "../../utils/pagination";
@@ -80,6 +80,7 @@ export function CustomerTicketsPage() {
   const [ticketQuestion, setTicketQuestion] = useState("");
   const [ticketType, setTicketType] = useState<LegalTicketType>("CONTACT_EXPERT");
   const [ticketSubmitting, setTicketSubmitting] = useState(false);
+  const ticketSubmitLockRef = useRef(false);
   const filterOptions = useMemo(() => getLegalTicketFilterOptions(t), [t]);
 
   const loadTickets = useCallback(async () => {
@@ -188,6 +189,7 @@ export function CustomerTicketsPage() {
   );
 
   const handleCreateTicket = async () => {
+    if (ticketSubmitLockRef.current || ticketSubmitting) return;
     const question = ticketQuestion.trim();
 
     if (!ticketWorkspaceId) {
@@ -200,6 +202,7 @@ export function CustomerTicketsPage() {
       return;
     }
 
+    ticketSubmitLockRef.current = true;
     setTicketSubmitting(true);
 
     try {
@@ -225,6 +228,7 @@ export function CustomerTicketsPage() {
       }
       toast.error(t("legalTickets.createError"), t("toast.errorTitle"));
     } finally {
+      ticketSubmitLockRef.current = false;
       setTicketSubmitting(false);
     }
   };
