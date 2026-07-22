@@ -18,6 +18,7 @@ import com.analyzer.api.repository.WorkspaceRepository;
 import com.analyzer.api.service.EmailService;
 import com.analyzer.api.service.SubscriptionQuotaService;
 import com.analyzer.api.service.PolicyAcceptanceService;
+import com.analyzer.api.service.support.DocumentUploadValidator;
 import com.analyzer.api.service.WorkspaceService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -150,6 +151,8 @@ public class WorkspaceServiceImpl implements WorkspaceService {
 
         workspaceRepository.findByIdAndUserIdAndStatus(workspaceId, userId, STATUS_ACTIVE)
                 .orElseThrow(() -> new RuntimeException("Workspace khong ton tai hoac khong thuoc user hien tai"));
+
+        DocumentUploadValidator.validate(file);
 
         String documentId = generateDocumentId();
         String originalFileName = StringUtils.cleanPath(

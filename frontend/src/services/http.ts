@@ -1,5 +1,5 @@
-import { buildAiServiceUrl, buildApiUrl } from "../config/api";
-import { getAccessToken } from "./authSession";
+import { API_ENDPOINTS, buildAiServiceUrl, buildApiUrl } from "../config/api";
+import { getAccessToken, setAccessToken } from "./authSession";
 
 export interface ApiResponse<T> {
   code: number;
@@ -64,6 +64,31 @@ export const getApiErrorCode = (error: unknown): string | undefined => {
 
   const normalizedMessage = error.message.toUpperCase();
   return [...PLAN_ENTITLEMENT_ERROR_CODES].find((code) => normalizedMessage.includes(code));
+};
+
+let refreshRequest: Promise<string | undefined> | undefined;
+
+const refreshAccessTokenOnce = (): Promise<string | undefined> => {
+  if (!refreshRequest) {
+    refreshRequest = fetch(buildApiUrl(API_ENDPOINTS.auth.refresh), {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      credentials: "include",
+      body: "null",
+    })
+      .then(async (response) => {
+        if (!response.ok) return undefined;
+        const payload = await response.json() as ApiResponse<{ accessToken?: string }>;
+        const token = payload.data?.accessToken?.trim();
+        if (token) setAccessToken(token);
+        return token || undefined;
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        refreshRequest = undefined;
+      });
+  }
+  return refreshRequest;
 };
 
 export const isPlanEntitlementError = (error: unknown): boolean => {
@@ -200,11 +225,24 @@ export const requestJson = async <TResponse>(
   requestInit: RequestInit,
   errorMessage: string,
 ): Promise<TResponse> => {
-  const response = await fetchOrThrow(
-    buildApiUrl(endpointPath),
+  const requestUrl = buildApiUrl(endpointPath);
+  let response = await fetchOrThrow(
+    requestUrl,
     requestInit,
     BACKEND_API_UNAVAILABLE_MESSAGE,
   );
+  if (response.status === 401 && getAccessToken() && endpointPath !== API_ENDPOINTS.auth.refresh) {
+    const refreshedToken = await refreshAccessTokenOnce();
+    if (refreshedToken) {
+      const retryHeaders = new Headers(requestInit.headers);
+      retryHeaders.set("Authorization", `Bearer ${refreshedToken}`);
+      response = await fetchOrThrow(
+        requestUrl,
+        { ...requestInit, headers: retryHeaders },
+        BACKEND_API_UNAVAILABLE_MESSAGE,
+      );
+    }
+  }
   const { data, rawText } = await readResponseBody<TResponse | ApiErrorResponse>(response);
 
   if (!response.ok) {

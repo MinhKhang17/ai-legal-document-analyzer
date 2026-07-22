@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.dao.PessimisticLockingFailureException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -175,6 +176,22 @@ public class GlobalExceptionHandler {
                 return new ResponseEntity<>(
                                 ApiResponseDTO.error(HttpStatus.GATEWAY_TIMEOUT.value(), ex.getMessage(), data),
                                 HttpStatus.GATEWAY_TIMEOUT);
+        }
+
+        @ExceptionHandler(NoResourceFoundException.class)
+        public ResponseEntity<ApiResponseDTO<Void>> handleNoResourceFoundException(NoResourceFoundException ex) {
+                return new ResponseEntity<>(
+                                ApiResponseDTO.error(HttpStatus.NOT_FOUND.value(), "API_ROUTE_NOT_FOUND",
+                                                "The requested API route does not exist"),
+                                HttpStatus.NOT_FOUND);
+        }
+
+        @ExceptionHandler(InvalidDocumentUploadException.class)
+        public ResponseEntity<ApiResponseDTO<Void>> handleInvalidDocumentUploadException(
+                        InvalidDocumentUploadException ex) {
+                return new ResponseEntity<>(
+                                ApiResponseDTO.error(HttpStatus.BAD_REQUEST.value(), ex.getErrorCode(), ex.getMessage()),
+                                HttpStatus.BAD_REQUEST);
         }
 
         @ExceptionHandler(InvalidAiResponseException.class)

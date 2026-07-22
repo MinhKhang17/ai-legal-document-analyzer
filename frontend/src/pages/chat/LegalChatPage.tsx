@@ -38,6 +38,7 @@ import type { AiCitation } from "../../types/aiFeature";
 import { formatDisplayDateTime, formatNumber, formatPercent } from "../../utils/format";
 import { simulateStreaming } from "../../utils/simulateStreaming";
 import { supportedContractScopeText } from "../../config/supportedContractTypes";
+import { DOCUMENT_UPLOAD_ACCEPT, validateDocumentFiles } from "../../config/upload";
 import { finishSubmission, tryStartSubmission } from "../../utils/submissionGuard";
 import { getApiErrorCode, isPlanEntitlementError } from "../../services/http";
 import { acceptCurrentPolicies } from "../../services/policy.service";
@@ -806,6 +807,13 @@ export function LegalChatPage() {
 
   const handleUploadAndAttach = async () => {
     if (!uploadFile || !selectedWorkspaceId || !selectedSessionId) return;
+    const validation = validateDocumentFiles([uploadFile]);
+    if (!validation.valid) {
+      const message = t(validation.messageKey);
+      setDocumentActionError(message);
+      toast.warning(message);
+      return;
+    }
     setDocumentActionBusy(true);
     setDocumentActionError("");
     try {
@@ -820,6 +828,13 @@ export function LegalChatPage() {
         setPolicyAccepted(false);
         setPolicyModalOpen(true);
         setDocumentActionError("Bạn cần chấp thuận Điều khoản sử dụng và Chính sách xử lý dữ liệu hiện hành trước khi tải tài liệu.");
+        return;
+      }
+      if (["DOCUMENT_FILE_TYPE_NOT_ALLOWED", "DOCUMENT_FILE_MIME_MISMATCH", "DOCUMENT_FILE_CONTENT_INVALID", "DOCUMENT_FILE_EMPTY"]
+        .includes(getApiErrorCode(err) ?? "")) {
+        const message = t("validation.file.pdfDocxDocOnly");
+        setDocumentActionError(message);
+        toast.warning(message);
         return;
       }
       const raw = err instanceof Error ? err.message : t("chat.documents.uploadError");
@@ -1807,8 +1822,26 @@ export function LegalChatPage() {
               <input
                 className="form-field h-11 min-w-0 px-0 py-0 pr-md text-sm file:mr-md file:h-full file:border-0 file:border-r file:border-outline-variant file:bg-surface-container-low file:px-md file:text-sm file:font-semibold file:text-primary dark:file:border-slate-700 dark:file:bg-slate-800 dark:file:text-inverse-primary"
                 type="file"
+                accept={DOCUMENT_UPLOAD_ACCEPT}
                 aria-label={t("chat.documentModal.uploadTitle")}
-                onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)}
+                onChange={(event) => {
+                  const files = event.target.files;
+                  if (!files?.length) {
+                    setUploadFile(null);
+                    return;
+                  }
+                  const validation = validateDocumentFiles(files);
+                  if (!validation.valid) {
+                    const message = t(validation.messageKey);
+                    setUploadFile(null);
+                    setDocumentActionError(message);
+                    toast.warning(message);
+                    event.target.value = "";
+                    return;
+                  }
+                  setDocumentActionError("");
+                  setUploadFile(files[0]);
+                }}
               />
               <Button className="h-11 w-full sm:min-w-40 sm:w-auto" disabled={!uploadFile || documentActionBusy} onClick={() => void handleUploadAndAttach()}>{documentActionBusy ? t("chat.documentModal.processing") : t("chat.documentModal.uploadAndAttach")}</Button>
             </div>
