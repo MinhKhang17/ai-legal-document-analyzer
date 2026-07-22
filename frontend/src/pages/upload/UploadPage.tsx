@@ -15,7 +15,6 @@ import { Card } from "../../components/common/Card";
 import { PageHeader } from "../../components/common/PageHeader";
 import { StatusBadge } from "../../components/common/StatusBadge";
 import { FileUploadZone } from "../../components/upload/FileUploadZone";
-import { ProcessingTimeline } from "../../components/upload/ProcessingTimeline";
 import { useI18n } from "../../hooks/useI18n";
 import { useToast } from "../../hooks/useToast";
 
@@ -512,10 +511,6 @@ export function UploadPage() {
         </div>
 
         <aside className="space-y-gutter">
-          <Card title={t("upload.pipeline")}>
-            <ProcessingTimeline />
-          </Card>
-
           <Card tone="ai">
             <div className="flex items-center gap-sm">
               <Sparkles className="h-5 w-5 text-secondary dark:text-accent-gold" />
