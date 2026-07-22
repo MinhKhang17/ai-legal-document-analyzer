@@ -1,4 +1,6 @@
 from app.schemas import RagQueryRequest
+from app.services.contract_generation_service import is_contract_generation_intent
+from app.services.llm_intent_detector import detect_intent_smart
 from app.services.safe_query_shortcuts import (
     build_contract_prompt_response,
     build_conversation_shortcut,
@@ -42,3 +44,19 @@ def test_redaction_is_consistent_for_repeated_values() -> None:
 
     assert changed is True
     assert result == "Gọi [PHONE_1] hoặc [PHONE_1]"
+
+
+def test_clause_extraction_is_not_misrouted_to_contract_drafting() -> None:
+    question = "Hãy trích xuất các điều khoản quan trọng trong hợp đồng này."
+
+    assert is_contract_generation_intent(question) is False
+    result = detect_intent_smart(
+        question,
+        has_user_chunks=True,
+        has_knowledge_chunks=True,
+    )
+    assert result.intent.value == "CONTRACT_INFORMATION_EXTRACTION"
+
+
+def test_explicit_contract_creation_still_routes_to_drafting() -> None:
+    assert is_contract_generation_intent("Tạo hợp đồng thuê nhà cho tôi") is True

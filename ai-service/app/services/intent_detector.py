@@ -77,7 +77,11 @@ _CLAUSE_DRAFTING_KEYWORDS = ["soạn điều khoản", "viết điều khoản",
 _CLAUSE_REVISION_KEYWORDS = ["sửa điều khoản", "chỉnh điều khoản", "viết lại điều khoản"]
 _MISSING_KEYWORDS = ["thiếu điều khoản", "cần bổ sung", "thiếu gì", "còn thiếu"]
 _SIGNING_KEYWORDS = ["có nên ký", "ký được không", "nên ký không", "quyết định ký"]
-_INFO_EXTRACTION_KEYWORDS = ["trích thông tin", "rút thông tin", "lấy thông tin", "bên nào", "thời hạn", "giá bao nhiêu"]
+_INFO_EXTRACTION_KEYWORDS = [
+    "trích thông tin", "trích xuất", "trích xuất điều khoản", "trích điều khoản",
+    "rút trích", "rút thông tin", "lấy thông tin", "extract clause", "extract terms",
+    "bên nào", "thời hạn", "giá bao nhiêu",
+]
 _REVIEW_KEYWORDS = ["rà soát", "phân tích hợp đồng", "review hợp đồng", "kiểm tra hợp đồng"]
 _VIETNAM_KEYWORDS = ["việt nam", "bl ds", "bộ luật dân sự", "luật việt nam"]
 _LEGAL_KB_QUESTION_KEYWORDS = [
