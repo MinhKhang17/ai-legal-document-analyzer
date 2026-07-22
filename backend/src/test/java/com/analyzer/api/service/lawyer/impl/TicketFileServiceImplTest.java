@@ -2,6 +2,7 @@ package com.analyzer.api.service.lawyer.impl;
 
 import com.analyzer.api.dto.legalticket.UploadTicketFileRequest;
 import com.analyzer.api.entity.LegalTicket;
+import com.analyzer.api.entity.Document;
 import com.analyzer.api.entity.User;
 import com.analyzer.api.enums.LegalTicketStatus;
 import com.analyzer.api.exception.common.ConflictException;
@@ -20,13 +21,16 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Base64;
+import java.util.List;
 import java.util.Optional;
+import tools.jackson.databind.ObjectMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 class TicketFileServiceImplTest {
@@ -38,17 +42,18 @@ class TicketFileServiceImplTest {
 
     private TicketFileServiceImpl service;
     private User expert;
+    private LegalTicket ticket;
 
     @BeforeEach
     void setUp() {
-        service = new TicketFileServiceImpl(ticketRepository, documentRepository, userRepository);
+        service = new TicketFileServiceImpl(ticketRepository, documentRepository, userRepository, new ObjectMapper());
         ReflectionTestUtils.setField(service, "uploadRoot", tempDir.toString());
         ReflectionTestUtils.setField(service, "maxFileSizeMb", 1L);
         expert = User.builder().id(2L).build();
-        LegalTicket ticket = LegalTicket.builder().id("ticket_1").assignedLawyer(expert)
+        ticket = LegalTicket.builder().id("ticket_1").assignedLawyer(expert)
                 .status(LegalTicketStatus.IN_REVIEW).build();
         when(ticketRepository.findById("ticket_1")).thenReturn(Optional.of(ticket));
-        when(userRepository.findById(2L)).thenReturn(Optional.of(expert));
+        lenient().when(userRepository.findById(2L)).thenReturn(Optional.of(expert));
     }
 
     @Test
@@ -83,6 +88,22 @@ class TicketFileServiceImplTest {
         try (var paths = Files.walk(tempDir)) {
             assertThat(paths.filter(Files::isRegularFile).toList()).isEmpty();
         }
+    }
+
+    @Test
+    void proposedExpertCanSeeCustomerDocumentsSharedWithTicket() {
+        ticket.setAssignedLawyer(null);
+        ticket.setProposedExpert(expert);
+        ticket.setSharedDocumentIdsJson("[\"doc_shared\"]");
+        Document shared = Document.builder().id("doc_shared").originalFileName("hop-dong.pdf")
+                .fileType("application/pdf").fileSize(128L).build();
+        when(documentRepository.findByLegalTicket_Id("ticket_1")).thenReturn(List.of());
+        when(documentRepository.findAllById(List.of("doc_shared"))).thenReturn(List.of(shared));
+
+        var files = service.listFiles("ticket_1", 2L);
+
+        assertThat(files).extracting(item -> item.getDocumentId()).containsExactly("doc_shared");
+        assertThat(files.getFirst().getOriginalFileName()).isEqualTo("hop-dong.pdf");
     }
 
     private UploadTicketFileRequest request(String name, String mime, byte[] content) {

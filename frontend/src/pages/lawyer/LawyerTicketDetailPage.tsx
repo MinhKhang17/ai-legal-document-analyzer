@@ -6,6 +6,7 @@ import {
   Download,
   FileText,
   Lightbulb,
+  Link2,
   MessageSquare,
   Paperclip,
   RefreshCw,
@@ -17,6 +18,7 @@ import {
 import {
   useCallback,
   useEffect,
+  useMemo,
   useState,
   type ChangeEvent,
   type ReactNode,
@@ -52,6 +54,29 @@ import { useAppStore } from "../../store/AppStore";
 
 const getValue = (value?: string | number | null) =>
   value === undefined || value === null || value === "" ? "—" : String(value);
+
+type SharedChatMessage = {
+  messageId?: string;
+  role?: string;
+  content?: string;
+  createdAt?: string;
+};
+
+type SharedDocumentSnapshot = {
+  documentId?: string;
+  fileName?: string;
+  mimeType?: string;
+  sizeBytes?: number;
+};
+
+const parseJson = <T,>(value: string | null | undefined, fallback: T): T => {
+  if (!value) return fallback;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return fallback;
+  }
+};
 
 const senderRoleKeys: Record<string, string> = {
   ADMIN: "role.admin",
@@ -137,6 +162,19 @@ export function LawyerTicketDetailPage() {
   const [resolveSubmitting, setResolveSubmitting] = useState(false);
   const [actionError, setActionError] = useState("");
   const [decisionReason, setDecisionReason] = useState("");
+
+  const sharedChatMessages = useMemo(() => {
+    const snapshot = parseJson<{ messages?: SharedChatMessage[] }>(
+      ticket?.contextSnapshot?.selectedMessageSnapshotJson,
+      {},
+    );
+    return snapshot.messages ?? [];
+  }, [ticket?.contextSnapshot?.selectedMessageSnapshotJson]);
+
+  const sharedDocumentSnapshots = useMemo(
+    () => parseJson<SharedDocumentSnapshot[]>(ticket?.contextSnapshot?.documentSnapshotJson, []),
+    [ticket?.contextSnapshot?.documentSnapshotJson],
+  );
 
   const isTerminal = terminalStatuses.has(String(ticket?.status ?? ""));
   const translateEnum = (value: string | null | undefined, keys: Record<string, string>) => {
@@ -433,14 +471,23 @@ export function LawyerTicketDetailPage() {
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">
-                  {getValue(ticket.request_id)}
+                  {getValue(ticket.ticketCode || ticket.id || ticket.request_id)}
                 </p>
                 <h2 className="mt-1 text-2xl font-semibold">
-                  {getValue(ticket.issue_title)}
+                  {getValue(ticket.title || ticket.issue_title || ticket.question)}
                 </h2>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  {getValue(ticket.issue_summary)}
+                  {getValue(ticket.description || ticket.issue_summary || ticket.customer_note || ticket.question)}
                 </p>
+                {ticket.chat_session_id && (
+                  <a
+                    href="#source-chat-context"
+                    className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline"
+                  >
+                    <Link2 className="h-4 w-4" aria-hidden="true" />
+                    Xem đoạn chat được user gửi kèm
+                  </a>
+                )}
               </div>
 
               <div className="flex flex-wrap gap-2">
@@ -526,17 +573,17 @@ export function LawyerTicketDetailPage() {
             <SectionCard
               icon={<Bot className="h-5 w-5" />}
               title={t("lawyerTickets.detail.aiAnalysis")}
-              content={ticket.answer}
+              content={ticket.answer || ticket.aiAnswerSummary || ticket.contextSnapshot?.assistantAnswer}
             />
             <SectionCard
               icon={<Lightbulb className="h-5 w-5" />}
               title={t("lawyerTickets.detail.recommendation")}
-              content={ticket.recommended_action}
+              content={ticket.recommended_action || ticket.suggestion_reason}
             />
             <SectionCard
               icon={<ShieldAlert className="h-5 w-5" />}
               title={t("lawyerTickets.detail.evidence")}
-              content={ticket.ai_evidence}
+              content={ticket.ai_evidence || ticket.contextSnapshot?.citationSnapshotJson}
             />
 
             <Card className="p-6">
@@ -562,11 +609,11 @@ export function LawyerTicketDetailPage() {
               <div className="space-y-3">
                 <InfoLine
                   label={t("lawyerTickets.detail.customerName")}
-                  value={ticket.created_by_name}
+                  value={ticket.userDisplayName || ticket.created_by_name}
                 />
                 <InfoLine
                   label={t("lawyerTickets.detail.customerNote")}
-                  value={ticket.customer_note}
+                  value={ticket.customer_note || ticket.description || ticket.userExpectedOutcome}
                 />
               </div>
             </Card>
@@ -600,10 +647,27 @@ export function LawyerTicketDetailPage() {
               </div>
 
               <div className="space-y-3">
-                <InfoLine
-                  label={t("lawyerTickets.detail.documentName")}
-                  value={ticket.document_name}
-                />
+                {(files.length > 0 || sharedDocumentSnapshots.length > 0) ? (
+                  <div className="space-y-2">
+                    {(files.length > 0
+                      ? files.map((file) => ({ id: file.documentId, name: file.originalFileName }))
+                      : sharedDocumentSnapshots.map((document) => ({
+                          id: document.documentId,
+                          name: document.fileName || document.documentId,
+                        })))
+                      .map((document) => (
+                        <div key={document.id || document.name} className="rounded-lg border p-2 text-sm">
+                          <p className="font-semibold">{getValue(document.name)}</p>
+                          <p className="break-all text-xs text-muted-foreground">{getValue(document.id)}</p>
+                        </div>
+                      ))}
+                  </div>
+                ) : (
+                  <InfoLine
+                    label={t("lawyerTickets.detail.documentName")}
+                    value={ticket.document_name || ticket.focusedDocumentId}
+                  />
+                )}
                 <InfoLine
                   label={t("lawyerTickets.detail.clauseReference")}
                   value={ticket.clause_reference}
@@ -628,6 +692,42 @@ export function LawyerTicketDetailPage() {
               {getValue(ticket.problematic_clause)}
             </p>
           </Card>
+
+          {ticket.chat_session_id && (
+            <Card id="source-chat-context" className="scroll-mt-24 p-6">
+              <div className="mb-4 flex items-center gap-2">
+                <MessageSquare className="h-5 w-5" />
+                <div>
+                  <h3 className="font-semibold">Đoạn chat user gửi kèm</h3>
+                  <p className="text-xs text-muted-foreground">
+                    {getValue(ticket.contextSnapshot?.conversationTitle)} · {ticket.chat_session_id}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {(sharedChatMessages.length > 0
+                  ? sharedChatMessages
+                  : ([
+                      { role: "USER", content: ticket.contextSnapshot?.userQuestion || ticket.question },
+                      { role: "ASSISTANT", content: ticket.contextSnapshot?.assistantAnswer || ticket.answer },
+                    ] as SharedChatMessage[]).filter((message) => Boolean(message.content)))
+                  .map((message, index) => (
+                    <div key={message.messageId || `${message.role}-${index}`} className="rounded-lg border p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-xs font-bold uppercase text-primary">{getValue(message.role)}</p>
+                        {message.createdAt && (
+                          <p className="text-xs text-muted-foreground">
+                            {formatDisplayDate(message.createdAt, "—", locale)}
+                          </p>
+                        )}
+                      </div>
+                      <p className="mt-2 whitespace-pre-wrap text-sm">{getValue(message.content)}</p>
+                    </div>
+                  ))}
+              </div>
+            </Card>
+          )}
 
           <Card className="p-6">
             <div className="mb-4 flex items-start justify-between gap-4">

@@ -16,6 +16,7 @@ import com.analyzer.api.repository.LegalTicketRepository;
 import com.analyzer.api.repository.UserRepository;
 import com.analyzer.api.service.lawyer.TicketFileService;
 import lombok.RequiredArgsConstructor;
+import tools.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
@@ -28,7 +29,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Base64;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.Locale;
 import java.util.Set;
@@ -53,6 +57,7 @@ public class TicketFileServiceImpl implements TicketFileService {
     private final LegalTicketRepository legalTicketRepository;
     private final DocumentRepository documentRepository;
     private final UserRepository userRepository;
+    private final ObjectMapper objectMapper;
 
     @Value("${app.storage.upload-root:uploads}")
     private String uploadRoot;
@@ -66,13 +71,18 @@ public class TicketFileServiceImpl implements TicketFileService {
         LegalTicket ticket = legalTicketRepository.findById(ticketId)
                 .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay yeu cau tu van ID: " + ticketId));
 
-        if (ticket.getAssignedLawyer() == null || !ticket.getAssignedLawyer().getId().equals(lawyerId)) {
-            throw new ForbiddenException("Ban khong phai la Luat su duoc phan cong xu ly yeu cau nay");
+        requireExpertAccess(ticket, lawyerId);
+
+        Map<String, Document> documentsById = new LinkedHashMap<>();
+        documentRepository.findByLegalTicket_Id(ticketId)
+                .forEach(document -> documentsById.put(document.getId(), document));
+        List<String> sharedDocumentIds = readSharedDocumentIds(ticket);
+        if (!sharedDocumentIds.isEmpty()) {
+            documentRepository.findAllById(sharedDocumentIds)
+                    .forEach(document -> documentsById.putIfAbsent(document.getId(), document));
         }
 
-        List<Document> documents = documentRepository.findByLegalTicket_Id(ticketId);
-
-        return documents.stream()
+        return new ArrayList<>(documentsById.values()).stream()
                 .map(doc -> TicketFileResponse.builder()
                         .documentId(doc.getId())
                         .originalFileName(doc.getOriginalFileName())
@@ -93,9 +103,7 @@ public class TicketFileServiceImpl implements TicketFileService {
         LegalTicket ticket = legalTicketRepository.findById(ticketId)
                 .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay yeu cau tu van ID: " + ticketId));
 
-        if (ticket.getAssignedLawyer() == null || !ticket.getAssignedLawyer().getId().equals(lawyerId)) {
-            throw new ForbiddenException("Ban khong phai la Luat su duoc phan cong xu ly yeu cau nay");
-        }
+        requireExpertAccess(ticket, lawyerId);
         if (!FILE_UPLOAD_STATUSES.contains(ticket.getStatus())) {
             throw new ConflictException("INVALID_STATUS_TRANSITION");
         }
@@ -170,14 +178,15 @@ public class TicketFileServiceImpl implements TicketFileService {
         LegalTicket ticket = legalTicketRepository.findById(ticketId)
                 .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay yeu cau tu van ID: " + ticketId));
 
-        if (ticket.getAssignedLawyer() == null || !ticket.getAssignedLawyer().getId().equals(lawyerId)) {
-            throw new ForbiddenException("Ban khong phai la Luat su duoc phan cong xu ly yeu cau nay");
-        }
+        requireExpertAccess(ticket, lawyerId);
 
         Document document = documentRepository.findById(documentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay tai lieu ID: " + documentId));
 
-        if (document.getLegalTicket() == null || !ticketId.equals(document.getLegalTicket().getId())) {
+        boolean directTicketFile = document.getLegalTicket() != null
+                && ticketId.equals(document.getLegalTicket().getId());
+        boolean sharedCustomerDocument = readSharedDocumentIds(ticket).contains(documentId);
+        if (!directTicketFile && !sharedCustomerDocument) {
             throw new ForbiddenException("Tai lieu khong thuoc yeu cau tu van nay");
         }
 
@@ -229,6 +238,28 @@ public class TicketFileServiceImpl implements TicketFileService {
 
     private boolean isCustomerVisible(Document document) {
         return document.getVisibilityScope() == DocumentVisibilityScope.CUSTOMER;
+    }
+
+    private void requireExpertAccess(LegalTicket ticket, Long expertId) {
+        boolean assigned = ticket.getAssignedLawyer() != null
+                && ticket.getAssignedLawyer().getId().equals(expertId);
+        boolean proposed = ticket.getProposedExpert() != null
+                && ticket.getProposedExpert().getId().equals(expertId);
+        if (!assigned && !proposed) {
+            throw new ForbiddenException("Ban khong phai la chuyen gia duoc de xuat hoac phan cong xu ly yeu cau nay");
+        }
+    }
+
+    private List<String> readSharedDocumentIds(LegalTicket ticket) {
+        String json = ticket.getSharedDocumentIdsJson();
+        if (json == null || json.isBlank()) return List.of();
+        try {
+            return objectMapper.readValue(
+                    json,
+                    objectMapper.getTypeFactory().constructCollectionType(List.class, String.class));
+        } catch (Exception ignored) {
+            return List.of();
+        }
     }
 
     private TicketFileResponse toResponse(Document doc) {
