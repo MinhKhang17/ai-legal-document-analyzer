@@ -206,8 +206,8 @@ public class GlobalExceptionHandler {
         @ExceptionHandler(InvalidAiResponseException.class)
         public ResponseEntity<ApiResponseDTO<Void>> handleInvalidAiResponseException(InvalidAiResponseException ex) {
                 return new ResponseEntity<>(
-                                ApiResponseDTO.error(HttpStatus.UNPROCESSABLE_ENTITY.value(), ex.getErrorCode(), ex.getMessage()),
-                                HttpStatus.UNPROCESSABLE_ENTITY);
+                                ApiResponseDTO.error(HttpStatus.UNPROCESSABLE_CONTENT.value(), ex.getErrorCode(), ex.getMessage()),
+                                HttpStatus.UNPROCESSABLE_CONTENT);
         }
 
         @ExceptionHandler(ExpiredVerificationTokenException.class)

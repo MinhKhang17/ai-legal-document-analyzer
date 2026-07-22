@@ -9,7 +9,7 @@ import com.analyzer.api.repository.document.DocumentRepository;
 import com.analyzer.api.repository.user.UserRepository;
 import com.analyzer.api.repository.workspace.WorkspaceRepository;
 import com.analyzer.api.repository.knowledge.KnowledgeBaseVersionRepository;
-import com.analyzer.api.service.EmailService;
+import com.analyzer.api.service.notification.EmailService;
 import com.analyzer.api.service.policy.PolicyAcceptanceService;
 import com.analyzer.api.service.subscription.SubscriptionQuotaService;
 import org.junit.jupiter.api.Test;

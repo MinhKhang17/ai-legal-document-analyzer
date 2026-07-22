@@ -26,10 +26,9 @@ import com.analyzer.api.repository.legalticket.LegalTicketRepository;
 import com.analyzer.api.repository.legalticket.LegalTicketMessageRepository;
 import com.analyzer.api.repository.legalticket.TicketContextSnapshotRepository;
 import com.analyzer.api.repository.legalticket.ExpertTicketCreditReservationRepository;
-import com.analyzer.api.repository.*;
 import com.analyzer.api.repository.ai.AiCitationRepository;
 import com.analyzer.api.service.legalticket.LegalTicketService;
-import com.analyzer.api.service.EmailService;
+import com.analyzer.api.service.notification.EmailService;
 import com.analyzer.api.service.revenue.ExpertRevenueService;
 import com.analyzer.api.service.subscription.SubscriptionQuotaService;
 import com.analyzer.api.service.legalticket.TicketCollaborationService;
@@ -83,7 +82,8 @@ public class LegalTicketServiceImpl implements LegalTicketService {
     public LegalTicketResponse createTicket(Long customerId, CreateLegalTicketRequest request) {
         User customer = userRepository.findById(customerId)
                 .orElseThrow(() -> new ResourceNotFoundException("USER_NOT_FOUND"));
-        LegalTicketType requestedType = request.getTicketType() != null ? request.getTicketType() : LegalTicketType.CONTACT_EXPERT;
+        LegalTicketType requestedType = request.getTicketType() != null ? request.getTicketType()
+                : LegalTicketType.CONTACT_EXPERT;
         validateTicketTypeForPlan(customer, requestedType);
 
         Workspace workspace = workspaceRepository.findById(request.getWorkspaceId())
@@ -142,7 +142,8 @@ public class LegalTicketServiceImpl implements LegalTicketService {
         String sourceSessionId = firstNonBlank(request.getChatSessionId(),
                 chatMsg != null && chatMsg.getChatSession() != null ? chatMsg.getChatSession().getId() : null);
         TicketCreationSource creationSource = sourceSessionId != null || chatMsg != null || userMessage != null
-                ? TicketCreationSource.AI_CHAT : TicketCreationSource.MANUAL_FORM;
+                ? TicketCreationSource.AI_CHAT
+                : TicketCreationSource.MANUAL_FORM;
         if (request.getCreationSource() != null && request.getCreationSource() != creationSource) {
             throw new ConflictException("TICKET_CREATION_SOURCE_MISMATCH");
         }
@@ -162,9 +163,11 @@ public class LegalTicketServiceImpl implements LegalTicketService {
         }
 
         String customerNote = firstNonBlank(request.getCustomerNote(), request.getQuestion());
-        String title = firstNonBlank(request.getTitle(), question.length() > 120 ? question.substring(0, 120) : question);
+        String title = firstNonBlank(request.getTitle(),
+                question.length() > 120 ? question.substring(0, 120) : question);
         String description = firstNonBlank(request.getDescription(), customerNote);
-        String issueCategory = firstNonBlank(request.getLegalIssueCategory(), chatMsg != null ? chatMsg.getLegalDomain() : null);
+        String issueCategory = firstNonBlank(request.getLegalIssueCategory(),
+                chatMsg != null ? chatMsg.getLegalDomain() : null);
         String expectedOutcome = firstNonBlank(request.getUserExpectedOutcome());
         if (requestedType == LegalTicketType.CONTACT_EXPERT) {
             requireCreateField(title, "title");
@@ -192,7 +195,8 @@ public class LegalTicketServiceImpl implements LegalTicketService {
                 .sharedProfileFieldsJson(writeJson(sharedProfileFields))
                 .consentGrantedAt(sharedProfileFields.isEmpty() ? null : LocalDateTime.now())
                 .relatedChatSessionId(sourceSessionId)
-                .relatedChatMessageId(firstNonBlank(request.getChatMessageId(), chatMsg != null ? chatMsg.getId() : null))
+                .relatedChatMessageId(
+                        firstNonBlank(request.getChatMessageId(), chatMsg != null ? chatMsg.getId() : null))
                 .sourceUserMessageId(userMessage != null ? userMessage.getId() : request.getUserMessageId())
                 .sourceAssistantMessageId(chatMsg != null ? chatMsg.getId() : request.getAssistantMessageId())
                 .recipientType(request.getRecipientType())
@@ -276,7 +280,8 @@ public class LegalTicketServiceImpl implements LegalTicketService {
                 }
                 subscriptionQuotaService.checkCanCreateSupportTicket(customer);
             }
-            case REFUND_REQUEST -> { /* Refund tickets never consume expert quota. */ }
+            case REFUND_REQUEST -> {
+                /* Refund tickets never consume expert quota. */ }
         }
     }
 
@@ -298,14 +303,17 @@ public class LegalTicketServiceImpl implements LegalTicketService {
             }
         }
 
-        if (RoleName.ADMIN.name().equalsIgnoreCase(userRole)) return toAdminResponse(ticket);
-        if (RoleName.EXPERT.name().equalsIgnoreCase(userRole)) return toExpertResponse(ticket);
+        if (RoleName.ADMIN.name().equalsIgnoreCase(userRole))
+            return toAdminResponse(ticket);
+        if (RoleName.EXPERT.name().equalsIgnoreCase(userRole))
+            return toExpertResponse(ticket);
         return toResponse(ticket);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public PageResponse<LegalTicketResponse> getMyTickets(Long customerId, LegalTicketStatus status, int page, int size) {
+    public PageResponse<LegalTicketResponse> getMyTickets(Long customerId, LegalTicketStatus status, int page,
+            int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<LegalTicket> pageResult;
 
@@ -413,7 +421,8 @@ public class LegalTicketServiceImpl implements LegalTicketService {
 
         LocalDateTime referenceTime = ticket.getResolvedAt() != null ? ticket.getResolvedAt() : ticket.getClosedAt();
         if (referenceTime == null || referenceTime.plusDays(7).isBefore(LocalDateTime.now())) {
-            throw new ConflictException("Chi cho phep mo lai ticket trong vong 7 ngay ke tu khi duoc giai quyet hoac dong");
+            throw new ConflictException(
+                    "Chi cho phep mo lai ticket trong vong 7 ngay ke tu khi duoc giai quyet hoac dong");
         }
 
         ticket.setStatus(LegalTicketStatus.REOPENED);
@@ -444,17 +453,18 @@ public class LegalTicketServiceImpl implements LegalTicketService {
         }
 
         String clientMessageId = request.getClientMessageId() == null || request.getClientMessageId().isBlank()
-                ? null : request.getClientMessageId().trim();
+                ? null
+                : request.getClientMessageId().trim();
         if (clientMessageId != null && legalTicketMessageRepository
                 .findByTicket_IdAndSender_IdAndClientMessageId(ticketId, customerId, clientMessageId).isPresent()) {
             return toResponse(ticket);
         }
 
         if (ticket.getStatus() != LegalTicketStatus.ASSIGNED_TO_LAWYER &&
-            ticket.getStatus() != LegalTicketStatus.IN_REVIEW &&
-            ticket.getStatus() != LegalTicketStatus.NEED_MORE_INFO &&
-            ticket.getStatus() != LegalTicketStatus.CUSTOMER_RESPONDED &&
-            ticket.getStatus() != LegalTicketStatus.REOPENED) {
+                ticket.getStatus() != LegalTicketStatus.IN_REVIEW &&
+                ticket.getStatus() != LegalTicketStatus.NEED_MORE_INFO &&
+                ticket.getStatus() != LegalTicketStatus.CUSTOMER_RESPONDED &&
+                ticket.getStatus() != LegalTicketStatus.REOPENED) {
             throw new ConflictException("INVALID_STATUS_TRANSITION");
         }
 
@@ -462,8 +472,10 @@ public class LegalTicketServiceImpl implements LegalTicketService {
         ticket.setLastCustomerMessageAt(LocalDateTime.now());
         if (ticket.getPausedAt() != null) {
             long paused = Math.max(0, Duration.between(ticket.getPausedAt(), LocalDateTime.now()).getSeconds());
-            ticket.setTotalPausedDurationSeconds(Optional.ofNullable(ticket.getTotalPausedDurationSeconds()).orElse(0L) + paused);
-            if (ticket.getResolutionDueAt() != null) ticket.setResolutionDueAt(ticket.getResolutionDueAt().plusSeconds(paused));
+            ticket.setTotalPausedDurationSeconds(
+                    Optional.ofNullable(ticket.getTotalPausedDurationSeconds()).orElse(0L) + paused);
+            if (ticket.getResolutionDueAt() != null)
+                ticket.setResolutionDueAt(ticket.getResolutionDueAt().plusSeconds(paused));
             ticket.setPausedAt(null);
         }
         ticket.setSlaStatus(com.analyzer.api.enums.TicketSlaStatus.ON_TRACK);
@@ -483,16 +495,19 @@ public class LegalTicketServiceImpl implements LegalTicketService {
 
     @Override
     @Transactional(readOnly = true)
-    public PageResponse<LegalTicketResponse> listAdminTickets(LegalTicketStatus status, RiskLevel riskLevel, LegalTicketType ticketType, int page, int size) {
+    public PageResponse<LegalTicketResponse> listAdminTickets(LegalTicketStatus status, RiskLevel riskLevel,
+            LegalTicketType ticketType, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<LegalTicket> pageResult;
 
         if (status != null && riskLevel != null && ticketType != null) {
-            pageResult = legalTicketRepository.findByStatusAndRiskLevelAndTicketTypeAndDeletedFalse(status, riskLevel, ticketType, pageable);
+            pageResult = legalTicketRepository.findByStatusAndRiskLevelAndTicketTypeAndDeletedFalse(status, riskLevel,
+                    ticketType, pageable);
         } else if (status != null && ticketType != null) {
             pageResult = legalTicketRepository.findByStatusAndTicketTypeAndDeletedFalse(status, ticketType, pageable);
         } else if (riskLevel != null && ticketType != null) {
-            pageResult = legalTicketRepository.findByRiskLevelAndTicketTypeAndDeletedFalse(riskLevel, ticketType, pageable);
+            pageResult = legalTicketRepository.findByRiskLevelAndTicketTypeAndDeletedFalse(riskLevel, ticketType,
+                    pageable);
         } else if (ticketType != null) {
             pageResult = legalTicketRepository.findByTicketTypeAndDeletedFalse(ticketType, pageable);
         } else if (status != null && riskLevel != null) {
@@ -598,8 +613,10 @@ public class LegalTicketServiceImpl implements LegalTicketService {
     private void validateCitationOwnership(List<String> citationIds, ChatMessage assistantMessage, Long userId) {
         List<String> ids = Optional.ofNullable(citationIds).orElse(List.of()).stream()
                 .filter(Objects::nonNull).distinct().toList();
-        if (ids.isEmpty()) return;
-        if (assistantMessage == null) throw new ConflictException("CITATIONS_REQUIRE_SOURCE_MESSAGE");
+        if (ids.isEmpty())
+            return;
+        if (assistantMessage == null)
+            throw new ConflictException("CITATIONS_REQUIRE_SOURCE_MESSAGE");
         for (String id : ids) {
             AiCitation citation = aiCitationRepository.findById(id)
                     .orElseThrow(() -> new ResourceNotFoundException("CITATION_NOT_FOUND"));
@@ -622,8 +639,10 @@ public class LegalTicketServiceImpl implements LegalTicketService {
 
     private List<Document> resolveSharedDocuments(CreateLegalTicketRequest request, Long userId, Workspace workspace) {
         List<String> ids = new ArrayList<>(Optional.ofNullable(request.getDocumentIds()).orElse(List.of()));
-        if (request.getDocumentId() != null && !request.getDocumentId().isBlank()) ids.add(request.getDocumentId());
-        if (request.getFocusedDocumentId() != null && !request.getFocusedDocumentId().isBlank()) ids.add(request.getFocusedDocumentId());
+        if (request.getDocumentId() != null && !request.getDocumentId().isBlank())
+            ids.add(request.getDocumentId());
+        if (request.getFocusedDocumentId() != null && !request.getFocusedDocumentId().isBlank())
+            ids.add(request.getFocusedDocumentId());
         List<Document> documents = new ArrayList<>();
         for (String id : ids.stream().filter(Objects::nonNull).distinct().toList()) {
             Document item = documentRepository.findById(id)
@@ -637,7 +656,7 @@ public class LegalTicketServiceImpl implements LegalTicketService {
     }
 
     private TicketContextSnapshot buildSnapshot(LegalTicket ticket, ChatMessage userMessage,
-                                                  ChatMessage assistantMessage, List<Document> documents) {
+            ChatMessage assistantMessage, List<Document> documents) {
         List<Map<String, Object>> documentSnapshots = documents.stream().map(document -> {
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("documentId", document.getId());
@@ -672,9 +691,10 @@ public class LegalTicketServiceImpl implements LegalTicketService {
                 int toIndex = Math.min(sessionMessages.size(), selectedIndex + 4);
                 scopedMessages = sessionMessages.subList(fromIndex, toIndex);
             } else {
-                scopedMessages = sessionMessages.stream().filter(message ->
-                        (userMessage != null && message.getId().equals(userMessage.getId()))
-                                || (assistantMessage != null && message.getId().equals(assistantMessage.getId()))).toList();
+                scopedMessages = sessionMessages.stream()
+                        .filter(message -> (userMessage != null && message.getId().equals(userMessage.getId()))
+                                || (assistantMessage != null && message.getId().equals(assistantMessage.getId())))
+                        .toList();
             }
             selectedMessages.put("messages", scopedMessages.stream().map(message -> {
                 Map<String, Object> item = new LinkedHashMap<>();
@@ -691,7 +711,8 @@ public class LegalTicketServiceImpl implements LegalTicketService {
         String conversationTitle = assistantMessage != null && assistantMessage.getChatSession() != null
                 ? assistantMessage.getChatSession().getTitle()
                 : userMessage != null && userMessage.getChatSession() != null
-                    ? userMessage.getChatSession().getTitle() : null;
+                        ? userMessage.getChatSession().getTitle()
+                        : null;
         String hashInput = ticket.getQuestion() + "\n" + Optional.ofNullable(ticket.getAnswer()).orElse("")
                 + "\n" + Optional.ofNullable(citations).orElse("") + "\n" + documentJson + "\n" + selectedJson;
         return TicketContextSnapshot.builder().ticket(ticket).userQuestion(ticket.getQuestion())
@@ -702,7 +723,8 @@ public class LegalTicketServiceImpl implements LegalTicketService {
 
     private LegalTicketResponse toResponse(LegalTicket ticket) {
         LegalTicketResponse response = enrichedResponse(ticket);
-        // Customer-facing ticket APIs must not expose notes intended only for experts/admins.
+        // Customer-facing ticket APIs must not expose notes intended only for
+        // experts/admins.
         response.setExpertInternalNote(null);
         response.setAdminNote(null);
         response.setCommissionRate(null);
@@ -744,7 +766,8 @@ public class LegalTicketServiceImpl implements LegalTicketService {
         response.setSharedProfileFields(readStringList(ticket.getSharedProfileFieldsJson()));
         snapshotRepository.findByTicket_Id(ticket.getId()).ifPresent(snapshot -> response.setContextSnapshot(
                 TicketContextSnapshotResponse.builder().id(snapshot.getId()).userQuestion(snapshot.getUserQuestion())
-                        .assistantAnswer(snapshot.getAssistantAnswer()).conversationTitle(snapshot.getConversationTitle())
+                        .assistantAnswer(snapshot.getAssistantAnswer())
+                        .conversationTitle(snapshot.getConversationTitle())
                         .citationSnapshotJson(snapshot.getCitationSnapshotJson())
                         .documentSnapshotJson(snapshot.getDocumentSnapshotJson())
                         .selectedMessageSnapshotJson(snapshot.getSelectedMessageSnapshotJson())
@@ -753,13 +776,16 @@ public class LegalTicketServiceImpl implements LegalTicketService {
     }
 
     private boolean isShared(LegalTicket ticket, String field) {
-        return ticket.getConsentRevokedAt() == null && readStringList(ticket.getSharedProfileFieldsJson()).contains(field);
+        return ticket.getConsentRevokedAt() == null
+                && readStringList(ticket.getSharedProfileFieldsJson()).contains(field);
     }
 
     private List<String> readStringList(String json) {
-        if (json == null || json.isBlank()) return List.of();
+        if (json == null || json.isBlank())
+            return List.of();
         try {
-            return objectMapper.readValue(json, objectMapper.getTypeFactory().constructCollectionType(List.class, String.class));
+            return objectMapper.readValue(json,
+                    objectMapper.getTypeFactory().constructCollectionType(List.class, String.class));
         } catch (Exception ex) {
             return List.of();
         }
@@ -777,8 +803,11 @@ public class LegalTicketServiceImpl implements LegalTicketService {
     }
 
     private String writeJson(Object value) {
-        try { return objectMapper.writeValueAsString(value); }
-        catch (Exception ex) { throw new ConflictException("SNAPSHOT_SERIALIZATION_FAILED"); }
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (Exception ex) {
+            throw new ConflictException("SNAPSHOT_SERIALIZATION_FAILED");
+        }
     }
 
     private String sha256(String value) {

@@ -1,4 +1,4 @@
-package com.analyzer.api.service;
+package com.analyzer.api.service.notification;
 
 public interface EmailService {
 

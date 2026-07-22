@@ -28,7 +28,7 @@ import com.analyzer.api.service.paymenttransaction.PaymentTransactionService;
 import com.analyzer.api.service.subscriptionplan.SubscriptionPlanService;
 import com.analyzer.api.service.subscription.SubscriptionQuotaService;
 import com.analyzer.api.service.workspace.WorkspaceService;
-import com.analyzer.api.service.support.CustomerPlanSnapshotHelper;
+import com.analyzer.api.service.customerplan.impl.CustomerPlanSnapshotHelper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;

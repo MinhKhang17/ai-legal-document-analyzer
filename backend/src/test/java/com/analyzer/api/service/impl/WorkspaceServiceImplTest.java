@@ -8,7 +8,7 @@ import com.analyzer.api.exception.common.ConflictException;
 import com.analyzer.api.repository.document.DocumentRepository;
 import com.analyzer.api.repository.user.UserRepository;
 import com.analyzer.api.repository.workspace.WorkspaceRepository;
-import com.analyzer.api.service.EmailService;
+import com.analyzer.api.service.notification.EmailService;
 import com.analyzer.api.service.subscription.SubscriptionQuotaService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

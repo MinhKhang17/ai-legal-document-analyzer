@@ -1,4 +1,4 @@
-package com.analyzer.api.service.support;
+package com.analyzer.api.util;
 
 import com.analyzer.api.exception.validation.InvalidDocumentUploadException;
 import org.springframework.web.multipart.MultipartFile;
@@ -18,11 +18,12 @@ public final class DocumentUploadValidator {
             "pdf", Set.of("application/pdf"),
             "doc", Set.of("application/msword", "application/vnd.ms-word"),
             "docx", Set.of("application/vnd.openxmlformats-officedocument.wordprocessingml.document"));
-    private static final byte[] PDF_MAGIC = {0x25, 0x50, 0x44, 0x46, 0x2D};
-    private static final byte[] OLE_MAGIC = {(byte) 0xD0, (byte) 0xCF, 0x11, (byte) 0xE0,
-            (byte) 0xA1, (byte) 0xB1, 0x1A, (byte) 0xE1};
+    private static final byte[] PDF_MAGIC = { 0x25, 0x50, 0x44, 0x46, 0x2D };
+    private static final byte[] OLE_MAGIC = { (byte) 0xD0, (byte) 0xCF, 0x11, (byte) 0xE0,
+            (byte) 0xA1, (byte) 0xB1, 0x1A, (byte) 0xE1 };
 
-    private DocumentUploadValidator() {}
+    private DocumentUploadValidator() {
+    }
 
     public static void validate(MultipartFile file) throws IOException {
         if (file == null || file.isEmpty()) {
@@ -54,20 +55,23 @@ public final class DocumentUploadValidator {
     }
 
     private static String extension(String fileName) {
-        if (fileName == null || fileName.isBlank()) return "";
+        if (fileName == null || fileName.isBlank())
+            return "";
         String normalized = fileName.trim().toLowerCase(Locale.ROOT);
         int separator = normalized.lastIndexOf('.');
         return separator < 0 || separator == normalized.length() - 1 ? "" : normalized.substring(separator + 1);
     }
 
     private static String normalizeMime(String mime) {
-        if (mime == null) return "";
+        if (mime == null)
+            return "";
         int parameters = mime.indexOf(';');
         return (parameters >= 0 ? mime.substring(0, parameters) : mime).trim().toLowerCase(Locale.ROOT);
     }
 
     private static boolean isWordOpenXml(byte[] bytes) {
-        if (bytes.length < 4 || bytes[0] != 0x50 || bytes[1] != 0x4B) return false;
+        if (bytes.length < 4 || bytes[0] != 0x50 || bytes[1] != 0x4B)
+            return false;
         boolean hasContentTypes = false;
         boolean hasWordDocument = false;
         int entries = 0;
@@ -75,9 +79,12 @@ public final class DocumentUploadValidator {
             ZipEntry entry;
             while ((entry = zip.getNextEntry()) != null && entries++ < 10_000) {
                 String name = entry.getName().replace('\\', '/');
-                if ("[Content_Types].xml".equals(name)) hasContentTypes = true;
-                if ("word/document.xml".equals(name)) hasWordDocument = true;
-                if (hasContentTypes && hasWordDocument) return true;
+                if ("[Content_Types].xml".equals(name))
+                    hasContentTypes = true;
+                if ("word/document.xml".equals(name))
+                    hasWordDocument = true;
+                if (hasContentTypes && hasWordDocument)
+                    return true;
             }
         } catch (IOException ignored) {
             return false;
@@ -86,7 +93,8 @@ public final class DocumentUploadValidator {
     }
 
     private static boolean isLegacyWord(byte[] bytes) {
-        if (!startsWith(bytes, OLE_MAGIC)) return false;
+        if (!startsWith(bytes, OLE_MAGIC))
+            return false;
         try (POIFSFileSystem fileSystem = new POIFSFileSystem(new ByteArrayInputStream(bytes))) {
             return fileSystem.getRoot().hasEntry("WordDocument");
         } catch (IOException | RuntimeException ignored) {
@@ -95,9 +103,11 @@ public final class DocumentUploadValidator {
     }
 
     private static boolean startsWith(byte[] value, byte[] prefix) {
-        if (value.length < prefix.length) return false;
+        if (value.length < prefix.length)
+            return false;
         for (int index = 0; index < prefix.length; index++) {
-            if (value[index] != prefix[index]) return false;
+            if (value[index] != prefix[index])
+                return false;
         }
         return true;
     }

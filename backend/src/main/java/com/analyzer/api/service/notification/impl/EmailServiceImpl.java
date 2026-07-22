@@ -1,6 +1,6 @@
-package com.analyzer.api.service.impl;
+package com.analyzer.api.service.notification.impl;
 
-import com.analyzer.api.service.EmailService;
+import com.analyzer.api.service.notification.EmailService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

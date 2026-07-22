@@ -14,11 +14,10 @@ import com.analyzer.api.repository.legalticket.LegalTicketRepository;
 import com.analyzer.api.repository.legalticket.LegalTicketMessageRepository;
 import com.analyzer.api.repository.paymenttransaction.PaymentTransactionRepository;
 import com.analyzer.api.repository.customerplan.CustomerPlanRepository;
-import com.analyzer.api.repository.*;
 import com.analyzer.api.repository.subscription.RefundRequestRepository;
 import com.analyzer.api.security.UserDetailsImpl;
 import com.analyzer.api.service.customerplan.CustomerPlanService;
-import com.analyzer.api.service.EmailService;
+import com.analyzer.api.service.notification.EmailService;
 import com.analyzer.api.service.subscription.RefundService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
@@ -76,7 +75,6 @@ public class RefundServiceImpl implements RefundService {
         this.customerPlanService = customerPlanService;
     }
 
-    /** Backward-compatible constructor retained for existing unit tests and integrations. */
     public RefundServiceImpl(
             RefundRequestRepository refundRequestRepository,
             PaymentTransactionRepository paymentTransactionRepository,
@@ -101,23 +99,29 @@ public class RefundServiceImpl implements RefundService {
     public RefundResponse requestRefund(Long customerId, CreateRefundRequest request) {
         User customer = userRepository.findById(customerId)
                 .orElseThrow(() -> new ResourceNotFoundException("CUSTOMER_NOT_FOUND"));
-        PaymentTransaction transaction = paymentTransactionRepository.findByIdForUpdate(request.getPaymentTransactionId())
+        PaymentTransaction transaction = paymentTransactionRepository
+                .findByIdForUpdate(request.getPaymentTransactionId())
                 .orElseThrow(() -> new ResourceNotFoundException("PAYMENT_TRANSACTION_NOT_FOUND"));
-        if (!transaction.getCustomer().getId().equals(customerId)) throw new ForbiddenException("REFUND_INVOICE_ACCESS_DENIED");
-        if (transaction.getPaymentStatus() != PaymentStatus.SUCCESS) throw new ConflictException("REFUND_REQUIRES_SUCCESSFUL_PAYMENT");
+        if (!transaction.getCustomer().getId().equals(customerId))
+            throw new ForbiddenException("REFUND_INVOICE_ACCESS_DENIED");
+        if (transaction.getPaymentStatus() != PaymentStatus.SUCCESS)
+            throw new ConflictException("REFUND_REQUIRES_SUCCESSFUL_PAYMENT");
         validateInvoiceReference(request, transaction);
-        if (refundRequestRepository.existsByPaymentTransactionIdAndStatusIn(transaction.getId(), IN_PROGRESS_STATUSES)) {
+        if (refundRequestRepository.existsByPaymentTransactionIdAndStatusIn(transaction.getId(),
+                IN_PROGRESS_STATUSES)) {
             throw new ConflictException("REFUND_ALREADY_IN_PROGRESS");
         }
         BigDecimal reserved = refundRequestRepository.sumReservedAmount(transaction.getId(), RefundStatus.REJECTED);
         BigDecimal remaining = transaction.getAmount().subtract(reserved);
-        if (request.getAmount().compareTo(remaining) > 0) throw new ConflictException("REFUND_AMOUNT_EXCEEDS_REMAINING_PAYMENT");
+        if (request.getAmount().compareTo(remaining) > 0)
+            throw new ConflictException("REFUND_AMOUNT_EXCEEDS_REMAINING_PAYMENT");
         CustomerPlan customerPlan = validateCustomerPlan(customerId, request.getCustomerPlanId(), transaction);
 
         Workspace workspace = workspaceRepository.findAllByUserIdAndStatusOrderByCreatedAtDesc(customerId, "ACTIVE")
                 .stream().findFirst().orElse(null);
         String reason = request.getRefundReason() != null && !request.getRefundReason().isBlank()
-                ? request.getRefundReason().trim() : request.getReason().trim();
+                ? request.getRefundReason().trim()
+                : request.getReason().trim();
         LegalTicket ticket = legalTicketRepository.save(LegalTicket.builder()
                 .requestId("refund_" + UUID.randomUUID().toString().replace("-", ""))
                 .ticketType(LegalTicketType.REFUND_REQUEST)
@@ -139,33 +143,45 @@ public class RefundServiceImpl implements RefundService {
                 && hasText(request.getAccountHolderName());
         RefundRequest refund = refundRequestRepository.save(RefundRequest.builder()
                 .paymentTransaction(transaction).customerPlan(customerPlan).requestedBy(customer).legalTicket(ticket)
-                .reason(reason).status(hasBankInfo ? RefundStatus.WAITING_EMAIL_CONFIRMATION : RefundStatus.WAITING_USER_BANK_INFO)
+                .reason(reason)
+                .status(hasBankInfo ? RefundStatus.WAITING_EMAIL_CONFIRMATION : RefundStatus.WAITING_USER_BANK_INFO)
                 .amount(request.getAmount()).bankName(normalize(request.getBankName()))
-                .accountNumber(normalize(request.getAccountNumber())).accountHolderName(normalize(request.getAccountHolderName()))
-                .invoiceId(hasText(request.getInvoiceId()) ? request.getInvoiceId().trim() : transaction.getTransactionCode())
+                .accountNumber(normalize(request.getAccountNumber()))
+                .accountHolderName(normalize(request.getAccountHolderName()))
+                .invoiceId(hasText(request.getInvoiceId()) ? request.getInvoiceId().trim()
+                        : transaction.getTransactionCode())
                 .confirmationTokenHash(hasBankInfo ? sha256(rawToken) : null)
                 .confirmationExpiresAt(hasBankInfo ? LocalDateTime.now().plusHours(24) : null)
-                .adminNote(hasBankInfo ? "Waiting for user email confirmation" : "Waiting for user bank information").build());
-        if (hasBankInfo) emailService.sendRefundConfirmationEmailAsync(customer.getEmail(), customer.getFirstName(), refund.getId(), rawToken);
+                .adminNote(hasBankInfo ? "Waiting for user email confirmation" : "Waiting for user bank information")
+                .build());
+        if (hasBankInfo)
+            emailService.sendRefundConfirmationEmailAsync(customer.getEmail(), customer.getFirstName(), refund.getId(),
+                    rawToken);
         return toResponse(refund);
     }
 
-    @Override @Transactional(readOnly = true)
+    @Override
+    @Transactional(readOnly = true)
     public RefundResponse getRefund(Long id) {
         RefundRequest refund = requireRefund(id);
-        if (!canViewRefund(refund)) throw new ForbiddenException("REFUND_ACCESS_DENIED");
+        if (!canViewRefund(refund))
+            throw new ForbiddenException("REFUND_ACCESS_DENIED");
         return toResponse(refund);
     }
 
-    @Override @Transactional(readOnly = true)
+    @Override
+    @Transactional(readOnly = true)
     public List<RefundResponse> getMyRefunds(Long customerId) {
-        return refundRequestRepository.findByRequestedByIdOrderByCreatedAtDesc(customerId).stream().map(this::toResponse).toList();
+        return refundRequestRepository.findByRequestedByIdOrderByCreatedAtDesc(customerId).stream()
+                .map(this::toResponse).toList();
     }
 
-    @Override @Transactional(readOnly = true)
+    @Override
+    @Transactional(readOnly = true)
     public List<RefundResponse> getRefunds(RefundStatus status) {
         return (status == null ? refundRequestRepository.findAllByOrderByCreatedAtDesc()
-                : refundRequestRepository.findByStatusOrderByCreatedAtDesc(status)).stream().map(this::toResponse).toList();
+                : refundRequestRepository.findByStatusOrderByCreatedAtDesc(status)).stream().map(this::toResponse)
+                .toList();
     }
 
     @Override
@@ -180,13 +196,15 @@ public class RefundServiceImpl implements RefundService {
             throw new ResourceNotFoundException("TOKEN_INVALID");
         }
         RefundRequest refund = refundWithActiveToken.get();
-        if (refund.getConfirmationExpiresAt() == null || LocalDateTime.now().isAfter(refund.getConfirmationExpiresAt())) {
+        if (refund.getConfirmationExpiresAt() == null
+                || LocalDateTime.now().isAfter(refund.getConfirmationExpiresAt())) {
             throw new ConflictException("TOKEN_EXPIRED");
         }
         if (refund.getStatus() == RefundStatus.EMAIL_CONFIRMED || refund.getEmailConfirmedAt() != null) {
             throw new ConflictException("TOKEN_ALREADY_USED");
         }
-        if (refund.getStatus() != RefundStatus.WAITING_EMAIL_CONFIRMATION) throw new ConflictException("REFUND_CONFIRMATION_NOT_ALLOWED");
+        if (refund.getStatus() != RefundStatus.WAITING_EMAIL_CONFIRMATION)
+            throw new ConflictException("REFUND_CONFIRMATION_NOT_ALLOWED");
         refund.setStatus(RefundStatus.EMAIL_CONFIRMED);
         refund.setEmailConfirmedAt(LocalDateTime.now());
         refund.setConfirmationUsedTokenHash(tokenHash);
@@ -203,12 +221,14 @@ public class RefundServiceImpl implements RefundService {
         refund.setStatus(request.status());
         refund.setAdminNote(normalize(request.adminNote()));
         RefundRequest saved = refundRequestRepository.save(refund);
-        if (request.status() == RefundStatus.REFUNDED || request.status() == RefundStatus.COMPLETED) completeRefund(saved);
+        if (request.status() == RefundStatus.REFUNDED || request.status() == RefundStatus.COMPLETED)
+            completeRefund(saved);
         if (request.status() == RefundStatus.REFUNDED || request.status() == RefundStatus.REJECTED
                 || request.status() == RefundStatus.CLOSED || request.status() == RefundStatus.COMPLETED) {
             LegalTicket ticket = saved.getLegalTicket();
             if (ticket != null) {
-                ticket.setStatus(request.status() == RefundStatus.REJECTED ? LegalTicketStatus.REJECTED_BY_ADMIN : LegalTicketStatus.CLOSED);
+                ticket.setStatus(request.status() == RefundStatus.REJECTED ? LegalTicketStatus.REJECTED_BY_ADMIN
+                        : LegalTicketStatus.CLOSED);
                 ticket.setClosedAt(LocalDateTime.now());
                 legalTicketRepository.save(ticket);
             }
@@ -223,8 +243,10 @@ public class RefundServiceImpl implements RefundService {
         }
         boolean valid = switch (current) {
             case NEW -> target == RefundStatus.ADMIN_REVIEWING || target == RefundStatus.REJECTED;
-            case ADMIN_REVIEWING -> target == RefundStatus.WAITING_USER_BANK_INFO || target == RefundStatus.WAITING_EMAIL_CONFIRMATION || target == RefundStatus.REJECTED;
-            case WAITING_USER_BANK_INFO -> target == RefundStatus.WAITING_EMAIL_CONFIRMATION || target == RefundStatus.REJECTED;
+            case ADMIN_REVIEWING -> target == RefundStatus.WAITING_USER_BANK_INFO
+                    || target == RefundStatus.WAITING_EMAIL_CONFIRMATION || target == RefundStatus.REJECTED;
+            case WAITING_USER_BANK_INFO ->
+                target == RefundStatus.WAITING_EMAIL_CONFIRMATION || target == RefundStatus.REJECTED;
             case WAITING_EMAIL_CONFIRMATION -> target == RefundStatus.REJECTED;
             case EMAIL_CONFIRMED -> target == RefundStatus.REFUND_REQUEST_CREATED || target == RefundStatus.REJECTED;
             case REFUND_REQUEST_CREATED -> target == RefundStatus.REFUNDED || target == RefundStatus.REJECTED;
@@ -234,14 +256,17 @@ public class RefundServiceImpl implements RefundService {
             case PROCESSING -> target == RefundStatus.COMPLETED;
             case REJECTED, CLOSED, COMPLETED -> false;
         };
-        if (!valid) throw new ConflictException("INVALID_REFUND_STATUS_TRANSITION");
+        if (!valid)
+            throw new ConflictException("INVALID_REFUND_STATUS_TRANSITION");
     }
 
     private void completeRefund(RefundRequest refund) {
-        PaymentTransaction transaction = paymentTransactionRepository.findByIdForUpdate(refund.getPaymentTransaction().getId())
+        PaymentTransaction transaction = paymentTransactionRepository
+                .findByIdForUpdate(refund.getPaymentTransaction().getId())
                 .orElseThrow(() -> new ResourceNotFoundException("PAYMENT_TRANSACTION_NOT_FOUND"));
         BigDecimal completedAmount = refundRequestRepository.sumAmountByStatus(transaction.getId(), refund.getStatus());
-        if (completedAmount == null || completedAmount.compareTo(transaction.getAmount()) < 0) return;
+        if (completedAmount == null || completedAmount.compareTo(transaction.getAmount()) < 0)
+            return;
         transaction.setPaymentStatus(PaymentStatus.REFUNDED);
         paymentTransactionRepository.save(transaction);
         if (transaction.getCustomerPlan() != null) {
@@ -250,7 +275,8 @@ public class RefundServiceImpl implements RefundService {
                 customerPlanService.cancelPlanAndActivateFree(transaction.getCustomer().getId(), plan.getId(),
                         "Refund " + transaction.getTransactionCode());
             } else {
-                plan.setStatus(PlanStatus.CANCELLED); plan.setAutoRenew(false);
+                plan.setStatus(PlanStatus.CANCELLED);
+                plan.setAutoRenew(false);
                 plan.setCancelReason("Refund " + transaction.getTransactionCode());
                 customerPlanRepository.save(plan);
             }
@@ -259,18 +285,22 @@ public class RefundServiceImpl implements RefundService {
 
     private CustomerPlan validateCustomerPlan(Long customerId, Long requestedId, PaymentTransaction transaction) {
         CustomerPlan plan = transaction.getCustomerPlan();
-        if (requestedId == null) return plan;
+        if (requestedId == null)
+            return plan;
         CustomerPlan requested = customerPlanRepository.findById(requestedId)
                 .orElseThrow(() -> new ResourceNotFoundException("CUSTOMER_PLAN_NOT_FOUND"));
-        if (!requested.getCustomer().getId().equals(customerId)) throw new ForbiddenException("CUSTOMER_PLAN_ACCESS_DENIED");
-        if (plan == null || !plan.getId().equals(requested.getId())) throw new ConflictException("CUSTOMER_PLAN_PAYMENT_MISMATCH");
+        if (!requested.getCustomer().getId().equals(customerId))
+            throw new ForbiddenException("CUSTOMER_PLAN_ACCESS_DENIED");
+        if (plan == null || !plan.getId().equals(requested.getId()))
+            throw new ConflictException("CUSTOMER_PLAN_PAYMENT_MISMATCH");
         return requested;
     }
 
     private void validateInvoiceReference(CreateRefundRequest request, PaymentTransaction transaction) {
         String code = transaction.getTransactionCode();
         String id = String.valueOf(transaction.getId());
-        if (request.getInvoiceId() == null || request.getInvoiceId().isBlank()) return;
+        if (request.getInvoiceId() == null || request.getInvoiceId().isBlank())
+            return;
         if (!request.getInvoiceId().equalsIgnoreCase(code) && !request.getInvoiceId().equals(id)) {
             throw new ConflictException("REFUND_INVOICE_MISMATCH");
         }
@@ -281,7 +311,8 @@ public class RefundServiceImpl implements RefundService {
     }
 
     private RefundRequest requireRefund(Long id) {
-        return refundRequestRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("REFUND_NOT_FOUND"));
+        return refundRequestRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("REFUND_NOT_FOUND"));
     }
 
     private RefundResponse toResponse(RefundRequest refund) {
@@ -299,13 +330,19 @@ public class RefundServiceImpl implements RefundService {
 
     private boolean canViewRefund(RefundRequest refund) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !(auth.getPrincipal() instanceof UserDetailsImpl details)) return false;
+        if (auth == null || !(auth.getPrincipal() instanceof UserDetailsImpl details))
+            return false;
         boolean admin = details.getAuthorities().stream().anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
         return admin || refund.getRequestedBy().getId().equals(details.getId());
     }
 
-    private String normalize(String value) { return value == null || value.isBlank() ? null : value.trim(); }
-    private boolean hasText(String value) { return value != null && !value.isBlank(); }
+    private String normalize(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
 
     private String sha256(String value) {
         try {

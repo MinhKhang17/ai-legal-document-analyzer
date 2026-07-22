@@ -11,7 +11,7 @@ import com.analyzer.api.repository.revenue.ExpertPayoutTransactionRepository;
 import com.analyzer.api.repository.revenue.ExpertRevenueStatementRepository;
 import com.analyzer.api.repository.*;
 import com.analyzer.api.service.revenue.EarlyPayoutService;
-import com.analyzer.api.service.EmailService;
+import com.analyzer.api.service.notification.EmailService;
 import com.analyzer.api.service.revenue.FinancialAuditService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;

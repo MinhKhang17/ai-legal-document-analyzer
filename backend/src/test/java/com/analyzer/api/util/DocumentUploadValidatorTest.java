@@ -1,4 +1,4 @@
-package com.analyzer.api.service.support;
+package com.analyzer.api.util;
 
 import com.analyzer.api.exception.validation.InvalidDocumentUploadException;
 import org.junit.jupiter.api.Test;

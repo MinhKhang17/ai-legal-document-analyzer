@@ -1,4 +1,4 @@
-package com.analyzer.api.service.support;
+package com.analyzer.api.service.customerplan.impl;
 
 import com.analyzer.api.entity.CustomerPlan;
 import com.analyzer.api.entity.SubscriptionPlan;
@@ -6,26 +6,28 @@ import com.analyzer.api.enums.PlanStatus;
 import com.analyzer.api.exception.common.ConflictException;
 import com.analyzer.api.repository.customerplan.CustomerPlanRepository;
 import com.analyzer.api.repository.subscriptionplan.SubscriptionPlanRepository;
+import com.analyzer.api.service.customerplan.CustomerPlanExpiryService;
 import com.analyzer.api.util.AppClock;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
-@Component
+@Service
 @RequiredArgsConstructor
-public class CustomerPlanExpiryHelper {
+public class CustomerPlanExpiryServiceImpl implements CustomerPlanExpiryService {
 
-    private static final Logger logger = LoggerFactory.getLogger(CustomerPlanExpiryHelper.class);
+    private static final Logger logger = LoggerFactory.getLogger(CustomerPlanExpiryServiceImpl.class);
 
     private final CustomerPlanRepository customerPlanRepository;
     private final SubscriptionPlanRepository subscriptionPlanRepository;
     private final CustomerPlanSnapshotHelper customerPlanSnapshotHelper;
 
+    @Override
     @Transactional
     public CustomerPlan getActiveOrHandleExpiry(Long customerId) {
         CustomerPlan activePlan = customerPlanRepository.findByCustomerIdAndStatus(customerId, PlanStatus.ACTIVE)
@@ -77,6 +79,7 @@ public class CustomerPlanExpiryHelper {
         return locked.getStatus() == PlanStatus.EXPIRED ? null : locked;
     }
 
+    @Override
     @Transactional
     public void expireDuePlans() {
         List<CustomerPlan> duePlans = customerPlanRepository
@@ -101,7 +104,7 @@ public class CustomerPlanExpiryHelper {
 
     // Mutates plan in place: applies the scheduled downgrade if one is pending,
     // otherwise marks it EXPIRED.
-    public void applyExpiryOrScheduledChange(CustomerPlan plan) {
+    private void applyExpiryOrScheduledChange(CustomerPlan plan) {
         SubscriptionPlan scheduled = plan.getScheduledSubscriptionPlan();
 
         if (scheduled != null && !Boolean.TRUE.equals(scheduled.getActive())) {

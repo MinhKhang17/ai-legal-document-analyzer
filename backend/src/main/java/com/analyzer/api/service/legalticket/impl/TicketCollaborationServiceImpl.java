@@ -15,10 +15,8 @@ import com.analyzer.api.repository.legalticket.TicketAttachmentRepository;
 import com.analyzer.api.repository.legalticket.TicketAuditLogRepository;
 import com.analyzer.api.repository.legalticket.TicketContextSnapshotRepository;
 import com.analyzer.api.repository.legalticket.ConversationShareRepository;
-import com.analyzer.api.repository.*;
-import com.analyzer.api.service.revenue.RevenuePayrollService;
 import com.analyzer.api.service.legalticket.TicketCollaborationService;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
@@ -51,21 +49,22 @@ public class TicketCollaborationServiceImpl implements TicketCollaborationServic
     private final TicketContextSnapshotRepository snapshotRepository;
     private final UserRepository userRepository;
     private final LegalTicketMapper ticketMapper;
-    private final RevenuePayrollService revenuePayrollService;
 
-    @org.springframework.beans.factory.annotation.Autowired
-    public TicketCollaborationServiceImpl(LegalTicketRepository ticketRepository,LegalTicketMessageRepository messageRepository,
-        TicketAttachmentRepository attachmentRepository,ConversationShareRepository shareRepository,TicketAuditLogRepository auditRepository,
-        TicketContextSnapshotRepository snapshotRepository,UserRepository userRepository,LegalTicketMapper ticketMapper,RevenuePayrollService revenuePayrollService){
-        this.ticketRepository=ticketRepository;this.messageRepository=messageRepository;this.attachmentRepository=attachmentRepository;
-        this.shareRepository=shareRepository;this.auditRepository=auditRepository;this.snapshotRepository=snapshotRepository;
-        this.userRepository=userRepository;this.ticketMapper=ticketMapper;this.revenuePayrollService=revenuePayrollService;
-    }
-    /** Compatibility constructor retained for existing tests. */
-    public TicketCollaborationServiceImpl(LegalTicketRepository ticketRepository,LegalTicketMessageRepository messageRepository,
-        TicketAttachmentRepository attachmentRepository,ConversationShareRepository shareRepository,TicketAuditLogRepository auditRepository,
-        TicketContextSnapshotRepository snapshotRepository,UserRepository userRepository,LegalTicketMapper ticketMapper){
-        this(ticketRepository,messageRepository,attachmentRepository,shareRepository,auditRepository,snapshotRepository,userRepository,ticketMapper,null);
+    @Autowired
+    public TicketCollaborationServiceImpl(LegalTicketRepository ticketRepository,
+            LegalTicketMessageRepository messageRepository,
+            TicketAttachmentRepository attachmentRepository, ConversationShareRepository shareRepository,
+            TicketAuditLogRepository auditRepository,
+            TicketContextSnapshotRepository snapshotRepository, UserRepository userRepository,
+            LegalTicketMapper ticketMapper) {
+        this.ticketRepository = ticketRepository;
+        this.messageRepository = messageRepository;
+        this.attachmentRepository = attachmentRepository;
+        this.shareRepository = shareRepository;
+        this.auditRepository = auditRepository;
+        this.snapshotRepository = snapshotRepository;
+        this.userRepository = userRepository;
+        this.ticketMapper = ticketMapper;
     }
 
     @Value("${app.ticket-attachments.max-size-kb:500}")
@@ -298,7 +297,8 @@ public class TicketCollaborationServiceImpl implements TicketCollaborationServic
                         && ticket.getCustomerPaymentStatus() != TicketPaymentStatus.PAID)
                     throw new ConflictException("PAYMENT_REQUIRED_BEFORE_EXPERT_START");
                 next = LegalTicketStatus.IN_REVIEW;
-                if (ticket.getStartedAt() == null) ticket.setStartedAt(LocalDateTime.now());
+                if (ticket.getStartedAt() == null)
+                    ticket.setStartedAt(LocalDateTime.now());
             }
             case "REQUEST_USER_INFO" -> {
                 if (!("EXPERT".equalsIgnoreCase(role) || "ADMIN".equalsIgnoreCase(role))

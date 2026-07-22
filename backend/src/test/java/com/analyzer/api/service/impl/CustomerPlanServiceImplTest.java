@@ -17,8 +17,8 @@ import com.analyzer.api.repository.paymenttransaction.PaymentTransactionReposito
 import com.analyzer.api.repository.subscriptionplan.SubscriptionPlanRepository;
 import com.analyzer.api.repository.user.UserRepository;
 import com.analyzer.api.service.subscription.SubscriptionQuotaService;
-import com.analyzer.api.service.support.CustomerPlanExpiryHelper;
-import com.analyzer.api.service.support.CustomerPlanSnapshotHelper;
+import com.analyzer.api.service.customerplan.CustomerPlanExpiryService;
+import com.analyzer.api.service.customerplan.impl.CustomerPlanSnapshotHelper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,7 +49,7 @@ class CustomerPlanServiceImplTest {
     @Mock PaymentTransactionRepository paymentTransactionRepository;
     @Mock CustomerPlanMapper customerPlanMapper;
     @Mock SubscriptionQuotaService subscriptionQuotaService;
-    @Mock CustomerPlanExpiryHelper customerPlanExpiryHelper;
+    @Mock CustomerPlanExpiryService customerPlanExpiryHelper;
     @Mock CustomerPlanSnapshotHelper customerPlanSnapshotHelper;
 
     private CustomerPlanServiceImpl service;

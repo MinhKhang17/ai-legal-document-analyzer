@@ -4,7 +4,7 @@ import com.analyzer.api.entity.LegalTicket;
 import com.analyzer.api.enums.*;
 import com.analyzer.api.repository.legalticket.ExpertTicketCreditReservationRepository;
 import com.analyzer.api.repository.legalticket.LegalTicketRepository;
-import com.analyzer.api.service.EmailService;
+import com.analyzer.api.service.notification.EmailService;
 import com.analyzer.api.service.legalticket.TicketCollaborationService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.*;

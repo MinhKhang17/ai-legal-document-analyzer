@@ -14,7 +14,7 @@ import com.analyzer.api.repository.customerplan.CustomerPlanRepository;
 import com.analyzer.api.repository.paymenttransaction.PaymentTransactionRepository;
 import com.analyzer.api.repository.subscriptionplan.SubscriptionPlanRepository;
 import com.analyzer.api.repository.user.UserRepository;
-import com.analyzer.api.service.support.CustomerPlanSnapshotHelper;
+import com.analyzer.api.service.customerplan.impl.CustomerPlanSnapshotHelper;
 import com.analyzer.api.util.AppClock;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;

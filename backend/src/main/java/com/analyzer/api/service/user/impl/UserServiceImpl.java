@@ -14,7 +14,7 @@ import com.analyzer.api.exception.common.ResourceNotFoundException;
 import com.analyzer.api.mapper.UserMapper;
 import com.analyzer.api.repository.user.RoleRepository;
 import com.analyzer.api.repository.user.UserRepository;
-import com.analyzer.api.service.EmailService;
+import com.analyzer.api.service.notification.EmailService;
 import com.analyzer.api.service.policy.PolicyAcceptanceService;
 import com.analyzer.api.service.user.UserService;
 import lombok.RequiredArgsConstructor;

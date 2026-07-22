@@ -15,7 +15,7 @@ import com.analyzer.api.repository.document.DocumentRepository;
 import com.analyzer.api.repository.legalticket.LegalTicketMessageRepository;
 import com.analyzer.api.repository.legalticket.LegalTicketRepository;
 import com.analyzer.api.repository.user.UserRepository;
-import com.analyzer.api.service.EmailService;
+import com.analyzer.api.service.notification.EmailService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

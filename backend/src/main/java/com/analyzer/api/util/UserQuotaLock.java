@@ -1,4 +1,4 @@
-package com.analyzer.api.service.support;
+package com.analyzer.api.util;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;

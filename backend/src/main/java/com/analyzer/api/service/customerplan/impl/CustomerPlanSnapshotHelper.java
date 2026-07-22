@@ -1,4 +1,4 @@
-package com.analyzer.api.service.support;
+package com.analyzer.api.service.customerplan.impl;
 
 import com.analyzer.api.entity.CustomerPlan;
 import com.analyzer.api.entity.SubscriptionPlan;
@@ -30,7 +30,7 @@ public class CustomerPlanSnapshotHelper {
             return live;
         }
 
-        SubscriptionPlan.SubscriptionPlanBuilder view = SubscriptionPlan.builder()
+        var view = SubscriptionPlan.builder()
                 .planName(customerPlan.getPlanNameSnapshot())
                 .planType(customerPlan.getPlanTypeSnapshot())
                 .price(customerPlan.getPriceSnapshot())

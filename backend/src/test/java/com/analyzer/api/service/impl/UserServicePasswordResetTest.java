@@ -6,7 +6,7 @@ import com.analyzer.api.entity.User;
 import com.analyzer.api.mapper.UserMapper;
 import com.analyzer.api.repository.user.RoleRepository;
 import com.analyzer.api.repository.user.UserRepository;
-import com.analyzer.api.service.EmailService;
+import com.analyzer.api.service.notification.EmailService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;

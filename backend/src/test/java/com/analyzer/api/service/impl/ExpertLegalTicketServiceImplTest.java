@@ -13,7 +13,7 @@ import com.analyzer.api.mapper.LegalTicketMapper;
 import com.analyzer.api.repository.legalticket.LegalTicketMessageRepository;
 import com.analyzer.api.repository.legalticket.LegalTicketRepository;
 import com.analyzer.api.repository.user.UserRepository;
-import com.analyzer.api.service.EmailService;
+import com.analyzer.api.service.notification.EmailService;
 import com.analyzer.api.service.revenue.ExpertRevenueService;
 import com.analyzer.api.service.revenue.RevenuePayrollService;
 import org.junit.jupiter.api.BeforeEach;

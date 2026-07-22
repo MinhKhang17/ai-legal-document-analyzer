@@ -16,7 +16,7 @@ import com.analyzer.api.repository.user.UserRepository;
 import com.analyzer.api.security.JwtTokenProvider;
 import com.analyzer.api.security.UserDetailsImpl;
 import com.analyzer.api.service.auth.AuthService;
-import com.analyzer.api.service.EmailService;
+import com.analyzer.api.service.notification.EmailService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;

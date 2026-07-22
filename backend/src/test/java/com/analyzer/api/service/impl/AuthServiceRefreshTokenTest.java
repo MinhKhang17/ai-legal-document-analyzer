@@ -7,7 +7,7 @@ import com.analyzer.api.mapper.UserMapper;
 import com.analyzer.api.repository.auth.RefreshTokenRepository;
 import com.analyzer.api.repository.user.UserRepository;
 import com.analyzer.api.security.JwtTokenProvider;
-import com.analyzer.api.service.EmailService;
+import com.analyzer.api.service.notification.EmailService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.Test;

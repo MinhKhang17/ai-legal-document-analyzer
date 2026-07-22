@@ -19,7 +19,7 @@ import com.analyzer.api.repository.legalticket.LegalTicketMessageRepository;
 import com.analyzer.api.repository.legalticket.LegalTicketRepository;
 import com.analyzer.api.repository.user.UserRepository;
 import com.analyzer.api.service.admin.AdminTicketManagementService;
-import com.analyzer.api.service.EmailService;
+import com.analyzer.api.service.notification.EmailService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

@@ -20,8 +20,7 @@ import com.analyzer.api.repository.subscriptionplan.SubscriptionPlanRepository;
 import com.analyzer.api.repository.user.UserRepository;
 import com.analyzer.api.service.customerplan.CustomerPlanService;
 import com.analyzer.api.service.subscription.SubscriptionQuotaService;
-import com.analyzer.api.service.support.CustomerPlanExpiryHelper;
-import com.analyzer.api.service.support.CustomerPlanSnapshotHelper;
+import com.analyzer.api.service.customerplan.CustomerPlanExpiryService;
 import com.analyzer.api.util.AppClock;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -45,7 +44,7 @@ public class CustomerPlanServiceImpl implements CustomerPlanService {
     private final PaymentTransactionRepository paymentTransactionRepository;
     private final CustomerPlanMapper customerPlanMapper;
     private final SubscriptionQuotaService subscriptionQuotaService;
-    private final CustomerPlanExpiryHelper customerPlanExpiryHelper;
+    private final CustomerPlanExpiryService customerPlanExpiryHelper;
     private final CustomerPlanSnapshotHelper customerPlanSnapshotHelper;
 
     @Override
@@ -78,7 +77,6 @@ public class CustomerPlanServiceImpl implements CustomerPlanService {
             }
         }
 
-        // Tạo hoặc cập nhật CustomerPlan trạng thái PENDING
         if (plan.getPrice().signum() == 0) {
             LocalDateTime now = AppClock.now();
             CustomerPlan freePlan = CustomerPlan.builder()
@@ -93,9 +91,6 @@ public class CustomerPlanServiceImpl implements CustomerPlanService {
             customerPlanSnapshotHelper.applySnapshot(freePlan, plan);
             if (currentActivePlan != null) {
                 currentActivePlan.setStatus(PlanStatus.EXPIRED);
-                // Flush before inserting the new ACTIVE row: a DB constraint enforces at most
-                // one ACTIVE customer_plan per customer, and Hibernate may otherwise order the
-                // new row's INSERT before this row's UPDATE within the same flush, tripping it.
                 customerPlanRepository.saveAndFlush(currentActivePlan);
             }
             return toResponseWithAccurateQuota(customerPlanRepository.save(freePlan));
@@ -109,10 +104,6 @@ public class CustomerPlanServiceImpl implements CustomerPlanService {
                 .orElse(null);
 
         if (customerPlan != null) {
-            // Cập nhật CustomerPlan PENDING cũ sang lựa chọn gói mới. Hủy các giao dịch
-            // PENDING cũ gắn với gói này trước — nếu không, một giao dịch bị bỏ dở (ứng
-            // với lựa chọn gói trước đó) vẫn có thể được VNPay xác nhận sau này và kích
-            // hoạt sai gói/sai thời hạn lên cùng một CustomerPlan đã bị đổi lựa chọn.
             cancelStalePendingTransactions(customerPlan);
             customerPlan.setSubscriptionPlan(plan);
             customerPlan.setUsedQuota(0);
@@ -120,7 +111,6 @@ public class CustomerPlanServiceImpl implements CustomerPlanService {
             customerPlan.setEndDate(null);
             customerPlan.setAutoRenew(false);
         } else {
-            // Tạo mới CustomerPlan PENDING
             customerPlan = CustomerPlan.builder()
                     .customer(user)
                     .subscriptionPlan(plan)
@@ -133,7 +123,6 @@ public class CustomerPlanServiceImpl implements CustomerPlanService {
 
         customerPlan = customerPlanRepository.save(customerPlan);
 
-        // Tạo PaymentTransaction trạng thái PENDING
         String transactionCode = "TX" + UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase();
         PaymentTransaction transaction = PaymentTransaction.builder()
                 .customer(user)
@@ -156,7 +145,6 @@ public class CustomerPlanServiceImpl implements CustomerPlanService {
     @Override
     @Transactional
     public CustomerPlanResponse getMyPlan(Long customerId) {
-        // Chỉ gói ACTIVE mới được xem là gói người dùng đang sở hữu.
         CustomerPlan activePlan = getActivePlanOrUpdateIfExpired(customerId);
         if (activePlan == null) {
             activePlan = createDefaultFreePlan(customerId);
@@ -178,7 +166,8 @@ public class CustomerPlanServiceImpl implements CustomerPlanService {
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin khách hàng"));
 
         CustomerPlan plan = customerPlanRepository.findByIdForUpdate(customerPlanId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy gói của khách hàng với id: " + customerPlanId));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Không tìm thấy gói của khách hàng với id: " + customerPlanId));
 
         if (!plan.getCustomer().getId().equals(customerId)) {
             throw new ForbiddenException("Bạn không có quyền hủy gói dịch vụ này");
@@ -206,15 +195,12 @@ public class CustomerPlanServiceImpl implements CustomerPlanService {
     @Override
     @Transactional
     public CustomerPlanResponse cancelPlanAndActivateFree(Long customerId, Long customerPlanId, String reason) {
-        // Lock the user row first (same order subscribe() uses) so cancel can't interleave
-        // with a concurrent subscribe()/upgrade for the same customer, then lock the specific
-        // CustomerPlan row so it can't interleave with a VNPay callback activating it (both
-        // now go through CustomerPlanRepository.findByIdForUpdate on this row).
         userRepository.findByIdForUpdate(customerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin khách hàng"));
 
         CustomerPlan plan = customerPlanRepository.findByIdForUpdate(customerPlanId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy gói của khách hàng với id: " + customerPlanId));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Không tìm thấy gói của khách hàng với id: " + customerPlanId));
 
         if (!plan.getCustomer().getId().equals(customerId)) {
             throw new ForbiddenException("Bạn không có quyền hủy gói dịch vụ này");

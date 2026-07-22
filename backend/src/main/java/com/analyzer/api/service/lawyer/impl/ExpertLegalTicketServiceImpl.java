@@ -19,7 +19,7 @@ import com.analyzer.api.repository.legalticket.LegalTicketRepository;
 import com.analyzer.api.repository.user.UserRepository;
 import com.analyzer.api.service.lawyer.ExpertLegalTicketService;
 import com.analyzer.api.service.revenue.ExpertRevenueService;
-import com.analyzer.api.service.EmailService;
+import com.analyzer.api.service.notification.EmailService;
 import com.analyzer.api.service.revenue.RevenuePayrollService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;

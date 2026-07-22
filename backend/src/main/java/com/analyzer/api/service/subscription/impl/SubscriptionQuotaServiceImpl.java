@@ -24,9 +24,9 @@ import com.analyzer.api.repository.workspace.WorkspaceRepository;
 import com.analyzer.api.repository.contract.ContractGenerationJobRepository;
 import com.analyzer.api.repository.subscription.SubscriptionUsageRepository;
 import com.analyzer.api.service.subscription.SubscriptionQuotaService;
-import com.analyzer.api.service.support.CustomerPlanExpiryHelper;
-import com.analyzer.api.service.support.CustomerPlanSnapshotHelper;
-import com.analyzer.api.service.support.UserQuotaLock;
+import com.analyzer.api.service.customerplan.CustomerPlanExpiryService;
+import com.analyzer.api.service.customerplan.impl.CustomerPlanSnapshotHelper;
+import com.analyzer.api.util.UserQuotaLock;
 import com.analyzer.api.util.AppClock;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -57,7 +57,7 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
     private final SubscriptionUsageRepository subscriptionUsageRepository;
     private final ChatSessionDocumentRepository chatSessionDocumentRepository;
     private final AiQueryExecutionRepository aiQueryExecutionRepository;
-    private final CustomerPlanExpiryHelper customerPlanExpiryHelper;
+    private final CustomerPlanExpiryService customerPlanExpiryHelper;
     private final CustomerPlanSnapshotHelper customerPlanSnapshotHelper;
     private final UserQuotaLock userQuotaLock;
 

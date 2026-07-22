@@ -9,7 +9,7 @@ import com.analyzer.api.enums.RoleName;
 import com.analyzer.api.mapper.UserMapper;
 import com.analyzer.api.repository.user.RoleRepository;
 import com.analyzer.api.repository.user.UserRepository;
-import com.analyzer.api.service.EmailService;
+import com.analyzer.api.service.notification.EmailService;
 import com.analyzer.api.service.policy.PolicyAcceptanceService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

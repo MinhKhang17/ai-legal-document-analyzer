@@ -10,7 +10,7 @@ import com.analyzer.api.repository.revenue.CommissionPolicyChangeRequestReposito
 import com.analyzer.api.repository.revenue.CommissionPolicyExpertNotificationRepository;
 import com.analyzer.api.repository.*;
 import com.analyzer.api.service.revenue.CommissionPolicyManagementService;
-import com.analyzer.api.service.EmailService;
+import com.analyzer.api.service.notification.EmailService;
 import com.analyzer.api.service.revenue.FinancialAuditService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
