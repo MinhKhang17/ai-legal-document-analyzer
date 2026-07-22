@@ -255,6 +255,7 @@ ALTER TABLE knowledge_ingestion_jobs ADD COLUMN IF NOT EXISTS request_id varchar
 ALTER TABLE knowledge_ingestion_jobs ADD COLUMN IF NOT EXISTS started_at timestamp(6);
 ALTER TABLE knowledge_ingestion_jobs ADD COLUMN IF NOT EXISTS status varchar(255);
 ALTER TABLE legal_ticket_messages ADD COLUMN IF NOT EXISTS content TEXT;
+ALTER TABLE legal_ticket_messages ADD COLUMN IF NOT EXISTS client_message_id varchar(100);
 ALTER TABLE legal_ticket_messages ADD COLUMN IF NOT EXISTS created_at timestamp(6);
 ALTER TABLE legal_ticket_messages ADD COLUMN IF NOT EXISTS deleted_at timestamp(6);
 ALTER TABLE legal_ticket_messages ADD COLUMN IF NOT EXISTS edited_at timestamp(6);

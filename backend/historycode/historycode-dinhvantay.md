@@ -1101,3 +1101,12 @@ BUILD SUCCESS
 - Nếu ghi file thành công nhưng lưu metadata DB thất bại, file vật lý được xóa lại.
 - Thêm regression tests cho no-op reassign, message idempotency, file quá lớn, MIME giả và orphan cleanup.
 - Kết quả regression mới: 50 tests PASS, 0 failures, 0 errors.
+# 2026-07-22 - Giữ quyền lợi gói sau khi hủy gia hạn
+
+- Tách luồng hủy gói thông thường khỏi luồng hoàn tiền toàn phần.
+- Hủy Plus/Premium chỉ tắt tự gia hạn; gói trả phí vẫn `ACTIVE`, giữ nguyên quota đã dùng và ngày hết hạn.
+- Lên lịch chuyển về Free bằng `scheduledSubscriptionPlan` và `planChangeEffectiveAt`.
+- Khi gói trả phí hết hạn hoặc dùng hết quota, hệ thống chuyển sang Free và mở chu kỳ quota Free mới.
+- Luồng hoàn tiền toàn phần vẫn hủy ngay và kích hoạt Free, không bị thay đổi.
+- Thêm regression test cho hủy tại 50/100, chuyển Free khi hết quota và chuyển Free khi hết hạn.
+- Kết quả toàn bộ backend: 74 tests PASS, 0 failures, 0 errors.

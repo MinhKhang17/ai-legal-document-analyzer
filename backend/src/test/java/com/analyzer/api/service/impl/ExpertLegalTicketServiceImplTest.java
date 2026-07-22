@@ -43,7 +43,8 @@ class ExpertLegalTicketServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new ExpertLegalTicketServiceImpl(ticketRepository, messageRepository, userRepository, mapper, emailService, expertRevenueService);
+        service = new ExpertLegalTicketServiceImpl(ticketRepository, messageRepository, userRepository, mapper,
+                emailService, expertRevenueService);
     }
 
     @Test
