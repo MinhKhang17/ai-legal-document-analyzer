@@ -145,7 +145,26 @@ public class CustomerPlanServiceImpl implements CustomerPlanService {
     @Override
     @Transactional
     public CustomerPlanResponseDTO cancelPlan(Long customerId, Long customerPlanId) {
-        return cancelPlanAndActivateFree(customerId, customerPlanId, "Cancelled by customer");
+        CustomerPlan plan = customerPlanRepository.findById(customerPlanId)
+                .orElseThrow(() -> new RuntimeException("CUSTOMER_PLAN_NOT_FOUND"));
+        if (!plan.getCustomer().getId().equals(customerId)) {
+            throw new RuntimeException("CUSTOMER_PLAN_ACCESS_DENIED");
+        }
+        if (plan.getSubscriptionPlan() != null
+                && "FREE".equalsIgnoreCase(plan.getSubscriptionPlan().getPlanType())) {
+            plan.setAutoRenew(false);
+            return customerPlanMapper.toResponseDTO(customerPlanRepository.save(plan));
+        }
+        if (plan.getStatus() != PlanStatus.ACTIVE) {
+            throw new RuntimeException("CUSTOMER_PLAN_NOT_ACTIVE");
+        }
+
+        SubscriptionPlan freePlan = requireActiveFreePlan();
+        plan.setAutoRenew(false);
+        plan.setCancelReason("Cancelled by customer");
+        plan.setScheduledSubscriptionPlan(freePlan);
+        plan.setPlanChangeEffectiveAt(resolvePlanEnd(plan));
+        return customerPlanMapper.toResponseDTO(customerPlanRepository.save(plan));
     }
 
     @Override
@@ -212,6 +231,10 @@ public class CustomerPlanServiceImpl implements CustomerPlanService {
         if (activePlan.getSubscriptionPlan() != null) {
             int maxQuota = activePlan.getSubscriptionPlan().getMaxQuota();
             if (activePlan.getUsedQuota() >= maxQuota) {
+                if (activePlan.getScheduledSubscriptionPlan() != null) {
+                    activateScheduledPlan(activePlan, LocalDateTime.now());
+                    return;
+                }
                 throw new RuntimeException("Vượt quá hạn mức sử dụng của gói (Quota exceeded)");
             }
         }
@@ -228,12 +251,22 @@ public class CustomerPlanServiceImpl implements CustomerPlanService {
         if (activePlan.getSubscriptionPlan() != null) {
             int maxQuota = activePlan.getSubscriptionPlan().getMaxQuota();
             if (activePlan.getUsedQuota() >= maxQuota) {
+                if (activePlan.getScheduledSubscriptionPlan() != null) {
+                    activePlan = activateScheduledPlan(activePlan, LocalDateTime.now());
+                    activePlan.setUsedQuota(activePlan.getUsedQuota() + 1);
+                    customerPlanRepository.save(activePlan);
+                    return;
+                }
                 throw new RuntimeException("Vượt quá hạn mức sử dụng của gói (Quota exceeded)");
             }
         }
 
         activePlan.setUsedQuota(activePlan.getUsedQuota() + 1);
-        customerPlanRepository.save(activePlan);
+        activePlan = customerPlanRepository.save(activePlan);
+        int maxQuota = activePlan.getSubscriptionPlan().getMaxQuota();
+        if (activePlan.getUsedQuota() >= maxQuota && activePlan.getScheduledSubscriptionPlan() != null) {
+            activateScheduledPlan(activePlan, LocalDateTime.now());
+        }
     }
 
     private CustomerPlan getActivePlanOrUpdateIfExpired(Long customerId) {
@@ -243,19 +276,7 @@ public class CustomerPlanServiceImpl implements CustomerPlanService {
         if (activePlan != null && activePlan.getEndDate() != null) {
             if (LocalDateTime.now().isAfter(activePlan.getEndDate())) {
                 if (activePlan.getScheduledSubscriptionPlan() != null) {
-                    SubscriptionPlan scheduled = activePlan.getScheduledSubscriptionPlan();
-                    LocalDateTime now = LocalDateTime.now();
-                    activePlan.setSubscriptionPlan(scheduled);
-                    activePlan.setStartDate(now);
-                    activePlan.setEndDate(now.plusDays(scheduled.getDurationDays()));
-                    activePlan.setUsageStartAt(now);
-                    activePlan.setUsageEndAt(activePlan.getEndDate());
-                    activePlan.setBillingCycleStartAt(now);
-                    activePlan.setBillingCycleEndAt(activePlan.getEndDate());
-                    activePlan.setScheduledSubscriptionPlan(null);
-                    activePlan.setPlanChangeEffectiveAt(null);
-                    activePlan.setStatus(PlanStatus.ACTIVE);
-                    return customerPlanRepository.save(activePlan);
+                    return activateScheduledPlan(activePlan, LocalDateTime.now());
                 }
                 activePlan.setStatus(PlanStatus.EXPIRED);
                 activePlan = customerPlanRepository.save(activePlan);
@@ -263,6 +284,37 @@ public class CustomerPlanServiceImpl implements CustomerPlanService {
             }
         }
         return activePlan;
+    }
+
+    private CustomerPlan activateScheduledPlan(CustomerPlan activePlan, LocalDateTime now) {
+        SubscriptionPlan scheduled = activePlan.getScheduledSubscriptionPlan();
+        if (scheduled == null) return activePlan;
+        activePlan.setSubscriptionPlan(scheduled);
+        activePlan.setStartDate(now);
+        activePlan.setEndDate(now.plusDays(scheduled.getDurationDays()));
+        activePlan.setUsedQuota(0);
+        activePlan.setUsageStartAt(now);
+        activePlan.setUsageEndAt(activePlan.getEndDate());
+        activePlan.setBillingCycleStartAt(now);
+        activePlan.setBillingCycleEndAt(activePlan.getEndDate());
+        activePlan.setScheduledSubscriptionPlan(null);
+        activePlan.setPlanChangeEffectiveAt(null);
+        activePlan.setAutoRenew(false);
+        activePlan.setStatus(PlanStatus.ACTIVE);
+        return customerPlanRepository.save(activePlan);
+    }
+
+    private SubscriptionPlan requireActiveFreePlan() {
+        return subscriptionPlanRepository.findByPlanTypeIgnoreCase("FREE")
+                .filter(free -> Boolean.TRUE.equals(free.getActive()))
+                .orElseThrow(() -> new RuntimeException("FREE_PLAN_NOT_CONFIGURED"));
+    }
+
+    private LocalDateTime resolvePlanEnd(CustomerPlan plan) {
+        if (plan.getEndDate() != null) return plan.getEndDate();
+        if (plan.getBillingCycleEndAt() != null) return plan.getBillingCycleEndAt();
+        if (plan.getUsageEndAt() != null) return plan.getUsageEndAt();
+        return LocalDateTime.now();
     }
 
     private int planRank(SubscriptionPlan plan) {

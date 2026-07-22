@@ -47,7 +47,7 @@ class CustomerPlanServiceImplTest {
     }
 
     @Test
-    void cancellingPaidPlanActivatesFreePlanAndPreservesCurrentUsage() {
+    void cancellingPaidPlanKeepsBenefitsUntilEndDateAndSchedulesFree() {
         User customer = User.builder().id(7L).build();
         SubscriptionPlan premium = SubscriptionPlan.builder().id(2L).planType("PREMIUM").active(true).build();
         SubscriptionPlan free = SubscriptionPlan.builder().id(1L).planType("FREE").active(true).durationDays(30).build();
@@ -55,31 +55,71 @@ class CustomerPlanServiceImplTest {
         LocalDateTime usageEnd = LocalDateTime.now().plusDays(25);
         CustomerPlan paidPlan = CustomerPlan.builder().id(5L).customer(customer).subscriptionPlan(premium)
                 .status(PlanStatus.ACTIVE).usedQuota(12).autoRenew(true)
+                .startDate(usageStart).endDate(usageEnd)
                 .usageStartAt(usageStart).usageEndAt(usageEnd).build();
         CustomerPlanResponseDTO response = new CustomerPlanResponseDTO();
 
         when(customerPlanRepository.findById(5L)).thenReturn(Optional.of(paidPlan));
-        when(customerPlanRepository.findTopByCustomerIdAndStatusOrderByCreatedAtDesc(7L, PlanStatus.ACTIVE))
-                .thenReturn(Optional.empty());
         when(subscriptionPlanRepository.findByPlanTypeIgnoreCase("FREE")).thenReturn(Optional.of(free));
         when(customerPlanRepository.save(any(CustomerPlan.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(customerPlanMapper.toResponseDTO(any(CustomerPlan.class))).thenReturn(response);
 
         assertSame(response, service.cancelPlan(7L, 5L));
 
-        assertEquals(PlanStatus.CANCELLED, paidPlan.getStatus());
+        assertEquals(PlanStatus.ACTIVE, paidPlan.getStatus());
         assertFalse(paidPlan.getAutoRenew());
         assertEquals("Cancelled by customer", paidPlan.getCancelReason());
+        assertSame(premium, paidPlan.getSubscriptionPlan());
+        assertSame(free, paidPlan.getScheduledSubscriptionPlan());
+        assertEquals(usageEnd, paidPlan.getPlanChangeEffectiveAt());
+        assertEquals(12, paidPlan.getUsedQuota());
+        verify(customerPlanRepository).save(paidPlan);
+    }
 
-        ArgumentCaptor<CustomerPlan> captor = ArgumentCaptor.forClass(CustomerPlan.class);
-        verify(customerPlanRepository, times(2)).save(captor.capture());
-        CustomerPlan freePlan = captor.getAllValues().get(1);
-        assertEquals(PlanStatus.ACTIVE, freePlan.getStatus());
-        assertSame(free, freePlan.getSubscriptionPlan());
-        assertEquals(12, freePlan.getUsedQuota());
-        assertEquals(usageStart, freePlan.getUsageStartAt());
-        assertEquals(usageEnd, freePlan.getUsageEndAt());
-        assertFalse(freePlan.getAutoRenew());
+    @Test
+    void cancelledPaidPlanSwitchesToFreeWhenPaidQuotaIsExhausted() {
+        User customer = User.builder().id(7L).build();
+        SubscriptionPlan premium = SubscriptionPlan.builder().id(2L).planType("PREMIUM")
+                .maxQuota(100).durationDays(30).active(true).build();
+        SubscriptionPlan free = SubscriptionPlan.builder().id(1L).planType("FREE")
+                .maxQuota(10).durationDays(30).active(true).build();
+        CustomerPlan paidPlan = CustomerPlan.builder().id(5L).customer(customer).subscriptionPlan(premium)
+                .scheduledSubscriptionPlan(free).status(PlanStatus.ACTIVE).usedQuota(99).autoRenew(false)
+                .endDate(LocalDateTime.now().plusDays(20)).build();
+
+        when(customerPlanRepository.findByCustomerIdAndStatus(7L, PlanStatus.ACTIVE))
+                .thenReturn(Optional.of(paidPlan));
+        when(customerPlanRepository.save(paidPlan)).thenReturn(paidPlan);
+
+        service.recordChatUsage(7L);
+
+        assertSame(free, paidPlan.getSubscriptionPlan());
+        assertEquals(0, paidPlan.getUsedQuota());
+        assertEquals(PlanStatus.ACTIVE, paidPlan.getStatus());
+        assertEquals(null, paidPlan.getScheduledSubscriptionPlan());
+    }
+
+    @Test
+    void cancelledPaidPlanSwitchesToFreeAfterEndDate() {
+        User customer = User.builder().id(7L).build();
+        SubscriptionPlan premium = SubscriptionPlan.builder().id(2L).planType("PREMIUM")
+                .maxQuota(100).durationDays(30).active(true).build();
+        SubscriptionPlan free = SubscriptionPlan.builder().id(1L).planType("FREE")
+                .maxQuota(10).durationDays(30).active(true).build();
+        CustomerPlan paidPlan = CustomerPlan.builder().id(5L).customer(customer).subscriptionPlan(premium)
+                .scheduledSubscriptionPlan(free).status(PlanStatus.ACTIVE).usedQuota(50).autoRenew(false)
+                .endDate(LocalDateTime.now().minusMinutes(1)).build();
+        CustomerPlanResponseDTO response = new CustomerPlanResponseDTO();
+
+        when(customerPlanRepository.findByCustomerIdAndStatus(7L, PlanStatus.ACTIVE))
+                .thenReturn(Optional.of(paidPlan));
+        when(customerPlanRepository.save(paidPlan)).thenReturn(paidPlan);
+        when(customerPlanMapper.toResponseDTO(paidPlan)).thenReturn(response);
+
+        assertSame(response, service.getMyPlan(7L));
+        assertSame(free, paidPlan.getSubscriptionPlan());
+        assertEquals(0, paidPlan.getUsedQuota());
+        assertEquals(PlanStatus.ACTIVE, paidPlan.getStatus());
     }
 
     @Test

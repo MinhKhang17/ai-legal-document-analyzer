@@ -18,6 +18,8 @@ public interface UserMapper {
     @Mapping(target = "emailVerificationToken", ignore = true)
     @Mapping(target = "emailVerificationTokenExpiry", ignore = true)
     @Mapping(target = "emailVerificationRequestedAt", ignore = true)
+    @Mapping(target = "emailVerificationLastUsedToken", ignore = true)
+    @Mapping(target = "emailVerificationTokenUsedAt", ignore = true)
     @Mapping(target = "emailVerifiedAt", ignore = true)
     @Mapping(target = "emailDeliveryStatus", ignore = true)
     @Mapping(target = "specialty", ignore = true)

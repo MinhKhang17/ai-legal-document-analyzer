@@ -13,6 +13,7 @@ import com.analyzer.api.repository.LegalTicketMessageRepository;
 import com.analyzer.api.repository.LegalTicketRepository;
 import com.analyzer.api.repository.UserRepository;
 import com.analyzer.api.service.EmailService;
+import com.analyzer.api.service.ExpertRevenueService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,12 +37,14 @@ class ExpertLegalTicketServiceImplTest {
     @Mock UserRepository userRepository;
     @Mock LegalTicketMapper mapper;
     @Mock EmailService emailService;
+    @Mock ExpertRevenueService expertRevenueService;
 
     private ExpertLegalTicketServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new ExpertLegalTicketServiceImpl(ticketRepository, messageRepository, userRepository, mapper, emailService);
+        service = new ExpertLegalTicketServiceImpl(ticketRepository, messageRepository, userRepository, mapper,
+                emailService, expertRevenueService);
     }
 
     @Test
