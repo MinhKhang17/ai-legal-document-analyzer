@@ -1,4 +1,5 @@
 package com.analyzer.api.service.impl;
+import com.analyzer.api.service.lawyer.impl.ExpertLegalTicketServiceImpl;
 
 import com.analyzer.api.dto.legalticket.LegalTicketResponse;
 import com.analyzer.api.dto.legalticket.RequestMoreInfoRequest;
@@ -13,8 +14,8 @@ import com.analyzer.api.repository.legalticket.LegalTicketMessageRepository;
 import com.analyzer.api.repository.legalticket.LegalTicketRepository;
 import com.analyzer.api.repository.user.UserRepository;
 import com.analyzer.api.service.EmailService;
-import com.analyzer.api.service.ExpertRevenueService;
-import com.analyzer.api.service.RevenuePayrollService;
+import com.analyzer.api.service.revenue.ExpertRevenueService;
+import com.analyzer.api.service.revenue.RevenuePayrollService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

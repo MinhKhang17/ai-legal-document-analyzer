@@ -1,4 +1,5 @@
 package com.analyzer.api.service.impl;
+import com.analyzer.api.service.user.impl.UserServiceImpl;
 
 import com.analyzer.api.dto.auth.ResetPasswordRequest;
 import com.analyzer.api.entity.User;
@@ -70,6 +71,6 @@ class UserServicePasswordResetTest {
 
     private UserServiceImpl service() {
         return new UserServiceImpl(userRepository, roleRepository, userMapper, passwordEncoder, emailService,
-                mock(com.analyzer.api.service.PolicyAcceptanceService.class));
+                mock(com.analyzer.api.service.policy.PolicyAcceptanceService.class));
     }
 }

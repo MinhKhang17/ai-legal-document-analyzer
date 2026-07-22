@@ -16,9 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 
-// Single source of truth for expiring a due CustomerPlan / applying its scheduled downgrade.
-// Shared by CustomerPlanServiceImpl and SubscriptionQuotaServiceImpl so /my-plan and /me
-// (and the quota checks) resolve the same current plan instead of diverging around endDate.
 @Component
 @RequiredArgsConstructor
 public class CustomerPlanExpiryHelper {
@@ -37,22 +34,29 @@ public class CustomerPlanExpiryHelper {
             return null;
         }
 
-        // Data-integrity guard: every activation path (subscribe/markSuccess/downgrade) always
+        // Data-integrity guard: every activation path (subscribe/markSuccess/downgrade)
+        // always
         // sets both startDate and endDate together. A row missing endDate or with
-        // startDate > endDate can only be corrupt data — treat it as a clear, detected error
-        // instead of silently granting indefinite access (a null endDate previously fell
+        // startDate > endDate can only be corrupt data — treat it as a clear, detected
+        // error
+        // instead of silently granting indefinite access (a null endDate previously
+        // fell
         // through the expiry check below and was treated as "never expires").
         if (activePlan.getEndDate() == null) {
-            throw new ConflictException("CUSTOMER_PLAN_DATA_INTEGRITY_ERROR: missing endDate for plan " + activePlan.getId());
+            throw new ConflictException(
+                    "CUSTOMER_PLAN_DATA_INTEGRITY_ERROR: missing endDate for plan " + activePlan.getId());
         }
         if (activePlan.getStartDate() != null && activePlan.getStartDate().isAfter(activePlan.getEndDate())) {
-            throw new ConflictException("CUSTOMER_PLAN_DATA_INTEGRITY_ERROR: startDate after endDate for plan " + activePlan.getId());
+            throw new ConflictException(
+                    "CUSTOMER_PLAN_DATA_INTEGRITY_ERROR: startDate after endDate for plan " + activePlan.getId());
         }
 
         LocalDateTime now = AppClock.now();
         if (activePlan.getStartDate() != null && now.isBefore(activePlan.getStartDate())) {
-            // Not started yet — never granted by any current activation path, but don't hand
-            // out early access if a future-dated row exists (e.g. bad data or a future feature).
+            // Not started yet — never granted by any current activation path, but don't
+            // hand
+            // out early access if a future-dated row exists (e.g. bad data or a future
+            // feature).
             return null;
         }
 
@@ -84,7 +88,8 @@ public class CustomerPlanExpiryHelper {
         int processed = 0;
         for (CustomerPlan candidate : duePlans) {
             CustomerPlan locked = customerPlanRepository.findByIdForUpdate(candidate.getId()).orElse(null);
-            if (locked == null || locked.getStatus() != PlanStatus.ACTIVE || !AppClock.now().isAfter(locked.getEndDate())) {
+            if (locked == null || locked.getStatus() != PlanStatus.ACTIVE
+                    || !AppClock.now().isAfter(locked.getEndDate())) {
                 continue;
             }
             applyExpiryOrScheduledChange(locked);
@@ -94,13 +99,14 @@ public class CustomerPlanExpiryHelper {
         logger.info("Processed {} due customer plan(s) on schedule", processed);
     }
 
-    // Mutates plan in place: applies the scheduled downgrade if one is pending, otherwise marks it EXPIRED.
+    // Mutates plan in place: applies the scheduled downgrade if one is pending,
+    // otherwise marks it EXPIRED.
     public void applyExpiryOrScheduledChange(CustomerPlan plan) {
         SubscriptionPlan scheduled = plan.getScheduledSubscriptionPlan();
 
         if (scheduled != null && !Boolean.TRUE.equals(scheduled.getActive())) {
             logger.warn("Scheduled plan '{}' for customer_plan {} was disabled before it took "
-                            + "effect; falling back to FREE instead of activating a disabled plan.",
+                    + "effect; falling back to FREE instead of activating a disabled plan.",
                     scheduled.getPlanType(), plan.getId());
             scheduled = subscriptionPlanRepository.findByPlanTypeIgnoreCase("FREE")
                     .filter(free -> Boolean.TRUE.equals(free.getActive()))

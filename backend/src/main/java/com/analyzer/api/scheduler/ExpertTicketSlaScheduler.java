@@ -5,7 +5,7 @@ import com.analyzer.api.enums.*;
 import com.analyzer.api.repository.legalticket.ExpertTicketCreditReservationRepository;
 import com.analyzer.api.repository.legalticket.LegalTicketRepository;
 import com.analyzer.api.service.EmailService;
-import com.analyzer.api.service.TicketCollaborationService;
+import com.analyzer.api.service.legalticket.TicketCollaborationService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.*;
 import org.springframework.scheduling.annotation.Scheduled;

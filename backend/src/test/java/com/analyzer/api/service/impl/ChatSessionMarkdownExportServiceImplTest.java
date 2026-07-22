@@ -1,4 +1,5 @@
 package com.analyzer.api.service.impl;
+import com.analyzer.api.service.chatsession.impl.ChatSessionMarkdownExportServiceImpl;
 
 import com.analyzer.api.entity.ChatMessage;
 import com.analyzer.api.entity.ChatSession;
@@ -14,7 +15,7 @@ import com.analyzer.api.repository.chatmessage.ChatMessageRepository;
 import com.analyzer.api.repository.chatsession.ChatSessionDocumentRepository;
 import com.analyzer.api.repository.chatsession.ChatSessionRepository;
 import com.analyzer.api.repository.ai.AiCitationRepository;
-import com.analyzer.api.service.ChatSessionMarkdownExportService;
+import com.analyzer.api.service.chatsession.ChatSessionMarkdownExportService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

@@ -8,7 +8,7 @@ import com.analyzer.api.dto.chatmessage.ChatMessageResponse;
 import com.analyzer.api.dto.chatmessage.SendMessageRequest;
 import com.analyzer.api.dto.chatmessage.SendMessageResponse;
 import com.analyzer.api.security.UserDetailsImpl;
-import com.analyzer.api.service.ChatMessageService;
+import com.analyzer.api.service.chatmessage.ChatMessageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;

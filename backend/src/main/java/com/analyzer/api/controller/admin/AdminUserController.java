@@ -5,7 +5,7 @@ import com.analyzer.api.dto.user.AdminCreateLawyerRequest;
 import com.analyzer.api.dto.user.ResendExpertActivationRequest;
 import com.analyzer.api.dto.user.UserResponse;
 import com.analyzer.api.security.UserDetailsImpl;
-import com.analyzer.api.service.UserService;
+import com.analyzer.api.service.user.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;

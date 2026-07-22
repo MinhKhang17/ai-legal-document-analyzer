@@ -7,7 +7,7 @@ import com.analyzer.api.enums.LegalTicketStatus;
 import com.analyzer.api.enums.LegalTicketType;
 import com.analyzer.api.enums.RiskLevel;
 import com.analyzer.api.security.UserDetailsImpl;
-import com.analyzer.api.service.LegalTicketService;
+import com.analyzer.api.service.legalticket.LegalTicketService;
 import com.analyzer.api.service.admin.AdminTicketManagementService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,8 +28,8 @@ public class AdminTicketManagementController {
 
     private final AdminTicketManagementService adminTicketManagementService;
     private final LegalTicketService legalTicketService;
-    private final com.analyzer.api.service.ExpertRevenueService expertRevenueService;
-    private final com.analyzer.api.service.ExpertTicketWorkflowService expertTicketWorkflowService;
+    private final com.analyzer.api.service.revenue.ExpertRevenueService expertRevenueService;
+    private final com.analyzer.api.service.legalticket.ExpertTicketWorkflowService expertTicketWorkflowService;
 
     @PostMapping("/{id}/classify")
     @PreAuthorize("hasRole('ADMIN')")

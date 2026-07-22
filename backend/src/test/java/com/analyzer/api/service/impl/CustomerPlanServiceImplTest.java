@@ -1,4 +1,5 @@
 package com.analyzer.api.service.impl;
+import com.analyzer.api.service.customerplan.impl.CustomerPlanServiceImpl;
 
 import com.analyzer.api.dto.customerplan.CustomerPlanResponse;
 import com.analyzer.api.dto.customerplan.SubscribeRequest;
@@ -15,7 +16,7 @@ import com.analyzer.api.repository.customerplan.CustomerPlanRepository;
 import com.analyzer.api.repository.paymenttransaction.PaymentTransactionRepository;
 import com.analyzer.api.repository.subscriptionplan.SubscriptionPlanRepository;
 import com.analyzer.api.repository.user.UserRepository;
-import com.analyzer.api.service.SubscriptionQuotaService;
+import com.analyzer.api.service.subscription.SubscriptionQuotaService;
 import com.analyzer.api.service.support.CustomerPlanExpiryHelper;
 import com.analyzer.api.service.support.CustomerPlanSnapshotHelper;
 import org.junit.jupiter.api.BeforeEach;

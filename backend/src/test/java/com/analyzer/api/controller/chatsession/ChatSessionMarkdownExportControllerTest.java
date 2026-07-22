@@ -1,8 +1,8 @@
 package com.analyzer.api.controller.chatsession;
 
 import com.analyzer.api.security.UserDetailsImpl;
-import com.analyzer.api.service.ChatSessionMarkdownExportService;
-import com.analyzer.api.service.ChatSessionService;
+import com.analyzer.api.service.chatsession.ChatSessionMarkdownExportService;
+import com.analyzer.api.service.chatsession.ChatSessionService;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.ResponseEntity;
 

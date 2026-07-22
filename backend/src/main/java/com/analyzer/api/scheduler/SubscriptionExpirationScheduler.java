@@ -1,6 +1,6 @@
 package com.analyzer.api.scheduler;
 
-import com.analyzer.api.service.CustomerPlanService;
+import com.analyzer.api.service.customerplan.CustomerPlanService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;

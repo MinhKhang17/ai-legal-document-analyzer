@@ -6,7 +6,7 @@ import com.analyzer.api.dto.ai.RagQueryRequest;
 import com.analyzer.api.dto.ai.RagQueryResponse;
 import com.analyzer.api.dto.ai.GenerateContractApiRequest;
 import com.analyzer.api.dto.ai.GenerateContractApiResponse;
-import com.analyzer.api.service.AiClient;
+import com.analyzer.api.service.ai.AiClient;
 import com.analyzer.api.exception.ai.AiServiceTimeoutException;
 import com.analyzer.api.exception.ai.AiServiceUnavailableException;
 import tools.jackson.databind.ObjectMapper;

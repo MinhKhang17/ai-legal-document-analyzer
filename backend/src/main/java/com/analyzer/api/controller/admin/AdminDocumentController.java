@@ -1,7 +1,7 @@
 package com.analyzer.api.controller.admin;
 
 import com.analyzer.api.security.UserDetailsImpl;
-import com.analyzer.api.service.WorkspaceService;
+import com.analyzer.api.service.workspace.WorkspaceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;

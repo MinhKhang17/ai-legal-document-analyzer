@@ -1,4 +1,5 @@
 package com.analyzer.api.service.impl;
+import com.analyzer.api.service.user.impl.UserServiceImpl;
 
 import com.analyzer.api.dto.auth.RegistrationResponse;
 import com.analyzer.api.dto.user.UserRequest;
@@ -9,7 +10,7 @@ import com.analyzer.api.mapper.UserMapper;
 import com.analyzer.api.repository.user.RoleRepository;
 import com.analyzer.api.repository.user.UserRepository;
 import com.analyzer.api.service.EmailService;
-import com.analyzer.api.service.PolicyAcceptanceService;
+import com.analyzer.api.service.policy.PolicyAcceptanceService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

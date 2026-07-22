@@ -6,7 +6,7 @@ import com.analyzer.api.dto.paymenttransaction.PaymentUrlResponse;
 import com.analyzer.api.dto.paymenttransaction.VnPayIpnResponse;
 import com.analyzer.api.exception.payment.VnPayCallbackException;
 import com.analyzer.api.security.UserDetailsImpl;
-import com.analyzer.api.service.PaymentTransactionService;
+import com.analyzer.api.service.paymenttransaction.PaymentTransactionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;

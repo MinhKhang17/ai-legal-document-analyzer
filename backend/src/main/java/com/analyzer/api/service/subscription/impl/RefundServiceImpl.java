@@ -17,7 +17,7 @@ import com.analyzer.api.repository.customerplan.CustomerPlanRepository;
 import com.analyzer.api.repository.*;
 import com.analyzer.api.repository.subscription.RefundRequestRepository;
 import com.analyzer.api.security.UserDetailsImpl;
-import com.analyzer.api.service.CustomerPlanService;
+import com.analyzer.api.service.customerplan.CustomerPlanService;
 import com.analyzer.api.service.EmailService;
 import com.analyzer.api.service.subscription.RefundService;
 import org.springframework.beans.factory.annotation.Autowired;

@@ -1,4 +1,5 @@
 package com.analyzer.api.service.impl;
+import com.analyzer.api.service.subscription.impl.SubscriptionQuotaServiceImpl;
 
 import com.analyzer.api.entity.CustomerPlan;
 import com.analyzer.api.entity.SubscriptionPlan;

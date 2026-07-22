@@ -1,4 +1,5 @@
 package com.analyzer.api.service.impl;
+import com.analyzer.api.service.revenue.impl.ExpertRevenueServiceImpl;
 
 import com.analyzer.api.dto.revenue.UpdateExpertPaymentRequest;
 import com.analyzer.api.entity.LegalTicket;
@@ -9,8 +10,8 @@ import com.analyzer.api.enums.TicketPricingType;
 import com.analyzer.api.exception.common.ConflictException;
 import com.analyzer.api.repository.legalticket.LegalTicketRepository;
 import com.analyzer.api.repository.user.UserRepository;
-import com.analyzer.api.service.RevenueSettingService;
-import com.analyzer.api.service.TicketCollaborationService;
+import com.analyzer.api.service.revenue.RevenueSettingService;
+import com.analyzer.api.service.legalticket.TicketCollaborationService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;

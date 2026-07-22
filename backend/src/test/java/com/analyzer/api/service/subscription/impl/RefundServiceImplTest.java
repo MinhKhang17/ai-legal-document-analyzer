@@ -14,7 +14,7 @@ import com.analyzer.api.repository.customerplan.CustomerPlanRepository;
 import com.analyzer.api.repository.paymenttransaction.PaymentTransactionRepository;
 import com.analyzer.api.repository.user.UserRepository;
 import com.analyzer.api.repository.subscription.RefundRequestRepository;
-import com.analyzer.api.service.CustomerPlanService;
+import com.analyzer.api.service.customerplan.CustomerPlanService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

@@ -16,7 +16,7 @@ import com.analyzer.api.repository.legalticket.TicketAuditLogRepository;
 import com.analyzer.api.repository.legalticket.TicketContextSnapshotRepository;
 import com.analyzer.api.repository.legalticket.ConversationShareRepository;
 import com.analyzer.api.repository.*;
-import com.analyzer.api.service.impl.TicketCollaborationServiceImpl;
+import com.analyzer.api.service.legalticket.impl.TicketCollaborationServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

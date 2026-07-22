@@ -5,7 +5,7 @@ import com.analyzer.api.dto.document.DocumentResponse;
 import com.analyzer.api.dto.workspace.WorkspaceRequest;
 import com.analyzer.api.dto.workspace.WorkspaceResponse;
 import com.analyzer.api.security.UserDetailsImpl;
-import com.analyzer.api.service.WorkspaceService;
+import com.analyzer.api.service.workspace.WorkspaceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;

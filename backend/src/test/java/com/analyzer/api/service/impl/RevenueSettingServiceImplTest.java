@@ -1,4 +1,5 @@
 package com.analyzer.api.service.impl;
+import com.analyzer.api.service.revenue.impl.RevenueSettingServiceImpl;
 
 import com.analyzer.api.dto.revenue.UpdateRevenueSettingRequest;
 import com.analyzer.api.entity.RevenueSetting;

@@ -1,4 +1,5 @@
 package com.analyzer.api.service.impl;
+import com.analyzer.api.service.chatmessage.impl.ChatMessageServiceImpl;
 
 import com.analyzer.api.client.PythonAiClient;
 import com.analyzer.api.dto.chatmessage.ChatMessageFeedbackRequest;
@@ -17,7 +18,7 @@ import com.analyzer.api.repository.chatsession.ChatSessionRepository;
 import com.analyzer.api.repository.chatsession.ChatSessionDocumentRepository;
 import com.analyzer.api.repository.*;
 import com.analyzer.api.repository.ai.AiCitationRepository;
-import com.analyzer.api.service.SubscriptionQuotaService;
+import com.analyzer.api.service.subscription.SubscriptionQuotaService;
 import com.analyzer.api.service.conversation.ConversationHistoryAssembler;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

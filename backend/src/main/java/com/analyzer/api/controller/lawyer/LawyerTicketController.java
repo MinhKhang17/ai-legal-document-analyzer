@@ -5,8 +5,8 @@ import com.analyzer.api.dto.PageResponse;
 import com.analyzer.api.dto.legalticket.*;
 import com.analyzer.api.enums.LegalTicketStatus;
 import com.analyzer.api.security.UserDetailsImpl;
-import com.analyzer.api.service.ExpertLegalTicketService;
-import com.analyzer.api.service.LegalTicketService;
+import com.analyzer.api.service.lawyer.ExpertLegalTicketService;
+import com.analyzer.api.service.legalticket.LegalTicketService;
 import com.analyzer.api.service.lawyer.TicketConversationService;
 import com.analyzer.api.service.lawyer.TicketFileService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -31,7 +31,7 @@ public class LawyerTicketController {
     private final TicketFileService ticketFileService;
     private final LegalTicketService legalTicketService;
     private final ExpertLegalTicketService expertLegalTicketService;
-    private final com.analyzer.api.service.ExpertTicketWorkflowService expertTicketWorkflowService;
+    private final com.analyzer.api.service.legalticket.ExpertTicketWorkflowService expertTicketWorkflowService;
 
     @PostMapping("/{id}/assessment")
     @PreAuthorize("hasRole('EXPERT')")

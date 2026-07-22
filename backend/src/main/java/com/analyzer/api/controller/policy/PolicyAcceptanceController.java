@@ -4,7 +4,7 @@ import com.analyzer.api.dto.ApiResponseDTO;
 import com.analyzer.api.dto.policy.PolicyAcceptanceDtos.AcceptRequest;
 import com.analyzer.api.dto.policy.PolicyAcceptanceDtos.StatusResponse;
 import com.analyzer.api.security.UserDetailsImpl;
-import com.analyzer.api.service.PolicyAcceptanceService;
+import com.analyzer.api.service.policy.PolicyAcceptanceService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

@@ -1,4 +1,5 @@
 package com.analyzer.api.service.impl;
+import com.analyzer.api.service.auth.impl.AuthServiceImpl;
 
 import com.analyzer.api.exception.GlobalExceptionHandler;
 import com.analyzer.api.exception.auth.InvalidRefreshTokenException;

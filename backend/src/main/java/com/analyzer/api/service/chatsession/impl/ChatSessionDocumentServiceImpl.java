@@ -10,7 +10,7 @@ import com.analyzer.api.repository.chatsession.ChatSessionDocumentRepository;
 import com.analyzer.api.repository.chatsession.ChatSessionRepository;
 import com.analyzer.api.repository.document.DocumentRepository;
 import com.analyzer.api.service.chatsession.ChatSessionDocumentService;
-import com.analyzer.api.service.SubscriptionQuotaService;
+import com.analyzer.api.service.subscription.SubscriptionQuotaService;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;

@@ -2,7 +2,7 @@ package com.analyzer.api.controller.chatsession;
 
 import com.analyzer.api.dto.ApiResponseDTO;
 import com.analyzer.api.dto.chatsession.SharedChatSessionResponse;
-import com.analyzer.api.service.ChatSessionService;
+import com.analyzer.api.service.chatsession.ChatSessionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;

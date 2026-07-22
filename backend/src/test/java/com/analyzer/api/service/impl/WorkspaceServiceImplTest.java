@@ -1,4 +1,5 @@
 package com.analyzer.api.service.impl;
+import com.analyzer.api.service.workspace.impl.WorkspaceServiceImpl;
 
 import com.analyzer.api.dto.workspace.WorkspaceRequest;
 import com.analyzer.api.entity.User;
@@ -8,7 +9,7 @@ import com.analyzer.api.repository.document.DocumentRepository;
 import com.analyzer.api.repository.user.UserRepository;
 import com.analyzer.api.repository.workspace.WorkspaceRepository;
 import com.analyzer.api.service.EmailService;
-import com.analyzer.api.service.SubscriptionQuotaService;
+import com.analyzer.api.service.subscription.SubscriptionQuotaService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

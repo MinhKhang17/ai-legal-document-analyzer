@@ -20,7 +20,6 @@ import com.analyzer.api.repository.contract.ContractVersionRepository;
 import com.analyzer.api.repository.contract.UserContractRepository;
 import com.analyzer.api.service.contract.UserContractService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.annotation.Primary;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -33,7 +32,6 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Service
-@Primary
 @RequiredArgsConstructor
 public class UserContractServiceImpl implements UserContractService {
 

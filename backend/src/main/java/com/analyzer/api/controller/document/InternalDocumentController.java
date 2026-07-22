@@ -3,7 +3,7 @@ package com.analyzer.api.controller.document;
 import com.analyzer.api.dto.ApiResponseDTO;
 import com.analyzer.api.dto.document.DocumentResponse;
 import com.analyzer.api.dto.document.ProcessingResultRequest;
-import com.analyzer.api.service.WorkspaceService;
+import com.analyzer.api.service.workspace.WorkspaceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;

@@ -3,7 +3,7 @@ package com.analyzer.api.controller.ai;
 import com.analyzer.api.dto.ApiResponseDTO;
 import com.analyzer.api.dto.ai.AiLegalQueryRequest;
 import com.analyzer.api.dto.ai.AiLegalQueryResponse;
-import com.analyzer.api.service.AiLegalService;
+import com.analyzer.api.service.ai.AiLegalService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;

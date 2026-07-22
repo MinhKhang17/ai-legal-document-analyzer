@@ -1,4 +1,5 @@
 package com.analyzer.api.service.impl;
+import com.analyzer.api.service.workspace.impl.WorkspaceServiceImpl;
 
 import com.analyzer.api.entity.KnowledgeBaseVersion;
 import com.analyzer.api.enums.KnowledgeStatus;
@@ -9,8 +10,8 @@ import com.analyzer.api.repository.user.UserRepository;
 import com.analyzer.api.repository.workspace.WorkspaceRepository;
 import com.analyzer.api.repository.knowledge.KnowledgeBaseVersionRepository;
 import com.analyzer.api.service.EmailService;
-import com.analyzer.api.service.PolicyAcceptanceService;
-import com.analyzer.api.service.SubscriptionQuotaService;
+import com.analyzer.api.service.policy.PolicyAcceptanceService;
+import com.analyzer.api.service.subscription.SubscriptionQuotaService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
