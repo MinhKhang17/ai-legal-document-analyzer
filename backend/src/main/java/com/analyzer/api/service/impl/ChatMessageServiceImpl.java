@@ -497,6 +497,8 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                         .messageType(ChatMessageType.NORMAL_CHAT)
                         .content("")
                         .requestId(requestId)
+                        .createdAt(LocalDateTime.now())
+                        .updatedAt(LocalDateTime.now())
                         .build());
         String assistantMessageId = assistantMessage.getId();
         ChatMode resolvedMode = ChatMode.LEGAL_QA;
@@ -578,7 +580,7 @@ public class ChatMessageServiceImpl implements ChatMessageService {
             assistantMessage.setErrorMessage(null);
             assistantMessage.setResolvedMode(resolvedMode);
             assistantMessage.setContextSnapshotJson(contextSnapshotJson);
-            chatMessageRepository.save(assistantMessage);
+            assistantMessage = chatMessageRepository.save(assistantMessage);
             subscriptionQuotaService.attachAiQueryContext(
                     currentUser, requestId, workspace.getId(), chatSession.getId(), contextSnapshotJson);
             aiResponse = pythonAiClient.query(aiRequest);

@@ -112,12 +112,23 @@ public class ChatMessage {
 
     @PrePersist
     protected void onCreate() {
-        createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now();
+        if (createdAt == null) {
+            createdAt = now;
+        }
+        if (updatedAt == null) {
+            updatedAt = now;
+        }
     }
 
     @PreUpdate
     protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now();
+        // Assigned IDs make Spring Data use merge(). Keep detached instances from
+        // accidentally overwriting the immutable creation timestamp with null.
+        if (createdAt == null) {
+            createdAt = now;
+        }
+        updatedAt = now;
     }
 }
