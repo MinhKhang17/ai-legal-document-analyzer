@@ -1,4 +1,4 @@
-import { Edit3, MessageSquareText, ShieldAlert, UsersRound } from "lucide-react";
+import { Edit3, MessageSquareText, ShieldAlert } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Badge } from "../../components/common/Badge";
