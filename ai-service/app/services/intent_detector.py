@@ -40,7 +40,8 @@ _LEGAL_NOT_CONTRACT_KEYWORDS = [
 _OUT_OF_STUDENT_SCOPE_KEYWORDS = [
     "m&a", "sáp nhập", "mua bán doanh nghiệp", "tín dụng ngân hàng",
     "thế chấp", "dự án bất động sản", "chuyển nhượng đất", "hợp đồng quốc tế",
-    "đầu tư", "trái phiếu", "khoản vay ngân hàng", "bảo hiểm",
+    "đầu tư", "trái phiếu", "khoản vay ngân hàng", "hợp đồng bảo hiểm",
+    "kinh doanh bảo hiểm", "bảo hiểm thương mại",
     "hợp đồng thương mại", "tố tụng", "vụ án", "hình sự",
 ]
 _FOREIGN_KEYWORDS = [
@@ -85,6 +86,8 @@ _LEGAL_KB_QUESTION_KEYWORDS = [
     "quyền lợi", "nghĩa vụ", "thời hạn", "giá thuê", "thuê nhà", "nhà ở",
     "tài liệu", "tham khảo", "văn bản", "căn cứ", "nghị định", "bộ luật", "thông tư",
     "nguồn tham khảo", "tài liệu khác", "văn bản khác",
+    "bảo hiểm tai nạn lao động", "bảo hiểm xã hội", "bảo hiểm y tế",
+    "bảo hiểm thất nghiệp", "tai nạn lao động", "bệnh nghề nghiệp",
 ]
 
 

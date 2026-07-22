@@ -218,4 +218,5 @@ def detect_intent_smart(
         question,
         has_user_chunks=has_user_chunks,
         has_knowledge_chunks=has_knowledge_chunks,
+        conversation_context=conversation_context or "",
     )
