@@ -240,7 +240,7 @@ export function KnowledgeBasePage() {
       const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
       const isTextDocument = ["txt", "md", "csv", "json"].includes(extension);
       const content = isTextDocument ? (await file.text()).replace(/\u0000/g, "") : "";
-      const safePendingContent = content || `[Tệp nguồn chờ AI trích xuất: ${file.name}]`;
+      const safePendingContent = content || t("knowledge.pendingExtraction", { fileName: file.name });
       setSelectedFile(file);
       setSelectedFileName(file.name);
       setForm((previous) => ({
@@ -269,7 +269,7 @@ export function KnowledgeBasePage() {
     { header: t("knowledge.code"), cell: (entry) => entry.code },
     { header: t("knowledge.category"), cell: (entry) => translateEnum(entry.category, knowledgeCategoryKeys) },
     { header: t("knowledge.scope"), cell: (entry) => <Badge>{translateEnum(entry.scope, knowledgeScopeKeys)}</Badge> },
-    { header: t("table.status"), cell: (entry) => <div><Badge>{translateEnum(entry.currentStatus, knowledgeStatusKeys)}</Badge>{!entry.active && <p className="mt-xs text-xs text-on-surface-variant">{t("knowledge.inactiveForRetrieval")}</p>}</div> },
+    { header: t("table.status"), cell: (entry) => <Badge>{translateEnum(entry.currentStatus, knowledgeStatusKeys)}</Badge> },
     { header: t("knowledge.ingestedDocuments.active"), cell: (entry) => <Badge tone={entry.active ? "green" : "slate"}>{entry.active ? t("admin.active") : t("admin.inactive")}</Badge> },
     { header: t("table.updated"), cell: (entry) => formatDisplayDate(entry.updatedAt, "-", locale) },
   ];

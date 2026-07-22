@@ -115,18 +115,17 @@ export function ProfilePage() {
         ? user.email.slice(0, 2).toUpperCase()
         : '--';
 
-  const roleLabel =
-    user?.role === 'ADMIN'
-      ? 'Quản trị viên (Admin)'
-      : user?.role === 'EXPERT'
-        ? 'Chuyên gia pháp lý (Lawyer)'
-        : 'Khách hàng (Customer)';
+  const roleLabel = user?.role === 'ADMIN'
+    ? t('role.admin')
+    : user?.role === 'EXPERT'
+      ? t('role.expert')
+      : t('role.customer');
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!firstName.trim() || !lastName.trim()) {
       toast.warning(
-        language === 'vi' ? 'Họ và tên không được để trống' : 'First and last name are required',
+        t('profile.validation.nameRequired'),
         t('toast.warningTitle'),
       );
       return;
@@ -145,12 +144,12 @@ export function ProfilePage() {
       });
 
       toast.success(
-        language === 'vi' ? 'Đã cập nhật thông tin hồ sơ thành công!' : 'Profile updated successfully!',
+        t('profile.updateSuccess'),
         t('toast.successTitle'),
       );
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : language === 'vi' ? 'Không thể cập nhật hồ sơ' : 'Failed to update profile',
+        err instanceof Error ? err.message : t('profile.updateError'),
         t('toast.errorTitle'),
       );
     } finally {
@@ -162,7 +161,7 @@ export function ProfilePage() {
     e.preventDefault();
     if (!oldPassword || !newPassword || !confirmNewPassword) {
       toast.warning(
-        language === 'vi' ? 'Vui lòng điền đầy đủ tất cả các trường mật khẩu' : 'Please fill out all password fields',
+        t('profile.password.allFieldsRequired'),
         t('toast.warningTitle'),
       );
       return;
@@ -170,7 +169,7 @@ export function ProfilePage() {
 
     if (newPassword !== confirmNewPassword) {
       toast.warning(
-        language === 'vi' ? 'Mật khẩu mới và xác nhận mật khẩu không khớp' : 'New passwords do not match',
+        t('profile.password.mismatch'),
         t('toast.warningTitle'),
       );
       return;
@@ -178,7 +177,7 @@ export function ProfilePage() {
 
     if (newPassword.length < 6) {
       toast.warning(
-        language === 'vi' ? 'Mật khẩu phải có ít nhất 6 ký tự' : 'Password must be at least 6 characters',
+        t('profile.password.minimumLength'),
         t('toast.warningTitle'),
       );
       return;
@@ -188,7 +187,7 @@ export function ProfilePage() {
     try {
       await changePassword({ oldPassword, newPassword, confirmNewPassword });
       toast.success(
-        language === 'vi' ? 'Đã đổi mật khẩu thành công!' : 'Password changed successfully!',
+        t('profile.password.success'),
         t('toast.successTitle'),
       );
       setOldPassword('');
@@ -196,7 +195,7 @@ export function ProfilePage() {
       setConfirmNewPassword('');
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : language === 'vi' ? 'Đổi mật khẩu thất bại' : 'Failed to change password',
+        err instanceof Error ? err.message : t('profile.password.error'),
         t('toast.errorTitle'),
       );
     } finally {
@@ -205,17 +204,17 @@ export function ProfilePage() {
   };
 
   const tabsItems = [
-    { id: 'info', label: language === 'vi' ? 'Thông tin cá nhân' : 'Profile Details' },
-    { id: 'workspace', label: language === 'vi' ? 'Workspace & Gói dịch vụ' : 'Workspace & Plan' },
-    { id: 'security', label: language === 'vi' ? 'Bảo mật tài khoản' : 'Security' },
-    { id: 'appearance', label: language === 'vi' ? 'Giao diện & Ngôn ngữ' : 'Theme & Language' },
+    { id: 'info', label: t('profile.tabs.info') },
+    { id: 'workspace', label: t('profile.tabs.workspace') },
+    { id: 'security', label: t('profile.tabs.security') },
+    { id: 'appearance', label: t('profile.tabs.appearance') },
   ];
 
   return (
     <div className="space-y-xl">
       <PageHeader
-        title={language === 'vi' ? 'Hồ sơ & Tài khoản' : 'Profile & Account'}
-        subtitle={language === 'vi' ? 'Quản lý thông tin cá nhân, cài đặt bảo mật và tài nguyên workspace.' : 'Manage personal details, security settings, and workspace resources.'}
+        title={t('profile.title')}
+        subtitle={t('profile.subtitle')}
       />
 
       {/* Hero Profile Banner Card matching Dashboard styling */}
@@ -239,7 +238,7 @@ export function ProfilePage() {
               </p>
               <div className="flex flex-wrap items-center gap-xs text-xs text-slate-400">
                 <UserCheck className="h-3.5 w-3.5 text-emerald-400" />
-                <span>{user?.emailVerified ? (language === 'vi' ? 'Đã xác thực Email' : 'Email Verified') : (language === 'vi' ? 'Chưa xác thực Email' : 'Email Unverified')}</span>
+                <span>{user?.emailVerified ? t('profile.emailVerified') : t('profile.emailUnverified')}</span>
                 <span>•</span>
                 <span>ID: #{user?.id}</span>
               </div>
@@ -248,14 +247,14 @@ export function ProfilePage() {
 
           <div className="flex flex-wrap items-center gap-md border-t border-white/10 pt-md md:border-t-0 md:pt-0">
             <div className="rounded-xl border border-white/10 bg-white/5 px-md py-sm backdrop-blur">
-              <p className="text-xs uppercase tracking-wider text-slate-400">{language === 'vi' ? 'Gói hiện tại' : 'Active Plan'}</p>
+              <p className="text-xs uppercase tracking-wider text-slate-400">{t('profile.currentPlan')}</p>
               <p className="mt-xs text-lg font-bold text-inverse-primary">{planName}</p>
             </div>
             <div className="rounded-xl border border-white/10 bg-white/5 px-md py-sm backdrop-blur">
-              <p className="text-xs uppercase tracking-wider text-slate-400">{language === 'vi' ? 'Trạng thái' : 'Status'}</p>
+              <p className="text-xs uppercase tracking-wider text-slate-400">{t('table.status')}</p>
               <div className="mt-xs flex items-center gap-xs">
                 <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-sm font-semibold text-emerald-300">{language === 'vi' ? 'Hoạt động' : 'Active'}</span>
+                <span className="text-sm font-semibold text-emerald-300">{t('status.active')}</span>
               </div>
             </div>
           </div>
@@ -273,15 +272,15 @@ export function ProfilePage() {
       {/* Tab 1: Profile Information */}
       {activeTab === 'info' && (
         <Card
-          title={language === 'vi' ? 'Cập nhật thông tin cá nhân' : 'Edit Profile Information'}
-          subtitle={language === 'vi' ? 'Thay đổi họ tên và thông tin giới thiệu cá nhân.' : 'Update your name and professional details.'}
+          title={t('profile.edit.title')}
+          subtitle={t('profile.edit.subtitle')}
           actions={<UserRound className="h-5 w-5 text-primary dark:text-inverse-primary" />}
         >
           <form onSubmit={handleSaveProfile} className="space-y-lg">
             <div className="grid gap-md sm:grid-cols-2">
               <div>
                 <label className="block text-sm font-semibold text-on-surface dark:text-slate-200">
-                  {language === 'vi' ? 'Họ và tên đệm' : 'First Name'} <span className="text-error">*</span>
+                  {t('auth.firstName')} <span className="text-error">*</span>
                 </label>
                 <input
                   type="text"
@@ -295,7 +294,7 @@ export function ProfilePage() {
 
               <div>
                 <label className="block text-sm font-semibold text-on-surface dark:text-slate-200">
-                  {language === 'vi' ? 'Tên' : 'Last Name'} <span className="text-error">*</span>
+                  {t('auth.lastName')} <span className="text-error">*</span>
                 </label>
                 <input
                   type="text"
@@ -310,7 +309,7 @@ export function ProfilePage() {
 
             <div>
               <label className="block text-sm font-semibold text-on-surface dark:text-slate-200">
-                {language === 'vi' ? 'Địa chỉ Email' : 'Email Address'}
+                {t('auth.emailAddress')}
               </label>
               <div className="relative mt-xs">
                 <input
@@ -322,7 +321,7 @@ export function ProfilePage() {
                 <Lock className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-outline dark:text-slate-500" />
               </div>
               <p className="mt-xs text-xs text-on-surface-variant dark:text-slate-400">
-                {language === 'vi' ? 'Email là định danh tài khoản và không thể tự thay đổi.' : 'Email is your account identifier and cannot be changed.'}
+                {t('profile.edit.emailNotice')}
               </p>
             </div>
 
@@ -330,7 +329,7 @@ export function ProfilePage() {
 
             <div className="flex justify-end pt-sm">
               <Button type="submit" disabled={savingProfile} leftIcon={<Save className="h-4 w-4" />}>
-                {language === 'vi' ? 'Lưu thay đổi' : 'Save Changes'}
+                {t('profile.edit.save')}
               </Button>
             </div>
           </form>
@@ -341,8 +340,8 @@ export function ProfilePage() {
       {activeTab === 'workspace' && (
         <div className="grid gap-gutter xl:grid-cols-[1.2fr_0.8fr]">
           <Card
-            title={language === 'vi' ? 'Gói dịch vụ & Hạn ngạch sử dụng' : 'Subscription & Quota Usage'}
-            subtitle={language === 'vi' ? 'Thông tin hạn ngạch AI và các tính năng khả dụng.' : 'AI usage limits and enabled features.'}
+            title={t('profile.subscription.title')}
+            subtitle={t('profile.subscription.subtitle')}
             actions={<Zap className="h-5 w-5 text-primary dark:text-inverse-primary" />}
           >
             {loadingUsage ? (
@@ -351,12 +350,12 @@ export function ProfilePage() {
               <div className="space-y-lg">
                 <div className="flex items-center justify-between rounded-xl border border-legal-border bg-surface-container-low p-md dark:border-slate-800 dark:bg-slate-900">
                   <div>
-                    <p className="text-xs uppercase tracking-wider text-on-surface-variant dark:text-slate-400">{language === 'vi' ? 'Gói hiện tại' : 'Current Plan'}</p>
+                    <p className="text-xs uppercase tracking-wider text-on-surface-variant dark:text-slate-400">{t('profile.currentPlan')}</p>
                     <p className="mt-xs text-xl font-bold text-primary dark:text-inverse-primary">{planName}</p>
                   </div>
                   <Link to="/billing/subscribe">
                     <Button variant="primary" size="sm" leftIcon={<Sparkles className="h-4 w-4" />}>
-                      {language === 'vi' ? 'Nâng cấp gói' : 'Upgrade Plan'}
+                      {t('profile.subscription.upgrade')}
                     </Button>
                   </Link>
                 </div>
@@ -364,7 +363,7 @@ export function ProfilePage() {
                 <div className="space-y-md">
                   <div>
                     <div className="mb-xs flex justify-between text-sm">
-                      <span className="font-semibold text-on-surface dark:text-slate-200">{language === 'vi' ? 'Phân tích hợp đồng' : 'Contract Analyses'}</span>
+                      <span className="font-semibold text-on-surface dark:text-slate-200">{t('billing.limit.contractAnalyses')}</span>
                       <span className="text-on-surface-variant dark:text-slate-400">
                         {usageSummary.contractAnalysisUsed} / {usageSummary.contractAnalysisLimit}
                       </span>
@@ -376,7 +375,7 @@ export function ProfilePage() {
 
                   <div>
                     <div className="mb-xs flex justify-between text-sm">
-                      <span className="font-semibold text-on-surface dark:text-slate-200">{language === 'vi' ? 'Token AI' : 'AI Tokens'}</span>
+                      <span className="font-semibold text-on-surface dark:text-slate-200">{t('billing.limit.aiTokens')}</span>
                       <span className="text-on-surface-variant dark:text-slate-400">
                         {usageSummary.aiTokensUsed.toLocaleString()} / {usageSummary.aiTokensLimit.toLocaleString()}
                       </span>
@@ -388,7 +387,7 @@ export function ProfilePage() {
 
                   <div>
                     <div className="mb-xs flex justify-between text-sm">
-                      <span className="font-semibold text-on-surface dark:text-slate-200">{language === 'vi' ? 'Số lượng Workspace' : 'Workspaces'}</span>
+                      <span className="font-semibold text-on-surface dark:text-slate-200">{t('billing.limit.workspaces')}</span>
                       <span className="text-on-surface-variant dark:text-slate-400">
                         {usageSummary.workspacesUsed} / {usageSummary.workspacesLimit}
                       </span>
@@ -401,17 +400,17 @@ export function ProfilePage() {
               </div>
             ) : (
               <div className="space-y-md text-sm text-on-surface-variant dark:text-slate-400">
-                <p>{language === 'vi' ? 'Gói của bạn hiện là:' : 'Current plan:'} <span className="font-bold text-primary dark:text-inverse-primary">{planName}</span></p>
+                <p>{t('profile.subscription.currentPlan')}: <span className="font-bold text-primary dark:text-inverse-primary">{planName}</span></p>
                 <Link to="/billing/subscribe">
-                  <Button variant="secondary" size="sm">{language === 'vi' ? 'Xem các gói dịch vụ' : 'View Subscription Plans'}</Button>
+                  <Button variant="secondary" size="sm">{t('profile.subscription.viewPlans')}</Button>
                 </Link>
               </div>
             )}
           </Card>
 
           <Card
-            title={language === 'vi' ? 'Truy cập nhanh Workspace' : 'Quick Workspace Access'}
-            subtitle={language === 'vi' ? 'Quản lý tài liệu và các dự án phân tích.' : 'Manage your analysis projects and documents.'}
+            title={t('profile.workspace.title')}
+            subtitle={t('profile.workspace.subtitle')}
             actions={<Shield className="h-5 w-5 text-primary dark:text-inverse-primary" />}
           >
             <div className="space-y-sm">
@@ -420,8 +419,8 @@ export function ProfilePage() {
                 className="group flex items-center justify-between rounded-xl border border-legal-border p-md transition hover:border-primary hover:bg-surface-container-low dark:border-slate-800 dark:hover:border-inverse-primary dark:hover:bg-slate-900"
               >
                 <div>
-                  <p className="font-semibold text-on-surface dark:text-slate-100">{language === 'vi' ? 'Trang tổng quan Dashboard' : 'Main Dashboard'}</p>
-                  <p className="text-xs text-on-surface-variant dark:text-slate-400">{language === 'vi' ? 'Xem thống kê và hoạt động gần đây' : 'View metrics & recent activities'}</p>
+                  <p className="font-semibold text-on-surface dark:text-slate-100">{t('profile.workspace.dashboard')}</p>
+                  <p className="text-xs text-on-surface-variant dark:text-slate-400">{t('profile.workspace.dashboardDescription')}</p>
                 </div>
                 <ChevronRight className="h-5 w-5 text-outline transition-transform group-hover:translate-x-1 dark:text-slate-500" />
               </Link>
@@ -431,8 +430,8 @@ export function ProfilePage() {
                 className="group flex items-center justify-between rounded-xl border border-legal-border p-md transition hover:border-primary hover:bg-surface-container-low dark:border-slate-800 dark:hover:border-inverse-primary dark:hover:bg-slate-900"
               >
                 <div>
-                  <p className="font-semibold text-on-surface dark:text-slate-100">{language === 'vi' ? 'Danh sách Dự án' : 'Projects List'}</p>
-                  <p className="text-xs text-on-surface-variant dark:text-slate-400">{language === 'vi' ? 'Quản lý dự án pháp lý' : 'Manage legal workspaces'}</p>
+                  <p className="font-semibold text-on-surface dark:text-slate-100">{t('profile.workspace.projects')}</p>
+                  <p className="text-xs text-on-surface-variant dark:text-slate-400">{t('profile.workspace.projectsDescription')}</p>
                 </div>
                 <ChevronRight className="h-5 w-5 text-outline transition-transform group-hover:translate-x-1 dark:text-slate-500" />
               </Link>
@@ -442,8 +441,8 @@ export function ProfilePage() {
                 className="group flex items-center justify-between rounded-xl border border-legal-border p-md transition hover:border-primary hover:bg-surface-container-low dark:border-slate-800 dark:hover:border-inverse-primary dark:hover:bg-slate-900"
               >
                 <div>
-                  <p className="font-semibold text-on-surface dark:text-slate-100">{language === 'vi' ? 'Hợp đồng của tôi' : 'My Contracts'}</p>
-                  <p className="text-xs text-on-surface-variant dark:text-slate-400">{language === 'vi' ? 'Quản lý hợp đồng đã soạn thảo' : 'Generated contracts & drafts'}</p>
+                  <p className="font-semibold text-on-surface dark:text-slate-100">{t('profile.workspace.contracts')}</p>
+                  <p className="text-xs text-on-surface-variant dark:text-slate-400">{t('profile.workspace.contractsDescription')}</p>
                 </div>
                 <ChevronRight className="h-5 w-5 text-outline transition-transform group-hover:translate-x-1 dark:text-slate-500" />
               </Link>
@@ -455,14 +454,14 @@ export function ProfilePage() {
       {/* Tab 3: Account Security */}
       {activeTab === 'security' && (
         <Card
-          title={language === 'vi' ? 'Đổi mật khẩu tài khoản' : 'Change Password'}
-          subtitle={language === 'vi' ? 'Xác minh mật khẩu hiện tại và nhập mật khẩu mới.' : 'Verify current password and set a new password.'}
+          title={t('profile.password.title')}
+          subtitle={t('profile.password.subtitle')}
           actions={<KeyRound className="h-5 w-5 text-primary dark:text-inverse-primary" />}
         >
           <form onSubmit={handleChangePassword} className="max-w-xl space-y-md">
             <div>
               <label className="block text-sm font-semibold text-on-surface dark:text-slate-200">
-                {language === 'vi' ? 'Mật khẩu hiện tại' : 'Current Password'} <span className="text-error">*</span>
+                {t('profile.password.current')} <span className="text-error">*</span>
               </label>
               <div className="relative mt-xs">
                 <input
@@ -484,7 +483,7 @@ export function ProfilePage() {
 
             <div>
               <label className="block text-sm font-semibold text-on-surface dark:text-slate-200">
-                {language === 'vi' ? 'Mật khẩu mới' : 'New Password'} <span className="text-error">*</span>
+                {t('profile.password.new')} <span className="text-error">*</span>
               </label>
               <div className="relative mt-xs">
                 <input
@@ -506,7 +505,7 @@ export function ProfilePage() {
 
             <div>
               <label className="block text-sm font-semibold text-on-surface dark:text-slate-200">
-                {language === 'vi' ? 'Xác nhận mật khẩu mới' : 'Confirm New Password'} <span className="text-error">*</span>
+                {t('profile.password.confirm')} <span className="text-error">*</span>
               </label>
               <div className="relative mt-xs">
                 <input
@@ -528,7 +527,7 @@ export function ProfilePage() {
 
             <div className="pt-sm">
               <Button type="submit" disabled={changingPassword} leftIcon={<KeyRound className="h-4 w-4" />}>
-                {language === 'vi' ? 'Cập nhật mật khẩu' : 'Update Password'}
+                {t('profile.password.submit')}
               </Button>
             </div>
           </form>
