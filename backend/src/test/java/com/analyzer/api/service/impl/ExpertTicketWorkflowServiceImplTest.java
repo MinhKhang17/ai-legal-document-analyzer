@@ -62,6 +62,50 @@ class ExpertTicketWorkflowServiceImplTest {
     }
 
     @Test
+    void paidClassificationUsesWholeVietnameseDongWithinVnPayRange() {
+        User admin = user(1L, RoleName.ADMIN);
+        User expert = user(2L, RoleName.EXPERT);
+        LegalTicket ticket = ticket(LegalTicketStatus.PENDING_ADMIN_REVIEW);
+        when(ticketRepository.findByIdAndDeletedFalse("ticket-1")).thenReturn(Optional.of(ticket));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(admin));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(expert));
+
+        service.classify(1L, "ticket-1", AdminTicketClassificationRequest.builder()
+                .complexity(TicketComplexity.STANDARD).reason("Paid consultation")
+                .proposedExpertId(2L).pricingType(TicketPricingType.PAID)
+                .userPrice(new BigDecimal("150000")).internalTicketValue(new BigDecimal("100000")).build());
+
+        assertThat(ticket.getUserPrice()).isEqualByComparingTo("150000");
+        assertThat(ticket.getInternalTicketValue()).isEqualByComparingTo("100000");
+    }
+
+    @Test
+    void paidClassificationRejectsFractionalOrOutOfRangeVietnameseDong() {
+        User admin = user(1L, RoleName.ADMIN);
+        User expert = user(2L, RoleName.EXPERT);
+        LegalTicket ticket = ticket(LegalTicketStatus.PENDING_ADMIN_REVIEW);
+        when(ticketRepository.findByIdAndDeletedFalse("ticket-1")).thenReturn(Optional.of(ticket));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(admin));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(expert));
+
+        AdminTicketClassificationRequest fractional = AdminTicketClassificationRequest.builder()
+                .complexity(TicketComplexity.STANDARD).reason("Paid consultation")
+                .proposedExpertId(2L).pricingType(TicketPricingType.PAID)
+                .userPrice(new BigDecimal("150000.50")).internalTicketValue(new BigDecimal("100000")).build();
+        assertThatThrownBy(() -> service.classify(1L, "ticket-1", fractional))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("số nguyên");
+
+        AdminTicketClassificationRequest belowMinimum = AdminTicketClassificationRequest.builder()
+                .complexity(TicketComplexity.STANDARD).reason("Paid consultation")
+                .proposedExpertId(2L).pricingType(TicketPricingType.PAID)
+                .userPrice(new BigDecimal("4999")).internalTicketValue(new BigDecimal("100000")).build();
+        assertThatThrownBy(() -> service.classify(1L, "ticket-1", belowMinimum))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("5.000 VNĐ");
+    }
+
+    @Test
     void paidAssignmentCannotBeAcceptedBeforePayment() {
         User expert = user(2L, RoleName.EXPERT);
         LegalTicket ticket = ticket(LegalTicketStatus.PENDING_EXPERT_ACCEPTANCE);

@@ -13,12 +13,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class ExpertTicketWorkflowServiceImpl implements ExpertTicketWorkflowService {
+    private static final BigDecimal MIN_VNPAY_VND = new BigDecimal("5000");
+    private static final BigDecimal MAX_VNPAY_VND_EXCLUSIVE = new BigDecimal("1000000000");
+
     private final LegalTicketRepository ticketRepository;
     private final UserRepository userRepository;
     private final ExpertTicketCreditReservationRepository creditRepository;
@@ -41,17 +45,26 @@ public class ExpertTicketWorkflowServiceImpl implements ExpertTicketWorkflowServ
         if (ticket.getCustomerPaymentStatus() == TicketPaymentStatus.PAID || ticket.getStartedAt() != null) {
             throw new ConflictException("TICKET_PRICING_LOCKED");
         }
+        BigDecimal userPriceVnd = normalizeVnd(request.getUserPrice());
+        BigDecimal internalTicketValueVnd = normalizeVnd(request.getInternalTicketValue());
+        if (internalTicketValueVnd.compareTo(BigDecimal.ZERO) <= 0
+                || internalTicketValueVnd.compareTo(MAX_VNPAY_VND_EXCLUSIVE) >= 0) {
+            throw new ConflictException("INVALID_INTERNAL_TICKET_VALUE_VND",
+                    "Giá trị nội bộ phải từ 1 VNĐ đến dưới 1 tỷ VNĐ");
+        }
         if (request.getPricingType() == TicketPricingType.PLAN_INCLUDED
                 && request.getComplexity() != TicketComplexity.BASIC) {
             throw new ConflictException("INCLUDED_CREDIT_REQUIRES_BASIC_TICKET");
         }
         if (request.getPricingType() == TicketPricingType.PLAN_INCLUDED
-                && request.getUserPrice().compareTo(BigDecimal.ZERO) != 0) {
+                && userPriceVnd.compareTo(BigDecimal.ZERO) != 0) {
             throw new ConflictException("INCLUDED_TICKET_USER_PRICE_MUST_BE_ZERO");
         }
         if (request.getPricingType() == TicketPricingType.PAID
-                && request.getUserPrice().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new ConflictException("PAID_TICKET_PRICE_REQUIRED");
+                && (userPriceVnd.compareTo(MIN_VNPAY_VND) < 0
+                || userPriceVnd.compareTo(MAX_VNPAY_VND_EXCLUSIVE) >= 0)) {
+            throw new ConflictException("PAID_TICKET_PRICE_OUT_OF_VND_RANGE",
+                    "Giá ticket phải từ 5.000 VNĐ đến dưới 1 tỷ VNĐ");
         }
         LocalDateTime now = LocalDateTime.now();
         ticket.setTicketComplexity(request.getComplexity());
@@ -60,8 +73,8 @@ public class ExpertTicketWorkflowServiceImpl implements ExpertTicketWorkflowServ
         ticket.setClassifiedBy(admin);
         ticket.setProposedExpert(expert);
         ticket.setPricingType(request.getPricingType());
-        ticket.setUserPrice(request.getUserPrice());
-        ticket.setInternalTicketValue(request.getInternalTicketValue());
+        ticket.setUserPrice(userPriceVnd);
+        ticket.setInternalTicketValue(internalTicketValueVnd);
         ticket.setQuoteStatus(TicketQuoteStatus.DRAFT);
         ticket.setCustomerPaymentStatus(request.getPricingType() == TicketPricingType.PLAN_INCLUDED
                 ? TicketPaymentStatus.NOT_REQUIRED : TicketPaymentStatus.UNPAID);
@@ -70,6 +83,18 @@ public class ExpertTicketWorkflowServiceImpl implements ExpertTicketWorkflowServ
         audit(saved, admin, "ADMIN_CLASSIFIED", request.getReason());
         audit(saved, admin, "EXPERT_ASSESSMENT_REQUESTED", String.valueOf(expert.getId()));
         return mapper.toResponse(saved);
+    }
+
+    private BigDecimal normalizeVnd(BigDecimal amount) {
+        if (amount == null) {
+            throw new ConflictException("VND_AMOUNT_REQUIRED", "Số tiền VNĐ là bắt buộc");
+        }
+        try {
+            return amount.setScale(0, RoundingMode.UNNECESSARY);
+        } catch (ArithmeticException exception) {
+            throw new ConflictException("INVALID_VND_AMOUNT",
+                    "Số tiền VNĐ phải là số nguyên, không sử dụng phần thập phân");
+        }
     }
 
     @Override
