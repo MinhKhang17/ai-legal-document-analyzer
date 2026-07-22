@@ -1157,6 +1157,7 @@ const en: TranslationDictionary = {
   "billing.paymentUrlMissing":
     "Backend created a VNPAY response but did not return paymentUrl.",
   "billing.paymentUrlError": "Unable to create the VNPAY payment URL.",
+  "billing.cancelPlanModalTitle": "Confirm plan cancellation",
   "billing.cancelConfirm": "Cancel the current plan?",
   "billing.cancelPlan": "Cancel plan",
   "billing.cancellingPlan": "Cancelling...",
@@ -3319,6 +3320,7 @@ const vi: TranslationDictionary = {
   "billing.paymentUrlMissing":
     "Backend đã tạo phản hồi VNPAY nhưng không trả paymentUrl.",
   "billing.paymentUrlError": "Không thể tạo URL thanh toán VNPAY.",
+  "billing.cancelPlanModalTitle": "Xác nhận hủy gói",
   "billing.cancelConfirm": "Hủy gói hiện tại?",
   "billing.cancelPlan": "Hủy gói",
   "billing.cancellingPlan": "Đang hủy...",

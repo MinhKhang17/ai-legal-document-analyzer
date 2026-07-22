@@ -8,6 +8,7 @@ import { Button } from '../../components/common/Button';
 import { Card } from '../../components/common/Card';
 import { DataTable, type DataTableColumn } from '../../components/common/DataTable';
 import { EmptyState } from '../../components/common/EmptyState';
+import { Modal } from '../../components/common/Modal';
 import { PageHeader } from '../../components/common/PageHeader';
 import { ProgressBar } from '../../components/common/ProgressBar';
 import { useI18n } from '../../hooks/useI18n';
@@ -94,6 +95,7 @@ export function BillingPage() {
   const [payingTransactionId, setPayingTransactionId] = useState<number | null>(null);
   const [refundingTransactionId, setRefundingTransactionId] = useState<number | null>(null);
   const [refundTransaction, setRefundTransaction] = useState<PaymentTransaction | null>(null);
+  const [isCancelPlanModalOpen, setIsCancelPlanModalOpen] = useState(false);
   const [isCancellingPlan, setIsCancellingPlan] = useState(false);
   const [usageRows, setUsageRows] = useState<SubscriptionUsage[]>([]);
   const [isLoadingUsage, setIsLoadingUsage] = useState(true);
@@ -231,11 +233,7 @@ export function BillingPage() {
   };
 
   const handleCancelPlan = async () => {
-    if (!customerPlan) {
-      return;
-    }
-
-    if (!window.confirm(t('billing.cancelConfirm'))) {
+    if (!customerPlan || isCancellingPlan) {
       return;
     }
 
@@ -248,6 +246,7 @@ export function BillingPage() {
       const nextCustomerPlan = response.data ?? null;
       setCustomerPlan(nextCustomerPlan);
       setHasNoPlan(nextCustomerPlan === null);
+      setIsCancelPlanModalOpen(false);
       const message = t('billing.cancelSuccess');
       setTransactionActionMessage(message);
       toast.success(message, t('toast.successTitle'));
@@ -517,7 +516,7 @@ export function BillingPage() {
                   <Button
                     variant="danger"
                     size="sm"
-                    onClick={() => void handleCancelPlan()}
+                    onClick={() => setIsCancelPlanModalOpen(true)}
                     disabled={isCancellingPlan}
                   >
                     {isCancellingPlan ? t('billing.cancellingPlan') : t('billing.cancelPlan')}
@@ -621,6 +620,24 @@ export function BillingPage() {
       />
 
       {renderPlanContent()}
+      <Modal
+        open={isCancelPlanModalOpen}
+        size="sm"
+        title={t('billing.cancelPlanModalTitle')}
+        onClose={() => !isCancellingPlan && setIsCancelPlanModalOpen(false)}
+        footer={
+          <div className="flex justify-end gap-sm">
+            <Button variant="secondary" disabled={isCancellingPlan} onClick={() => setIsCancelPlanModalOpen(false)}>
+              {t('actions.cancel')}
+            </Button>
+            <Button variant="danger" disabled={isCancellingPlan} onClick={() => void handleCancelPlan()}>
+              {isCancellingPlan ? t('billing.cancellingPlan') : t('billing.cancelPlan')}
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-sm text-on-surface-variant dark:text-slate-400">{t('billing.cancelConfirm')}</p>
+      </Modal>
       <RefundRequestModal transaction={refundTransaction} submitting={refundingTransactionId !== null} onClose={() => setRefundTransaction(null)} onSubmit={handleRequestRefund} />
     </div>
   );
