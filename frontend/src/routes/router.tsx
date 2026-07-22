@@ -37,8 +37,6 @@ import { AdminTicketsPage } from "../pages/admin/AdminTicketsPage";
 import { AdminTicketDetailPage } from "../pages/admin/AdminTicketDetailPage";
 import { AdminRefundsPage } from "../pages/admin/AdminRefundsPage";
 import { AdminRefundDetailPage } from "../pages/admin/AdminRefundDetailPage";
-import { SystemHealthPage } from "../pages/admin/SystemHealthPage";
-import { ContractDetailPage } from "../pages/contracts/ContractDetailPage";
 import { SettingsPage } from "../pages/settings/SettingsPage";
 import { AccountSecurityPage } from "../pages/settings/AccountSecurityPage";
 import { ProfilePage } from "../pages/settings/ProfilePage";
@@ -54,11 +52,9 @@ import { CreateCustomerTicketPage } from "../pages/tickets/CreateCustomerTicketP
 import { SharedChatPage } from "../pages/chat/SharedChatPage";
 import { SharedTicketConversationPage } from "../pages/tickets/SharedTicketConversationPage";
 
-const RiskReviewPage = lazy(() => import("../pages/editor/RiskReviewPage").then((module) => ({ default: module.RiskReviewPage })));
 const LegalChatPage = lazy(() => import("../pages/chat/LegalChatPage").then((module) => ({ default: module.LegalChatPage })));
 const ChatHistoryPage = lazy(() => import("../pages/chat/ChatHistoryPage").then((module) => ({ default: module.ChatHistoryPage })));
 const AdminConsolePage = lazy(() => import("../pages/admin/AdminConsolePage").then((module) => ({ default: module.AdminConsolePage })));
-const MyContractsPage = lazy(() => import("../pages/contracts/MyContractsPage").then((module) => ({ default: module.MyContractsPage })));
 
 export const router = createBrowserRouter([
   { path: "/verify-email", element: <VerifyEmailPage /> },
@@ -148,14 +144,6 @@ export const router = createBrowserRouter([
           <CustomerRoute>
             <EditorPage />
           </CustomerRoute>
-        ),
-      },
-      {
-        path: "/editor/risk-review",
-        element: (
-          <AdminRoute>
-            <RiskReviewPage />
-          </AdminRoute>
         ),
       },
       {
@@ -252,22 +240,7 @@ export const router = createBrowserRouter([
         path: "*",
         element: <Navigate to="/dashboard" replace />,
       },
-      {
-        path: "/contracts",
-        element: (
-          <CustomerRoute>
-            <MyContractsPage />
-          </CustomerRoute>
-        ),
-      },
-      {
-        path: "/contracts/:id",
-        element: (
-          <CustomerRoute>
-            <ContractDetailPage />
-          </CustomerRoute>
-        ),
-      },
+
       { path: "/settings", element: <SettingsPage /> },
       { path: "/settings/security", element: <AccountSecurityPage /> },
       { path: "/profile", element: <ProfilePage /> },
@@ -309,14 +282,6 @@ export const router = createBrowserRouter([
       { path: "/admin/revenue/statements/:statementId", element: <AdminRoute><RevenueStatementDetailPage admin /></AdminRoute> },
       { path: "/admin/revenue/early-payouts/:id", element: <AdminRoute><AdminEarlyPayoutDetailPage /></AdminRoute> },
       { path: "/admin/revenue/commission/verify", element: <AdminRoute><CommissionVerificationPage /></AdminRoute> },
-      {
-        path: "/admin/system-health",
-        element: (
-          <AdminRoute>
-            <SystemHealthPage />
-          </AdminRoute>
-        ),
-      },
       {
         path: "/lawyer/tickets",
         element: (
