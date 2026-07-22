@@ -7,7 +7,7 @@ import com.analyzer.api.entity.SystemNotification;
 import com.analyzer.api.entity.User;
 import com.analyzer.api.enums.RoleName;
 import com.analyzer.api.repository.SystemNotificationRepository;
-import com.analyzer.api.repository.UserRepository;
+import com.analyzer.api.repository.user.UserRepository;
 import com.analyzer.api.service.EmailService;
 import com.analyzer.api.service.knowledge.KnowledgeIngestNotificationService;
 import lombok.RequiredArgsConstructor;

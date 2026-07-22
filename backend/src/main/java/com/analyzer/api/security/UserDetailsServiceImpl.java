@@ -1,7 +1,7 @@
 package com.analyzer.api.security;
 
 import com.analyzer.api.entity.User;
-import com.analyzer.api.repository.UserRepository;
+import com.analyzer.api.repository.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;

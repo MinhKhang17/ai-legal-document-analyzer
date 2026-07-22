@@ -9,7 +9,7 @@ import com.analyzer.api.enums.KnowledgeReviewDecision;
 import com.analyzer.api.enums.KnowledgeStatus;
 import com.analyzer.api.enums.KnowledgeVisibility;
 import com.analyzer.api.exception.common.ConflictException;
-import com.analyzer.api.repository.UserRepository;
+import com.analyzer.api.repository.user.UserRepository;
 import com.analyzer.api.repository.knowledge.KnowledgeBaseEntryRepository;
 import com.analyzer.api.repository.knowledge.KnowledgeBaseVersionRepository;
 import org.junit.jupiter.api.Test;

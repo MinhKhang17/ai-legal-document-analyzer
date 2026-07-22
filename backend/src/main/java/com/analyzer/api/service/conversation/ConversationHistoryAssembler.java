@@ -4,7 +4,7 @@ import com.analyzer.api.dto.ai.RagQueryRequest;
 import com.analyzer.api.entity.ChatMessage;
 import com.analyzer.api.entity.ChatSession;
 import com.analyzer.api.enums.ChatMessageStatus;
-import com.analyzer.api.repository.ChatMessageRepository;
+import com.analyzer.api.repository.chatmessage.ChatMessageRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;

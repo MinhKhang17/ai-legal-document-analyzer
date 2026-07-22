@@ -4,6 +4,7 @@ import com.analyzer.api.dto.ApiResponseDTO;
 import com.analyzer.api.dto.user.AdminCreateLawyerRequest;
 import com.analyzer.api.dto.user.ResendExpertActivationRequest;
 import com.analyzer.api.dto.user.UserResponse;
+import com.analyzer.api.security.UserDetailsImpl;
 import com.analyzer.api.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -12,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -60,9 +62,9 @@ public class AdminUserController {
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Soft delete user", description = "Deactivates (soft deletes) a user account.")
     public ResponseEntity<ApiResponseDTO<Void>> deleteUser(
+            @AuthenticationPrincipal UserDetailsImpl currentUser,
             @org.springframework.web.bind.annotation.PathVariable Long id) {
-        Long currentAdminId = getCurrentUserId();
-        userService.softDeleteUser(id, currentAdminId);
+        userService.softDeleteUser(id, currentUser.getId());
         return ResponseEntity.ok(ApiResponseDTO.success("Đã xóa (vô hiệu hóa) tài khoản người dùng thành công"));
     }
 
@@ -73,19 +75,5 @@ public class AdminUserController {
             @org.springframework.web.bind.annotation.PathVariable Long id) {
         userService.restoreUser(id);
         return ResponseEntity.ok(ApiResponseDTO.success("Đã khôi phục tài khoản người dùng thành công"));
-    }
-
-    private Long getCurrentUserId() {
-        org.springframework.security.core.Authentication authentication =
-                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()
-                || "anonymousUser".equals(authentication.getPrincipal())) {
-            throw new RuntimeException("Bạn chưa đăng nhập");
-        }
-        Object principal = authentication.getPrincipal();
-        if (principal instanceof com.analyzer.api.security.UserDetailsImpl userDetails) {
-            return userDetails.getId();
-        }
-        throw new RuntimeException("Thông tin xác thực không hợp lệ");
     }
 }

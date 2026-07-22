@@ -3,7 +3,7 @@ package com.analyzer.api.e2e;
 import com.analyzer.api.entity.Document;
 import com.analyzer.api.entity.User;
 import com.analyzer.api.entity.Workspace;
-import com.analyzer.api.repository.DocumentRepository;
+import com.analyzer.api.repository.document.DocumentRepository;
 import com.analyzer.api.service.SubscriptionQuotaService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

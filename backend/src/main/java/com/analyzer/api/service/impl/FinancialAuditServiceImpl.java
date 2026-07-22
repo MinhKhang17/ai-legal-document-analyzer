@@ -3,7 +3,7 @@ package com.analyzer.api.service.impl;
 import com.analyzer.api.dto.PageResponse;
 import com.analyzer.api.dto.revenue.RevenuePayrollDtos;
 import com.analyzer.api.entity.*;
-import com.analyzer.api.repository.FinancialAuditLogRepository;
+import com.analyzer.api.repository.revenue.FinancialAuditLogRepository;
 import com.analyzer.api.service.FinancialAuditService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;

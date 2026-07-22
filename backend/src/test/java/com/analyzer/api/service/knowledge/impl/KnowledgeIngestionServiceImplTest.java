@@ -5,7 +5,7 @@ import com.analyzer.api.entity.KnowledgeBaseEntry;
 import com.analyzer.api.entity.KnowledgeBaseVersion;
 import com.analyzer.api.entity.KnowledgeIngestionJob;
 import com.analyzer.api.enums.KnowledgeStatus;
-import com.analyzer.api.repository.UserRepository;
+import com.analyzer.api.repository.user.UserRepository;
 import com.analyzer.api.repository.knowledge.KnowledgeBaseEntryRepository;
 import com.analyzer.api.repository.knowledge.KnowledgeBaseVersionRepository;
 import com.analyzer.api.repository.knowledge.KnowledgeIngestionJobRepository;

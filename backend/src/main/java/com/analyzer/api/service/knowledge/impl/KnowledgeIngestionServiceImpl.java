@@ -12,7 +12,7 @@ import com.analyzer.api.exception.common.ResourceNotFoundException;
 import com.analyzer.api.repository.knowledge.KnowledgeBaseEntryRepository;
 import com.analyzer.api.repository.knowledge.KnowledgeBaseVersionRepository;
 import com.analyzer.api.repository.knowledge.KnowledgeIngestionJobRepository;
-import com.analyzer.api.repository.UserRepository;
+import com.analyzer.api.repository.user.UserRepository;
 import com.analyzer.api.service.knowledge.KnowledgeIngestNotificationService;
 import com.analyzer.api.service.knowledge.event.KnowledgeIngestionDispatchRequested;
 import org.springframework.context.ApplicationEventPublisher;

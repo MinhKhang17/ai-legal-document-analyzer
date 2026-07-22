@@ -1,7 +1,7 @@
 package com.analyzer.api.scheduler;
 
 import com.analyzer.api.entity.User;
-import com.analyzer.api.repository.UserRepository;
+import com.analyzer.api.repository.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

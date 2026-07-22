@@ -23,8 +23,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -97,10 +96,11 @@ public class ContractManagementController {
     @GetMapping("/my")
     @PreAuthorize("hasRole('CUSTOMER')")
     public ResponseEntity<ApiResponseDTO<PageResponse<ContractResponse>>> getMyContracts(
+            @AuthenticationPrincipal UserDetailsImpl currentUser,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         Page<ContractResponse> pageResult = userContractService.getMyContracts(
-                getCurrentUserId(),
+                currentUser.getId(),
                 PageRequest.of(page, size)
         );
         return ResponseEntity.ok(ApiResponseDTO.success("Lấy danh sách hợp đồng thành công", toPageResponse(pageResult)));
@@ -108,8 +108,9 @@ public class ContractManagementController {
 
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('CUSTOMER')")
-    public ResponseEntity<ApiResponseDTO<ContractResponse>> getContract(@PathVariable("id") String contractId) {
-        ContractResponse response = userContractService.getById(getCurrentUserId(), contractId);
+    public ResponseEntity<ApiResponseDTO<ContractResponse>> getContract(
+            @AuthenticationPrincipal UserDetailsImpl currentUser, @PathVariable("id") String contractId) {
+        ContractResponse response = userContractService.getById(currentUser.getId(), contractId);
         return ResponseEntity.ok(ApiResponseDTO.success("Lấy thông tin hợp đồng thành công", response));
     }
 
@@ -128,21 +129,6 @@ public class ContractManagementController {
             @Valid @RequestBody RevertContractVersionRequest request) {
         ContractResponse response = contractVersionService.revert(contractId, versionNo, request);
         return ResponseEntity.ok(ApiResponseDTO.success("Khôi phục phiên bản thành công", response));
-    }
-
-    private Long getCurrentUserId() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()
-                || "anonymousUser".equals(authentication.getPrincipal())) {
-            throw new RuntimeException("Bạn chưa đăng nhập");
-        }
-
-        Object principal = authentication.getPrincipal();
-        if (principal instanceof UserDetailsImpl userDetails) {
-            return userDetails.getId();
-        }
-
-        throw new RuntimeException("Thông tin xác thực không hợp lệ");
     }
 
     private <T> PageResponse<T> toPageResponse(Page<T> page) {

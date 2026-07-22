@@ -15,8 +15,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -35,48 +34,53 @@ public class AdminTicketManagementController {
     @PostMapping("/{id}/classify")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponseDTO<LegalTicketResponse>> classify(
+            @AuthenticationPrincipal UserDetailsImpl currentUser,
             @PathVariable("id") String ticketId,
             @Valid @RequestBody AdminTicketClassificationRequest request) {
         return ResponseEntity.ok(ApiResponseDTO.success("Ticket classified",
-                expertTicketWorkflowService.classify(getCurrentUserId(), ticketId, request)));
+                expertTicketWorkflowService.classify(currentUser.getId(), ticketId, request)));
     }
 
     @PostMapping("/{id}/confirm-payment")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponseDTO<LegalTicketResponse>> confirmPayment(
+            @AuthenticationPrincipal UserDetailsImpl currentUser,
             @PathVariable("id") String ticketId,
             @Valid @RequestBody TicketPaymentConfirmationRequest request) {
         return ResponseEntity.ok(ApiResponseDTO.success("Ticket payment confirmed",
-                expertTicketWorkflowService.confirmPayment(getCurrentUserId(), ticketId, request)));
+                expertTicketWorkflowService.confirmPayment(currentUser.getId(), ticketId, request)));
     }
 
     @PostMapping("/{id}/offer-assignment")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponseDTO<LegalTicketResponse>> offerAssignment(
+            @AuthenticationPrincipal UserDetailsImpl currentUser,
             @PathVariable("id") String ticketId,
             @Valid @RequestBody AssignLawyerRequest request) {
         return ResponseEntity.ok(ApiResponseDTO.success("Assignment offered",
-                expertTicketWorkflowService.offerAssignment(getCurrentUserId(), ticketId,
+                expertTicketWorkflowService.offerAssignment(currentUser.getId(), ticketId,
                         request.getLawyerId(), request.getAdminNote())));
     }
 
     @PostMapping("/{id}/extend-sla")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponseDTO<LegalTicketResponse>> extendSla(
+            @AuthenticationPrincipal UserDetailsImpl currentUser,
             @PathVariable("id") String ticketId,
             @Valid @RequestBody AdminSlaExtensionRequest request) {
         return ResponseEntity.ok(ApiResponseDTO.success("SLA extended",
-                expertTicketWorkflowService.extendSla(getCurrentUserId(), ticketId, request)));
+                expertTicketWorkflowService.extendSla(currentUser.getId(), ticketId, request)));
     }
 
     @PatchMapping("/{id}/expert-payment")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Update expert consultation fee and payment status")
     public ResponseEntity<ApiResponseDTO<com.analyzer.api.dto.revenue.ExpertRevenueTicketResponse>> updateExpertPayment(
+            @AuthenticationPrincipal UserDetailsImpl currentUser,
             @PathVariable("id") String ticketId,
             @Valid @RequestBody com.analyzer.api.dto.revenue.UpdateExpertPaymentRequest request) {
         return ResponseEntity.ok(ApiResponseDTO.success("Cap nhat thanh toan expert thanh cong",
-                expertRevenueService.updatePayment(ticketId, getCurrentUserId(), request)));
+                expertRevenueService.updatePayment(ticketId, currentUser.getId(), request)));
     }
 
     @PostMapping("/{id}/expert-payment/reset")
@@ -84,9 +88,10 @@ public class AdminTicketManagementController {
     @Operation(summary = "Reset expert payment/commission data on a ticket",
             description = "Clears consultationFee, commissionRate, platformFee, expertPayout and paymentStatus so the ticket can be reassigned to a different expert. Blocked once paymentStatus is PAID.")
     public ResponseEntity<ApiResponseDTO<com.analyzer.api.dto.revenue.ExpertRevenueTicketResponse>> resetExpertPayment(
+            @AuthenticationPrincipal UserDetailsImpl currentUser,
             @PathVariable("id") String ticketId) {
         return ResponseEntity.ok(ApiResponseDTO.success("Da reset du lieu thanh toan expert",
-                expertRevenueService.resetFinancials(ticketId, getCurrentUserId())));
+                expertRevenueService.resetFinancials(ticketId, currentUser.getId())));
     }
 
     @GetMapping
@@ -105,10 +110,10 @@ public class AdminTicketManagementController {
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "View ticket details for admin")
-    public ResponseEntity<ApiResponseDTO<LegalTicketResponse>> viewTicket(@PathVariable("id") String ticketId) {
-        Long adminId = getCurrentUserId();
+    public ResponseEntity<ApiResponseDTO<LegalTicketResponse>> viewTicket(
+            @AuthenticationPrincipal UserDetailsImpl currentUser, @PathVariable("id") String ticketId) {
         return ResponseEntity.ok(ApiResponseDTO.success("Retrieved ticket details successfully",
-                legalTicketService.getTicketById(adminId, "ADMIN", ticketId)));
+                legalTicketService.getTicketById(currentUser.getId(), "ADMIN", ticketId)));
     }
 
     @GetMapping("/{id}/summary")
@@ -139,59 +144,50 @@ public class AdminTicketManagementController {
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Assign lawyer to ticket")
     public ResponseEntity<ApiResponseDTO<LegalTicketResponse>> assignLawyer(
+            @AuthenticationPrincipal UserDetailsImpl currentUser,
             @PathVariable("id") String ticketId,
             @Valid @RequestBody AssignLawyerRequest request) {
-        Long adminId = getCurrentUserId();
         return ResponseEntity.ok(ApiResponseDTO.success("Lawyer assigned successfully",
-                expertTicketWorkflowService.offerAssignment(adminId, ticketId, request.getLawyerId(), request.getAdminNote())));
+                expertTicketWorkflowService.offerAssignment(currentUser.getId(), ticketId, request.getLawyerId(), request.getAdminNote())));
     }
 
     @PostMapping("/{id}/reassign-lawyer")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Reassign lawyer to ticket")
     public ResponseEntity<ApiResponseDTO<LegalTicketResponse>> reassignLawyer(
+            @AuthenticationPrincipal UserDetailsImpl currentUser,
             @PathVariable("id") String ticketId,
             @Valid @RequestBody AssignLawyerRequest request) {
-        Long adminId = getCurrentUserId();
         return ResponseEntity.ok(ApiResponseDTO.success("Lawyer reassigned successfully",
-                expertTicketWorkflowService.reassign(adminId, ticketId, request.getLawyerId(), request.getAdminNote())));
+                expertTicketWorkflowService.reassign(currentUser.getId(), ticketId, request.getLawyerId(), request.getAdminNote())));
     }
 
     @PostMapping("/{id}/reject")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Reject legal ticket", description = "Rejects a ticket during admin review.")
     public ResponseEntity<ApiResponseDTO<LegalTicketResponse>> rejectTicket(
+            @AuthenticationPrincipal UserDetailsImpl currentUser,
             @PathVariable("id") String ticketId,
             @Valid @RequestBody RejectLegalTicketRequest request) {
-        Long adminId = getCurrentUserId();
         return ResponseEntity.ok(ApiResponseDTO.success("Ticket rejected successfully",
-                legalTicketService.rejectTicket(adminId, ticketId, request)));
+                legalTicketService.rejectTicket(currentUser.getId(), ticketId, request)));
     }
 
     @PostMapping("/{id}/approve")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponseDTO<LegalTicketResponse>> approveTicket(@PathVariable("id") String ticketId) {
+    public ResponseEntity<ApiResponseDTO<LegalTicketResponse>> approveTicket(
+            @AuthenticationPrincipal UserDetailsImpl currentUser, @PathVariable("id") String ticketId) {
         return ResponseEntity.ok(ApiResponseDTO.success("Ticket approved",
-                adminTicketManagementService.approveInternal(ticketId, getCurrentUserId())));
+                adminTicketManagementService.approveInternal(ticketId, currentUser.getId())));
     }
 
     @PostMapping("/{id}/close")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponseDTO<LegalTicketResponse>> closeTicket(
+            @AuthenticationPrincipal UserDetailsImpl currentUser,
             @PathVariable("id") String ticketId,
             @RequestBody(required = false) java.util.Map<String, String> body) {
         return ResponseEntity.ok(ApiResponseDTO.success("Ticket closed",
-                adminTicketManagementService.closeInternal(ticketId, getCurrentUserId(), body == null ? null : body.get("note"))));
-    }
-
-    private Long getCurrentUserId() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {
-            throw new RuntimeException("Bạn chưa đăng nhập");
-        }
-        if (authentication.getPrincipal() instanceof UserDetailsImpl userDetails) {
-            return userDetails.getId();
-        }
-        throw new RuntimeException("Thông tin xác thực không hợp lệ");
+                adminTicketManagementService.closeInternal(ticketId, currentUser.getId(), body == null ? null : body.get("note"))));
     }
 }

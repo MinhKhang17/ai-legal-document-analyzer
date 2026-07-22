@@ -8,7 +8,7 @@ import com.analyzer.api.enums.RiskLevel;
 import com.analyzer.api.enums.SuggestionType;
 import com.analyzer.api.enums.UserActionHint;
 import com.analyzer.api.exception.common.ResourceNotFoundException;
-import com.analyzer.api.repository.LegalTicketRepository;
+import com.analyzer.api.repository.legalticket.LegalTicketRepository;
 import com.analyzer.api.service.ai.AiFeatureService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

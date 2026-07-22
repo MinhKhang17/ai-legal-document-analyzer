@@ -61,6 +61,14 @@ public class UserDetailsImpl implements UserDetails {
         return enabled;
     }
 
+    public String getRoleName() {
+        return authorities.stream()
+                .findFirst()
+                .map(GrantedAuthority::getAuthority)
+                .map(authority -> authority.startsWith("ROLE_") ? authority.substring(5) : authority)
+                .orElseThrow(() -> new IllegalStateException("Authenticated user has no role"));
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o)

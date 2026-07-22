@@ -8,7 +8,7 @@ import com.analyzer.api.entity.User;
 import com.analyzer.api.enums.FeedbackSurveyStatus;
 import com.analyzer.api.exception.common.ConflictException;
 import com.analyzer.api.exception.common.ResourceNotFoundException;
-import com.analyzer.api.repository.UserRepository;
+import com.analyzer.api.repository.user.UserRepository;
 import com.analyzer.api.repository.feedback.FeedbackSurveyRepository;
 import com.analyzer.api.repository.feedback.FeedbackSurveyResponseRepository;
 import com.analyzer.api.service.feedback.FeedbackSurveyResponseService;

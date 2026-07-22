@@ -3,11 +3,13 @@ package com.analyzer.api.repository.knowledge;
 import com.analyzer.api.entity.KnowledgeBaseEntry;
 import com.analyzer.api.enums.KnowledgeStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 import java.util.List;
 import java.util.Optional;
 
+@Repository
 public interface KnowledgeBaseEntryRepository extends JpaRepository<KnowledgeBaseEntry, String>,
         JpaSpecificationExecutor<KnowledgeBaseEntry> {
 

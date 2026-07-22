@@ -1,0 +1,62 @@
+package com.analyzer.api.controller.user;
+
+import com.analyzer.api.dto.ApiResponseDTO;
+import com.analyzer.api.dto.user.ChangePasswordRequest;
+import com.analyzer.api.dto.user.UpdateProfileRequest;
+import com.analyzer.api.dto.user.UserResponse;
+import com.analyzer.api.security.UserDetailsImpl;
+import com.analyzer.api.service.UserService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/v1/users")
+@RequiredArgsConstructor
+@Tag(name = "User Management", description = "APIs for managing users")
+public class UserController {
+
+    private final UserService userService;
+
+    @GetMapping("/{id}")
+    @Operation(summary = "Get user by ID", description = "Retrieves a user's details based on their ID")
+    public ResponseEntity<ApiResponseDTO<UserResponse>> getUserById(
+            @Parameter(description = "ID of the user to be retrieved") @PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponseDTO.success(userService.getUserById(id)));
+    }
+
+    @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Get all users", description = "Retrieves a list of all registered users")
+    public ResponseEntity<ApiResponseDTO<List<UserResponse>>> getAllUsers() {
+        return ResponseEntity.ok(ApiResponseDTO.success(userService.getAllUsers()));
+    }
+
+    @PutMapping("/profile")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Update current user profile", description = "Updates profile details for the currently authenticated user.")
+    public ResponseEntity<ApiResponseDTO<UserResponse>> updateProfile(
+            @AuthenticationPrincipal UserDetailsImpl currentUser,
+            @Valid @RequestBody UpdateProfileRequest request) {
+        UserResponse updatedUser = userService.updateProfile(currentUser.getId(), request);
+        return ResponseEntity.ok(ApiResponseDTO.success("Cập nhật thông tin cá nhân thành công", updatedUser));
+    }
+
+    @PostMapping("/change-password")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Change password", description = "Change the password of the currently authenticated user (customer or expert).")
+    public ResponseEntity<ApiResponseDTO<Void>> changePassword(
+            @AuthenticationPrincipal UserDetailsImpl currentUser,
+            @Valid @RequestBody ChangePasswordRequest request) {
+        userService.changePassword(currentUser.getId(), request);
+        return ResponseEntity.ok(ApiResponseDTO.success("Đổi mật khẩu thành công"));
+    }
+}

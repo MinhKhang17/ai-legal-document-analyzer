@@ -2,8 +2,8 @@ package com.analyzer.api.scheduler;
 
 import com.analyzer.api.entity.LegalTicket;
 import com.analyzer.api.enums.*;
-import com.analyzer.api.repository.ExpertTicketCreditReservationRepository;
-import com.analyzer.api.repository.LegalTicketRepository;
+import com.analyzer.api.repository.legalticket.ExpertTicketCreditReservationRepository;
+import com.analyzer.api.repository.legalticket.LegalTicketRepository;
 import com.analyzer.api.service.EmailService;
 import com.analyzer.api.service.TicketCollaborationService;
 import lombok.RequiredArgsConstructor;
@@ -42,9 +42,11 @@ public class ExpertTicketSlaScheduler {
                 notifyCustomer(ticket, "Chuyên gia chưa phản hồi đề nghị đúng hạn; ticket đang được phân công lại.");
                 continue;
             }
-            if (ticket.getSlaStatus() == TicketSlaStatus.WAITING_FOR_USER) continue;
+            if (ticket.getSlaStatus() == TicketSlaStatus.WAITING_FOR_USER)
+                continue;
             LocalDateTime activity = ticket.getLastExpertActivityAt() != null
-                    ? ticket.getLastExpertActivityAt() : ticket.getAcceptedAt();
+                    ? ticket.getLastExpertActivityAt()
+                    : ticket.getAcceptedAt();
             if (activity != null && activity.plusHours(24).isBefore(now)
                     && ticket.getStatus() != LegalTicketStatus.INACTIVE_WARNING
                     && ticket.getStatus() != LegalTicketStatus.OVERDUE
@@ -62,7 +64,8 @@ public class ExpertTicketSlaScheduler {
                     ticket.setStatus(LegalTicketStatus.SLA_BREACHED);
                     ticket.setSlaStatus(TicketSlaStatus.BREACHED);
                     collaborationService.auditTicket(ticket, null, "SLA_BREACHED", "{}");
-                    notifyCustomer(ticket, "Thời gian dự kiến đã bị vượt; Admin đang can thiệp để bảo vệ quyền lợi của bạn.");
+                    notifyCustomer(ticket,
+                            "Thời gian dự kiến đã bị vượt; Admin đang can thiệp để bảo vệ quyền lợi của bạn.");
                 } else {
                     ticket.setStatus(LegalTicketStatus.OVERDUE);
                     ticket.setSlaStatus(TicketSlaStatus.OVERDUE);

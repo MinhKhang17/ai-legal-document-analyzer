@@ -5,7 +5,7 @@ import com.analyzer.api.entity.ChatSession;
 import com.analyzer.api.enums.ChatMessageRole;
 import com.analyzer.api.enums.ChatMessageStatus;
 import com.analyzer.api.enums.ChatMessageType;
-import com.analyzer.api.repository.ChatMessageRepository;
+import com.analyzer.api.repository.chatmessage.ChatMessageRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentMatchers;

@@ -17,11 +17,6 @@ import java.util.Base64;
 import java.util.Date;
 import java.util.stream.Collectors;
 
-/**
- * JWT Token Provider:
- * - Access Token: JWT chứa email + roles, truyền qua Authorization: Bearer header
- * - Refresh Token: Secure random string, lưu trong DB và trả về qua HttpOnly Cookie
- */
 @Component
 public class JwtTokenProvider {
     private static final Logger logger = LoggerFactory.getLogger(JwtTokenProvider.class);

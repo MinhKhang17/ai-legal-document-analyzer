@@ -6,7 +6,7 @@ import com.analyzer.api.dto.contract.RevertContractVersionRequest;
 import com.analyzer.api.entity.ContractVersion;
 import com.analyzer.api.entity.User;
 import com.analyzer.api.entity.UserContract;
-import com.analyzer.api.repository.UserRepository;
+import com.analyzer.api.repository.user.UserRepository;
 import com.analyzer.api.repository.contract.ContractVersionRepository;
 import com.analyzer.api.repository.contract.UserContractRepository;
 import com.analyzer.api.security.UserDetailsImpl;

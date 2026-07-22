@@ -6,7 +6,7 @@ import com.analyzer.api.dto.chatsession.ChatSessionSummaryResponse;
 import com.analyzer.api.entity.ChatSession;
 import com.analyzer.api.exception.common.ForbiddenException;
 import com.analyzer.api.exception.common.ResourceNotFoundException;
-import com.analyzer.api.repository.ChatSessionRepository;
+import com.analyzer.api.repository.chatsession.ChatSessionRepository;
 import com.analyzer.api.service.chatsession.ChatMemoryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

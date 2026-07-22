@@ -59,42 +59,43 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http.cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .csrf(AbstractHttpConfigurer::disable)
-            .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> 
-                auth.dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
-                    .requestMatchers("/error").permitAll()
-                    .requestMatchers("/api/v1/auth/me").authenticated()
-                    .requestMatchers("/api/v1/auth/**").permitAll()
-                    .requestMatchers(HttpMethod.POST,
-                            "/api/v1/admin/knowledge-base/bulk-ingest-server-file").permitAll()
-                    .requestMatchers(HttpMethod.GET, "/api/v1/shared/chat/*").permitAll()
-                    .requestMatchers(HttpMethod.GET,
-                            "/api/v1/subscriptions/refunds/confirm",
-                            "/api/subscription/refunds/confirm").permitAll()
-                    .requestMatchers(
-                            "/api/v1/payment-transactions/vnpay-return",
-                            "/api/v1/payment-transactions/vnpay-ipn",
-                            "/api/v1/subscriptions/refunds/confirm",
-                            "/api/subscription/refunds/confirm",
-                            "/api/internal/**",
-                            "/api/v1/workspaces/*/documents/*/download",
-                            "/api/v1/workspaces/*/documents/system/download"
-                    ).permitAll()
-                    .requestMatchers(
-                            "/v3/api-docs",
-                            "/v3/api-docs/**",
-                            "/swagger-resources",
-                            "/swagger-resources/**",
-                            "/configuration/ui",
-                            "/configuration/security",
-                            "/swagger-ui/**",
-                            "/swagger-ui.html",
-                            "/webjars/**"
-                    ).permitAll()
-                    .anyRequest().authenticated()
-            );
+                .csrf(AbstractHttpConfigurer::disable)
+                .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(
+                        auth -> auth.dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
+                                .requestMatchers("/error").permitAll()
+                                .requestMatchers("/api/v1/auth/me").authenticated()
+                                .requestMatchers("/api/v1/auth/**").permitAll()
+                                .requestMatchers(HttpMethod.POST,
+                                        "/api/v1/admin/knowledge-base/bulk-ingest-server-file")
+                                .permitAll()
+                                .requestMatchers(HttpMethod.GET, "/api/v1/shared/chat/*").permitAll()
+                                .requestMatchers(HttpMethod.GET,
+                                        "/api/v1/subscriptions/refunds/confirm",
+                                        "/api/subscription/refunds/confirm")
+                                .permitAll()
+                                .requestMatchers(
+                                        "/api/v1/payment-transactions/vnpay-return",
+                                        "/api/v1/payment-transactions/vnpay-ipn",
+                                        "/api/v1/subscriptions/refunds/confirm",
+                                        "/api/subscription/refunds/confirm",
+                                        "/api/internal/**",
+                                        "/api/v1/workspaces/*/documents/*/download",
+                                        "/api/v1/workspaces/*/documents/system/download")
+                                .permitAll()
+                                .requestMatchers(
+                                        "/v3/api-docs",
+                                        "/v3/api-docs/**",
+                                        "/swagger-resources",
+                                        "/swagger-resources/**",
+                                        "/configuration/ui",
+                                        "/configuration/security",
+                                        "/swagger-ui/**",
+                                        "/swagger-ui.html",
+                                        "/webjars/**")
+                                .permitAll()
+                                .anyRequest().authenticated());
 
         http.authenticationProvider(authenticationProvider());
         http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
@@ -111,7 +112,8 @@ public class SecurityConfig {
                 .distinct()
                 .toList());
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Cache-Control", "Access-Control-Allow-Origin"));
+        configuration.setAllowedHeaders(
+                List.of("Authorization", "Content-Type", "Cache-Control", "Access-Control-Allow-Origin"));
         configuration.setExposedHeaders(List.of("Authorization"));
         configuration.setAllowCredentials(true);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
