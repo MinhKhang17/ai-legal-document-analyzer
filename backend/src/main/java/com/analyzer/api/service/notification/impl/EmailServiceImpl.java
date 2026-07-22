@@ -1,9 +1,9 @@
 package com.analyzer.api.service.notification.impl;
 
 import com.analyzer.api.service.notification.EmailService;
-import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
@@ -13,21 +13,44 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 @Service
-@RequiredArgsConstructor
 public class EmailServiceImpl implements EmailService {
 
     private static final Logger logger = LoggerFactory.getLogger(EmailServiceImpl.class);
 
-    private final JavaMailSender mailSender;
+    private final JavaMailSender primaryMailSender;
+    private final JavaMailSender backupMailSender;
+
+    public EmailServiceImpl(@Qualifier("primaryMailSender") JavaMailSender primaryMailSender,
+                             @Qualifier("backupMailSender") JavaMailSender backupMailSender) {
+        this.primaryMailSender = primaryMailSender;
+        this.backupMailSender = backupMailSender;
+    }
 
     @Value("${app.mail.enabled:true}")
     private boolean mailEnabled;
 
-    @Value("${app.mail.from:}")
-    private String mailFrom;
+    @Value("${app.mail.primary.username:}")
+    private String primaryUsername;
+
+    @Value("${app.mail.primary.from:}")
+    private String primaryFrom;
+
+    @Value("${app.mail.backup.username:}")
+    private String backupUsername;
+
+    @Value("${app.mail.backup.from:}")
+    private String backupFrom;
 
     @Value("${app.mail.frontend-base-url:http://localhost:5173}")
     private String frontendBaseUrl;
+
+    // A blank "from" in config falls back to the account's username: an explicit
+    // "from" key present-but-empty in a .env file (e.g. "MAIL_FROM=") is a value
+    // Spring placeholder defaults won't fall back from, since the property is
+    // technically present, so the fallback has to happen here instead of in YAML.
+    private String effectiveFrom(String from, String username) {
+        return StringUtils.hasText(from) ? from : username;
+    }
 
     @Override
     @Async
@@ -121,21 +144,35 @@ public class EmailServiceImpl implements EmailService {
     }
 
     private boolean send(String toEmail, String subject, String body) {
-        if (!mailEnabled || !StringUtils.hasText(mailFrom)) {
-            logger.warn("Mail is not configured (app.mail.enabled/from/SMTP_USERNAME missing) - skipping email to {}", toEmail);
+        String from = effectiveFrom(primaryFrom, primaryUsername);
+        if (!mailEnabled || !StringUtils.hasText(from)) {
+            logger.warn("Mail is not configured (app.mail.enabled/primary.username missing) - skipping email to {}", toEmail);
             return false;
         }
 
+        if (trySend(primaryMailSender, from, toEmail, subject, body)) {
+            return true;
+        }
+
+        if (!StringUtils.hasText(backupUsername)) {
+            return false;
+        }
+
+        logger.warn("Primary SMTP failed, retrying with backup SMTP account for {}", toEmail);
+        return trySend(backupMailSender, effectiveFrom(backupFrom, backupUsername), toEmail, subject, body);
+    }
+
+    private boolean trySend(JavaMailSender sender, String from, String toEmail, String subject, String body) {
         try {
             SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(mailFrom);
+            message.setFrom(from);
             message.setTo(toEmail);
             message.setSubject(subject);
             message.setText(body);
-            mailSender.send(message);
+            sender.send(message);
             return true;
         } catch (MailException ex) {
-            logger.error("Failed to send email to {}: {}", toEmail, ex.getMessage());
+            logger.error("Failed to send email to {} via {}: {}", toEmail, from, ex.getMessage());
             return false;
         }
     }
