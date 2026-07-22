@@ -38,6 +38,7 @@ interface AppStoreValue {
   setMobileSidebarOpen: (open: boolean) => void;
   signIn: (accessToken?: string, user?: CurrentUser) => void;
   signOut: (options?: SignOutOptions) => Promise<void>;
+  updateUser: (updatedFields: Partial<CurrentUser>) => void;
   retryAuthRecovery: () => Promise<void>;
 }
 
@@ -377,6 +378,17 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     clearAuthState();
   };
 
+  const updateUser = useCallback((updatedFields: Partial<CurrentUser>) => {
+    setUser((prevUser) => {
+      if (!prevUser) return null;
+      const nextUser = { ...prevUser, ...updatedFields };
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(nextUser));
+      }
+      return nextUser;
+    });
+  }, []);
+
   const value = useMemo<AppStoreValue>(
     () => ({
       theme,
@@ -395,6 +407,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       setMobileSidebarOpen,
       signIn,
       signOut,
+      updateUser,
       retryAuthRecovery: refreshSession,
     }),
     [
@@ -408,6 +421,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       isAuthReady,
       authRecoveryError,
       user,
+      updateUser,
       refreshSession,
     ],
   );

@@ -37,6 +37,13 @@ public interface DocumentRepository extends JpaRepository<Document, String> {
             LocalDateTime start,
             LocalDateTime end);
 
+    long countByUserIdAndSourceTypeAndStatusAndProcessedAtBetween(
+            Long userId,
+            String sourceType,
+            String status,
+            LocalDateTime start,
+            LocalDateTime end);
+
     List<Document> findByLegalTicket_Id(String legalTicketId);
 
     long countByUserIdAndStatusNot(Long userId, String status);

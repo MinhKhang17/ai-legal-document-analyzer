@@ -68,6 +68,8 @@ public class ChatMessageServiceImpl implements ChatMessageService {
 
     private static final Logger logger = LoggerFactory.getLogger(ChatMessageServiceImpl.class);
 
+    private static final int SYSTEM_PROMPT_TOKEN_OVERHEAD = 2_500;
+
     private final WorkspaceRepository workspaceRepository;
     private final DocumentRepository documentRepository;
     private final ChatSessionRepository chatSessionRepository;
@@ -82,13 +84,14 @@ public class ChatMessageServiceImpl implements ChatMessageService {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
-    @Transactional(noRollbackFor = {AiServiceUnavailableException.class, AiServiceTimeoutException.class})
+    @Transactional(noRollbackFor = { AiServiceUnavailableException.class, AiServiceTimeoutException.class })
     public SendMessageResponse sendMessageInWorkspace(Long userId, String workspaceId, SendMessageRequest request) {
         // Validate request
         validateMessageRequest(request);
         User currentUser = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        subscriptionQuotaService.checkCanUseAiChat(currentUser, estimateTokens(request.getMessage()));
+        subscriptionQuotaService.checkCanUseAiChat(currentUser,
+                estimateTokens(request.getMessage()) + SYSTEM_PROMPT_TOKEN_OVERHEAD);
 
         // Find Workspace
         Workspace workspace = workspaceRepository.findById(workspaceId)
@@ -119,17 +122,19 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         ChatMessage userMessage = createAndSaveUserMessage(chatSession, request.getMessage().trim());
 
         // Process AI Query
-        return executeAiQuery(currentUser, workspace, chatSession, userMessage, request.getMessage().trim(), selectedDocument, request);
+        return executeAiQuery(currentUser, workspace, chatSession, userMessage, request.getMessage().trim(),
+                selectedDocument, request);
     }
 
     @Override
-    @Transactional(noRollbackFor = {AiServiceUnavailableException.class, AiServiceTimeoutException.class})
+    @Transactional(noRollbackFor = { AiServiceUnavailableException.class, AiServiceTimeoutException.class })
     public SendMessageResponse sendMessageInChatSession(Long userId, String chatSessionId, SendMessageRequest request) {
         // Validate request
         validateMessageRequest(request);
         User currentUser = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        subscriptionQuotaService.checkCanUseAiChat(currentUser, estimateTokens(request.getMessage()));
+        subscriptionQuotaService.checkCanUseAiChat(currentUser,
+                estimateTokens(request.getMessage()) + SYSTEM_PROMPT_TOKEN_OVERHEAD);
 
         // Find ChatSession
         ChatSession chatSession = chatSessionRepository.findById(chatSessionId)
@@ -161,12 +166,14 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         ChatMessage userMessage = createAndSaveUserMessage(chatSession, request.getMessage().trim());
 
         // Process AI Query
-        return executeAiQuery(currentUser, workspace, chatSession, userMessage, request.getMessage().trim(), selectedDocument, request);
+        return executeAiQuery(currentUser, workspace, chatSession, userMessage, request.getMessage().trim(),
+                selectedDocument, request);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public PageResponse<ChatMessageResponse> getMessagesByChatSession(Long userId, String chatSessionId, int page, int size) {
+    public PageResponse<ChatMessageResponse> getMessagesByChatSession(Long userId, String chatSessionId, int page,
+            int size) {
         // Validate page and size
         if (page < 0) {
             throw new InvalidPageException("Page index must not be negative", page);
@@ -193,11 +200,10 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         Pageable pageable = PageRequest.of(
                 page,
                 size,
-                Sort.by(Sort.Direction.ASC, "createdAt")
-        );
+                Sort.by(Sort.Direction.ASC, "createdAt"));
 
-        Page<ChatMessage> messagePage =
-                chatMessageRepository.findByChatSessionIdOrderByCreatedAtAsc(chatSessionId, pageable);
+        Page<ChatMessage> messagePage = chatMessageRepository.findByChatSessionIdOrderByCreatedAtAsc(chatSessionId,
+                pageable);
 
         List<ChatMessageResponse> items = messagePage.getContent().stream()
                 .map(this::toChatMessageResponse)
@@ -227,7 +233,8 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         // Check if the ChatSession of this message has been deleted
         ChatSession chatSession = chatMessage.getChatSession();
         if (chatSession.getStatus() == ChatSessionStatus.DELETED) {
-            throw new DeletedChatSessionException("Message belongs to a deleted chat session", chatSession.getId(), "DELETED");
+            throw new DeletedChatSessionException("Message belongs to a deleted chat session", chatSession.getId(),
+                    "DELETED");
         }
 
         return toChatMessageResponse(chatMessage);
@@ -235,7 +242,8 @@ public class ChatMessageServiceImpl implements ChatMessageService {
 
     @Override
     @Transactional
-    public ChatMessageFeedbackResponse submitFeedback(Long userId, String messageId, ChatMessageFeedbackRequest request) {
+    public ChatMessageFeedbackResponse submitFeedback(Long userId, String messageId,
+            ChatMessageFeedbackRequest request) {
         ChatMessage chatMessage = chatMessageRepository.findById(messageId)
                 .orElseThrow(() -> new ResourceNotFoundException("Message not found"));
 
@@ -282,9 +290,12 @@ public class ChatMessageServiceImpl implements ChatMessageService {
     }
 
     private static AiFeedbackType resolveFeedbackType(ChatMessageFeedbackRequest request) {
-        if (request.getFeedbackType() != null) return request.getFeedbackType();
-        if (request.getRating() == FeedbackRating.THUMBS_UP) return AiFeedbackType.LIKE;
-        if (request.getRating() == FeedbackRating.THUMBS_DOWN) return AiFeedbackType.DISLIKE;
+        if (request.getFeedbackType() != null)
+            return request.getFeedbackType();
+        if (request.getRating() == FeedbackRating.THUMBS_UP)
+            return AiFeedbackType.LIKE;
+        if (request.getRating() == FeedbackRating.THUMBS_DOWN)
+            return AiFeedbackType.DISLIKE;
         throw new InvalidMessageException("feedbackType is required", true, 0);
     }
 
@@ -334,27 +345,6 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         }
         if (request.getDocumentId() != null && request.getDocumentId().trim().length() > 100) {
             throw new InvalidMessageException("Document ID must not exceed 100 characters", false, 100);
-        }
-    }
-
-    private void validateWorkspaceDocuments(Long userId, String workspaceId, Document selectedDocument) {
-        if (selectedDocument != null) {
-            return;
-        }
-
-        long readyDocCount = documentRepository.countByWorkspaceIdAndUserIdAndStatus(workspaceId, userId, "READY");
-        if (readyDocCount == 0) {
-            long processingDocCount = documentRepository.countByWorkspaceIdAndUserIdAndStatusIn(
-                    workspaceId, userId, List.of("UPLOADED", "PROCESSING"));
-            if (processingDocCount > 0) {
-                throw new NoReadyDocumentsException(
-                        "Documents are still processing. Please wait until at least one document is ready",
-                        workspaceId, 0, processingDocCount);
-            } else {
-                throw new NoReadyDocumentsException(
-                        "Workspace does not have any ready document for chat",
-                        workspaceId, 0, 0);
-            }
         }
     }
 
@@ -452,7 +442,6 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         String requestId = "req_" + UUID.randomUUID().toString().replace("-", "");
         userMessage.setRequestId(requestId);
 
-        // Update default chat session title to the first message if needed
         if (chatSession.getIsDefault() && "Default Conversation".equals(chatSession.getTitle())) {
             String title = question;
             if (title.length() > 100) {
@@ -466,16 +455,18 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         ChatMode resolvedMode = ChatMode.LEGAL_QA;
         try {
             var activeMappings = chatSessionDocumentRepository
-                    .findByChatSessionIdAndUserIdAndActiveTrueOrderByAttachedAtAsc(chatSession.getId(), currentUser.getId());
+                    .findByChatSessionIdAndUserIdAndActiveTrueOrderByAttachedAtAsc(chatSession.getId(),
+                            currentUser.getId());
             ensureAttachedDocumentsReady(activeMappings, workspace.getId());
             List<String> attachedDocumentIds = activeMappings.stream()
                     .map(mapping -> mapping.getDocument())
                     .map(Document::getId)
                     .distinct()
                     .toList();
-            List<String> requestedDocumentIds = sendRequest.getDocumentIds() != null && !sendRequest.getDocumentIds().isEmpty()
-                    ? sendRequest.getDocumentIds()
-                    : sendRequest.getMessageAttachedDocumentIds();
+            List<String> requestedDocumentIds = sendRequest.getDocumentIds() != null
+                    && !sendRequest.getDocumentIds().isEmpty()
+                            ? sendRequest.getDocumentIds()
+                            : sendRequest.getMessageAttachedDocumentIds();
             List<String> messageAttachedDocumentIds = resolveMessageAttachedDocumentIds(
                     currentUser.getId(), workspace.getId(), requestedDocumentIds);
             String focusedDocumentId = resolveFocusedDocumentId(
@@ -495,7 +486,6 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                     .userId(String.valueOf(workspace.getUser().getId()))
                     .workspaceId(workspace.getId())
                     .documentId(activeMappings.isEmpty() && selectedDocument != null ? selectedDocument.getId() : null)
-                    // [] explicitly means system-KB-only; null preserves legacy single-document behavior.
                     .attachedDocumentIds(activeMappings.isEmpty() && selectedDocument != null
                             ? null
                             : attachedDocumentIds)
@@ -587,8 +577,10 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         saveCitations(chatSession.getWorkspace().getId(), aiResponse.getCitations(), assistantMessage);
         subscriptionQuotaService.recordAiChatUsage(
                 currentUser,
-                assistantMessage.getPromptTokens() == null ? estimateTokens(question) : assistantMessage.getPromptTokens(),
-                assistantMessage.getCompletionTokens() == null ? estimateTokens(aiResponse.getAnswer()) : assistantMessage.getCompletionTokens());
+                assistantMessage.getPromptTokens() == null ? estimateTokens(question)
+                        : assistantMessage.getPromptTokens(),
+                assistantMessage.getCompletionTokens() == null ? estimateTokens(aiResponse.getAnswer())
+                        : assistantMessage.getCompletionTokens());
 
         // Update ChatSession timestamps
         chatSession.setLastMessageAt(LocalDateTime.now());
@@ -619,17 +611,6 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         return hasSessionDocuments || hasMessageDocuments || legacySelectedDocument != null
                 ? ChatMode.DOCUMENT_ANALYSIS
                 : ChatMode.LEGAL_QA;
-    }
-
-    private void updateSessionTitleIfNeeded(ChatSession chatSession, String question) {
-        if (chatSession.getIsDefault() && "Default Conversation".equals(chatSession.getTitle())) {
-            String title = question;
-            if (title.length() > 100) {
-                title = title.substring(0, 100);
-            }
-            chatSession.setTitle(title);
-            chatSessionRepository.save(chatSession);
-        }
     }
 
     private ChatSessionResponse toChatSessionResponse(ChatSession chatSession) {
@@ -676,7 +657,8 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                 .build();
     }
 
-    private void saveCitations(String workspaceId, List<RagQueryResponse.Citation> citations, ChatMessage assistantMessage) {
+    private void saveCitations(String workspaceId, List<RagQueryResponse.Citation> citations,
+            ChatMessage assistantMessage) {
         if (citations == null || citations.isEmpty()) {
             return;
         }
@@ -698,15 +680,18 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                     if (knowledgeBase) {
                         if (citation.getFileName() != null && !citation.getFileName().isBlank()) {
                             try {
-                                uri = "/api/v1/workspaces/" + workspaceId + "/documents/system/download?filename=" 
-                                    + java.net.URLEncoder.encode(citation.getFileName(), java.nio.charset.StandardCharsets.UTF_8.toString());
+                                uri = "/api/v1/workspaces/" + workspaceId + "/documents/system/download?filename="
+                                        + java.net.URLEncoder.encode(citation.getFileName(),
+                                                java.nio.charset.StandardCharsets.UTF_8.toString());
                             } catch (java.io.UnsupportedEncodingException e) {
-                                uri = "/api/v1/workspaces/" + workspaceId + "/documents/system/download?filename=" + citation.getFileName();
+                                uri = "/api/v1/workspaces/" + workspaceId + "/documents/system/download?filename="
+                                        + citation.getFileName();
                             }
                         }
                     } else {
                         if (citation.getDocumentId() != null && !citation.getDocumentId().isBlank()) {
-                            uri = "/api/v1/workspaces/" + workspaceId + "/documents/" + citation.getDocumentId() + "/download";
+                            uri = "/api/v1/workspaces/" + workspaceId + "/documents/" + citation.getDocumentId()
+                                    + "/download";
                         }
                     }
 
@@ -728,10 +713,12 @@ public class ChatMessageServiceImpl implements ChatMessageService {
 
     private List<String> resolveMessageAttachedDocumentIds(
             Long userId, String workspaceId, List<String> requestedDocumentIds) {
-        if (requestedDocumentIds == null || requestedDocumentIds.isEmpty()) return List.of();
+        if (requestedDocumentIds == null || requestedDocumentIds.isEmpty())
+            return List.of();
         List<String> validated = new ArrayList<>();
         for (String documentId : requestedDocumentIds) {
-            if (documentId == null || documentId.isBlank() || validated.contains(documentId.trim())) continue;
+            if (documentId == null || documentId.isBlank() || validated.contains(documentId.trim()))
+                continue;
             validated.add(resolveSelectedDocument(userId, workspaceId, documentId).getId());
         }
         return List.copyOf(validated);
@@ -759,8 +746,10 @@ public class ChatMessageServiceImpl implements ChatMessageService {
             logger.warn("Unable to serialize conversation document state for session {}", session.getId());
         }
         session.setFocusedDocumentId(focusedDocumentId);
-        if (userRole != null && !userRole.isBlank()) session.setConversationUserRole(userRole.trim());
-        if (conversationMode != null && !conversationMode.isBlank()) session.setConversationMode(conversationMode.trim());
+        if (userRole != null && !userRole.isBlank())
+            session.setConversationUserRole(userRole.trim());
+        if (conversationMode != null && !conversationMode.isBlank())
+            session.setConversationMode(conversationMode.trim());
         session.setMemoryUpdatedAt(LocalDateTime.now());
     }
 

@@ -71,6 +71,24 @@ export const resendExpertActivation = async (email: string): Promise<void> =>
     body: JSON.stringify({ email }),
   }, "Không thể gửi lại thông tin kích hoạt").then(() => undefined);
 
+export const updateProfile = async (payload: {
+  firstName: string;
+  lastName: string;
+  specialty?: string;
+  legalDomain?: string;
+  description?: string;
+}): Promise<BackendUser> =>
+  requestApiData<BackendUser>(
+    API_ENDPOINTS.users.profile,
+    {
+      method: "PUT",
+      headers: buildAuthHeaders({ "Content-Type": "application/json" }),
+      credentials: "include",
+      body: JSON.stringify(payload),
+    },
+    "Không thể cập nhật thông tin cá nhân",
+  );
+
 export const changePassword = async (payload: { oldPassword: string; newPassword: string; confirmNewPassword: string }): Promise<void> =>
   requestApiResponse<void>(API_ENDPOINTS.users.changePassword, {
     method: "POST",

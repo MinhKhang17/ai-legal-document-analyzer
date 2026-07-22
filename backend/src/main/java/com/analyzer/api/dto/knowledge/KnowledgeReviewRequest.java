@@ -1,7 +1,6 @@
 package com.analyzer.api.dto.knowledge;
 
 import com.analyzer.api.enums.KnowledgeReviewDecision;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;

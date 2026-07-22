@@ -512,6 +512,7 @@ export function AdminConsolePage() {
       cell: (user) => {
         const rawUser = backendUsers.find((b) => String(b.id) === user.id);
         const isActive = rawUser ? rawUser.active : user.status === 'active';
+        const isAdmin = rawUser?.role?.toUpperCase() === 'ADMIN' || user.role?.toUpperCase() === 'ADMIN' || user.role === 'Quản trị viên';
         return (
           <div className="flex items-center gap-xs">
             <Button
@@ -523,28 +524,30 @@ export function AdminConsolePage() {
             >
               <MoreHorizontal className="h-4 w-4" />
             </Button>
-            {isActive ? (
-              <Button
-                variant="ghost"
-                size="icon"
-                title={language === 'vi' ? 'Xóa người dùng (Soft Delete)' : 'Deactivate user'}
-                aria-label={language === 'vi' ? 'Xóa người dùng' : 'Deactivate user'}
-                className="text-error hover:bg-error/10"
-                onClick={() => handleSoftDeleteUserClick(user)}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            ) : (
-              <Button
-                variant="ghost"
-                size="icon"
-                title={language === 'vi' ? 'Khôi phục người dùng' : 'Restore user'}
-                aria-label={language === 'vi' ? 'Khôi phục người dùng' : 'Restore user'}
-                className="text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/30"
-                onClick={() => void handleRestoreUser(user.id)}
-              >
-                <RotateCcw className="h-4 w-4" />
-              </Button>
+            {!isAdmin && (
+              isActive ? (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  title={language === 'vi' ? 'Xóa người dùng (Soft Delete)' : 'Deactivate user'}
+                  aria-label={language === 'vi' ? 'Xóa người dùng' : 'Deactivate user'}
+                  className="text-error hover:bg-error/10"
+                  onClick={() => handleSoftDeleteUserClick(user)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  title={language === 'vi' ? 'Khôi phục người dùng' : 'Restore user'}
+                  aria-label={language === 'vi' ? 'Khôi phục người dùng' : 'Restore user'}
+                  className="text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/30"
+                  onClick={() => void handleRestoreUser(user.id)}
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </Button>
+              )
             )}
           </div>
         );
