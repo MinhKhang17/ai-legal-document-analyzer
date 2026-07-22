@@ -357,7 +357,6 @@ export function CustomerTicketDetailPage() {
                 </div>
               )}
             </Card>
-            {ticket.contextSnapshot && <Card title={t("sharedTicket.immutableContext")}><div className="space-y-md text-sm"><div><p className="label-uppercase">{t("sharedTicket.userQuestion")}</p><p className="mt-xs whitespace-pre-line">{ticket.contextSnapshot.userQuestion}</p></div><div><p className="label-uppercase">{t("sharedTicket.aiAnswer")}</p><p className="mt-xs max-h-64 overflow-y-auto whitespace-pre-line text-on-surface-variant">{ticket.contextSnapshot.assistantAnswer || "—"}</p></div><div><p className="label-uppercase">{t("ticketComposer.sharedDocuments")}</p><pre className="mt-xs max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-surface-container-low p-sm text-xs">{ticket.contextSnapshot.documentSnapshotJson || "[]"}</pre></div><p className="break-all text-xs text-on-surface-variant">{t("legalTickets.detail.contentHash")}: {ticket.contextSnapshot.contentHash}</p></div></Card>}
             <Card title={t("legalTickets.detail.actions")}>
               <div className="flex flex-col gap-sm">
                 {ticket.status === 'PENDING_ADMIN_REVIEW' && <Button variant="secondary" disabled={saving} onClick={() => void runAction(() => cancelLegalTicket(id, { reason: t("legalTickets.detail.cancelReason") }), t("legalTickets.detail.cancelSuccess"))}>
