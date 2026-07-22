@@ -14,7 +14,7 @@ import com.analyzer.api.enums.PaymentMethod;
 import com.analyzer.api.enums.PaymentStatus;
 import com.analyzer.api.enums.PlanStatus;
 import com.analyzer.api.exception.common.ConflictException;
-import com.analyzer.api.exception.common.ResourceNotFoundException;
+import com.analyzer.api.exception.common.ForbiddenException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -37,34 +37,31 @@ class PlanFlowE2ETest extends AbstractPlanFlowE2ETest {
 
     @Autowired private TestUploadAttemptService testUploadAttemptService;
 
-    // E2E-PLAN-01 (P0): new user, no CustomerPlan -> Free fallback -> 1 workspace, 3 documents
-    // -> exceeding quota is rejected -> /me, /my-plan and quota all agree; no Premium access.
+    // E2E-PLAN-01 (P0): new user, no CustomerPlan -> Free fallback (auto-provisioned on first
+    // /my-plan read) -> workspace/document counts are unmetered (only AI tokens, expert
+    // tickets and storage remain metered quotas) -> no Premium access.
     @Test
     void e2e01_newUserFallsBackToFreeAndCannotExceedItsQuota() {
         User user = createCustomer("e2e01");
 
         assertThat(subscriptionQuotaService.getCurrentPlan(user).getPlanType()).isEqualToIgnoringCase("FREE");
-        assertThatThrownBy(() -> customerPlanService.getMyPlan(user.getId()))
-                .isInstanceOf(ResourceNotFoundException.class);
+        CustomerPlanResponse myPlan = customerPlanService.getMyPlan(user.getId());
+        assertThat(myPlan.getSubscriptionPlan().getPlanType()).isEqualToIgnoringCase("FREE");
+        assertThat(myPlan.getStatus()).isEqualTo(PlanStatus.ACTIVE);
 
         String workspaceId = workspaceService.createWorkspace(user.getId(),
                 new WorkspaceRequest("WS1", null)).workspaceId();
-        assertThatThrownBy(() -> workspaceService.createWorkspace(user.getId(), new WorkspaceRequest("WS2", null)))
-                .isInstanceOf(ConflictException.class)
-                .hasMessageContaining("WORKSPACE_LIMIT_EXCEEDED");
 
         Workspace workspace = workspaceRepository.findById(workspaceId).orElseThrow();
         for (int i = 0; i < 3; i++) {
             subscriptionQuotaService.checkCanUploadOrAnalyzeContract(user, workspace.getId(), 1_000_000L);
             createReadyDocument(workspace, user, LocalDateTime.now(), 1_000_000L);
         }
-        assertThatThrownBy(() -> subscriptionQuotaService.checkCanUploadOrAnalyzeContract(user, workspace.getId(), 1_000_000L))
-                .isInstanceOf(ConflictException.class)
-                .hasMessageContaining("CONTRACTS_PER_WORKSPACE_LIMIT_EXCEEDED");
 
         assertThatThrownBy(() -> subscriptionQuotaService.checkCanCreateExpertTicket(user))
-                .isInstanceOf(ConflictException.class)
-                .hasMessageContaining("EXPERT_TICKET_REQUIRES_PREMIUM");
+                .isInstanceOf(ForbiddenException.class)
+                .extracting(error -> ((ForbiddenException) error).getErrorCode())
+                .isEqualTo("EXPERT_TICKET_REQUIRES_PREMIUM");
     }
 
     // E2E-PLAN-02 (P0): Free -> buy Standard -> PENDING -> VNPay IPN success -> a duplicate
@@ -225,11 +222,12 @@ class PlanFlowE2ETest extends AbstractPlanFlowE2ETest {
         assertThat(reloaded.getPaymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
     }
 
-    // E2E-PLAN-07 (P0): Free workspace with 1 upload slot left (2/3 used) -> many concurrent
-    // upload attempts -> at most 1 succeeds, the per-workspace limit is never exceeded. Adapted
-    // from the doc's literal "5/month" framing to the per-workspace slot (3 for Free) so the
-    // scenario doesn't depend on the still-undecided delete/re-upload quota policy (muc 19 #3/#4)
-    // — it still exercises exactly the concurrency mechanism (UserQuotaLock) the case is about.
+    // E2E-PLAN-07 (P0): Free workspace one upload away from the plan's storage limit -> many
+    // concurrent upload attempts -> at most 1 succeeds, storage usage never exceeds the plan
+    // limit. Adapted from the doc's literal "5/month" framing to a storage "last slot" (the
+    // per-workspace document-count quota was retired; storage remains the only metered upload
+    // limit) — it still exercises exactly the concurrency mechanism (UserQuotaLock) the case
+    // is about.
     @Test
     void e2e07_concurrentUploadsWithOneSlotLeftNeverExceedTheLimit() throws InterruptedException {
         User user = createCustomer("e2e07");
@@ -237,8 +235,8 @@ class PlanFlowE2ETest extends AbstractPlanFlowE2ETest {
         LocalDateTime now = LocalDateTime.now();
         persistCustomerPlan(user, free, PlanStatus.ACTIVE, now.minusDays(1), now.plusDays(29));
         Workspace workspace = createWorkspace(user);
-        createReadyDocument(workspace, user, now, 1_000_000L);
-        createReadyDocument(workspace, user, now, 1_000_000L);
+        long storageLimitBytes = free.getStorageLimitMb() * 1024L * 1024L;
+        createReadyDocument(workspace, user, now, storageLimitBytes - 1_000_000L);
 
         int concurrency = 50;
         ExecutorService pool = Executors.newFixedThreadPool(concurrency);
@@ -267,8 +265,8 @@ class PlanFlowE2ETest extends AbstractPlanFlowE2ETest {
 
         assertThat(succeeded.get()).isEqualTo(1);
         assertThat(rejected.get()).isEqualTo(concurrency - 1);
-        long finalCount = documentRepository.countByWorkspaceIdAndUserIdAndStatusNot(workspace.getId(), user.getId(), "DELETED");
-        assertThat(finalCount).isEqualTo(3);
+        long finalStorageUsed = documentRepository.sumFileSizeByUserIdAndStatusNot(user.getId(), "DELETED");
+        assertThat(finalStorageUsed).isEqualTo(storageLimitBytes);
     }
 
     // E2E-PLAN-08 (P0): Admin edits Premium's quota mid-cycle -> the existing ACTIVE customer

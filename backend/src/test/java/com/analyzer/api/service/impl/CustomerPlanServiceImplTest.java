@@ -16,7 +16,6 @@ import com.analyzer.api.repository.customerplan.CustomerPlanRepository;
 import com.analyzer.api.repository.paymenttransaction.PaymentTransactionRepository;
 import com.analyzer.api.repository.subscriptionplan.SubscriptionPlanRepository;
 import com.analyzer.api.repository.user.UserRepository;
-import com.analyzer.api.service.subscription.SubscriptionQuotaService;
 import com.analyzer.api.service.customerplan.CustomerPlanExpiryService;
 import com.analyzer.api.service.customerplan.impl.CustomerPlanSnapshotHelper;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,7 +47,6 @@ class CustomerPlanServiceImplTest {
     @Mock UserRepository userRepository;
     @Mock PaymentTransactionRepository paymentTransactionRepository;
     @Mock CustomerPlanMapper customerPlanMapper;
-    @Mock SubscriptionQuotaService subscriptionQuotaService;
     @Mock CustomerPlanExpiryService customerPlanExpiryHelper;
     @Mock CustomerPlanSnapshotHelper customerPlanSnapshotHelper;
 
@@ -58,7 +56,7 @@ class CustomerPlanServiceImplTest {
     void setUp() {
         service = new CustomerPlanServiceImpl(customerPlanRepository, subscriptionPlanRepository,
                 userRepository, paymentTransactionRepository, customerPlanMapper,
-                subscriptionQuotaService, customerPlanExpiryHelper, customerPlanSnapshotHelper);
+                customerPlanExpiryHelper, customerPlanSnapshotHelper);
     }
 
     // --- cancelPlan(): self-service, graceful cancel (PLAN-CAN-01/02/05/06/09, muc 19 #1) ---

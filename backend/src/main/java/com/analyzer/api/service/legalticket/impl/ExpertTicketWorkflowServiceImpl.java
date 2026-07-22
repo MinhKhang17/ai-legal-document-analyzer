@@ -67,7 +67,7 @@ public class ExpertTicketWorkflowServiceImpl implements ExpertTicketWorkflowServ
         }
         if (request.getPricingType() == TicketPricingType.PAID
                 && (userPriceVnd.compareTo(MIN_VNPAY_VND) < 0
-                || userPriceVnd.compareTo(MAX_VNPAY_VND_EXCLUSIVE) >= 0)) {
+                        || userPriceVnd.compareTo(MAX_VNPAY_VND_EXCLUSIVE) >= 0)) {
             throw new ConflictException("PAID_TICKET_PRICE_OUT_OF_VND_RANGE",
                     "Giá ticket phải từ 5.000 VNĐ đến dưới 1 tỷ VNĐ");
         }

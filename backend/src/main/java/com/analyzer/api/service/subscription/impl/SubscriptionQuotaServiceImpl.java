@@ -11,14 +11,10 @@ import com.analyzer.api.enums.LegalTicketStatus;
 import com.analyzer.api.enums.LegalTicketType;
 import com.analyzer.api.enums.UsageEventType;
 import com.analyzer.api.exception.common.ConflictException;
-import com.analyzer.api.repository.chatmessage.ChatMessageRepository;
 import com.analyzer.api.repository.ai.AiQueryExecutionRepository;
-import com.analyzer.api.repository.chatsession.ChatSessionDocumentRepository;
 import com.analyzer.api.repository.document.DocumentRepository;
 import com.analyzer.api.repository.legalticket.LegalTicketRepository;
 import com.analyzer.api.repository.subscriptionplan.SubscriptionPlanRepository;
-import com.analyzer.api.repository.workspace.WorkspaceRepository;
-import com.analyzer.api.repository.contract.ContractGenerationJobRepository;
 import com.analyzer.api.repository.subscription.SubscriptionUsageRepository;
 import com.analyzer.api.service.subscription.SubscriptionQuotaService;
 import com.analyzer.api.service.customerplan.CustomerPlanExpiryService;
@@ -39,8 +35,7 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
 
     private static final String DELETED_DOCUMENT_STATUS = "DELETED";
     private static final int FREE_SUPPORT_TICKET_LIMIT = 3;
-    private static final String QUOTA_UPGRADE_MESSAGE =
-            "The current plan quota is exhausted. Please purchase or upgrade your service plan.";
+    private static final String QUOTA_UPGRADE_MESSAGE = "The current plan quota is exhausted. Please purchase or upgrade your service plan.";
 
     private final SubscriptionPlanRepository subscriptionPlanRepository;
     private final DocumentRepository documentRepository;
@@ -100,7 +95,8 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
                         List.of(LegalTicketStatus.CANCELLED, LegalTicketStatus.REJECTED_BY_ADMIN),
                         periodStart,
                         periodEnd));
-        long storageUsedBytes = documentRepository.sumFileSizeByUserIdAndStatusNot(user.getId(), DELETED_DOCUMENT_STATUS);
+        long storageUsedBytes = documentRepository.sumFileSizeByUserIdAndStatusNot(user.getId(),
+                DELETED_DOCUMENT_STATUS);
 
         return SubscriptionQuotaUsageSummaryResponse.builder()
                 .periodStart(periodStart)
@@ -148,9 +144,12 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
         // Attachment count is no longer a metered plan quota.
     }
 
-    // REQUIRES_NEW: caller holds this transaction open across the (slow) AI call that follows
-    // the check. Running the lock+check in its own short transaction releases the advisory
-    // lock and DB connection immediately instead of pinning them for the AI call's duration.
+    // REQUIRES_NEW: caller holds this transaction open across the (slow) AI call
+    // that follows
+    // the check. Running the lock+check in its own short transaction releases the
+    // advisory
+    // lock and DB connection immediately instead of pinning them for the AI call's
+    // duration.
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void checkCanUseAiChat(User user, int estimatedInputTokens) {
@@ -172,8 +171,10 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
         recordUsage(user, UsageEventType.AI_QUERY, inputTokens + outputTokens, "ai-chat");
     }
 
-    // REQUIRES_NEW: same reasoning as checkCanUseAiChat — contract drafting calls the AI
-    // service synchronously right after this check, within the caller's transaction.
+    // REQUIRES_NEW: same reasoning as checkCanUseAiChat — contract drafting calls
+    // the AI
+    // service synchronously right after this check, within the caller's
+    // transaction.
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void checkCanDraftContract(User user) {
@@ -229,10 +230,11 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
             throw new ConflictException("TOKEN_QUOTA_EXCEEDED", QUOTA_UPGRADE_MESSAGE);
         }
 
-        AiQueryExecution execution = existing != null ? existing : AiQueryExecution.builder()
-                .requestId(requestId)
-                .user(user)
-                .build();
+        AiQueryExecution execution = existing != null ? existing
+                : AiQueryExecution.builder()
+                        .requestId(requestId)
+                        .user(user)
+                        .build();
         execution.setStatus(AiQueryExecutionStatus.PROCESSING);
         execution.setEstimatedTokens(normalizedEstimate);
         execution.setActualInputTokens(null);
@@ -245,7 +247,7 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void attachAiQueryContext(User user, String requestId, String workspaceId, String chatSessionId,
-                                     String contextSnapshotJson) {
+            String contextSnapshotJson) {
         AiQueryExecution execution = aiQueryExecutionRepository.findByRequestIdAndUserId(requestId, user.getId())
                 .orElseThrow(() -> new ConflictException("CONCURRENT_MODIFICATION", "Query reservation not found"));
         if (execution.getStatus() != AiQueryExecutionStatus.PROCESSING) {
@@ -325,7 +327,8 @@ public class SubscriptionQuotaServiceImpl implements SubscriptionQuotaService {
         CustomerPlan activePlan = customerPlanExpiryHelper.getActiveOrHandleExpiry(userId);
         if (activePlan != null && (activePlan.getSubscriptionPlan() == null
                 || !Boolean.TRUE.equals(activePlan.getSubscriptionPlan().getActive()))) {
-            throw new ConflictException("SUBSCRIPTION_INACTIVE", "The active subscription record references an inactive plan");
+            throw new ConflictException("SUBSCRIPTION_INACTIVE",
+                    "The active subscription record references an inactive plan");
         }
         return activePlan;
     }

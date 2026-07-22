@@ -2,7 +2,6 @@ package com.analyzer.api.service.customerplan.impl;
 
 import com.analyzer.api.dto.customerplan.CustomerPlanResponse;
 import com.analyzer.api.dto.customerplan.SubscribeRequest;
-import com.analyzer.api.dto.subscription.SubscriptionQuotaUsageSummaryResponse;
 import com.analyzer.api.entity.CustomerPlan;
 import com.analyzer.api.entity.PaymentTransaction;
 import com.analyzer.api.entity.SubscriptionPlan;
@@ -19,7 +18,6 @@ import com.analyzer.api.repository.paymenttransaction.PaymentTransactionReposito
 import com.analyzer.api.repository.subscriptionplan.SubscriptionPlanRepository;
 import com.analyzer.api.repository.user.UserRepository;
 import com.analyzer.api.service.customerplan.CustomerPlanService;
-import com.analyzer.api.service.subscription.SubscriptionQuotaService;
 import com.analyzer.api.service.customerplan.CustomerPlanExpiryService;
 import com.analyzer.api.util.AppClock;
 import lombok.RequiredArgsConstructor;
@@ -43,7 +41,6 @@ public class CustomerPlanServiceImpl implements CustomerPlanService {
     private final UserRepository userRepository;
     private final PaymentTransactionRepository paymentTransactionRepository;
     private final CustomerPlanMapper customerPlanMapper;
-    private final SubscriptionQuotaService subscriptionQuotaService;
     private final CustomerPlanExpiryService customerPlanExpiryHelper;
     private final CustomerPlanSnapshotHelper customerPlanSnapshotHelper;
 
